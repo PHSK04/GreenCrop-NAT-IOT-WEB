@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "../../iot_test1"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"java.configuration.updateBuildConfiguration": "automatic"
+	}
+}

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Farm Sensor Simulator</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #fff; padding: 20px; max-width: 600px; margin: 0 auto; }
+        h1 { text-align: center; color: #00d2ff; }
+        .card { background: #16213e; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #0f3460; }
+        .control-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="range"] { width: 100%; }
+        .value-display { float: right; color: #00ff9d; font-family: monospace; font-size: 1.2em; }
+        button { width: 100%; padding: 15px; background: #e94560; border: none; color: white; border-radius: 8px; font-size: 1.2em; cursor: pointer; transition: 0.3s; }
+        button.active { background: #00d2ff; }
+        .status { text-align: center; margin-top: 10px; font-size: 0.9em; color: #aaa; }
+        
+        /* Tank Visual */
+        .tanks { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+        .tank { width: 50px; height: 50px; border: 2px solid #555; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .tank.active { border-color: #00d2ff; background: rgba(0, 210, 255, 0.2); }
+    </style>
+</head>
+<body>
+
+    <h1>🎛 Sensor Simulator</h1>
+    
+    <div class="card">
+        <h3>Power Control</h3>
+        <button id="powerBtn" onclick="togglePower()">SYSTEM OFF</button>
+    </div>
+
+    <div class="card">
+        <h3>Sensor Values</h3>
+        
+        <div class="control-group">
+            <label>Pressure (BAR) <span id="pressureVal" class="value-display">0.0</span></label>
+            <input type="range" id="pressure" min="0" max="10" step="0.1" value="0" oninput="updateVal('pressure', 'pressureVal')">
+        </div>
+
+        <div class="control-group">
+            <label>Flow Rate (L/min) <span id="flowVal" class="value-display">0.0</span></label>
+            <input type="range" id="flow" min="0" max="100" step="0.5" value="0" oninput="updateVal('flow', 'flowVal')">
+        </div>
+
+        <div class="control-group">
+            <label>EC Value (mS/cm) <span id="ecVal" class="value-display">0.0</span></label>
+            <input type="range" id="ec" min="0" max="5" step="0.1" value="0" oninput="updateVal('ec', 'ecVal')">
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Active Tank</h3>
+        <div class="tanks">
+            <div class="tank" id="t1" onclick="setTank(1)">1</div>
+            <div class="tank" id="t2" onclick="setTank(2)">2</div>
+            <div class="tank" id="t3" onclick="setTank(3)">3</div>
+        </div>
+    </div>
+
+    <div class="status" id="status">Ready to connect...</div>
+
+    <script>
+        // State
+        let state = {
+            isOn: false,
+            pressure: 0,
+            flow_rate: 0,
+            ec_value: 0,
+            active_tank: 1,
+            pumps: [0,0,0,0,0],
+            tenant_id: 'admin_001' // Hardcoded for demo - matches the admin user we created!
+        };
+
+        const API_URL = 'http://localhost:3001/api/sensor-data';
+
+        function updateVal(inputId, displayId) {
+            const val = document.getElementById(inputId).value;
+            document.getElementById(displayId).innerText = val;
+            state[inputId === 'flow' ? 'flow_rate' : inputId === 'ec' ? 'ec_value' : inputId] = parseFloat(val);
+            sendData();
+        }
+
+        function togglePower() {
+            state.isOn = !state.isOn;
+            const btn = document.getElementById('powerBtn');
+            if (state.isOn) {
+                btn.innerText = "SYSTEM ONLINE";
+                btn.classList.add('active');
+                // Auto set some values
+                if(state.pressure == 0) {
+                    document.getElementById('pressure').value = 2.5;
+                    updateVal('pressure', 'pressureVal');
+                }
+            } else {
+                btn.innerText = "SYSTEM OFF";
+                btn.classList.remove('active');
+            }
+            sendData();
+        }
+
+        function setTank(id) {
+            state.active_tank = id;
+            document.querySelectorAll('.tank').forEach(t => t.classList.remove('active'));
+            document.getElementById('t'+id).classList.add('active');
+            sendData();
+        }
+
+        // Send Data to Server
+        async function sendData() {
+            const statusEl = document.getElementById('status');
+            statusEl.innerText = "Sending...";
+            
+            try {
+                const payload = {
+                    ...state,
+                    is_on: state.isOn ? 1 : 0,
+                    timestamp: new Date().toISOString(),
+                    // Send to admin user
+                    tenant_id: 'admin_001' // IMPORTANT: Must match the user ID you logged in with!
+                };
+
+                // Add random pumps for fun
+                if (state.isOn) {
+                    payload.pumps = JSON.stringify([
+                        Math.random() > 0.5 ? 1 : 0,
+                        Math.random() > 0.5 ? 1 : 0,
+                        1, 
+                        Math.random() > 0.5 ? 1 : 0, 
+                        0
+                    ]);    
+                } else {
+                    payload.pumps = JSON.stringify([0,0,0,0,0]);
+                }
+
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-tenant-id': 'admin_001'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    statusEl.innerText = "✅ Data Sent! Update App/Web.";
+                    statusEl.style.color = '#00ff9d';
+                } else {
+                    statusEl.innerText = "❌ Choose Error";
+                    statusEl.style.color = 'red';
+                }
+
+            } catch (err) {
+                console.error(err);
+                statusEl.innerText = "❌ Network Error (Is server running?)";
+                statusEl.style.color = 'red';
+            }
+        }
+
+        // Init
+        setTank(1);
+    </script>
+</body>
+</html>

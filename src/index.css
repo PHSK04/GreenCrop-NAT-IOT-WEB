@@ -1,0 +1,184 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-size: 14px;
+
+    /* Base Palette: Clean, Professional Light Mode (Slate/Emerald) */
+    /* All values in HSL format for Tailwind interoperability */
+    
+    --background: 210 40% 98%; /* Slate-50 #F8FAFC */
+    --foreground: 222 47% 11%; /* Slate-900 #0F172A */
+
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 158 64% 52%; /* Emerald-500 #10B981 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96.1%; /* Slate-100 #F1F5F9 */
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 47%; /* Slate-500 #64748B */
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84.2% 60.2%; /* Red-500 */
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%; /* Slate-200 #E2E8F0 */
+    --input: 214.3 31.8% 91.4%;
+    --ring: 158 64% 52%; /* Emerald-500 */
+
+    --radius: 0.75rem;
+
+    /* Chart Colors (HSL) */
+    --chart-1: 158 64% 52%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 335 85% 60%;
+    --chart-5: 247 74% 67%;
+    
+    /* Legacy Vars Mapped */
+    --dark-bg: 210 40% 98%;
+    --dark-card: 0 0% 100%;
+    --dark-primary-text: 222 47% 11%;
+    --dark-secondary-text: 215 16% 47%;
+    --dark-border: 214.3 31.8% 91.4%;
+    --dark-cta: 158 64% 52%;
+    --dark-tag: 210 40% 96.1%;
+    --dark-hover: 210 40% 96.1%;
+  }
+
+  .dark {
+    /* Dark Mode: High-Tech Future (Slate/Emerald) */
+    
+    --background: 222 47% 5%; /* Slate-950 approx #020617 (Darker) */
+    --foreground: 210 40% 98%; /* Slate-50 */
+
+    --card: 222 47% 11%; /* Slate-900 #0F172A */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 158 64% 52%; /* Emerald-500 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217 33% 17%; /* Slate-800 #1E293B */
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%; /* Slate-400 #94A3B8 */
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 158 64% 52%;
+
+    /* Chart Colors (HSL) */
+    --chart-1: 158 64% 52%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 335 85% 60%;
+    --chart-5: 247 74% 67%;
+
+    /* Legacy Vars Mapped */
+    --dark-bg: 222 47% 5%;
+    --dark-card: 222 47% 11%;
+    --dark-primary-text: 210 40% 98%;
+    --dark-secondary-text: 215 20% 65%;
+    --dark-border: 217 33% 17%;
+    --dark-cta: 158 64% 52%;
+    --dark-tag: 217 33% 17%;
+    --dark-hover: 217 33% 17%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Legacy dark utilities mapped to semantic tokens */
+  .text-dark-primary {
+    @apply text-foreground;
+  }
+
+  .text-dark-secondary {
+    @apply text-muted-foreground;
+  }
+
+  .text-dark-cta {
+    @apply text-primary;
+  }
+
+  .bg-dark-bg {
+    @apply bg-background;
+  }
+
+  .bg-dark-card {
+    @apply bg-card;
+  }
+
+  .bg-dark-tag {
+    @apply bg-secondary text-secondary-foreground;
+  }
+
+  .bg-dark-hover {
+    @apply hover:bg-accent hover:text-accent-foreground;
+  }
+
+  .border-dark-color {
+    @apply border-border;
+  }
+}
+
+@layer components {
+  /* Mapped legacy component styles to new system */
+  .dark-card {
+    @apply rounded-xl border border-border bg-card p-6 shadow-sm;
+  }
+
+  .dark-button-primary {
+    @apply font-semibold px-6 py-3 rounded-xl transition-all duration-200 text-primary-foreground bg-primary hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20;
+  }
+
+  .dark-button-secondary {
+    @apply font-semibold px-6 py-3 rounded-xl transition-all duration-200 bg-transparent text-primary border border-primary hover:bg-primary/10;
+  }
+
+  .dark-nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-muted-foreground hover:bg-accent hover:text-accent-foreground;
+  }
+
+  .dark-nav-item-active {
+    @apply bg-accent text-foreground border border-border;
+  }
+
+  .dark-shadow {
+    @apply shadow-md;
+  }
+
+  .dark-shadow-lg {
+    @apply shadow-lg;
+  }
+}
