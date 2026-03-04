@@ -60,16 +60,21 @@ async function initDb() {
                 ALTER TABLE users ADD auth_provider NVARCHAR(32) NULL;
             IF COL_LENGTH('users', 'provider_user_id') IS NULL
                 ALTER TABLE users ADD provider_user_id NVARCHAR(191) NULL;
-
-            IF NOT EXISTS (
-                SELECT 1
-                FROM sys.indexes
-                WHERE name = 'ux_users_provider_user_id'
-                  AND object_id = OBJECT_ID('users')
-            )
-                CREATE UNIQUE INDEX ux_users_provider_user_id
-                ON users(auth_provider, provider_user_id)
-                WHERE provider_user_id IS NOT NULL;
+        `);
+        await pool.request().query(`
+            IF COL_LENGTH('users', 'auth_provider') IS NOT NULL
+               AND COL_LENGTH('users', 'provider_user_id') IS NOT NULL
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM sys.indexes
+                   WHERE name = 'ux_users_provider_user_id'
+                     AND object_id = OBJECT_ID('users')
+               )
+            BEGIN
+                EXEC('CREATE UNIQUE INDEX ux_users_provider_user_id
+                      ON users(auth_provider, provider_user_id)
+                      WHERE provider_user_id IS NOT NULL');
+            END
         `);
         await pool.request().query(`
             UPDATE users

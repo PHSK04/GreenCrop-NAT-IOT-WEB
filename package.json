@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "server": "node server/server.js",
+    "server": "node server/nest-server.js",
+    "server:legacy": "node server/server.js",
     "dev:all": "sh -c 'npm run server & npm run dev'",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

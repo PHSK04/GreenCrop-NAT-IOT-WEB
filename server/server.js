@@ -889,7 +889,19 @@ app.post('/api/sensor-data', async (req, res) => {
     }
 });
 
-// Start Server
-app.listen(PORT, HOST, () => {
-    console.log(`Server is running on http://localhost:${PORT} (bound to ${HOST})`);
-});
+function startServer() {
+    return app.listen(PORT, HOST, () => {
+        console.log(`Server is running on http://localhost:${PORT} (bound to ${HOST})`);
+    });
+}
+
+if (require.main === module) {
+    startServer();
+}
+
+module.exports = {
+    app,
+    HOST,
+    PORT,
+    startServer
+};
