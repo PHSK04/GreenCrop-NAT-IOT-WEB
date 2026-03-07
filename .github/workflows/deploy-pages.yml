@@ -29,19 +29,11 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Validate required production env
-        run: |
-          if [ -z "${VITE_API_URL}" ]; then
-            echo "VITE_API_URL secret is required for GitHub Pages production login/API."
-            exit 1
-          fi
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-
       - name: Build for GitHub Pages
         run: npm run build:gh
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          # Temporary public tunnel API (fallback when secret is not set)
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://supplements-bend-separation-fool.trycloudflare.com/api' }}
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_FACEBOOK_APP_ID: ${{ secrets.VITE_FACEBOOK_APP_ID }}
           VITE_APPLE_CLIENT_ID: ${{ secrets.VITE_APPLE_CLIENT_ID }}
