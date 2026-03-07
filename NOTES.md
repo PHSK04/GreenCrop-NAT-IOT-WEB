@@ -318,6 +318,12 @@ VITE_API_URL=https://your-backend-domain.com/api
 - `npm run server:public`
   - รัน `node server/server.js` และ `cloudflared tunnel --url http://localhost:3001` พร้อมกัน
 
+- `npm run server:public:stable` (แนะนำ)
+  - รันแบบเฝ้าระวังอัตโนมัติ
+  - ถ้า tunnel หลุด จะพยายามรีสตาร์ต tunnel ให้เอง
+  - บันทึก log ไว้ที่ `.runtime/server.log` และ `.runtime/tunnel.log`
+  - เก็บ URL ปัจจุบันไว้ที่ `.runtime/tunnel_url.txt`
+
 - `npm run server:tunnel`
   - รันเฉพาะ tunnel
 
@@ -325,6 +331,12 @@ VITE_API_URL=https://your-backend-domain.com/api
 
 ```bash
 npm run server:public
+```
+
+หรือ (เสถียรกว่า):
+
+```bash
+npm run server:public:stable
 ```
 
 หยุดการทำงาน:
@@ -335,3 +347,45 @@ npm run server:public
 
 - URL ของ quick tunnel จะเปลี่ยนได้เมื่อเปิดใหม่
 - ถ้า URL เปลี่ยน ต้องอัปเดต `VITE_API_URL` ที่ใช้ deploy GitHub Pages ให้ตรง URL ใหม่
+
+## K) แบบถาวร (ไม่ต้องเปลี่ยน URL API ทุกครั้ง)
+
+เป้าหมาย:
+- ให้ GitHub Pages ใช้ backend URL คงที่
+- ไม่ต้องพึ่ง quick tunnel
+
+ทำครั้งเดียว:
+
+1. Deploy backend แบบถาวรบน Render
+- ใน repo มีไฟล์ `render.yaml` แล้ว
+- สร้าง Web Service ใหม่จาก repo นี้
+- Render จะใช้:
+  - Build: `npm ci --legacy-peer-deps`
+  - Start: `node server/server.js`
+  - Health: `/api/health`
+
+2. ตั้งค่า Environment Variables ใน Render
+- `DB_HOST`
+- `DB_PORT`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_NAME`
+- `JWT_SECRET`
+- `CORS_ORIGINS` (อย่างน้อยต้องมี `https://phsk04.github.io,http://localhost:3000,http://127.0.0.1:3000`)
+- `NODE_ENV=production`
+- `API_HOST=0.0.0.0`
+
+3. เอา URL ถาวรจาก Render (ตัวอย่าง)
+- `https://greencropnat-api.onrender.com`
+
+4. ตั้ง GitHub Secret ให้ถาวร
+- ไป `Settings > Secrets and variables > Actions`
+- ตั้ง `VITE_API_URL` เป็น:
+  - `https://greencropnat-api.onrender.com/api`
+
+5. Push โค้ดขึ้น `main` เพื่อ deploy หน้าเว็บ
+- workflow จะใช้ `VITE_API_URL` จาก secret อัตโนมัติ
+
+ผลลัพธ์:
+- GitHub Pages ใช้งาน URL เดิมตลอด
+- ไม่ต้องไล่เปลี่ยนลิงก์ tunnel อีก
