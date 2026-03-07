@@ -3,31 +3,64 @@ const bcrypt = require('bcrypt');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
-const config = {
-    user: process.env.DB_USER || 'sa',
-    password: process.env.DB_PASSWORD || 'Password123!',
-    server: process.env.DB_HOST || 'localhost', 
-    database: process.env.DB_NAME || 'SmartIoTDB',
-    options: {
-        encrypt: true, // Use this if you're on Windows Azure
-        trustServerCertificate: true // Change to true for local dev / self-signed certs
-    },
-    port: parseInt(process.env.DB_PORT) || 1433
-};
+function buildConfig(dbUser) {
+    return {
+        user: dbUser,
+        password: process.env.DB_PASSWORD || 'Password123!',
+        server: process.env.DB_HOST || 'localhost',
+        database: process.env.DB_NAME || 'SmartIoTDB',
+        options: {
+            encrypt: true, // Required for Azure SQL
+            trustServerCertificate: true // Keep true to simplify cert chain on hosted envs
+        },
+        port: parseInt(process.env.DB_PORT, 10) || 1433
+    };
+}
+
+function getAzureSqlServerName(host) {
+    if (!host) return '';
+    return host.replace(/\.database\.windows\.net$/i, '');
+}
 
 let pool;
 
 async function connectToDatabase() {
     try {
         if (!pool) {
-            pool = await sql.connect(config);
-            console.log('✅ Connected to MSSQL Database');
+            const dbUser = process.env.DB_USER || 'sa';
+            const dbHost = process.env.DB_HOST || 'localhost';
+            const candidateUsers = [dbUser];
+
+            // Azure SQL often requires user@servername login format.
+            if (!dbUser.includes('@') && /\.database\.windows\.net$/i.test(dbHost)) {
+                const serverName = getAzureSqlServerName(dbHost);
+                if (serverName) {
+                    candidateUsers.push(`${dbUser}@${serverName}`);
+                }
+            }
+
+            let lastErr = null;
+            for (const candidateUser of candidateUsers) {
+                try {
+                    pool = await sql.connect(buildConfig(candidateUser));
+                    console.log(`✅ Connected to MSSQL Database as ${candidateUser}`);
+                    break;
+                } catch (err) {
+                    lastErr = err;
+                    console.warn(`⚠️ DB connect failed for user ${candidateUser}: ${err.message}`);
+                }
+            }
+
+            if (!pool) {
+                throw lastErr || new Error('Unable to connect to MSSQL');
+            }
             await initDb();
         }
         return pool;
     } catch (err) {
         console.error('❌ Database Connection Failed! Make sure SQL Server is running.', err);
-        throw err;
+        // Keep API process alive; routes using DB will fail per-request until connection works.
+        return null;
     }
 }
 
@@ -200,6 +233,9 @@ async function initDb() {
 // --- Helper to execute Query with Parameters ---
 async function executeQuery(sqlText, params = []) {
     if (!pool) await connectToDatabase();
+    if (!pool) {
+        throw new Error('Database is unavailable. Please verify DB host/network/firewall settings.');
+    }
     
     const request = pool.request();
     let query = sqlText;
@@ -273,7 +309,10 @@ const db = {
 };
 
 // Initialize on require for consistency with other modules
-connectToDatabase();
+connectToDatabase().catch((err) => {
+    // Defensive fallback: avoid unhandled startup rejection from crashing the service.
+    console.error('Initial DB connect failed (service stays up):', err.message);
+});
 
 // Allow setting tenant context for Row-Level Security (MSSQL)
 async function setSessionContext(tenantId) {

@@ -24,6 +24,7 @@ const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 const SESSION_KEY = 'smart_iot_session';
 const isGithubPagesRuntime =
   typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
+const REQUEST_TIMEOUT_MS = isGithubPagesRuntime ? 65000 : 12000;
 
 type SessionPayload = {
   token?: string;
@@ -113,7 +114,7 @@ export const authService = {
   // Login via API (DB-backed)
   login: async (email: string, password: string): Promise<User> => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
       const response = await fetchWithApiFallback('/login', {
@@ -151,7 +152,7 @@ export const authService = {
   // Register via API (DB-backed)
   register: async (email: string, password: string, name: string): Promise<User> => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
       const response = await fetchWithApiFallback('/register', {
