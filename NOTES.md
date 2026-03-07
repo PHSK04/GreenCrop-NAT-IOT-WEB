@@ -348,6 +348,25 @@ npm run server:public:stable
 - URL ของ quick tunnel จะเปลี่ยนได้เมื่อเปิดใหม่
 - ถ้า URL เปลี่ยน ต้องอัปเดต `VITE_API_URL` ที่ใช้ deploy GitHub Pages ให้ตรง URL ใหม่
 
+### โหมดออโต้ push deploy
+
+ถ้าไม่อยากเปลี่ยน URL เองทุกครั้ง ให้ใช้:
+
+```bash
+npm run server:public:auto-deploy
+```
+
+สิ่งที่คำสั่งนี้ทำ:
+- เปิด `server + tunnel` อัตโนมัติ
+- อ่าน URL tunnel ใหม่
+- อัปเดต fallback `VITE_API_URL` ใน `.github/workflows/deploy-pages.yml`
+- `commit + push main` ให้อัตโนมัติ
+- ถ้า URL tunnel เปลี่ยนอีก จะ deploy ใหม่ให้อัตโนมัติ
+
+เงื่อนไข:
+- เครื่องต้องออนไลน์และเปิด terminal ค้างไว้
+- ถ้าปิดเครื่อง/ปิดคำสั่งนี้ ระบบจะหยุด
+
 ## K) แบบถาวร (ไม่ต้องเปลี่ยน URL API ทุกครั้ง)
 
 เป้าหมาย:

@@ -10,6 +10,8 @@
     "server": "node server/server.js",
     "server:tunnel": "cloudflared tunnel --url http://localhost:3001",
     "server:public": "sh -c 'npm run server & npm run server:tunnel'",
+    "server:public:stable": "bash ./scripts/server_public_stable.sh",
+    "server:public:auto-deploy": "bash ./scripts/server_public_auto_deploy.sh",
     "dev:all": "sh -c 'npm run server & npm run dev:web'",
     "build": "tsc -b && vite build",
     "build:gh": "tsc -b && vite build --base=/GreenCrop-NAT-IOT-WEB/",
