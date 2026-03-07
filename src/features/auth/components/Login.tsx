@@ -163,7 +163,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
               <span className="pointer-events-none absolute h-[132px] w-[132px] rounded-full bg-emerald-400/15 blur-2xl dark:bg-emerald-400/12" />
               <img
                 src={appLogoGreen}
-                alt="GreenCrop NAT brand"
+                alt="GreenCropNAT logo"
                 className="gc-float relative w-[280px] max-w-[88%] object-contain drop-shadow-[0_12px_26px_rgba(16,185,129,0.22)]"
                 draggable={false}
               />
@@ -173,7 +173,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
               className="text-center text-[2rem] leading-tight text-slate-900 dark:text-slate-100"
               style={brandWordmarkStyle}
             >
-              GreenCrop NAT IOT
+              GreenCropNAT
             </h3>
             <p className="mt-2 text-center text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
               Precision command portal
@@ -209,7 +209,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
           <div className="gc-fade-up mb-8 text-center">
             <img
               src={appLogoGreen}
-              alt="GreenCrop NAT logo"
+              alt="GreenCropNAT logo"
               className="gc-float mx-auto mb-4 w-[292px] max-w-full object-contain sm:w-[336px]"
               draggable={false}
             />
@@ -217,7 +217,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
               className="px-2 text-[2.05rem] leading-tight text-slate-900 dark:text-slate-100 sm:text-[2.5rem]"
               style={brandWordmarkStyle}
             >
-              GreenCrop NAT IOT
+              GreenCropNAT
             </h2>
             <p className="mt-3 text-base leading-relaxed text-slate-700 dark:text-slate-300">
               Sign in to open your secure farm command surface.

@@ -36,6 +36,7 @@ import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 
 import { ModeToggle } from "./mode-toggle";
 import { useMachine } from "../contexts/MachineContext";
+import appLogoGreen from "@/assets/images/3_transparent_logo_green.png";
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
@@ -145,7 +146,7 @@ function SidebarContent({
 }: SidebarContentProps & { user?: { name: string; role?: string } }) {
   const { isOn } = useMachine();
   const isAdmin = isAdminUser ?? (String(user?.role || "").toLowerCase() === "admin");
-  const brandName = isAdmin ? "Admin" : (user?.name ? user.name.split(" ")[0] : "Smart Farm");
+  const brandName = isAdmin ? "GreenCropNAT Admin" : "GreenCropNAT";
   const t = (navTranslations as any)[language] || navTranslations.EN;
 
   const handleNavClick = (label: string) => {
@@ -184,11 +185,16 @@ function SidebarContent({
         <div className={`flex items-center ${compact ? "justify-center" : "gap-3"}`}>
           <div className={`${compact ? "w-10 h-10" : "w-11 h-11"} rounded-xl flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.25)] relative overflow-hidden group transition-all duration-500 ${isOn ? "bg-gradient-to-br from-primary to-emerald-700" : "bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 grayscale"}`}>
             <div className="absolute inset-0 bg-background/50 backdrop-blur-md/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <Activity className="text-primary-foreground w-6 h-6 relative z-10" />
+            <img
+              src={appLogoGreen}
+              alt="GreenCropNAT logo"
+              className="relative z-10 h-7 w-7 object-contain"
+              draggable={false}
+            />
           </div>
           {!compact && <div>
             <h1 className="text-lg font-bold text-foreground tracking-tight leading-tight">
-              {brandName} <span className="text-primary">IoT</span>
+              {brandName}
             </h1>
              <div className="flex items-center gap-1.5 mt-0.5">
                <span className="relative flex h-2 w-2">
@@ -371,7 +377,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
              </Sheet>
              <div>
               <p className="text-xs text-muted-foreground font-medium">
-                Smart Farm IoT
+                GreenCropNAT
               </p>
               <h1 className="text-base font-semibold tracking-tight">
                 {t[activePage] || activePage}

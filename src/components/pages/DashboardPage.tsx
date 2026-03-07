@@ -22,7 +22,7 @@ interface DashboardPageProps {
 
 const translations = {
   EN: {
-    title: "Smart Farm Dashboard",
+    title: "GreenCropNAT Dashboard",
     subtitle: "Real-time machine control and analytics",
     online: "System Online",
     offline: "System Offline",
@@ -53,7 +53,7 @@ const translations = {
     pumpNames: ["Water Pump", "Water Pump", "Solid pump", "Water Pump", "Air Pump"]
   },
   TH: {
-    title: "แดชบอร์ดสมาร์ทฟาร์ม",
+    title: "แดชบอร์ด GreenCropNAT",
     subtitle: "การควบคุมเครื่องจักรและวิเคราะห์ผลแบบเรียลไทม์",
     online: "ระบบออนไลน์",
     offline: "ระบบออฟไลน์",

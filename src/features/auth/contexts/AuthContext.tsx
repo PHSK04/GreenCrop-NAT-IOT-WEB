@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const user = await authService.register(email, password, name);
       setUser(user);
-      toast.success("Account Created", { description: "Welcome to Smart IoT Farm!" });
+      toast.success("Account Created", { description: "Welcome to GreenCropNAT!" });
     } catch (error: any) {
       toast.error("Registration Failed", { description: error.message });
       throw error;

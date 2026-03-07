@@ -114,7 +114,7 @@ export function Register({ onSwitchToLogin }: RegisterProps) {
                     </div>
                     <h1 className="text-5xl font-bold text-white mb-6">Join the Revolution</h1>
                     <p className="text-slate-300 text-lg leading-relaxed">
-                        Secure, Verified, and Ready for Smart Farming.
+                        Secure, Verified, and Ready for GreenCropNAT.
                     </p>
                 </div>
             </div>
@@ -139,7 +139,7 @@ export function Register({ onSwitchToLogin }: RegisterProps) {
                             Create Account
                         </h2>
                         <p className="text-muted-foreground text-base leading-relaxed">
-                            Register to access the Smart Farm Control Center
+                            Register to access the GreenCropNAT Control Center
                         </p>
                     </div>
 

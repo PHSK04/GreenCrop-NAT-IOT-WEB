@@ -245,3 +245,93 @@ VITE_API_URL=https://your-backend-domain.com/api
 7. If login fails on both local and Pages:
 - Check backend health endpoint
 - Check backend DB credentials and service status
+
+## I) GitHub Pages แบบละเอียด (รวมเรื่องชื่อ URL)
+
+### 1) ชื่อ GitHub Pages มี 2 แบบ
+
+- `User/Org Page`:
+  - Repo ต้องชื่อ: `<username>.github.io`
+  - URL: `https://<username>.github.io/`
+
+- `Project Page` (โปรเจกต์นี้ใช้แบบนี้):
+  - Repo ชื่ออะไรก็ได้ เช่น `GreenCrop-NAT-IOT-WEB`
+  - URL: `https://<username>.github.io/<repo-name>/`
+  - ของโปรเจกต์นี้คือ:
+    - `https://phsk04.github.io/GreenCrop-NAT-IOT-WEB/`
+
+### 2) ตั้งค่าโปรเจกต์ให้ตรงกับ Project Page
+
+1. ใน `package.json`:
+   - `"homepage": "https://phsk04.github.io/GreenCrop-NAT-IOT-WEB"`
+2. ใช้คำสั่ง build สำหรับ GitHub Pages ให้มี base path:
+   - `vite build --base=/GreenCrop-NAT-IOT-WEB/`
+3. ในโปรเจกต์นี้มี script แล้ว:
+   - `build:gh`
+   - `deploy`
+
+### 3) ตั้งค่าใน GitHub
+
+1. เปิด repo `PHSK04/GreenCrop-NAT-IOT-WEB`
+2. ไป `Settings > Pages`
+3. `Source` เลือก `Deploy from a branch`
+4. `Branch` เลือก `gh-pages` และโฟลเดอร์ `(root)`
+5. กด Save
+
+### 4) วิธี deploy
+
+- แบบ auto (แนะนำ):
+  1. push code ขึ้น `main`
+  2. GitHub Actions จะ build/deploy ให้อัตโนมัติ
+
+- แบบ manual:
+  1. `npm run deploy`
+  2. ระบบจะ build แล้ว push ไป branch `gh-pages`
+
+### 5) วิธีเช็กว่า deploy สำเร็จ
+
+1. ไปแท็บ `Actions` ต้องขึ้นสถานะเขียว (`Success`)
+2. เปิด URL:
+   - `https://phsk04.github.io/GreenCrop-NAT-IOT-WEB/`
+3. ถ้ายังเห็นของเก่า ให้ hard refresh:
+   - macOS: `Cmd + Shift + R`
+
+### 6) จุดที่ทำให้เข้าเว็บไม่ได้บ่อยที่สุด
+
+- ตั้ง branch ผิด (ไม่ใช่ `gh-pages`)
+- base path ผิด (ลืม `/GreenCrop-NAT-IOT-WEB/`)
+- หน้าเว็บเรียก API ผิดโดเมน
+- CORS backend ไม่อนุญาต `https://phsk04.github.io`
+
+### 7) คำเตือนเรื่องคำสั่งตัวอย่าง
+
+- ห้ามพิมพ์ `< >` ลงคำสั่งจริง
+- ตัวอย่างผิด:
+  - `curl https://<your-tunnel-url>/api/health`
+- ตัวอย่างถูก (ใช้ URL จริง):
+  - `curl https://supplements-bend-separation-fool.trycloudflare.com/api/health`
+
+## J) รันคำสั่งเดียว (Server + Tunnel)
+
+เพิ่มแล้วใน `package.json`:
+
+- `npm run server:public`
+  - รัน `node server/server.js` และ `cloudflared tunnel --url http://localhost:3001` พร้อมกัน
+
+- `npm run server:tunnel`
+  - รันเฉพาะ tunnel
+
+วิธีใช้:
+
+```bash
+npm run server:public
+```
+
+หยุดการทำงาน:
+
+- กด `Ctrl + C`
+
+หมายเหตุ:
+
+- URL ของ quick tunnel จะเปลี่ยนได้เมื่อเปิดใหม่
+- ถ้า URL เปลี่ยน ต้องอัปเดต `VITE_API_URL` ที่ใช้ deploy GitHub Pages ให้ตรง URL ใหม่
