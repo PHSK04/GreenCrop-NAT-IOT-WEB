@@ -32,8 +32,8 @@ jobs:
       - name: Build for GitHub Pages
         run: npm run build:gh
         env:
-          # Temporary public tunnel API (fallback when secret is not set)
-          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://supplements-bend-separation-fool.trycloudflare.com/api' }}
+          # Temporary public tunnel API for GitHub Pages
+          VITE_API_URL: https://supplements-bend-separation-fool.trycloudflare.com/api
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_FACEBOOK_APP_ID: ${{ secrets.VITE_FACEBOOK_APP_ID }}
           VITE_APPLE_CLIENT_ID: ${{ secrets.VITE_APPLE_CLIENT_ID }}
