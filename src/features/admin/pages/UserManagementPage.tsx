@@ -187,7 +187,7 @@ export function UserManagementPage() {
   };
 
   return (
-    <div className="p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="p-8 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">User Management</h1>
@@ -201,7 +201,7 @@ export function UserManagementPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="bg-card/50 backdrop-blur border-emerald-500/20">
+        <Card className="border-emerald-500/20 bg-white/75 backdrop-blur dark:bg-slate-900/70">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Users</CardTitle>
                 <Users className="h-4 w-4 text-emerald-500" />
@@ -210,7 +210,7 @@ export function UserManagementPage() {
                 <div className="text-2xl font-bold">{users.length}</div>
             </CardContent>
         </Card>
-        <Card className="bg-card/50 backdrop-blur border-blue-500/20">
+        <Card className="border-blue-500/20 bg-white/75 backdrop-blur dark:bg-slate-900/70">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Admins</CardTitle>
                 <Shield className="h-4 w-4 text-blue-500" />
@@ -221,9 +221,9 @@ export function UserManagementPage() {
         </Card>
       </div>
 
-      <div className="rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-border bg-white/75 shadow-sm backdrop-blur-sm dark:bg-slate-900/70">
         <Table>
-          <TableHeader className="bg-muted/50">
+          <TableHeader className="bg-slate-100/70 dark:bg-slate-800/45">
             <TableRow>
               <TableHead className="w-[100px]">ID</TableHead>
               <TableHead>User / Location</TableHead>
@@ -317,7 +317,7 @@ export function UserManagementPage() {
                               {user.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteUser(user)}>
+                          <DropdownMenuItem className="text-red-600 dark:text-red-400" onClick={() => handleDeleteUser(user)}>
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete User
                           </DropdownMenuItem>

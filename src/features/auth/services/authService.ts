@@ -21,12 +21,9 @@ export interface SocialLoginPayload {
 }
 
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
-const API_CANDIDATES = [
-  API_URL,
-  'http://localhost:3001/api',
-  'http://127.0.0.1:3001/api',
-].filter((value, index, list) => value && list.indexOf(value) === index);
 const SESSION_KEY = 'smart_iot_session';
+const isGithubPagesRuntime =
+  typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
 
 type SessionPayload = {
   token?: string;
@@ -90,27 +87,26 @@ const getAuthHeaders = () => {
   return { 'Content-Type': 'application/json' };
 };
 
-const buildApiUrl = (base: string, path: string) => {
+const buildApiUrl = (path: string) => {
   const safePath = path.startsWith('/') ? path : `/${path}`;
-  return `${base}${safePath}`;
+  return `${API_URL}${safePath}`;
 };
 
 const fetchWithApiFallback = async (
   path: string,
   init: RequestInit,
 ): Promise<Response> => {
-  let lastNetworkError: unknown;
-
-  for (const base of API_CANDIDATES) {
-    try {
-      return await fetch(buildApiUrl(base, path), init);
-    } catch (error) {
-      lastNetworkError = error;
-      continue;
-    }
+  if (isGithubPagesRuntime && API_URL === '/api') {
+    throw new Error('Production API is not configured. Set VITE_API_URL in GitHub Actions secrets.');
   }
-
-  throw lastNetworkError ?? new Error('Cannot connect to server/DB');
+  try {
+    return await fetch(buildApiUrl(path), init);
+  } catch (error) {
+    if (error instanceof Error && (error.message === 'Failed to fetch' || error.message.includes('connect'))) {
+      throw new Error('Cannot connect to server/DB');
+    }
+    throw error;
+  }
 };
 
 export const authService = {

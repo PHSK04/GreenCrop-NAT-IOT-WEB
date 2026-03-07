@@ -1,0 +1,73 @@
+# GreenCrop NAT IOT Web
+
+Smart farm command center (Web) for monitoring devices, dashboards, and secure authentication.
+
+## Tech Stack
+- Frontend: React 18 + TypeScript + Vite + Tailwind + Radix UI
+- Backend: Node.js + Express (`server/`)
+- Database: Microsoft SQL Server / Azure SQL Edge
+- Auth: Email/Password + Social login integration points (Google, Facebook, LINE, Azure mock)
+
+## Main Features
+- Role-based login flow (web auth context)
+- Real-time style dashboard pages for IoT farm operations
+- Device/tank/analytics pages
+- Theme mode toggle (light/dark)
+- Backend API with SQL connection and migration scripts
+
+## Project Structure
+```text
+.
+├─ src/
+│  ├─ features/
+│  │  ├─ auth/
+│  │  └─ admin/
+│  ├─ components/
+│  ├─ layouts/
+│  └─ assets/
+├─ server/
+│  ├─ migrations/
+│  ├─ middleware/
+│  └─ server.js
+├─ scripts/
+└─ docs (*.md)
+```
+
+## Quick Start
+### 1) Install dependencies
+```bash
+npm install
+cd server && npm install && cd ..
+```
+
+### 2) Configure environment
+- Frontend: copy `.env.example` to `.env`
+- Backend: copy `server/.env.example` to `server/.env`
+
+### 3) Run backend
+```bash
+npm run server
+```
+
+### 4) Run frontend
+```bash
+npm run dev
+```
+
+Open: `http://localhost:5173`
+
+## Scripts
+- `npm run dev` - start web frontend (Vite)
+- `npm run server` - start backend API
+- `npm run dev:all` - start server + frontend together
+- `npm run build` - production build
+- `npm run lint` - lint source files
+
+## Notes for Portfolio Demo
+- Keep `server/.env` with local DB credentials ready before demo.
+- For social login production usage, set provider credentials in both frontend and backend env.
+- Existing markdown guides in repo root contain setup and troubleshooting details.
+
+## Status
+- Build: passing (`npm run build`)
+- Lint: passing without errors (`npm run lint`, warnings remain)

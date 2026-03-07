@@ -208,14 +208,14 @@ function SidebarContent({
         {!isAdmin && (
           <>
             <div className="space-y-1">
-              {!compact && <h3 className="px-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 font-mono">{t["Control Center"]}</h3>}
+              {!compact && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">{t["Control Center"]}</h3>}
               {mainNavItems.map((item) => renderNavItem(item, activePage === item.label))}
             </div>
 
             {!compact && <Separator className="bg-border/50" />}
 
             <div className="space-y-1">
-              {!compact && <h3 className="px-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 font-mono">{t["Field Insights"]}</h3>}
+              {!compact && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">{t["Field Insights"]}</h3>}
               <div className="space-y-1">
                 {insightItems.map((item) => renderNavItem(item, activePage === item.label))}
               </div>
@@ -224,7 +224,7 @@ function SidebarContent({
             {!compact && <Separator className="bg-border/50" />}
 
             <div className="space-y-1">
-              {!compact && <h3 className="px-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 font-mono">{t["Resources"]}</h3>}
+              {!compact && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">{t["Resources"]}</h3>}
               <div className="space-y-1">
                 {analyticsItems.map((item) => renderNavItem(item, activePage === item.label))}
               </div>
@@ -233,7 +233,7 @@ function SidebarContent({
             {!compact && <Separator className="bg-border/50" />}
 
             <div className="space-y-1">
-              {!compact && <h3 className="px-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 font-mono">{t["System"]}</h3>}
+              {!compact && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">{t["System"]}</h3>}
               <div className="space-y-1">
                 {otherItems.map((item) => renderNavItem(item, activePage === item.label))}
               </div>
@@ -245,7 +245,7 @@ function SidebarContent({
           <>
             {!compact && <Separator className="bg-border/50" />}
             <div className="space-y-1">
-              {!compact && <h3 className="px-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 font-mono">ADMINISTRATION</h3>}
+              {!compact && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">Administration</h3>}
               <div className="space-y-1">
                 {adminItems.map((item) => renderNavItem(item, activePage === item.label))}
               </div>
@@ -344,8 +344,8 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden relative bg-background transition-colors duration-300">
          {/* Background Grid Pattern */}
-         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none"></div>
-         <div className="absolute inset-0 bg-[radial-gradient(circle_800px_at_50%_-30%,#10b98115,transparent)] pointer-events-none"></div>
+         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,rgba(15,23,42,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.05)_1px,transparent_1px)] bg-[size:24px_24px] dark:bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)]"></div>
+         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_800px_at_50%_-30%,rgba(16,185,129,0.14),transparent)] dark:bg-[radial-gradient(circle_800px_at_50%_-30%,rgba(16,185,129,0.2),transparent)]"></div>
          
          {/* Mobile Header */}
          <div className="lg:hidden flex items-center p-4 border-b border-border bg-card/85 backdrop-blur-md sticky top-0 z-30 justify-between">
@@ -370,7 +370,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
                </SheetContent>
              </Sheet>
              <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              <p className="text-xs text-muted-foreground font-medium">
                 Smart Farm IoT
               </p>
               <h1 className="text-base font-semibold tracking-tight">

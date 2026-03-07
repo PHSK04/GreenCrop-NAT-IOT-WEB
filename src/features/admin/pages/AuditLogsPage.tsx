@@ -43,7 +43,7 @@ export function AuditLogsPage() {
   );
 
   return (
-    <div className="p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="p-8 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Device Activity & Audit Logs</h1>
@@ -77,9 +77,9 @@ export function AuditLogsPage() {
         </Button>
       </div>
 
-      <div className="rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-border bg-white/75 shadow-sm backdrop-blur-sm dark:bg-slate-900/70">
         <Table>
-          <TableHeader className="bg-muted/50">
+          <TableHeader className="bg-slate-100/70 dark:bg-slate-800/45">
             <TableRow>
               <TableHead className="w-[180px]">Timestamp</TableHead>
               <TableHead>User / Source</TableHead>

@@ -175,8 +175,9 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       const latest = [...dataList].sort((a, b) => recordSortKey(b) - recordSortKey(a))[0];
       if (!latest) return;
 
-      const nowMs = Date.now();
+      const localNowMs = Date.now();
       const serverAtMs = parseServerTimestampMs(latest.timestamp);
+      const serverNowMs = parseServerTimestampMs((latest as any).server_now) ?? localNowMs;
       const staleByCommand =
         lastLocalCommandAtMs != null &&
         serverAtMs != null &&
@@ -191,7 +192,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         const waitingAck = pendingIsOnAck !== null;
         const isAckMatched = waitingAck && apiIsOn === pendingIsOnAck;
         const ignoreApiState =
-          ((ignoreApiStateUntilMs != null && nowMs < ignoreApiStateUntilMs) || waitingAck) &&
+          ((ignoreApiStateUntilMs != null && localNowMs < ignoreApiStateUntilMs) || waitingAck) &&
           apiIsOn !== isOn;
         if (!ignoreApiState || isAckMatched) {
           setIsOn(apiIsOn);
@@ -204,50 +205,64 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       const apiUptime = Number(latest.uptime_seconds);
       if (Number.isFinite(apiUptime) && apiUptime >= 0 && !staleByCommand) {
         const normalized = Math.floor(apiUptime);
-        const pendingReset = pendingResetUntilMs != null && nowMs < pendingResetUntilMs;
+        let projectedApiUptime = normalized;
+        if (apiIsOn && serverAtMs != null) {
+          const ageSeconds = Math.floor((serverNowMs - serverAtMs) / 1000);
+          if (ageSeconds > 0) {
+            projectedApiUptime += ageSeconds;
+          }
+        }
+        const pendingReset = pendingResetUntilMs != null && localNowMs < pendingResetUntilMs;
         const localUptime = getCurrentUptimeSeconds(isOn);
         const sawPositiveApiBefore = (lastApiUptimeRef.current ?? 0) > 0;
+        const freshServerReset =
+          projectedApiUptime === 0 &&
+          apiIsOn &&
+          serverAtMs != null &&
+          serverNowMs >= serverAtMs &&
+          serverNowMs - serverAtMs <= 6000;
 
-        if (isOn && normalized === 0 && !pendingReset && sawPositiveApiBefore) {
+        if (isOn && projectedApiUptime === 0 && !pendingReset && sawPositiveApiBefore) {
           zeroUptimeWhileRunningStreakRef.current += 1;
         } else {
           zeroUptimeWhileRunningStreakRef.current = 0;
         }
 
         const allowZeroOverride =
-          normalized === 0 &&
+          projectedApiUptime === 0 &&
           (!isOn ||
             pendingReset ||
+            freshServerReset ||
             (sawPositiveApiBefore && zeroUptimeWhileRunningStreakRef.current >= 2));
 
-        if (!(pendingReset && normalized > 0)) {
+        if (!(pendingReset && projectedApiUptime > 0)) {
           if (!isOn) {
-            setUptimeBaseSeconds(normalized);
+            setUptimeBaseSeconds(projectedApiUptime);
             setUptimeSyncedAtMs(null);
-            setUptimeSeconds(normalized);
+            setUptimeSeconds(projectedApiUptime);
           } else if (allowZeroOverride) {
             setUptimeBaseSeconds(0);
-            setUptimeSyncedAtMs(nowMs);
+            setUptimeSyncedAtMs(localNowMs);
             setUptimeSeconds(0);
             zeroUptimeWhileRunningStreakRef.current = 0;
-          } else if (normalized > localUptime + 2) {
-            setUptimeBaseSeconds(normalized);
-            setUptimeSyncedAtMs(nowMs);
-            setUptimeSeconds(normalized);
+          } else if (projectedApiUptime > localUptime + 2) {
+            setUptimeBaseSeconds(projectedApiUptime);
+            setUptimeSyncedAtMs(localNowMs);
+            setUptimeSeconds(projectedApiUptime);
           } else {
-            setUptimeSyncedAtMs((prev) => prev ?? nowMs);
+            setUptimeSyncedAtMs((prev) => prev ?? localNowMs);
           }
         }
 
-        if (normalized === 0) {
+        if (projectedApiUptime === 0) {
           setPendingResetUntilMs(null);
-          setUptimeFreezeUntilMs(nowMs + 1500);
+          setUptimeFreezeUntilMs(localNowMs + 1500);
         } else {
           setUptimeFreezeUntilMs(null);
         }
-        lastApiUptimeRef.current = normalized;
+        lastApiUptimeRef.current = projectedApiUptime;
       } else if (apiIsOn && uptimeSyncedAtRef.current == null) {
-        setUptimeSyncedAtMs((prev) => prev ?? nowMs);
+        setUptimeSyncedAtMs((prev) => prev ?? localNowMs);
       }
 
       if (latest.active_tank !== undefined && latest.active_tank !== null) {

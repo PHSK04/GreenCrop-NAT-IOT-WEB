@@ -122,10 +122,12 @@ export function SocialAuth({
             {showDivider ? (
                 <div className="relative">
                     <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-border" />
+                        <span className="w-full border-t border-slate-300/80 dark:border-slate-700/80" />
                     </div>
                     <div className="relative flex justify-center text-xs font-semibold uppercase tracking-[0.12em]">
-                        <span className="bg-background px-3 text-muted-foreground">Or {actionText} with</span>
+                        <span className="bg-white/95 px-3 text-slate-500 dark:bg-slate-900/95 dark:text-slate-300">
+                            Or {actionText} with
+                        </span>
                     </div>
                 </div>
             ) : null}
@@ -135,7 +137,7 @@ export function SocialAuth({
                     type="button"
                     variant="outline" 
                     onClick={() => handleMockLogin('Google Workspace')}
-                    className="w-full border-input bg-secondary/30 hover:bg-secondary hover:text-foreground text-muted-foreground transition-all h-12 rounded-xl relative overflow-hidden group text-base"
+                    className="group relative h-11 w-full overflow-hidden rounded-xl border border-slate-300/80 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800"
                     disabled={!!isLoading}
                 >
                     <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/5 transition-colors duration-300" />
@@ -147,7 +149,7 @@ export function SocialAuth({
                     type="button"
                     variant="outline" 
                     onClick={() => handleMockLogin('Microsoft Azure')}
-                    className="w-full border-input bg-secondary/30 hover:bg-secondary hover:text-foreground text-muted-foreground transition-all h-12 rounded-xl relative overflow-hidden group text-base"
+                    className="group relative h-11 w-full overflow-hidden rounded-xl border border-slate-300/80 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800"
                     disabled={!!isLoading}
                 >
                      <div className="absolute inset-0 bg-orange-500/0 group-hover:bg-orange-500/5 transition-colors duration-300" />
@@ -159,7 +161,7 @@ export function SocialAuth({
                     type="button"
                     variant="outline" 
                     onClick={() => handleMockLogin('LINE')}
-                    className="w-full border-input bg-secondary/30 hover:bg-secondary hover:text-foreground text-muted-foreground transition-all h-12 rounded-xl relative overflow-hidden group text-base"
+                    className="group relative h-11 w-full overflow-hidden rounded-xl border border-slate-300/80 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800"
                     disabled={!!isLoading}
                 >
                      <div className="absolute inset-0 bg-[#06C755]/0 group-hover:bg-[#06C755]/5 transition-colors duration-300" />
@@ -171,7 +173,7 @@ export function SocialAuth({
                     type="button"
                     variant="outline" 
                     onClick={handleFacebookLogin}
-                    className="w-full border-input bg-secondary/30 hover:bg-secondary hover:text-foreground text-muted-foreground transition-all h-12 rounded-xl relative overflow-hidden group text-base"
+                    className="group relative h-11 w-full overflow-hidden rounded-xl border border-slate-300/80 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800"
                     disabled={!!isLoading}
                 >
                      <div className="absolute inset-0 bg-[#1877F2]/0 group-hover:bg-[#1877F2]/5 transition-colors duration-300" />

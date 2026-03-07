@@ -30,11 +30,25 @@ const APPLE_SERVICE_ID = process.env.APPLE_SERVICE_ID || '';
 const APPLE_JWKS_CACHE_MS = 6 * 60 * 60 * 1000;
 let appleJwksCache = { fetchedAt: 0, keys: [] };
 
-// Allow all origins for development to fix Flutter Web CORS issues
+const DEFAULT_CORS_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://phsk04.github.io',
+];
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || DEFAULT_CORS_ORIGINS.join(','))
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
 app.use(cors({
-    origin: '*', 
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id']
+    origin: (origin, callback) => {
+        // Allow mobile apps, curl, and same-network tools that do not send Origin.
+        if (!origin) return callback(null, true);
+        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
 }));
 app.use(bodyParser.json());
 
@@ -798,6 +812,7 @@ app.get('/api/login-sessions/active', async (req, res) => {
 // --- Sensor Data Endpoints (Strict User/Tenant Specific)
 app.get('/api/sensor-data', async (req, res) => {
     try {
+        const serverNowIso = new Date().toISOString();
         // 1. Get User ID (Tenant ID) from JWT (req.tenant), Header, or Query
         let tenantId = req.tenant || req.headers['x-tenant-id'] || req.query.tenant_id;
         if (tenantId) tenantId = String(tenantId); // Ensure String for MSSQL comparison
@@ -810,7 +825,8 @@ app.get('/api/sensor-data', async (req, res) => {
                 pressure: 0, 
                 flow_rate: 0, 
                 is_on: false,
-                message: "No tenant_id provided, please login."
+                message: "No tenant_id provided, please login.",
+                server_now: serverNowIso
             }]);
         }
 
@@ -839,6 +855,9 @@ app.get('/api/sensor-data', async (req, res) => {
                 WHERE tenant_id = ?
                 ORDER BY id DESC
             `, [targetTenant]);
+            for (const row of history) {
+                row.server_now = serverNowIso;
+            }
             return res.json(history); 
         }
 
@@ -852,11 +871,15 @@ app.get('/api/sensor-data', async (req, res) => {
                 pumps: '[]',
                 active_tank: 0,
                 uptime_seconds: 0,
-                tenant_id: tenantId // Echo back
+                tenant_id: tenantId, // Echo back
+                server_now: serverNowIso
             }]);
         }
         
         // Return as Array (Mobile App expects List)
+        for (const row of rows) {
+            row.server_now = serverNowIso;
+        }
         res.json(rows); 
         
     } catch (err) {

@@ -61,7 +61,27 @@ Open: `http://localhost:5173`
 - `npm run server` - start backend API
 - `npm run dev:all` - start server + frontend together
 - `npm run build` - production build
+- `npm run build:gh` - production build for GitHub Pages (`/GreenCrop-NAT-IOT-WEB/` base path)
+- `npm run deploy` - publish `dist/` to `gh-pages` branch
 - `npm run lint` - lint source files
+
+## Deploy Frontend to GitHub Pages (without breaking API/DB)
+1. Keep backend and database deployed/running separately (GitHub Pages hosts frontend only).
+2. Create `.env.production` from `.env.production.example`.
+3. Set `VITE_API_URL` in `.env.production` to your real backend URL, for example:
+   - `https://your-backend-domain.com/api`
+4. Run:
+```bash
+npm run deploy
+```
+5. In GitHub repo settings, enable Pages with:
+   - Source: `Deploy from a branch`
+   - Branch: `gh-pages` / `(root)`
+
+Notes:
+- Local development behavior is unchanged.
+- In development, auth API can still fall back to localhost (`3001`) if needed.
+- In production build, frontend uses only `VITE_API_URL` so it connects to the intended backend.
 
 ## Notes for Portfolio Demo
 - Keep `server/.env` with local DB credentials ready before demo.
