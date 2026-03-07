@@ -33,7 +33,7 @@ jobs:
         run: npm run build:gh
         env:
           # Temporary public tunnel API for GitHub Pages
-          VITE_API_URL: https://supplements-bend-separation-fool.trycloudflare.com/api
+          VITE_API_URL: https://newman-phoenix-exclude-businesses.trycloudflare.com/api
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_FACEBOOK_APP_ID: ${{ secrets.VITE_FACEBOOK_APP_ID }}
           VITE_APPLE_CLIENT_ID: ${{ secrets.VITE_APPLE_CLIENT_ID }}
