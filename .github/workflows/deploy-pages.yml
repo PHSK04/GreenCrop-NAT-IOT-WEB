@@ -33,7 +33,7 @@ jobs:
         run: npm run build:gh
         env:
           # Auto tunnel fallback (updated by local automation script when secrets are not used)
-          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://troubleshooting-menus-placing-russell.trycloudflare.com/api' }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://klein-injection-italic-recorders.trycloudflare.com/api' }}
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_FACEBOOK_APP_ID: ${{ secrets.VITE_FACEBOOK_APP_ID }}
           VITE_APPLE_CLIENT_ID: ${{ secrets.VITE_APPLE_CLIENT_ID }}
