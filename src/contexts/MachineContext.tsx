@@ -277,7 +277,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
   const syncAfterCommand = async () => {
     await fetchApiData();
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    await new Promise((resolve) => setTimeout(resolve, 40));
     await fetchApiData();
   };
 
@@ -303,6 +303,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         uptime_seconds: nextUptimeSeconds,
         timestamp: new Date().toISOString(),
         tenant_id: tenantId,
+        source: 'web-ui',
       }),
     });
 
@@ -337,7 +338,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
     setClient(mqttClient);
 
-    const pollId = setInterval(fetchApiData, 500);
+    const pollId = setInterval(fetchApiData, 250);
     fetchApiData();
 
     return () => {

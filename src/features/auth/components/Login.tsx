@@ -161,10 +161,11 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
               <span className="pointer-events-none absolute h-[300px] w-[300px] rounded-full border border-slate-300/55 dark:border-slate-500/28" />
               <span className="gc-orbit pointer-events-none absolute h-[236px] w-[236px] rounded-full border border-emerald-400/28 dark:border-emerald-400/22" />
               <span className="pointer-events-none absolute h-[132px] w-[132px] rounded-full bg-emerald-400/15 blur-2xl dark:bg-emerald-400/12" />
+              <span className="pointer-events-none absolute h-[190px] w-[190px] rounded-full bg-white/80 blur-xl dark:bg-emerald-100/12" />
               <img
                 src={appLogoGreen}
                 alt="GreenCropNAT logo"
-                className="gc-float relative w-[280px] max-w-[88%] object-contain drop-shadow-[0_12px_26px_rgba(16,185,129,0.22)]"
+                className="gc-float relative w-[300px] max-w-[92%] object-contain brightness-110 contrast-125 saturate-125 drop-shadow-[0_14px_30px_rgba(16,185,129,0.34)]"
                 draggable={false}
               />
             </div>
@@ -210,7 +211,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
             <img
               src={appLogoGreen}
               alt="GreenCropNAT logo"
-              className="gc-float mx-auto mb-4 w-[292px] max-w-full object-contain sm:w-[336px]"
+              className="gc-float mx-auto mb-4 w-[320px] max-w-full object-contain brightness-110 contrast-125 saturate-125 drop-shadow-[0_12px_24px_rgba(16,185,129,0.30)] sm:w-[360px]"
               draggable={false}
             />
             <h2

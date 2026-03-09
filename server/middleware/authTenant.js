@@ -27,7 +27,12 @@ module.exports = function (db) {
       const secret = process.env.JWT_SECRET || 'dev_jwt_secret';
       const payload = jwt.verify(token, secret);
 
-      const tenantId = payload.tenant_id || payload.tenant || payload.tid;
+      let tenantId = payload.tenant_id || payload.tenant || payload.tid;
+      // Backward compatibility: older tokens used tenant_id='public'.
+      // When account-bound mode is active, fall back to user id so app/web sync per account.
+      if ((tenantId === 'public' || tenantId === 'PUBLIC') && payload.id !== undefined && payload.id !== null) {
+        tenantId = String(payload.id);
+      }
       if (!tenantId) return res.status(403).json({ error: 'Token missing tenant_id' });
 
       req.tenant = tenantId;

@@ -19,6 +19,8 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.API_HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret';
+const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || 'public';
+const SHARED_SENSOR_TENANT = String(process.env.SHARED_SENSOR_TENANT || 'false').toLowerCase() === 'true';
 const GOOGLE_CLIENT_IDS = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
     .split(',')
     .map((value) => value.trim())
@@ -155,6 +157,29 @@ app.post('/api/verify-password', async (req, res) => {
 
 function normalizeEmail(email) {
     return (email || '').trim().toLowerCase();
+}
+
+function asBool(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value === 1;
+    const v = String(value ?? '').toLowerCase().trim();
+    return v === '1' || v === 'true' || v === 'on';
+}
+
+function asNumber(value, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function computeLiveUptimeSeconds(row, nowMs = Date.now()) {
+    const baseUptime = Math.max(0, Math.floor(asNumber(row?.uptime_seconds, 0)));
+    if (!asBool(row?.is_on)) return baseUptime;
+
+    const rowTimeMs = row?.timestamp ? new Date(row.timestamp).getTime() : NaN;
+    if (!Number.isFinite(rowTimeMs) || rowTimeMs <= 0) return baseUptime;
+
+    const elapsed = Math.floor((nowMs - rowTimeMs) / 1000);
+    return baseUptime + Math.max(0, elapsed);
 }
 
 function randomLocalPassword() {
@@ -812,9 +837,12 @@ app.get('/api/login-sessions/active', async (req, res) => {
 // --- Sensor Data Endpoints (Strict User/Tenant Specific)
 app.get('/api/sensor-data', async (req, res) => {
     try {
-        const serverNowIso = new Date().toISOString();
-        // 1. Get User ID (Tenant ID) from JWT (req.tenant), Header, or Query
-        let tenantId = req.tenant || req.headers['x-tenant-id'] || req.query.tenant_id;
+        const serverNowMs = Date.now();
+        const serverNowIso = new Date(serverNowMs).toISOString();
+        // In shared mode, app/web always read the same stream.
+        let tenantId = SHARED_SENSOR_TENANT
+            ? DEFAULT_TENANT_ID
+            : (req.tenant || req.headers['x-tenant-id'] || req.query.tenant_id);
         if (tenantId) tenantId = String(tenantId); // Ensure String for MSSQL comparison
         
         console.log(`[READ] Sensor Request - Tenant ID: ${tenantId}`);
@@ -878,6 +906,8 @@ app.get('/api/sensor-data', async (req, res) => {
         
         // Return as Array (Mobile App expects List)
         for (const row of rows) {
+            row.uptime_seconds = computeLiveUptimeSeconds(row, serverNowMs);
+            row.is_on = asBool(row.is_on);
             row.server_now = serverNowIso;
         }
         res.json(rows); 
@@ -890,20 +920,63 @@ app.get('/api/sensor-data', async (req, res) => {
 
 app.post('/api/sensor-data', async (req, res) => {
     try {
-        let tenant = req.tenant || req.headers['x-tenant-id'] || req.body.tenant_id || 'public';
+        // In shared mode, app/web always write to the same stream.
+        let tenant = SHARED_SENSOR_TENANT
+            ? DEFAULT_TENANT_ID
+            : (req.tenant || req.headers['x-tenant-id'] || req.body.tenant_id || DEFAULT_TENANT_ID);
         tenant = String(tenant); // Ensure String
         
-        console.log(`[DATA SYNC] Update from Tenant ID: ${tenant} | Power: ${req.body.is_on}`);
+        const source = String(req.body.source || 'unknown');
+        console.log(`[DATA SYNC] Update from Tenant ID: ${tenant} | Power: ${req.body.is_on} | source=${source}`);
 
         const { device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp } = req.body;
+        const latest = await db.get(
+            `SELECT TOP 1 is_on, uptime_seconds, timestamp
+             FROM sensor_data
+             WHERE tenant_id = ?
+             ORDER BY id DESC`,
+            [tenant]
+        );
+
+        const isTrustedControlSource = source === 'app-ui' || source === 'web-ui';
+        const parsedIncomingUptime = Math.max(0, Math.floor(asNumber(uptime_seconds, 0)));
+        const normalizedIsOn = asBool(is_on);
+        const incomingIsOffReset = !normalizedIsOn && parsedIncomingUptime === 0;
+        const latestTsMs = latest?.timestamp ? new Date(latest.timestamp).getTime() : 0;
+        const nowMs = Date.now();
+        const recentOnRow =
+            latest &&
+            asBool(latest.is_on) &&
+            Number.isFinite(latestTsMs) &&
+            latestTsMs > 0 &&
+            (nowMs - latestTsMs) <= 15000;
+
+        if (!isTrustedControlSource && incomingIsOffReset && recentOnRow) {
+            console.warn(`[DATA SYNC] Suppressed stale OFF overwrite for tenant=${tenant} from source=${source}`);
+            return res.json({ ok: true, suppressed: true, reason: 'stale-off-overwrite' });
+        }
+
         const pumpsJson = pumps && Array.isArray(pumps) ? JSON.stringify(pumps.map(p => p ? 1 : 0)) : '[]';
-        const parsedTs = timestamp ? new Date(timestamp) : new Date();
-        const safeTimestamp = Number.isNaN(parsedTs.getTime()) ? new Date() : parsedTs;
+        const parsedTsMs = timestamp ? new Date(timestamp).getTime() : NaN;
+        const clientTsSkewMs = Number.isFinite(parsedTsMs) ? Math.abs(nowMs - parsedTsMs) : Number.POSITIVE_INFINITY;
+        const safeTimestamp = (clientTsSkewMs <= 5 * 60 * 1000) ? new Date(parsedTsMs) : new Date(nowMs);
 
         const result = await db.run(
             `INSERT INTO sensor_data (tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [tenant, device_id || null, sensor_id || null, pressure || 0, flow_rate || 0, ec_value || 0, pumpsJson, active_tank ?? null, is_on ? 1 : 0, uptime_seconds || 0, safeTimestamp]
+            [
+                tenant,
+                device_id || null,
+                sensor_id || null,
+                asNumber(pressure, 0),
+                asNumber(flow_rate, 0),
+                asNumber(ec_value, 0),
+                pumpsJson,
+                active_tank ?? null,
+                normalizedIsOn ? 1 : 0,
+                parsedIncomingUptime,
+                safeTimestamp
+            ]
         );
 
         res.json({ ok: true, id: result.id });

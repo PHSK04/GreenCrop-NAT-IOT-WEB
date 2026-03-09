@@ -183,12 +183,13 @@ function SidebarContent({
         onClick={() => handleNavClick(isAdmin ? "Admin Panel" : "Dashboard")}
       >
         <div className={`flex items-center ${compact ? "justify-center" : "gap-3"}`}>
-          <div className={`${compact ? "w-10 h-10" : "w-11 h-11"} rounded-xl flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.25)] relative overflow-hidden group transition-all duration-500 ${isOn ? "bg-gradient-to-br from-primary to-emerald-700" : "bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 grayscale"}`}>
+          <div className={`${compact ? "w-10 h-10" : "w-12 h-12"} rounded-xl flex items-center justify-center shadow-[0_0_14px_rgba(16,185,129,0.32)] relative overflow-hidden group transition-all duration-500 ${isOn ? "bg-gradient-to-br from-primary to-emerald-700" : "bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 grayscale"}`}>
             <div className="absolute inset-0 bg-background/50 backdrop-blur-md/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="absolute inset-[5px] rounded-lg bg-white/78 dark:bg-slate-900/35" />
             <img
               src={appLogoGreen}
               alt="GreenCropNAT logo"
-              className="relative z-10 h-7 w-7 object-contain"
+              className="relative z-10 h-8 w-8 object-contain brightness-110 contrast-125 saturate-125"
               draggable={false}
             />
           </div>

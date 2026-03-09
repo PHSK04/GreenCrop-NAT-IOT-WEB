@@ -10,7 +10,9 @@ import {
   Beaker, 
   Zap, 
   Database,
-  Cpu
+  Cpu,
+  TrendingUp,
+  Clock3
 } from "lucide-react";
 import machineModel from "@/assets/images/machine_model.png";
 import { MetricsChart } from "../MetricsChart";
@@ -111,18 +113,20 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
   return (
     <>
       {/* Header */}
-      <header className="bg-card/50 backdrop-blur-sm border-b border-border px-4 py-4 md:px-8 md:py-6 z-10 sticky top-0">
+      <header className="sticky top-0 z-10 border-b border-border/60 bg-card/75 px-4 py-4 backdrop-blur-xl md:px-8 md:py-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-3 tracking-tight">
-              <Activity className="w-6 h-6 text-primary" />
+            <h1 className="flex items-center gap-3 text-xl font-bold tracking-tight text-foreground md:text-2xl">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/15 text-primary">
+                <Activity className="h-5 w-5" />
+              </span>
               {t.title}
             </h1>
-            <p className="text-muted-foreground text-xs md:text-sm font-medium mt-1">{t.subtitle}</p>
+            <p className="mt-1 text-xs font-medium text-muted-foreground md:text-sm">{t.subtitle}</p>
           </div>
           <Badge 
             variant={isOn ? "default" : "secondary"}
-            className={`px-4 py-1.5 text-xs font-mono border self-end sm:self-auto ${isOn ? "bg-primary/10 text-primary border-primary/30 hover:bg-primary/20" : "bg-muted text-muted-foreground border-border"}`}
+            className={`self-end border px-4 py-1.5 font-mono text-xs sm:self-auto ${isOn ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20" : "border-border bg-muted text-muted-foreground"}`}
           >
             {isOn ? (
               <span className="flex items-center gap-2">
@@ -142,18 +146,54 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto p-4 md:p-8 relative z-10">
+      <main className="relative z-10 flex-1 overflow-auto p-4 md:p-8">
+        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <Card className="rounded-2xl border-border/60 bg-card/70 shadow-sm backdrop-blur-sm">
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t.uptime}</p>
+                <p className="mt-1 font-mono text-xl font-semibold text-foreground">{formatUptime(uptimeSeconds)}</p>
+              </div>
+              <div className="rounded-xl bg-primary/15 p-2 text-primary">
+                <Clock3 className="h-5 w-5" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border-border/60 bg-card/70 shadow-sm backdrop-blur-sm">
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t.metrics.pressure.title}</p>
+                <p className="mt-1 text-xl font-semibold text-foreground">{pressure.toFixed(1)} <span className="text-xs text-muted-foreground">BAR</span></p>
+              </div>
+              <div className="rounded-xl bg-cyan-500/15 p-2 text-cyan-600 dark:text-cyan-400">
+                <Gauge className="h-5 w-5" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border-border/60 bg-card/70 shadow-sm backdrop-blur-sm">
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t.metrics.flow.title}</p>
+                <p className="mt-1 text-xl font-semibold text-foreground">{flowRate.toFixed(1)} <span className="text-xs text-muted-foreground">L/min</span></p>
+              </div>
+              <div className="rounded-xl bg-emerald-500/15 p-2 text-emerald-600 dark:text-emerald-400">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Machine Control Section (Hero) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
           
           {/* Left Column: Visual Model */}
           <div className="lg:col-span-7 space-y-6">
-            <Card className="bg-card/50 border-border backdrop-blur-xl overflow-hidden h-full min-h-[500px] shadow-lg">
+            <Card className="h-full min-h-[500px] overflow-hidden rounded-2xl border-border/70 bg-card/65 shadow-lg backdrop-blur-xl">
               <CardHeader>
                 <CardTitle className="text-foreground">{t.visualizer}</CardTitle>
                 <CardDescription className="text-muted-foreground">{t.visualizerDesc}</CardDescription>
               </CardHeader>
-              <CardContent className="flex items-center justify-center p-8 bg-gradient-to-b from-transparent to-background/30 rounded-b-xl h-full">
+              <CardContent className="flex h-full items-center justify-center rounded-b-2xl bg-gradient-to-b from-transparent to-background/30 p-8">
                 <div className="relative w-full h-full flex items-center justify-center">
                    {/* Glow effect */}
                    {isOn && <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full transition-all duration-1000"></div>}
@@ -176,7 +216,7 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
           <div className="lg:col-span-5 space-y-6">
             
             {/* Master Control */}
-            <Card className="bg-card/80 border-border shadow-xl backdrop-blur-md">
+            <Card className="rounded-2xl border-border/70 bg-card/80 shadow-xl backdrop-blur-md">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-foreground">
                   <Power className="w-5 h-5" />
@@ -247,7 +287,7 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
             </Card>
 
             {/* Tank Status Visualizer */}
-            <Card className="bg-card/50 border-border shadow-lg">
+            <Card className="rounded-2xl border-border/70 bg-card/55 shadow-lg">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
                   <span>{t.tankLevels}</span>
@@ -284,7 +324,7 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
             </Card>
 
             {/* Sensor Health Status */}
-            <Card className="bg-card/50 border-border shadow-lg">
+            <Card className="rounded-2xl border-border/70 bg-card/55 shadow-lg">
                <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-full ${isOn ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"}`}>
@@ -360,7 +400,7 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
               bgColor: "bg-green-500/10",
             }
           ].map((metric) => (
-            <Card key={metric.title} className="bg-card/50 border-border hover:border-border transition-all duration-300 shadow-lg backdrop-blur-sm">
+            <Card key={metric.title} className="rounded-2xl border-border/70 bg-card/65 shadow-md backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
               <CardHeader className="pb-2 p-4">
                 <div className="flex justify-between items-start">
                   <div className={`p-2 rounded-lg ${metric.bgColor}`}>

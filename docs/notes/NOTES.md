@@ -257,7 +257,128 @@ VITE_API_URL=https://your-backend-domain.com/api
 - `Project Page` (โปรเจกต์นี้ใช้แบบนี้):
   - Repo ชื่ออะไรก็ได้ เช่น `GreenCrop-NAT-IOT-WEB`
   - URL: `https://<username>.github.io/<repo-name>/`
-  - ของโปรเจกต์นี้คือ:
+- ของโปรเจกต์นี้คือ:
+
+## J) Runbook แก้ปัญหา Login/DB (สถานะล่าสุด)
+
+สรุปปัญหาที่เจอบ่อย:
+- `Cannot connect to server/DB`
+- `Cannot connect to server/DB (timeout)`
+- Render log ขึ้น `ELOGIN` หรือ `IP not allowed`
+
+สาเหตุจริงที่เคยเกิด:
+- GitHub Pages ชี้ API ไม่ตรง
+- Render deploy commit เก่า
+- Azure SQL ปิด public access / firewall ไม่อนุญาต
+- DB user/password ไม่ตรงกับที่ reset ล่าสุด
+
+### 1) ค่าใช้งานจริง (Current Production)
+
+- Frontend URL:
+  - `https://phsk04.github.io/GreenCrop-NAT-IOT-WEB/`
+- Backend URL:
+  - `https://greencrop-api.onrender.com`
+- Health endpoint:
+  - `https://greencrop-api.onrender.com/api/health`
+- Azure SQL Server:
+  - `greencrop-sql-phsk04-ea.database.windows.net`
+- Database:
+  - `SmartIoTDB`
+- SQL Admin user:
+  - `greencropadmin`
+
+### 2) Render (API) ค่าที่ต้องตั้ง
+
+Root/Build/Start:
+- Root Directory: `server`
+- Build Command: `npm install`
+- Start Command: `npm start`
+
+Environment Variables:
+- `DB_HOST=greencrop-sql-phsk04-ea.database.windows.net`
+- `DB_PORT=1433`
+- `DB_USER=greencropadmin`
+- `DB_PASSWORD=<password ล่าสุดจาก Azure Reset password>`
+- `DB_NAME=SmartIoTDB`
+- `JWT_SECRET=<long-random-secret>`
+- `NODE_ENV=production`
+- `ENABLE_DEV_TOKEN=false`
+- `CORS_ORIGINS=https://phsk04.github.io,http://localhost:3000,http://127.0.0.1:3000`
+
+หมายเหตุ:
+- หากยังขึ้น `ELOGIN` ให้ลอง `DB_USER=greencropadmin@greencrop-sql-phsk04-ea`
+- โค้ดปัจจุบันมี fallback ลองรูปแบบ `user@servername` ให้อัตโนมัติ
+
+### 3) Azure SQL Networking ที่ต้องเปิด
+
+ไปที่ SQL Server > `Networking`:
+- Public network access: `Selected networks` (หรือ `All networks` ชั่วคราวตอน debug)
+- ติ๊ก `Allow Azure services and resources to access this server`
+- เพิ่ม firewall rule จาก IP ที่ปรากฏใน Render log เมื่อโดนบล็อก
+- กด `Save`
+
+ตัวอย่าง firewall rule:
+- Rule name: `render-1`
+- Start IPv4: `74.220.48.246`
+- End IPv4: `74.220.48.246`
+
+### 4) GitHub Pages ให้ชี้ Render API
+
+Repo > Settings > Secrets and variables > Actions:
+- `VITE_API_URL=https://greencrop-api.onrender.com/api`
+
+กระตุ้น deploy หน้าเว็บใหม่:
+
+```bash
+git commit --allow-empty -m "chore: redeploy pages"
+git push origin main
+```
+
+### 5) ลำดับแก้ปัญหาแบบเร็ว (ทำตามนี้ทีละข้อ)
+
+1. เช็ก Azure SQL Networking (public + azure services + firewall)
+2. เช็ก Render env โดยเฉพาะ `DB_PASSWORD`
+3. Manual Deploy ใน Render (ต้องเป็น commit ล่าสุด ไม่ใช่ commit เก่า)
+4. เช็ก health:
+   - `curl https://greencrop-api.onrender.com/api/health`
+5. Hard refresh หน้าเว็บ (`Cmd+Shift+R`) แล้วลอง login ใหม่
+
+### 6) อาการ/วิธีแก้แบบจับคู่
+
+- อาการ: `Connection denied because Deny Public Network Access is set to Yes`
+  - แก้: เปิด Public network access ใน Azure SQL
+
+- อาการ: `Client with IP address ... is not allowed`
+  - แก้: เพิ่ม firewall rule IP นั้น + Save
+
+- อาการ: `Login failed for user 'greencropadmin'` (`ELOGIN`)
+  - แก้: reset password ใน Azure แล้วอัปเดต `DB_PASSWORD` ใน Render
+
+- อาการ: เว็บขึ้น `timeout`
+  - แก้: รอ cold start ของ Render Free (30-60 วินาที) แล้วลองใหม่
+  - โค้ดปัจจุบันเพิ่ม timeout ฝั่ง frontend แล้ว
+
+### 7) คำสั่งที่ใช้บ่อย
+
+เช็ก API:
+
+```bash
+curl https://greencrop-api.onrender.com/api/health
+```
+
+redeploy pages:
+
+```bash
+git commit --allow-empty -m "chore: redeploy pages"
+git push origin main
+```
+
+### 8) ข้อควรจำสำคัญ
+
+- อย่าพิมพ์ URL ตรงๆ ใน terminal (จะขึ้น `zsh: no such file or directory`)
+- ต้องใช้ `curl <url>`
+- Render Free มี cold start และ egress IP อาจเปลี่ยนได้
+- ถ้าต้องการเสถียรถาวร ควรใช้แผนที่มี static IP หรือย้าย backend ไปโครงสร้างที่ควบคุม network ได้
     - `https://phsk04.github.io/GreenCrop-NAT-IOT-WEB/`
 
 ### 2) ตั้งค่าโปรเจกต์ให้ตรงกับ Project Page
@@ -408,3 +529,17 @@ npm run server:public:auto-deploy
 ผลลัพธ์:
 - GitHub Pages ใช้งาน URL เดิมตลอด
 - ไม่ต้องไล่เปลี่ยนลิงก์ tunnel อีก
+
+## FREE (ใช้งานตอนนี้)
+
+ใช้แบบฟรีด้วยคำสั่งเดียว:
+
+```bash
+cd "/Users/phsk/Documents/PROJECT ETE/Smart Iot Web/GreenCrop NAT IOT"
+npm run server:public:auto-deploy
+```
+
+หมายเหตุ:
+- ฟรี
+- ใช้งานได้
+- ต้องเปิดเครื่องและเปิด terminal ค้างไว้

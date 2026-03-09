@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { useEffect } from "react";
+import { startSocialWebAuth } from "../services/socialWebAuth";
 
 // --- Constants ---
 const FACEBOOK_APP_ID = "1585600402556361"; // Facebook App ID
@@ -25,11 +26,12 @@ const FacebookIcon = () => (
 );
 
 const LineIcon = () => (
-    <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true" fill="#06C755">
-        <path d="M20.6 10c0-4.6-4.6-8-10.6-8S-.6 5.4-.6 10c0 4 3.5 7.3 8.8 7.9.3.1.8.2.9.6.1.3 0 .8-.1.9-1.3 3.9-.2 4.2 2.3 2.3 3.3-2.5 9-6.9 8.7-11.7z" transform="translate(1.6 2) scale(0.9)"/>
-        {/* Simplified Line Icon Path logic for cleaner SVG */}
-        <path d="M24 10.3c0-5-5-9.1-11.7-9.1C5.7 1.2.9 5.2.9 10.3c0 4.5 3.6 8.3 8.3 9l.3 2.6c0 .2-.1.5 0 .7.1.3.4.4.8.2L16 19c4.3-1.6 8-4.9 8-8.7zm-16.7 3.5c-.5 0-.9-.4-.9-.9v-4c0-.5.4-.9.9-.9s.9.4.9.9v4c0 .5-.4.9-.9.9zm4.2 0c-.5 0-.9-.4-.9-.9v-4c0-.5.4-.9.9-.9s.9.4.9.9v4c0 .5-.4.9-.9.9zm4.2 0c-.5 0-.9-.4-.9-.9v-4c0-.5.4-.9.9-.9s.9.4.9.9v4c0 .5-.4.9-.9.9zm3.3-2.9h-2.4c-.2 0-.4-.2-.4-.4s.2-.4.4-.4h2.4c.2 0 .4.2.4.4s-.2.4-.4.4z" fill="#06C755" transform="scale(0.8) translate(5, 5)"/>
-        <text x="12" y="23" fontSize="0" fill="none">Line</text>
+    <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="#06C755" />
+        <path
+            d="M16.8 10.8c0-2.2-2.1-3.9-4.8-3.9s-4.8 1.7-4.8 3.9c0 2 1.7 3.6 4.1 3.9l-.2 1.7c0 .1.1.2.2.1l1.9-1.4c2.1-.4 3.6-2 3.6-4.3z"
+            fill="#fff"
+        />
     </svg>
 );
 
@@ -88,7 +90,7 @@ export function SocialAuth({
                 console.log('Facebook Access Token:', accessToken);
                 
                 // Call Auth Service with token
-                socialLogin('Facebook', accessToken)
+                socialLogin('Facebook', { accessToken })
                     .then(() => {
                         if (onLoginSuccess) onLoginSuccess();
                     })
@@ -102,6 +104,24 @@ export function SocialAuth({
                 setIsLoading(null);
             }
         }, { scope: 'public_profile,email' });
+    };
+
+    const handleGoogleLogin = async () => {
+        setIsLoading('Google');
+        try {
+            const payload = await startSocialWebAuth('google');
+            await socialLogin('Google', {
+                accessToken: payload.accessToken,
+                idToken: payload.idToken,
+                email: payload.email,
+                name: payload.name,
+            });
+            if (onLoginSuccess) onLoginSuccess();
+        } catch (err: any) {
+            toast.error("Google Login Failed", { description: err?.message || "Unknown error" });
+        } finally {
+            setIsLoading(null);
+        }
     };
 
     const handleMockLogin = async (provider: string) => {
@@ -132,53 +152,53 @@ export function SocialAuth({
                 </div>
             ) : null}
             
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
                 <Button 
                     type="button"
                     variant="outline" 
-                    onClick={() => handleMockLogin('Google Workspace')}
-                    className="group relative h-11 w-full overflow-hidden rounded-xl border border-slate-300/80 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800"
+                    onClick={handleGoogleLogin}
+                    className="group relative h-14 w-full overflow-hidden rounded-2xl border border-emerald-600/35 bg-gradient-to-b from-[#05211b] to-[#031914] text-emerald-50 shadow-[inset_0_1px_0_rgba(52,211,153,0.15),0_10px_30px_rgba(2,18,14,0.5)] transition-all duration-200 hover:border-emerald-400/60 hover:shadow-[inset_0_1px_0_rgba(110,231,183,0.25),0_14px_36px_rgba(2,18,14,0.7)]"
                     disabled={!!isLoading}
                 >
-                    <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/5 transition-colors duration-300" />
+                    <div className="absolute inset-0 bg-emerald-400/0 group-hover:bg-emerald-300/5 transition-colors duration-300" />
                     <GoogleIcon />
-                    <span className="ml-2 font-medium">Google</span>
+                    <span className="ml-3 text-xl font-medium tracking-tight">Google</span>
                 </Button>
                 
                 <Button 
                     type="button"
                     variant="outline" 
-                    onClick={() => handleMockLogin('Microsoft Azure')}
-                    className="group relative h-11 w-full overflow-hidden rounded-xl border border-slate-300/80 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800"
+                    onClick={() => handleMockLogin('Microsoft')}
+                    className="group relative h-14 w-full overflow-hidden rounded-2xl border border-emerald-600/35 bg-gradient-to-b from-[#05211b] to-[#031914] text-emerald-50 shadow-[inset_0_1px_0_rgba(52,211,153,0.15),0_10px_30px_rgba(2,18,14,0.5)] transition-all duration-200 hover:border-emerald-400/60 hover:shadow-[inset_0_1px_0_rgba(110,231,183,0.25),0_14px_36px_rgba(2,18,14,0.7)]"
                     disabled={!!isLoading}
                 >
-                     <div className="absolute inset-0 bg-orange-500/0 group-hover:bg-orange-500/5 transition-colors duration-300" />
+                     <div className="absolute inset-0 bg-emerald-400/0 group-hover:bg-emerald-300/5 transition-colors duration-300" />
                     <MicrosoftIcon />
-                    <span className="ml-2 font-medium">Azure</span>
+                    <span className="ml-3 text-xl font-medium tracking-tight">Microsoft</span>
                 </Button>
 
                 <Button 
                     type="button"
                     variant="outline" 
                     onClick={() => handleMockLogin('LINE')}
-                    className="group relative h-11 w-full overflow-hidden rounded-xl border border-slate-300/80 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800"
+                    className="group relative h-14 w-full overflow-hidden rounded-2xl border border-emerald-600/35 bg-gradient-to-b from-[#05211b] to-[#031914] text-emerald-50 shadow-[inset_0_1px_0_rgba(52,211,153,0.15),0_10px_30px_rgba(2,18,14,0.5)] transition-all duration-200 hover:border-emerald-400/60 hover:shadow-[inset_0_1px_0_rgba(110,231,183,0.25),0_14px_36px_rgba(2,18,14,0.7)]"
                     disabled={!!isLoading}
                 >
-                     <div className="absolute inset-0 bg-[#06C755]/0 group-hover:bg-[#06C755]/5 transition-colors duration-300" />
+                     <div className="absolute inset-0 bg-emerald-400/0 group-hover:bg-emerald-300/5 transition-colors duration-300" />
                     <LineIcon />
-                    <span className="ml-2 font-medium">LINE</span>
+                    <span className="ml-3 text-xl font-medium tracking-tight">LINE</span>
                 </Button>
 
                 <Button 
                     type="button"
                     variant="outline" 
                     onClick={handleFacebookLogin}
-                    className="group relative h-11 w-full overflow-hidden rounded-xl border border-slate-300/80 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800"
+                    className="group relative h-14 w-full overflow-hidden rounded-2xl border border-emerald-600/35 bg-gradient-to-b from-[#05211b] to-[#031914] text-emerald-50 shadow-[inset_0_1px_0_rgba(52,211,153,0.15),0_10px_30px_rgba(2,18,14,0.5)] transition-all duration-200 hover:border-emerald-400/60 hover:shadow-[inset_0_1px_0_rgba(110,231,183,0.25),0_14px_36px_rgba(2,18,14,0.7)]"
                     disabled={!!isLoading}
                 >
-                     <div className="absolute inset-0 bg-[#1877F2]/0 group-hover:bg-[#1877F2]/5 transition-colors duration-300" />
+                     <div className="absolute inset-0 bg-emerald-400/0 group-hover:bg-emerald-300/5 transition-colors duration-300" />
                     <FacebookIcon />
-                    <span className="ml-2 font-medium">Facebook</span>
+                    <span className="ml-3 text-xl font-medium tracking-tight">Facebook</span>
                 </Button>
             </div>
         </div>

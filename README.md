@@ -30,7 +30,12 @@ Smart farm command center (Web) for monitoring devices, dashboards, and secure a
 │  ├─ middleware/
 │  └─ server.js
 ├─ scripts/
-└─ docs (*.md)
+│  └─ tools/
+└─ docs/
+   ├─ guides/
+   ├─ operations/
+   ├─ notes/
+   └─ reference/
 ```
 
 ## Quick Start
@@ -86,7 +91,7 @@ Notes:
 ## Notes for Portfolio Demo
 - Keep `server/.env` with local DB credentials ready before demo.
 - For social login production usage, set provider credentials in both frontend and backend env.
-- Existing markdown guides in repo root contain setup and troubleshooting details.
+- Documentation is grouped under `docs/` (see `docs/DOCS_INDEX.md`).
 
 ## Status
 - Build: passing (`npm run build`)
