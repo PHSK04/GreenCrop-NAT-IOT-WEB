@@ -551,7 +551,11 @@ export function DatabaseViewerPage() {
       </Tabs>
 
       {selectedUserDetails && (
-        <div ref={userDetailsRef} className="space-y-4 rounded-xl border-2 border-emerald-200 bg-white/95 p-4 dark:border-emerald-700/60 dark:bg-slate-900/70">
+        <div
+          ref={userDetailsRef}
+          className="space-y-4 rounded-xl border-2 border-emerald-200 bg-white/95 p-4 dark:border-emerald-700/60 dark:bg-slate-900/70 max-h-[76vh] overflow-y-auto pr-2"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
@@ -604,7 +608,7 @@ export function DatabaseViewerPage() {
             <Button variant="outline" onClick={() => setExpandedEventKey(null)}>Collapse All</Button>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[54vh] overflow-y-auto pr-1" style={{ WebkitOverflowScrolling: "touch" }}>
             {groupedUserEvents.length === 0 && (
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
                 No events found for this user in selected filters.
