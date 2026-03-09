@@ -966,7 +966,7 @@ app.get('/api/admin/db/users/:id/details', requireAdmin, async (req, res) => {
         const startDate = normalizeDateTime(req.query.startDate, false);
         const endDate = normalizeDateTime(req.query.endDate, true);
         const user = await db.get(`
-            SELECT id, name, email, role, location, title, created_at
+            SELECT id, name, email, role, location, bio, title, notes, plain_password, created_at
             FROM users
             WHERE id = ?
         `, [userId]);

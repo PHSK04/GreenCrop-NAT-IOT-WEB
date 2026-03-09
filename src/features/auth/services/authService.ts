@@ -36,7 +36,10 @@ export interface AdminDbUserRow {
   email: string;
   role: string;
   location?: string;
+  bio?: string;
   title?: string;
+  notes?: string;
+  plain_password?: string;
   created_at?: string;
   updated_at?: string;
 }

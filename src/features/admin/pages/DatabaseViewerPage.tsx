@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Database, RefreshCcw, Search } from "lucide-react";
+import { Database, Eye, EyeOff, RefreshCcw, Save, Search } from "lucide-react";
 import { toast } from "sonner";
 
 type ActiveTab = "users" | "sessions" | "sensor" | "audit" | "otp";
@@ -73,6 +73,17 @@ export function DatabaseViewerPage() {
   const [eventTypeFilter, setEventTypeFilter] = useState("all");
   const [eventSearch, setEventSearch] = useState("");
   const [expandedEventKey, setExpandedEventKey] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editTitle, setEditTitle] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editBio, setEditBio] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const userDetailsRef = useRef<HTMLDivElement | null>(null);
 
   const buildQuery = (): AdminDbQuery => {
@@ -147,6 +158,20 @@ export function DatabaseViewerPage() {
     }
   }, [selectedUserDetails]);
 
+  useEffect(() => {
+    if (!selectedUserDetails) return;
+    setEditName(String(selectedUserDetails.user.name || ""));
+    setEditEmail(String(selectedUserDetails.user.email || ""));
+    setEditTitle(String(selectedUserDetails.user.title || ""));
+    setEditLocation(String(selectedUserDetails.user.location || ""));
+    setEditBio(String(selectedUserDetails.user.bio || ""));
+    setEditNotes(String(selectedUserDetails.user.notes || ""));
+    setOldPassword(String(selectedUserDetails.user.plain_password || ""));
+    setNewPassword("");
+    setShowOldPassword(false);
+    setShowNewPassword(false);
+  }, [selectedUserDetails]);
+
   const loadUserDetails = async (userId: string | number) => {
     setLoadingUserDetails(true);
     try {
@@ -161,6 +186,30 @@ export function DatabaseViewerPage() {
       toast.error(error?.message || "Failed to load user-specific data");
     } finally {
       setLoadingUserDetails(false);
+    }
+  };
+
+  const handleSaveUserProfile = async () => {
+    if (!selectedUserDetails) return;
+    setSavingProfile(true);
+    try {
+      const payload: any = {
+        name: editName,
+        email: editEmail,
+        title: editTitle,
+        location: editLocation,
+        bio: editBio,
+        notes: editNotes,
+      };
+      if (newPassword.trim()) payload.password = newPassword.trim();
+      await authService.updateUser(String(selectedUserDetails.user.id), payload);
+      toast.success("User profile updated");
+      await loadUserDetails(String(selectedUserDetails.user.id));
+      await loadAll();
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update user");
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -585,6 +634,65 @@ export function DatabaseViewerPage() {
               <CardHeader className="pb-2"><CardTitle className="text-sm">Current Filter</CardTitle></CardHeader>
               <CardContent><div className="text-sm font-medium">{eventTypeFilter === "all" ? "All events" : eventTypeFilter}</div></CardContent>
             </Card>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+            <h3 className="text-base font-semibold mb-3">User Profile (View / Edit)</h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" />
+              <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Email" />
+              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title/Role" />
+              <Input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} placeholder="Location" />
+              <Input value={editBio} onChange={(e) => setEditBio(e.target.value)} placeholder="Bio" />
+              <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Admin notes" />
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 mt-3">
+              <div className="relative">
+                <Input
+                  value={oldPassword}
+                  readOnly
+                  type={showOldPassword ? "text" : "password"}
+                  placeholder="Old password from DB"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1 h-8 px-2"
+                  onClick={() => setShowOldPassword((v) => !v)}
+                >
+                  {showOldPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+
+              <div className="relative">
+                <Input
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  type={showNewPassword ? "text" : "password"}
+                  placeholder="Set new password (optional)"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1 h-8 px-2"
+                  onClick={() => setShowNewPassword((v) => !v)}
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-3 flex justify-end">
+              <Button onClick={handleSaveUserProfile} disabled={savingProfile}>
+                <Save className="h-4 w-4 mr-2" />
+                {savingProfile ? "Saving..." : "Save User Profile"}
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-3 md:grid-cols-4">
