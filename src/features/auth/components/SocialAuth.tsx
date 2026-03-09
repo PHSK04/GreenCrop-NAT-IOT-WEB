@@ -12,7 +12,24 @@ const FACEBOOK_APP_ID = "1585600402556361"; // Facebook App ID
 // --- Brand Icons ---
 
 const GoogleIcon = () => (
-   <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true"><path d="M12.0003 20.45c4.6667 0 7.9733-3.2533 7.9733-8.16 0-.6933-.08-1.5467-.1866-2.08H12.0003v3.8933h4.64C16.3203 15.68 14.667 17.52 12.0003 17.52c-3.1467 0-5.7867-2.1867-6.72-5.12H1.9736v3.1733C3.9203 19.3333 7.6803 20.45 12.0003 20.45z" fill="#34A853"/><path d="M5.2803 12.4c-.24-.7467-.3733-1.5467-.3733-2.4s.1333-1.6533.3733-2.4V4.4267H1.9736C1.1736 6.0267.7203 7.92.7203 10s.4533 3.9733 1.2533 5.5733l3.3067-3.1733z" fill="#FBBC05"/><path d="M12.0003 6.48c2.16 0 3.8667.9067 5.0667 2.0533l2.88-2.88C18.187 3.84 15.3603 2.4 12.0003 2.4 7.6803 2.4 3.9203 3.52 1.9736 7.4267l3.3067 3.1733C6.2136 7.68 8.8536 5.4933 12.0003 5.4933c.48 0 .96.0533 1.4133.16.4533.1067.88.2933 1.28.5333l-1.92 1.92c-.2133.2133-.5067.32-.8.32-.5867 0-1.0667-.48-1.0667-1.0667 0-.5867.48-1.0667 1.0667-1.0667z" fill="#EA4335"/><path d="M12.0003 2.4c-4.32 0-8.08 1.12-10.0267 5.0267l3.3067 3.1733c.9333-2.9333 3.5733-5.12 6.72-5.12 2.6667 0 4.32 1.84 4.64 3.3867h4.64C19.9736 5.6533 16.667 2.4 12.0003 2.4z" fill="#EA4335"/></svg>
+   <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
+      <path
+         d="M21.805 10.023h-9.8v3.955h5.62c-.48 2.52-2.62 3.955-5.62 3.955-3.33 0-6.04-2.79-6.04-6.23s2.71-6.23 6.04-6.23c1.89 0 3.13.8 3.85 1.47l2.63-2.71c-1.69-1.6-3.88-2.58-6.48-2.58-5.32 0-9.63 4.43-9.63 9.89s4.31 9.89 9.63 9.89c5.56 0 9.24-3.95 9.24-9.5 0-.64-.06-1.1-.14-1.91z"
+         fill="#4285F4"
+      />
+      <path
+         d="M3.59 7.35l3.25 2.45c.88-2.67 2.84-4.33 5.17-4.33 1.89 0 3.13.8 3.85 1.47l2.63-2.71c-1.69-1.6-3.88-2.58-6.48-2.58-3.7 0-6.94 2.17-8.42 5.7z"
+         fill="#EA4335"
+      />
+      <path
+         d="M12 21.43c2.54 0 4.69-.86 6.26-2.47l-2.9-2.4c-.87.62-1.96 1.37-3.36 1.37-2.98 0-5.14-1.92-5.62-4.5l-3.22 2.52c1.46 3.58 4.77 5.48 8.84 5.48z"
+         fill="#34A853"
+      />
+      <path
+         d="M6.38 13.43a6.42 6.42 0 0 1 0-3.96L3.16 6.95a10.23 10.23 0 0 0 0 9l3.22-2.52z"
+         fill="#FBBC05"
+      />
+   </svg>
 );
 
 const MicrosoftIcon = () => (
@@ -137,6 +154,12 @@ export function SocialAuth({
         }
     };
 
+    const socialButtonBase =
+        "group relative h-14 w-full overflow-hidden rounded-2xl border transition-all duration-200 disabled:opacity-60 " +
+        "border-slate-200 bg-white text-slate-800 shadow-[0_10px_24px_rgba(15,23,42,0.10)] hover:border-emerald-300 hover:shadow-[0_14px_30px_rgba(15,23,42,0.14)] " +
+        "dark:border-emerald-600/35 dark:bg-gradient-to-b dark:from-[#05211b] dark:to-[#031914] dark:text-emerald-50 " +
+        "dark:shadow-[inset_0_1px_0_rgba(52,211,153,0.15),0_10px_30px_rgba(2,18,14,0.5)] dark:hover:border-emerald-400/60 dark:hover:shadow-[inset_0_1px_0_rgba(110,231,183,0.25),0_14px_36px_rgba(2,18,14,0.7)]";
+
     return (
         <div className="pt-2 text-center space-y-4">
             {showDivider ? (
@@ -152,54 +175,56 @@ export function SocialAuth({
                 </div>
             ) : null}
             
+            <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-inner dark:border-slate-800/70 dark:bg-slate-900/35">
             <div className="grid grid-cols-2 gap-4">
                 <Button 
                     type="button"
                     variant="outline" 
                     onClick={handleGoogleLogin}
-                    className="group relative h-14 w-full overflow-hidden rounded-2xl border border-emerald-600/35 bg-gradient-to-b from-[#05211b] to-[#031914] text-emerald-50 shadow-[inset_0_1px_0_rgba(52,211,153,0.15),0_10px_30px_rgba(2,18,14,0.5)] transition-all duration-200 hover:border-emerald-400/60 hover:shadow-[inset_0_1px_0_rgba(110,231,183,0.25),0_14px_36px_rgba(2,18,14,0.7)]"
+                    className={socialButtonBase}
                     disabled={!!isLoading}
                 >
-                    <div className="absolute inset-0 bg-emerald-400/0 group-hover:bg-emerald-300/5 transition-colors duration-300" />
+                    <div className="absolute inset-0 bg-emerald-400/0 transition-colors duration-300 group-hover:bg-emerald-500/5 dark:group-hover:bg-emerald-300/5" />
                     <GoogleIcon />
-                    <span className="ml-3 text-xl font-medium tracking-tight">Google</span>
+                    <span className="ml-3 text-[1.05rem] font-semibold tracking-tight">Google</span>
                 </Button>
                 
                 <Button 
                     type="button"
                     variant="outline" 
                     onClick={() => handleMockLogin('Microsoft')}
-                    className="group relative h-14 w-full overflow-hidden rounded-2xl border border-emerald-600/35 bg-gradient-to-b from-[#05211b] to-[#031914] text-emerald-50 shadow-[inset_0_1px_0_rgba(52,211,153,0.15),0_10px_30px_rgba(2,18,14,0.5)] transition-all duration-200 hover:border-emerald-400/60 hover:shadow-[inset_0_1px_0_rgba(110,231,183,0.25),0_14px_36px_rgba(2,18,14,0.7)]"
+                    className={socialButtonBase}
                     disabled={!!isLoading}
                 >
-                     <div className="absolute inset-0 bg-emerald-400/0 group-hover:bg-emerald-300/5 transition-colors duration-300" />
+                     <div className="absolute inset-0 bg-emerald-400/0 transition-colors duration-300 group-hover:bg-emerald-500/5 dark:group-hover:bg-emerald-300/5" />
                     <MicrosoftIcon />
-                    <span className="ml-3 text-xl font-medium tracking-tight">Microsoft</span>
+                    <span className="ml-3 text-[1.05rem] font-semibold tracking-tight">Microsoft</span>
                 </Button>
 
                 <Button 
                     type="button"
                     variant="outline" 
                     onClick={() => handleMockLogin('LINE')}
-                    className="group relative h-14 w-full overflow-hidden rounded-2xl border border-emerald-600/35 bg-gradient-to-b from-[#05211b] to-[#031914] text-emerald-50 shadow-[inset_0_1px_0_rgba(52,211,153,0.15),0_10px_30px_rgba(2,18,14,0.5)] transition-all duration-200 hover:border-emerald-400/60 hover:shadow-[inset_0_1px_0_rgba(110,231,183,0.25),0_14px_36px_rgba(2,18,14,0.7)]"
+                    className={socialButtonBase}
                     disabled={!!isLoading}
                 >
-                     <div className="absolute inset-0 bg-emerald-400/0 group-hover:bg-emerald-300/5 transition-colors duration-300" />
+                     <div className="absolute inset-0 bg-emerald-400/0 transition-colors duration-300 group-hover:bg-emerald-500/5 dark:group-hover:bg-emerald-300/5" />
                     <LineIcon />
-                    <span className="ml-3 text-xl font-medium tracking-tight">LINE</span>
+                    <span className="ml-3 text-[1.05rem] font-semibold tracking-tight">LINE</span>
                 </Button>
 
                 <Button 
                     type="button"
                     variant="outline" 
                     onClick={handleFacebookLogin}
-                    className="group relative h-14 w-full overflow-hidden rounded-2xl border border-emerald-600/35 bg-gradient-to-b from-[#05211b] to-[#031914] text-emerald-50 shadow-[inset_0_1px_0_rgba(52,211,153,0.15),0_10px_30px_rgba(2,18,14,0.5)] transition-all duration-200 hover:border-emerald-400/60 hover:shadow-[inset_0_1px_0_rgba(110,231,183,0.25),0_14px_36px_rgba(2,18,14,0.7)]"
+                    className={socialButtonBase}
                     disabled={!!isLoading}
                 >
-                     <div className="absolute inset-0 bg-emerald-400/0 group-hover:bg-emerald-300/5 transition-colors duration-300" />
+                     <div className="absolute inset-0 bg-emerald-400/0 transition-colors duration-300 group-hover:bg-emerald-500/5 dark:group-hover:bg-emerald-300/5" />
                     <FacebookIcon />
-                    <span className="ml-3 text-xl font-medium tracking-tight">Facebook</span>
+                    <span className="ml-3 text-[1.05rem] font-semibold tracking-tight">Facebook</span>
                 </Button>
+            </div>
             </div>
         </div>
     );
