@@ -427,6 +427,11 @@ export function UserManagementPage() {
                      <p className="text-xs text-slate-600">
                          <span className="inline-flex items-center gap-1"><KeyRound className="h-3.5 w-3.5" /> Click the eye icon to show or hide</span>
                      </p>
+                     {!editPassword && (
+                        <p className="text-xs text-amber-600">
+                            No old password stored for this user (social login/migrated account).
+                        </p>
+                     )}
                  </div>
 
                  <div className="space-y-1">

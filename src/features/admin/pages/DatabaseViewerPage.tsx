@@ -664,6 +664,11 @@ export function DatabaseViewerPage() {
                 >
                   {showOldPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
+                {!oldPassword && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    No old password stored for this user (common with social login/migrated account).
+                  </p>
+                )}
               </div>
 
               <div className="relative">
