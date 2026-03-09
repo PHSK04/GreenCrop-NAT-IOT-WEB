@@ -32,8 +32,14 @@ const APPLE_SERVICE_ID = process.env.APPLE_SERVICE_ID || '';
 const LINE_CHANNEL_ID = process.env.LINE_CHANNEL_ID || '';
 const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || '';
 const LINE_REDIRECT_URI = process.env.LINE_REDIRECT_URI || '';
+const MICROSOFT_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || '';
+const MICROSOFT_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET || '';
+const MICROSOFT_TENANT_ID = process.env.MICROSOFT_TENANT_ID || 'common';
+const MICROSOFT_REDIRECT_URI = process.env.MICROSOFT_REDIRECT_URI || '';
 const APPLE_JWKS_CACHE_MS = 6 * 60 * 60 * 1000;
 let appleJwksCache = { fetchedAt: 0, keys: [] };
+const MICROSOFT_JWKS_CACHE_MS = 6 * 60 * 60 * 1000;
+let microsoftJwksCache = { fetchedAt: 0, keys: [] };
 
 const DEFAULT_CORS_ORIGINS = [
     'http://localhost:3000',
@@ -485,6 +491,116 @@ async function verifyLineIdentity({ authorizationCode, redirectUri, accessToken,
     };
 }
 
+async function getMicrosoftJwks() {
+    const now = Date.now();
+    if (microsoftJwksCache.keys.length > 0 && now - microsoftJwksCache.fetchedAt < MICROSOFT_JWKS_CACHE_MS) {
+        return microsoftJwksCache.keys;
+    }
+
+    const jwkSet = await httpsGetJson('https://login.microsoftonline.com/common/discovery/v2.0/keys');
+    const keys = Array.isArray(jwkSet.keys) ? jwkSet.keys : [];
+    if (!keys.length) {
+        throw new Error('Unable to load Microsoft public keys');
+    }
+
+    microsoftJwksCache = { fetchedAt: now, keys };
+    return keys;
+}
+
+async function verifyMicrosoftIdentity({ authorizationCode, redirectUri, accessToken, idToken }) {
+    if (!MICROSOFT_CLIENT_ID) {
+        throw new Error('MICROSOFT_CLIENT_ID is not configured on server');
+    }
+
+    let msAccessToken = accessToken || '';
+    let msIdToken = idToken || '';
+
+    if (authorizationCode) {
+        const configuredRedirectUri = String(MICROSOFT_REDIRECT_URI || '').trim();
+        const clientRedirectUri = String(redirectUri || '').trim();
+        const effectiveRedirectUri = clientRedirectUri || configuredRedirectUri;
+        if (!effectiveRedirectUri) {
+            throw new Error('Microsoft redirect URI is missing');
+        }
+        if (configuredRedirectUri && clientRedirectUri && configuredRedirectUri !== clientRedirectUri) {
+            throw new Error(
+                `Microsoft redirect URI mismatch (server='${configuredRedirectUri}' client='${clientRedirectUri}')`
+            );
+        }
+
+        const tokenBody = new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: String(authorizationCode),
+            client_id: MICROSOFT_CLIENT_ID,
+            redirect_uri: effectiveRedirectUri,
+            scope: 'openid profile email User.Read'
+        });
+        if (MICROSOFT_CLIENT_SECRET) {
+            tokenBody.set('client_secret', MICROSOFT_CLIENT_SECRET);
+        }
+
+        const tokenResp = await fetch(`https://login.microsoftonline.com/${MICROSOFT_TENANT_ID}/oauth2/v2.0/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: tokenBody.toString()
+        });
+        const tokenData = await tokenResp.json().catch(() => ({}));
+        if (!tokenResp.ok || !(tokenData.id_token || tokenData.access_token)) {
+            throw new Error(tokenData.error_description || tokenData.error || 'Microsoft token exchange failed');
+        }
+
+        msAccessToken = String(tokenData.access_token || msAccessToken || '');
+        msIdToken = String(tokenData.id_token || msIdToken || '');
+    }
+
+    if (!msIdToken && !msAccessToken) {
+        throw new Error('Missing Microsoft token or authorization code');
+    }
+
+    let verified = {};
+    if (msIdToken) {
+        const jwtParts = msIdToken.split('.');
+        if (jwtParts.length !== 3) {
+            throw new Error('Invalid Microsoft token format');
+        }
+        const header = decodeJwtPart(jwtParts[0]);
+        const keys = await getMicrosoftJwks();
+        const jwk = keys.find((item) => item.kid === header.kid);
+        if (!jwk) {
+            throw new Error('Microsoft public key not found for token');
+        }
+
+        const msKey = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+        verified = jwt.verify(msIdToken, msKey, {
+            algorithms: ['RS256'],
+            audience: MICROSOFT_CLIENT_ID
+        });
+    }
+
+    let profile = {};
+    if (msAccessToken) {
+        const profileResp = await fetch('https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName', {
+            headers: { Authorization: `Bearer ${msAccessToken}` }
+        });
+        profile = await profileResp.json().catch(() => ({}));
+        if (!profileResp.ok) {
+            throw new Error((profile && (profile.error?.message || profile.error_description || profile.error)) || 'Microsoft profile fetch failed');
+        }
+    }
+
+    const providerUserId = String(verified.oid || verified.sub || profile.id || '').trim();
+    if (!providerUserId) {
+        throw new Error('Unable to resolve Microsoft user id');
+    }
+
+    return {
+        providerUserId,
+        email: normalizeEmail(verified.preferred_username || verified.email || profile.mail || profile.userPrincipalName || ''),
+        name: (verified.name || profile.displayName || 'Microsoft User'),
+        avatar: null
+    };
+}
+
 async function upsertSocialUser({ provider, providerUserId, email, name, avatar }) {
     const normalizedEmail = normalizeEmail(email || '');
     const finalEmail = normalizedEmail || socialFallbackEmail(provider, providerUserId);
@@ -580,8 +696,7 @@ app.post('/api/auth/social', async (req, res) => {
     } = req.body || {};
 
     const normalizedProvider = String(provider || '').trim().toLowerCase();
-    // Added 'line' to supported providers
-    if (!['google', 'facebook', 'apple', 'line'].includes(normalizedProvider)) {
+    if (!['google', 'facebook', 'apple', 'line', 'microsoft'].includes(normalizedProvider)) {
         return res.status(400).json({ error: 'Unsupported social provider' });
     }
 
@@ -609,6 +724,13 @@ app.post('/api/auth/social', async (req, res) => {
                 verifiedProfile = await verifyAppleIdentity({ idToken, email });
             } else if (normalizedProvider === 'line') {
                 verifiedProfile = await verifyLineIdentity({
+                    authorizationCode,
+                    redirectUri,
+                    accessToken,
+                    idToken
+                });
+            } else if (normalizedProvider === 'microsoft') {
+                verifiedProfile = await verifyMicrosoftIdentity({
                     authorizationCode,
                     redirectUri,
                     accessToken,
@@ -721,6 +843,162 @@ app.post('/api/logout', async (req, res) => {
 // Tenant middleware: verify JWT and set DB session context (for MSSQL RLS)
 const authTenant = require('./middleware/authTenant')(db);
 app.use(authTenant);
+
+function requireAdmin(req, res, next) {
+    const role = String(req.user?.role || '').toLowerCase();
+    if (role !== 'admin') {
+        return res.status(403).json({ error: 'Admin permission required' });
+    }
+    return next();
+}
+
+function maskContact(value) {
+    const text = String(value || '');
+    if (!text) return '';
+    const at = text.indexOf('@');
+    if (at > 1) {
+        return `${text.slice(0, 2)}***${text.slice(at)}`;
+    }
+    if (text.length <= 4) return `${text[0] || '*'}***`;
+    return `${text.slice(0, 2)}***${text.slice(-2)}`;
+}
+
+app.get('/api/admin/db/summary', requireAdmin, async (req, res) => {
+    try {
+        const [usersCount, loginCount, sensorCount, auditCount, otpCount] = await Promise.all([
+            db.get('SELECT COUNT(*) AS total FROM users'),
+            db.get('SELECT COUNT(*) AS total FROM login_sessions'),
+            db.get('SELECT COUNT(*) AS total FROM sensor_data'),
+            db.get('SELECT COUNT(*) AS total FROM audit_logs'),
+            db.get('SELECT COUNT(*) AS total FROM otp_codes')
+        ]);
+
+        res.json({
+            users: Number(usersCount?.total || 0),
+            login_sessions: Number(loginCount?.total || 0),
+            sensor_data: Number(sensorCount?.total || 0),
+            audit_logs: Number(auditCount?.total || 0),
+            otp_codes: Number(otpCount?.total || 0)
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/admin/db/users', requireAdmin, async (req, res) => {
+    try {
+        const users = await db.all(`
+            SELECT id, name, email, role, location, title, created_at, updated_at
+            FROM users
+            ORDER BY created_at DESC
+        `);
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/admin/db/users/:id/details', requireAdmin, async (req, res) => {
+    try {
+        const userId = String(req.params.id);
+        const user = await db.get(`
+            SELECT id, name, email, role, location, title, created_at, updated_at
+            FROM users
+            WHERE id = ?
+        `, [userId]);
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const [sessions, sensorData, auditLogs] = await Promise.all([
+            db.all(`
+                SELECT TOP 120 id, user_id, user_name, user_email, device_type, device_name, browser, os, ip_address, login_time, logout_time, status
+                FROM login_sessions
+                WHERE user_id = ?
+                ORDER BY login_time DESC
+            `, [userId]),
+            db.all(`
+                SELECT TOP 120 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, active_tank, is_on, uptime_seconds, timestamp
+                FROM sensor_data
+                WHERE tenant_id = ?
+                ORDER BY id DESC
+            `, [userId]),
+            db.all(`
+                SELECT TOP 120 id, user_name, action, device, status, details, timestamp
+                FROM audit_logs
+                WHERE user_name = ?
+                ORDER BY timestamp DESC
+            `, [String(user.name || '')])
+        ]);
+
+        res.json({
+            user,
+            sessions,
+            sensor_data: sensorData,
+            audit_logs: auditLogs
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/admin/db/login-sessions', requireAdmin, async (req, res) => {
+    try {
+        const rows = await db.all(`
+            SELECT TOP 300 id, user_id, user_name, user_email, device_type, device_name, browser, os, ip_address, login_time, logout_time, status
+            FROM login_sessions
+            ORDER BY login_time DESC
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/admin/db/sensor-data', requireAdmin, async (req, res) => {
+    try {
+        const rows = await db.all(`
+            SELECT TOP 300 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, active_tank, is_on, uptime_seconds, timestamp
+            FROM sensor_data
+            ORDER BY id DESC
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/admin/db/audit-logs', requireAdmin, async (req, res) => {
+    try {
+        const rows = await db.all(`
+            SELECT TOP 300 id, user_name, action, device, status, details, timestamp
+            FROM audit_logs
+            ORDER BY timestamp DESC
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/admin/db/otp-codes', requireAdmin, async (req, res) => {
+    try {
+        const rows = await db.all(`
+            SELECT TOP 300 id, contact, expires_at, created_at
+            FROM otp_codes
+            ORDER BY created_at DESC
+        `);
+        res.json(
+            rows.map((row) => ({
+                ...row,
+                contact: maskContact(row.contact)
+            }))
+        );
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // 3. GET ALL USERS
 app.get('/api/users', async (req, res) => {

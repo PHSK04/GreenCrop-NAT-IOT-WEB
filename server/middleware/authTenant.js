@@ -26,6 +26,7 @@ module.exports = function (db) {
 
       const secret = process.env.JWT_SECRET || 'dev_jwt_secret';
       const payload = jwt.verify(token, secret);
+      req.user = payload;
 
       let tenantId = payload.tenant_id || payload.tenant || payload.tid;
       // Backward compatibility: older tokens used tenant_id='public'.
