@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowUpRight, Loader2, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowUpRight, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -242,7 +243,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                       <div className="group relative">
                         <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-emerald-500" />
                         <Input
-                          placeholder="name@example.com"
+                          placeholder="Username"
                           className="h-12 rounded-2xl border-slate-200/80 bg-slate-100/65 pl-12 text-[15px] text-slate-900 placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-700/80 dark:bg-slate-950/65 dark:text-slate-100 dark:placeholder:text-slate-500"
                           autoComplete="off"
                           autoCorrect="off"
@@ -277,15 +278,23 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                       <div className="group relative">
                         <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-emerald-500" />
                         <Input
-                          type="password"
+                          type={showPassword ? "text" : "password"}
                           placeholder="••••••••"
-                          className="h-12 rounded-2xl border-slate-200/80 bg-slate-100/65 pl-12 text-[15px] text-slate-900 placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-700/80 dark:bg-slate-950/65 dark:text-slate-100 dark:placeholder:text-slate-500"
+                          className="h-12 rounded-2xl border-slate-200/80 bg-slate-100/65 pl-12 pr-12 text-[15px] text-slate-900 placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-700/80 dark:bg-slate-950/65 dark:text-slate-100 dark:placeholder:text-slate-500"
                           autoComplete="off"
                           autoCorrect="off"
                           autoCapitalize="none"
                           spellCheck={false}
                           {...field}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-emerald-500"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
                       </div>
                     </FormControl>
                     <FormMessage />

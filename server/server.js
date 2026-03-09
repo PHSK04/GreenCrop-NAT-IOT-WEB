@@ -888,7 +888,7 @@ app.get('/api/admin/db/summary', requireAdmin, async (req, res) => {
 app.get('/api/admin/db/users', requireAdmin, async (req, res) => {
     try {
         const users = await db.all(`
-            SELECT id, name, email, role, location, title, created_at, updated_at
+            SELECT id, name, email, role, location, title, created_at
             FROM users
             ORDER BY created_at DESC
         `);
@@ -902,7 +902,7 @@ app.get('/api/admin/db/users/:id/details', requireAdmin, async (req, res) => {
     try {
         const userId = String(req.params.id);
         const user = await db.get(`
-            SELECT id, name, email, role, location, title, created_at, updated_at
+            SELECT id, name, email, role, location, title, created_at
             FROM users
             WHERE id = ?
         `, [userId]);
