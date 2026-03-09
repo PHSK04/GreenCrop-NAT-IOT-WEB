@@ -40,10 +40,10 @@ export function DatabaseViewerPage() {
   const [auditRows, setAuditRows] = useState<AdminDbAuditRow[]>([]);
   const [otpRows, setOtpRows] = useState<AdminDbOtpRow[]>([]);
   const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDateTime, setStartDateTime] = useState("");
+  const [endDateTime, setEndDateTime] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedUserId, setSelectedUserId] = useState<string>("all");
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [loadingUserDetails, setLoadingUserDetails] = useState(false);
   const [selectedUserDetails, setSelectedUserDetails] = useState<AdminDbUserDetails | null>(null);
@@ -52,8 +52,8 @@ export function DatabaseViewerPage() {
   const buildQuery = (): AdminDbQuery => {
     const query: AdminDbQuery = { limit: 300 };
     if (search.trim()) query.q = search.trim();
-    if (startDate) query.startDate = startDate;
-    if (endDate) query.endDate = endDate;
+    if (startDateTime) query.startDate = startDateTime;
+    if (endDateTime) query.endDate = endDateTime;
     if (statusFilter !== "all" && (activeTab === "sessions" || activeTab === "audit")) {
       query.status = statusFilter;
     }
@@ -73,12 +73,10 @@ export function DatabaseViewerPage() {
         authService.getAdminDbOtpCodes(),
       ]);
 
-      const effectiveUserId =
-        selectedUserId !== "all"
-          ? selectedUserId
-          : (u[0]?.id !== undefined ? String(u[0].id) : "");
+      const requestedUserId = query?.userId ? String(query.userId) : "";
+      const effectiveUserId = requestedUserId || selectedUserId || (u[0]?.id !== undefined ? String(u[0].id) : "");
 
-      if (selectedUserId === "all" && effectiveUserId) {
+      if (!selectedUserId && effectiveUserId) {
         setSelectedUserId(effectiveUserId);
       }
 
@@ -121,8 +119,8 @@ export function DatabaseViewerPage() {
     setLoadingUserDetails(true);
     try {
       const details = await authService.getAdminDbUserDetails(String(userId), {
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
+        startDate: startDateTime || undefined,
+        endDate: endDateTime || undefined,
         limit: 120,
       });
       setSelectedUserDetails(details);
@@ -185,7 +183,7 @@ export function DatabaseViewerPage() {
   );
 
   return (
-    <div className="p-8 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="p-8 pb-24 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Database Viewer</h1>
@@ -230,8 +228,8 @@ export function DatabaseViewerPage() {
             className="pl-8"
           />
         </div>
-        <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-        <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        <Input aria-label="Start date and time" type="datetime-local" value={startDateTime} onChange={(e) => setStartDateTime(e.target.value)} />
+        <Input aria-label="End date and time" type="datetime-local" value={endDateTime} onChange={(e) => setEndDateTime(e.target.value)} />
         <Button variant="outline" onClick={loadAll} disabled={loading}>
           Apply Filters
         </Button>
@@ -239,11 +237,18 @@ export function DatabaseViewerPage() {
 
       <div className="grid gap-3 md:grid-cols-4">
         <select
-          className="h-10 rounded-md border bg-background px-3 text-sm"
+          className="h-11 rounded-md border border-slate-300 bg-background px-3 text-sm"
           value={selectedUserId}
-          onChange={(e) => setSelectedUserId(e.target.value)}
+          onChange={(e) => {
+            setSelectedUserId(e.target.value);
+            setTimeout(() => {
+              loadAllWithQuery({ ...buildQuery(), userId: e.target.value });
+            }, 0);
+          }}
         >
-          <option value="all">All users</option>
+          <option value="" disabled>
+            Select user
+          </option>
           {users.map((u) => (
             <option key={String(u.id)} value={String(u.id)}>
               {safeText(u.name)} ({safeText(u.email)})
@@ -252,7 +257,7 @@ export function DatabaseViewerPage() {
         </select>
 
         <select
-          className="h-10 rounded-md border bg-background px-3 text-sm"
+          className="h-11 rounded-md border border-slate-300 bg-background px-3 text-sm"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
@@ -268,10 +273,9 @@ export function DatabaseViewerPage() {
           variant="outline"
           onClick={() => {
             setSearch("");
-            setStartDate("");
-            setEndDate("");
+            setStartDateTime("");
+            setEndDateTime("");
             setStatusFilter("all");
-            setSelectedUserId("all");
             loadAllWithQuery({ limit: 300 });
           }}
         >
@@ -288,15 +292,16 @@ export function DatabaseViewerPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ActiveTab)}>
-        <TabsList>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="sessions">Login Sessions</TabsTrigger>
-          <TabsTrigger value="sensor">Sensor Data</TabsTrigger>
-          <TabsTrigger value="audit">Audit Logs</TabsTrigger>
-          <TabsTrigger value="otp">OTP Codes</TabsTrigger>
+        <TabsList className="h-auto flex-wrap gap-2 bg-slate-100/80 p-2 dark:bg-slate-800/70">
+          <TabsTrigger className="text-sm" value="users">Users</TabsTrigger>
+          <TabsTrigger className="text-sm" value="sessions">Login Sessions</TabsTrigger>
+          <TabsTrigger className="text-sm" value="sensor">Sensor Data</TabsTrigger>
+          <TabsTrigger className="text-sm" value="audit">Audit Logs</TabsTrigger>
+          <TabsTrigger className="text-sm" value="otp">OTP Codes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="overflow-hidden rounded-xl border-2 border-slate-200 bg-white/95 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+          <div className="max-h-[56vh] overflow-auto">
           <Table>
             <TableHeader className="bg-slate-100/90 dark:bg-slate-800/70"><TableRow><TableHead>ID</TableHead><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Location</TableHead><TableHead>Created</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
             <TableBody>
@@ -323,9 +328,11 @@ export function DatabaseViewerPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </TabsContent>
 
         <TabsContent value="sessions" className="overflow-hidden rounded-xl border-2 border-slate-200 bg-white/95 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+          <div className="max-h-[56vh] overflow-auto">
           <Table>
             <TableHeader className="bg-slate-100/90 dark:bg-slate-800/70"><TableRow><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Device</TableHead><TableHead>Browser</TableHead><TableHead>Status</TableHead><TableHead>Login Time</TableHead></TableRow></TableHeader>
             <TableBody>
@@ -341,9 +348,11 @@ export function DatabaseViewerPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </TabsContent>
 
         <TabsContent value="sensor" className="overflow-hidden rounded-xl border-2 border-slate-200 bg-white/95 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+          <div className="max-h-[56vh] overflow-auto">
           <Table>
             <TableHeader className="bg-slate-100/90 dark:bg-slate-800/70"><TableRow><TableHead>ID</TableHead><TableHead>Tenant</TableHead><TableHead>Device</TableHead><TableHead>Sensor</TableHead><TableHead>Pressure</TableHead><TableHead>Flow</TableHead><TableHead>Timestamp</TableHead></TableRow></TableHeader>
             <TableBody>
@@ -360,9 +369,11 @@ export function DatabaseViewerPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </TabsContent>
 
         <TabsContent value="audit" className="overflow-hidden rounded-xl border-2 border-slate-200 bg-white/95 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+          <div className="max-h-[56vh] overflow-auto">
           <Table>
             <TableHeader className="bg-slate-100/90 dark:bg-slate-800/70"><TableRow><TableHead>Time</TableHead><TableHead>User</TableHead><TableHead>Action</TableHead><TableHead>Target</TableHead><TableHead>Status</TableHead><TableHead>Details</TableHead></TableRow></TableHeader>
             <TableBody>
@@ -378,9 +389,11 @@ export function DatabaseViewerPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </TabsContent>
 
         <TabsContent value="otp" className="overflow-hidden rounded-xl border-2 border-slate-200 bg-white/95 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+          <div className="max-h-[56vh] overflow-auto">
           <Table>
             <TableHeader className="bg-slate-100/90 dark:bg-slate-800/70"><TableRow><TableHead>ID</TableHead><TableHead>Contact (masked)</TableHead><TableHead>Created</TableHead><TableHead>Expires</TableHead></TableRow></TableHeader>
             <TableBody>
@@ -394,6 +407,7 @@ export function DatabaseViewerPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </TabsContent>
       </Tabs>
 
