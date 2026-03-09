@@ -175,7 +175,6 @@ export function SocialAuth({
                 </div>
             ) : null}
             
-            <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-inner dark:border-slate-800/70 dark:bg-slate-900/35">
             <div className="grid grid-cols-2 gap-4">
                 <Button 
                     type="button"
@@ -224,7 +223,6 @@ export function SocialAuth({
                     <FacebookIcon />
                     <span className="ml-3 text-[1.05rem] font-semibold tracking-tight">Facebook</span>
                 </Button>
-            </div>
             </div>
         </div>
     );
