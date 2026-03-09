@@ -694,7 +694,7 @@ export function DatabaseViewerPage() {
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-6">
             <Input
               value={eventSearch}
               onChange={(e) => setEventSearch(e.target.value)}
@@ -712,7 +712,29 @@ export function DatabaseViewerPage() {
               <option value="SENSOR">SENSOR</option>
               <option value="ERROR">ERROR</option>
             </select>
-            <Button variant="outline" onClick={() => setExpandedEventKey(null)}>Collapse All</Button>
+            <Input
+              type="datetime-local"
+              value={startDateTime}
+              onChange={(e) => setStartDateTime(e.target.value)}
+              aria-label="User timeline start date time"
+            />
+            <Input
+              type="datetime-local"
+              value={endDateTime}
+              onChange={(e) => setEndDateTime(e.target.value)}
+              aria-label="User timeline end date time"
+            />
+            <Button
+              variant="outline"
+              onClick={() => {
+                setExpandedEventKey(null);
+                if (selectedUserDetails) {
+                  loadUserDetails(String(selectedUserDetails.user.id));
+                }
+              }}
+            >
+              Reload by Date
+            </Button>
           </div>
 
           <div className="space-y-4">
