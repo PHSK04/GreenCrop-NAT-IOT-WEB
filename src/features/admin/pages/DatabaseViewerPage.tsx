@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AdminDbAuditRow,
   AdminDbOtpRow,
+  AdminDbQuery,
   AdminDbSensorRow,
   AdminDbSessionRow,
   AdminDbSummary,
@@ -39,22 +40,61 @@ export function DatabaseViewerPage() {
   const [auditRows, setAuditRows] = useState<AdminDbAuditRow[]>([]);
   const [otpRows, setOtpRows] = useState<AdminDbOtpRow[]>([]);
   const [search, setSearch] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [loadingUserDetails, setLoadingUserDetails] = useState(false);
   const [selectedUserDetails, setSelectedUserDetails] = useState<AdminDbUserDetails | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("users");
 
-  const loadAll = async () => {
+  const buildQuery = (): AdminDbQuery => {
+    const query: AdminDbQuery = { limit: 300 };
+    if (search.trim()) query.q = search.trim();
+    if (startDate) query.startDate = startDate;
+    if (endDate) query.endDate = endDate;
+    if (statusFilter !== "all" && (activeTab === "sessions" || activeTab === "audit")) {
+      query.status = statusFilter;
+    }
+    return query;
+  };
+
+  const loadAllWithQuery = async (query?: AdminDbQuery) => {
     setLoading(true);
     try {
-      const [s, u, ls, sd, al, otp] = await Promise.all([
+      const usersQuery: AdminDbQuery = { ...query };
+      delete usersQuery.userId;
+      delete usersQuery.status;
+
+      const [s, u, otp] = await Promise.all([
         authService.getAdminDbSummary(),
-        authService.getAdminDbUsers(),
-        authService.getAdminDbLoginSessions(),
-        authService.getAdminDbSensorData(),
-        authService.getAdminDbAuditLogs(),
+        authService.getAdminDbUsers(usersQuery),
         authService.getAdminDbOtpCodes(),
       ]);
+
+      const effectiveUserId =
+        selectedUserId !== "all"
+          ? selectedUserId
+          : (u[0]?.id !== undefined ? String(u[0].id) : "");
+
+      if (selectedUserId === "all" && effectiveUserId) {
+        setSelectedUserId(effectiveUserId);
+      }
+
+      let ls: AdminDbSessionRow[] = [];
+      let sd: AdminDbSensorRow[] = [];
+      let al: AdminDbAuditRow[] = [];
+
+      if (effectiveUserId) {
+        const scopedQuery: AdminDbQuery = { ...query, userId: effectiveUserId };
+        [ls, sd, al] = await Promise.all([
+          authService.getAdminDbLoginSessions(scopedQuery),
+          authService.getAdminDbSensorData(scopedQuery),
+          authService.getAdminDbAuditLogs(scopedQuery),
+        ]);
+      }
+
       setSummary(s);
       setUsers(u);
       setSessions(ls);
@@ -68,6 +108,11 @@ export function DatabaseViewerPage() {
     }
   };
 
+  const loadAll = async () => {
+    const query = buildQuery();
+    await loadAllWithQuery(query);
+  };
+
   useEffect(() => {
     loadAll();
   }, []);
@@ -75,7 +120,11 @@ export function DatabaseViewerPage() {
   const loadUserDetails = async (userId: string | number) => {
     setLoadingUserDetails(true);
     try {
-      const details = await authService.getAdminDbUserDetails(String(userId));
+      const details = await authService.getAdminDbUserDetails(String(userId), {
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        limit: 120,
+      });
       setSelectedUserDetails(details);
       toast.success(`Loaded data for ${details.user.name}`);
     } catch (error: any) {
@@ -130,6 +179,11 @@ export function DatabaseViewerPage() {
     );
   }, [otpRows, search]);
 
+  const selectedUser = useMemo(
+    () => users.find((u) => String(u.id) === String(selectedUserId)) || null,
+    [users, selectedUserId],
+  );
+
   return (
     <div className="p-8 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center justify-between gap-4">
@@ -166,14 +220,71 @@ export function DatabaseViewerPage() {
         </Card>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search current table..."
-          className="pl-8"
-        />
+      <div className="grid gap-3 md:grid-cols-5">
+        <div className="relative md:col-span-2">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by user/email/device/action..."
+            className="pl-8"
+          />
+        </div>
+        <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        <Button variant="outline" onClick={loadAll} disabled={loading}>
+          Apply Filters
+        </Button>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <select
+          className="h-10 rounded-md border bg-background px-3 text-sm"
+          value={selectedUserId}
+          onChange={(e) => setSelectedUserId(e.target.value)}
+        >
+          <option value="all">All users</option>
+          {users.map((u) => (
+            <option key={String(u.id)} value={String(u.id)}>
+              {safeText(u.name)} ({safeText(u.email)})
+            </option>
+          ))}
+        </select>
+
+        <select
+          className="h-10 rounded-md border bg-background px-3 text-sm"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="all">All status</option>
+          <option value="success">SUCCESS</option>
+          <option value="failed">FAILED</option>
+          <option value="active">active</option>
+          <option value="inactive">inactive</option>
+          <option value="expired">expired</option>
+        </select>
+
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSearch("");
+            setStartDate("");
+            setEndDate("");
+            setStatusFilter("all");
+            setSelectedUserId("all");
+            loadAllWithQuery({ limit: 300 });
+          }}
+        >
+          Clear Filters
+        </Button>
+      </div>
+
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-sm text-emerald-800">
+        Viewing scoped data by user:
+        {" "}
+        <span className="font-semibold">
+          {selectedUser ? `${safeText(selectedUser.name)} (${safeText(selectedUser.email)})` : "No user selected"}
+        </span>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ActiveTab)}>
@@ -185,12 +296,12 @@ export function DatabaseViewerPage() {
           <TabsTrigger value="otp">OTP Codes</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users" className="overflow-hidden rounded-xl border bg-white/85 dark:bg-slate-900/70">
+        <TabsContent value="users" className="overflow-hidden rounded-xl border-2 border-slate-200 bg-white/95 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
           <Table>
-            <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Location</TableHead><TableHead>Created</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+            <TableHeader className="bg-slate-100/90 dark:bg-slate-800/70"><TableRow><TableHead>ID</TableHead><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Location</TableHead><TableHead>Created</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
             <TableBody>
               {filteredUsers.slice(0, 300).map((row) => (
-                <TableRow key={String(row.id)}>
+                <TableRow key={String(row.id)} className="border-b border-slate-200/70 dark:border-slate-700/70">
                   <TableCell className="font-mono text-xs">{safeText(row.id)}</TableCell>
                   <TableCell>{safeText(row.name)}</TableCell>
                   <TableCell>{safeText(row.email)}</TableCell>
@@ -214,12 +325,12 @@ export function DatabaseViewerPage() {
           </Table>
         </TabsContent>
 
-        <TabsContent value="sessions" className="overflow-hidden rounded-xl border bg-white/85 dark:bg-slate-900/70">
+        <TabsContent value="sessions" className="overflow-hidden rounded-xl border-2 border-slate-200 bg-white/95 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
           <Table>
-            <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Device</TableHead><TableHead>Browser</TableHead><TableHead>Status</TableHead><TableHead>Login Time</TableHead></TableRow></TableHeader>
+            <TableHeader className="bg-slate-100/90 dark:bg-slate-800/70"><TableRow><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Device</TableHead><TableHead>Browser</TableHead><TableHead>Status</TableHead><TableHead>Login Time</TableHead></TableRow></TableHeader>
             <TableBody>
               {filteredSessions.slice(0, 300).map((row) => (
-                <TableRow key={String(row.id)}>
+                <TableRow key={String(row.id)} className="border-b border-slate-200/70 dark:border-slate-700/70">
                   <TableCell>{safeText(row.user_name)}</TableCell>
                   <TableCell>{safeText(row.user_email)}</TableCell>
                   <TableCell>{safeText(row.device_name)}</TableCell>
@@ -232,12 +343,12 @@ export function DatabaseViewerPage() {
           </Table>
         </TabsContent>
 
-        <TabsContent value="sensor" className="overflow-hidden rounded-xl border bg-white/85 dark:bg-slate-900/70">
+        <TabsContent value="sensor" className="overflow-hidden rounded-xl border-2 border-slate-200 bg-white/95 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
           <Table>
-            <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Tenant</TableHead><TableHead>Device</TableHead><TableHead>Sensor</TableHead><TableHead>Pressure</TableHead><TableHead>Flow</TableHead><TableHead>Timestamp</TableHead></TableRow></TableHeader>
+            <TableHeader className="bg-slate-100/90 dark:bg-slate-800/70"><TableRow><TableHead>ID</TableHead><TableHead>Tenant</TableHead><TableHead>Device</TableHead><TableHead>Sensor</TableHead><TableHead>Pressure</TableHead><TableHead>Flow</TableHead><TableHead>Timestamp</TableHead></TableRow></TableHeader>
             <TableBody>
               {filteredSensors.slice(0, 300).map((row) => (
-                <TableRow key={String(row.id)}>
+                <TableRow key={String(row.id)} className="border-b border-slate-200/70 dark:border-slate-700/70">
                   <TableCell className="font-mono text-xs">{safeText(row.id)}</TableCell>
                   <TableCell>{safeText(row.tenant_id)}</TableCell>
                   <TableCell>{safeText(row.device_id)}</TableCell>
@@ -251,12 +362,12 @@ export function DatabaseViewerPage() {
           </Table>
         </TabsContent>
 
-        <TabsContent value="audit" className="overflow-hidden rounded-xl border bg-white/85 dark:bg-slate-900/70">
+        <TabsContent value="audit" className="overflow-hidden rounded-xl border-2 border-slate-200 bg-white/95 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
           <Table>
-            <TableHeader><TableRow><TableHead>Time</TableHead><TableHead>User</TableHead><TableHead>Action</TableHead><TableHead>Target</TableHead><TableHead>Status</TableHead><TableHead>Details</TableHead></TableRow></TableHeader>
+            <TableHeader className="bg-slate-100/90 dark:bg-slate-800/70"><TableRow><TableHead>Time</TableHead><TableHead>User</TableHead><TableHead>Action</TableHead><TableHead>Target</TableHead><TableHead>Status</TableHead><TableHead>Details</TableHead></TableRow></TableHeader>
             <TableBody>
               {filteredAudit.slice(0, 300).map((row) => (
-                <TableRow key={String(row.id)}>
+                <TableRow key={String(row.id)} className="border-b border-slate-200/70 dark:border-slate-700/70">
                   <TableCell>{formatDate(row.timestamp)}</TableCell>
                   <TableCell>{safeText(row.user_name)}</TableCell>
                   <TableCell>{safeText(row.action)}</TableCell>
@@ -269,12 +380,12 @@ export function DatabaseViewerPage() {
           </Table>
         </TabsContent>
 
-        <TabsContent value="otp" className="overflow-hidden rounded-xl border bg-white/85 dark:bg-slate-900/70">
+        <TabsContent value="otp" className="overflow-hidden rounded-xl border-2 border-slate-200 bg-white/95 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
           <Table>
-            <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Contact (masked)</TableHead><TableHead>Created</TableHead><TableHead>Expires</TableHead></TableRow></TableHeader>
+            <TableHeader className="bg-slate-100/90 dark:bg-slate-800/70"><TableRow><TableHead>ID</TableHead><TableHead>Contact (masked)</TableHead><TableHead>Created</TableHead><TableHead>Expires</TableHead></TableRow></TableHeader>
             <TableBody>
               {filteredOtp.slice(0, 300).map((row) => (
-                <TableRow key={String(row.id)}>
+                <TableRow key={String(row.id)} className="border-b border-slate-200/70 dark:border-slate-700/70">
                   <TableCell className="font-mono text-xs">{safeText(row.id)}</TableCell>
                   <TableCell>{safeText(row.contact)}</TableCell>
                   <TableCell>{formatDate(row.created_at)}</TableCell>

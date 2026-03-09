@@ -225,6 +225,16 @@ async function recordLoginSession(user, req) {
     const userAgent = req.headers['user-agent'] || '';
     const deviceInfo = parseUserAgent(userAgent);
     const ipAddress = getClientIP(req);
+    const clientPlatform = String(req.headers['x-client-platform'] || '').trim();
+    const appVersion = String(req.headers['x-app-version'] || '').trim();
+    const headerDeviceName = String(req.headers['x-device-name'] || '').trim();
+    const headerOsVersion = String(req.headers['x-os-version'] || '').trim();
+    const networkType = String(req.headers['x-network-type'] || '').trim();
+
+    const deviceName = headerDeviceName || deviceInfo.deviceName;
+    const osName = headerOsVersion ? `${deviceInfo.os} ${headerOsVersion}` : deviceInfo.os;
+    const browser = clientPlatform ? `${clientPlatform}${appVersion ? ` v${appVersion}` : ''}` : deviceInfo.browser;
+    const mergedUserAgent = [deviceInfo.userAgent, networkType ? `network=${networkType}` : ''].filter(Boolean).join(' | ');
 
     await db.run(
         `INSERT INTO login_sessions (user_id, user_name, user_email, device_type, device_name, browser, browser_version, os, ip_address, user_agent, login_time, status)
@@ -234,16 +244,41 @@ async function recordLoginSession(user, req) {
             user.name,
             user.email,
             deviceInfo.deviceType,
-            deviceInfo.deviceName,
-            deviceInfo.browser,
+            deviceName,
+            browser,
             deviceInfo.browserVersion,
-            deviceInfo.os,
+            osName,
             ipAddress,
-            deviceInfo.userAgent,
+            mergedUserAgent,
             new Date(),
             'active'
         ]
     );
+}
+
+function parsePositiveInt(raw, fallback, min = 1, max = 1000) {
+    const n = Number.parseInt(String(raw ?? ''), 10);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(min, Math.min(max, n));
+}
+
+function normalizeDateTime(raw, endOfDay = false) {
+    if (!raw) return null;
+    const text = String(raw).trim();
+    if (!text) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+        return endOfDay ? `${text}T23:59:59.999Z` : `${text}T00:00:00.000Z`;
+    }
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString();
+}
+
+function auditDeviceFromRequest(req, fallback = 'Web') {
+    const clientPlatform = String(req.headers['x-client-platform'] || '').trim();
+    const networkType = String(req.headers['x-network-type'] || '').trim();
+    const base = clientPlatform || fallback;
+    return networkType ? `${base} (${networkType})` : base;
 }
 
 function httpsGetJson(url) {
@@ -649,17 +684,17 @@ const handleLogin = async (req, res) => {
         const user = await db.get("SELECT * FROM users WHERE email = ?", [email]);
         
         if (!user) {
-            await logAudit(email, 'LOGIN_ATTEMPT', 'Web', 'FAILED', 'User not found');
+            await logAudit(email, 'LOGIN_ATTEMPT', auditDeviceFromRequest(req, 'Web'), 'FAILED', 'User not found');
             return res.status(401).json({ error: "Invalid credentials" });
         }
 
         const match = await bcrypt.compare(password, user.password);
         if (!match) {
-            await logAudit(user.name, 'LOGIN', 'Web', 'FAILED', 'Incorrect password');
+            await logAudit(user.name, 'LOGIN', auditDeviceFromRequest(req, 'Web'), 'FAILED', 'Incorrect password');
             return res.status(401).json({ error: "Invalid credentials" });
         }
 
-        await logAudit(user.name, 'LOGIN', 'Web', 'SUCCESS', 'User logged in successfully');
+        await logAudit(user.name, 'LOGIN', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', 'User logged in successfully');
 
         const token = appTokenForUser(user);
         
@@ -760,7 +795,7 @@ app.post('/api/auth/social', async (req, res) => {
         await logAudit(
             user.name,
             'LOGIN_SOCIAL',
-            normalizedProvider.toUpperCase(),
+            auditDeviceFromRequest(req, normalizedProvider.toUpperCase()),
             'SUCCESS',
             `Social login (${normalizedProvider})`
         );
@@ -775,7 +810,7 @@ app.post('/api/auth/social', async (req, res) => {
         await logAudit(
             normalizeEmail(email || '') || 'Unknown',
             'LOGIN_SOCIAL',
-            normalizedProvider.toUpperCase() || 'UNKNOWN',
+            auditDeviceFromRequest(req, normalizedProvider.toUpperCase() || 'UNKNOWN'),
             'FAILED',
             err.message || 'Social login failed'
         );
@@ -831,7 +866,7 @@ app.post('/api/logout', async (req, res) => {
 
         // Audit Log
         const user = await db.get("SELECT name FROM users WHERE id = ?", [userId]);
-        logAudit(user ? user.name : 'Unknown', 'LOGOUT', 'Web', 'SUCCESS', 'User logged out');
+        logAudit(user ? user.name : 'Unknown', 'LOGOUT', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', 'User logged out');
 
         res.json({ message: "Logged out successfully" });
     } catch (err) {
@@ -887,11 +922,37 @@ app.get('/api/admin/db/summary', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/db/users', requireAdmin, async (req, res) => {
     try {
+        const limit = parsePositiveInt(req.query.limit, 300, 1, 1000);
+        const q = String(req.query.q || '').trim();
+        const role = String(req.query.role || '').trim();
+        const startDate = normalizeDateTime(req.query.startDate, false);
+        const endDate = normalizeDateTime(req.query.endDate, true);
+
+        const where = [];
+        const params = [];
+        if (q) {
+            where.push('(CAST(id AS NVARCHAR(50)) LIKE ? OR name LIKE ? OR email LIKE ? OR role LIKE ?)');
+            params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+        }
+        if (role) {
+            where.push('role = ?');
+            params.push(role);
+        }
+        if (startDate) {
+            where.push('created_at >= ?');
+            params.push(startDate);
+        }
+        if (endDate) {
+            where.push('created_at <= ?');
+            params.push(endDate);
+        }
+
         const users = await db.all(`
-            SELECT id, name, email, role, location, title, created_at
+            SELECT TOP ${limit} id, name, email, role, location, title, created_at
             FROM users
+            ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
             ORDER BY created_at DESC
-        `);
+        `, params);
         res.json(users);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -901,6 +962,9 @@ app.get('/api/admin/db/users', requireAdmin, async (req, res) => {
 app.get('/api/admin/db/users/:id/details', requireAdmin, async (req, res) => {
     try {
         const userId = String(req.params.id);
+        const limit = parsePositiveInt(req.query.limit, 120, 1, 1000);
+        const startDate = normalizeDateTime(req.query.startDate, false);
+        const endDate = normalizeDateTime(req.query.endDate, true);
         const user = await db.get(`
             SELECT id, name, email, role, location, title, created_at
             FROM users
@@ -911,25 +975,62 @@ app.get('/api/admin/db/users/:id/details', requireAdmin, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
+        const sessionWhere = ['user_id = ?'];
+        const sessionParams = [userId];
+        if (startDate) {
+            sessionWhere.push('login_time >= ?');
+            sessionParams.push(startDate);
+        }
+        if (endDate) {
+            sessionWhere.push('login_time <= ?');
+            sessionParams.push(endDate);
+        }
+
+        const sensorWhere = ['tenant_id = ?'];
+        const sensorParams = [userId];
+        if (startDate) {
+            sensorWhere.push('timestamp >= ?');
+            sensorParams.push(startDate);
+        }
+        if (endDate) {
+            sensorWhere.push('timestamp <= ?');
+            sensorParams.push(endDate);
+        }
+
+        const auditWhere = ['user_name = ?'];
+        const auditParams = [String(user.name || '')];
+        if (startDate) {
+            auditWhere.push('timestamp >= ?');
+            auditParams.push(startDate);
+        }
+        if (endDate) {
+            auditWhere.push('timestamp <= ?');
+            auditParams.push(endDate);
+        }
+
         const [sessions, sensorData, auditLogs] = await Promise.all([
             db.all(`
-                SELECT TOP 120 id, user_id, user_name, user_email, device_type, device_name, browser, os, ip_address, login_time, logout_time, status
+                SELECT TOP ${limit} id, user_id, user_name, user_email, device_type, device_name, browser, os, ip_address, login_time, logout_time,
+                CASE
+                  WHEN status = 'active' AND DATEDIFF(HOUR, login_time, GETDATE()) >= 24 THEN 'expired'
+                  ELSE status
+                END AS status
                 FROM login_sessions
-                WHERE user_id = ?
+                WHERE ${sessionWhere.join(' AND ')}
                 ORDER BY login_time DESC
-            `, [userId]),
+            `, sessionParams),
             db.all(`
-                SELECT TOP 120 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, active_tank, is_on, uptime_seconds, timestamp
+                SELECT TOP ${limit} id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, active_tank, is_on, uptime_seconds, timestamp
                 FROM sensor_data
-                WHERE tenant_id = ?
+                WHERE ${sensorWhere.join(' AND ')}
                 ORDER BY id DESC
-            `, [userId]),
+            `, sensorParams),
             db.all(`
-                SELECT TOP 120 id, user_name, action, device, status, details, timestamp
+                SELECT TOP ${limit} id, user_name, action, device, status, details, timestamp
                 FROM audit_logs
-                WHERE user_name = ?
+                WHERE ${auditWhere.join(' AND ')}
                 ORDER BY timestamp DESC
-            `, [String(user.name || '')])
+            `, auditParams)
         ]);
 
         res.json({
@@ -945,11 +1046,57 @@ app.get('/api/admin/db/users/:id/details', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/db/login-sessions', requireAdmin, async (req, res) => {
     try {
+        const limit = parsePositiveInt(req.query.limit, 300, 1, 1000);
+        const userId = String(req.query.userId || '').trim();
+        const status = String(req.query.status || '').trim().toLowerCase();
+        const deviceType = String(req.query.deviceType || '').trim();
+        const q = String(req.query.q || '').trim();
+        const startDate = normalizeDateTime(req.query.startDate, false);
+        const endDate = normalizeDateTime(req.query.endDate, true);
+
+        const where = [];
+        const params = [];
+        if (userId) {
+            where.push('user_id = ?');
+            params.push(userId);
+        }
+        if (deviceType) {
+            where.push('device_type = ?');
+            params.push(deviceType);
+        }
+        if (q) {
+            where.push('(user_name LIKE ? OR user_email LIKE ? OR device_name LIKE ? OR browser LIKE ? OR os LIKE ? OR ip_address LIKE ?)');
+            params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+        }
+        if (startDate) {
+            where.push('login_time >= ?');
+            params.push(startDate);
+        }
+        if (endDate) {
+            where.push('login_time <= ?');
+            params.push(endDate);
+        }
+        if (status && status !== 'all') {
+            if (status === 'expired') {
+                where.push("status = 'active' AND DATEDIFF(HOUR, login_time, GETDATE()) >= 24");
+            } else if (status === 'active') {
+                where.push("status = 'active' AND DATEDIFF(HOUR, login_time, GETDATE()) < 24");
+            } else {
+                where.push('status = ?');
+                params.push(status);
+            }
+        }
+
         const rows = await db.all(`
-            SELECT TOP 300 id, user_id, user_name, user_email, device_type, device_name, browser, os, ip_address, login_time, logout_time, status
+            SELECT TOP ${limit} id, user_id, user_name, user_email, device_type, device_name, browser, os, ip_address, login_time, logout_time,
+            CASE
+              WHEN status = 'active' AND DATEDIFF(HOUR, login_time, GETDATE()) >= 24 THEN 'expired'
+              ELSE status
+            END AS status
             FROM login_sessions
+            ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
             ORDER BY login_time DESC
-        `);
+        `, params);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -958,11 +1105,47 @@ app.get('/api/admin/db/login-sessions', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/db/sensor-data', requireAdmin, async (req, res) => {
     try {
+        const limit = parsePositiveInt(req.query.limit, 300, 1, 1000);
+        const userId = String(req.query.userId || '').trim();
+        const deviceId = String(req.query.deviceId || '').trim();
+        const sensorId = String(req.query.sensorId || '').trim();
+        const q = String(req.query.q || '').trim();
+        const startDate = normalizeDateTime(req.query.startDate, false);
+        const endDate = normalizeDateTime(req.query.endDate, true);
+
+        const where = [];
+        const params = [];
+        if (userId) {
+            where.push('tenant_id = ?');
+            params.push(userId);
+        }
+        if (deviceId) {
+            where.push('device_id = ?');
+            params.push(deviceId);
+        }
+        if (sensorId) {
+            where.push('sensor_id = ?');
+            params.push(sensorId);
+        }
+        if (q) {
+            where.push('(tenant_id LIKE ? OR device_id LIKE ? OR sensor_id LIKE ?)');
+            params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+        }
+        if (startDate) {
+            where.push('timestamp >= ?');
+            params.push(startDate);
+        }
+        if (endDate) {
+            where.push('timestamp <= ?');
+            params.push(endDate);
+        }
+
         const rows = await db.all(`
-            SELECT TOP 300 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, active_tank, is_on, uptime_seconds, timestamp
+            SELECT TOP ${limit} id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, active_tank, is_on, uptime_seconds, timestamp
             FROM sensor_data
+            ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
             ORDER BY id DESC
-        `);
+        `, params);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -971,11 +1154,53 @@ app.get('/api/admin/db/sensor-data', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/db/audit-logs', requireAdmin, async (req, res) => {
     try {
+        const limit = parsePositiveInt(req.query.limit, 300, 1, 1000);
+        const userId = String(req.query.userId || '').trim();
+        const action = String(req.query.action || '').trim();
+        const status = String(req.query.status || '').trim();
+        const q = String(req.query.q || '').trim();
+        const startDate = normalizeDateTime(req.query.startDate, false);
+        const endDate = normalizeDateTime(req.query.endDate, true);
+
+        let userName = '';
+        if (userId) {
+            const user = await db.get('SELECT name FROM users WHERE id = ?', [userId]);
+            userName = String(user?.name || '');
+        }
+
+        const where = [];
+        const params = [];
+        if (userName) {
+            where.push('user_name = ?');
+            params.push(userName);
+        }
+        if (action) {
+            where.push('action = ?');
+            params.push(action);
+        }
+        if (status) {
+            where.push('status = ?');
+            params.push(status);
+        }
+        if (q) {
+            where.push('(user_name LIKE ? OR action LIKE ? OR device LIKE ? OR status LIKE ? OR details LIKE ?)');
+            params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+        }
+        if (startDate) {
+            where.push('timestamp >= ?');
+            params.push(startDate);
+        }
+        if (endDate) {
+            where.push('timestamp <= ?');
+            params.push(endDate);
+        }
+
         const rows = await db.all(`
-            SELECT TOP 300 id, user_name, action, device, status, details, timestamp
+            SELECT TOP ${limit} id, user_name, action, device, status, details, timestamp
             FROM audit_logs
+            ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
             ORDER BY timestamp DESC
-        `);
+        `, params);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });

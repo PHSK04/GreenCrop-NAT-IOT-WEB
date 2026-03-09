@@ -385,3 +385,209 @@ Backend:
    - `MICROSOFT_TENANT_ID=common`
    - `MICROSOFT_REDIRECT_URI=https://phsk04.github.io/GreenCrop-NAT-IOT-WEB/`
 4. Deploy ใหม่ทั้ง backend และ frontend แล้วค่อยทดสอบ
+
+## 11) คู่มือแก้ปัญหา: `Failed to load DB users` (ฉบับละเอียด)
+
+อัปเดต: 10 มีนาคม 2026
+
+### 11.1 อาการที่พบ
+
+1. หน้า `Database Viewer` ขึ้น toast: `Failed to load DB users`
+2. บางครั้งขึ้น `Failed to load DB summary`
+3. ผู้ใช้สับสนว่าเป็นปัญหา frontend, token, หรือ backend
+
+### 11.2 สาเหตุจริงที่เจอในโปรเจกต์นี้
+
+1. **401 Unauthorized** เพราะไม่มี Bearer token หรือใส่ token ผิดรูปแบบ
+2. **500 Internal Server Error** เพราะ query backend อ้างคอลัมน์ `updated_at` แต่ตารางจริงไม่มีคอลัมน์นี้
+3. หน้าเว็บค้าง cache ทำให้เห็น UI เก่า แม้โค้ดใหม่ deploy แล้ว
+
+### 11.3 วิธีตรวจด้วย Postman (ต้องทำตามลำดับ)
+
+#### Step A: Login เพื่อรับ token
+
+Request:
+
+- Method: `POST`
+- URL: `https://greencrop-api.onrender.com/api/login`
+- Header: `Content-Type: application/json`
+- Body (raw/json):
+
+```json
+{
+  "email": "admin@smartiot.com",
+  "password": "password123"
+}
+```
+
+ผลที่ต้องได้:
+
+- Status `200`
+- Response มี key `"token"` และ `"user.role": "admin"`
+
+#### Step B: เรียก admin endpoint ด้วย Bearer token
+
+Request:
+
+- Method: `GET`
+- URL: `https://greencrop-api.onrender.com/api/admin/db/users`
+- Authorization: `Bearer Token`
+- Token: วางเฉพาะค่า `eyJ...` จาก Step A (ห้ามวางทั้ง JSON)
+
+ข้อควรระวัง:
+
+1. `GET /api/admin/db/users` **ไม่ใช้ body**
+2. ถ้าใส่ token แบบ `{ "token": "...", "user": ... }` จะ 401 ทันที
+
+### 11.4 การแปลผล status code
+
+1. `200` = backend ปกติ, token ปกติ, สิทธิ์ admin ปกติ
+2. `401` = ไม่มี token หรือ token ไม่ถูกต้อง/หมดอายุ
+3. `403` = token ถูกต้องแต่ role ไม่ใช่ admin
+4. `500` = backend/query/DB schema มีปัญหา
+
+### 11.5 การแก้เชิงโค้ดที่ทำแล้ว
+
+#### Frontend
+
+1. เพิ่มการอ่าน session token ให้รองรับหลายรูปแบบเก่า/ใหม่:
+   - `token`
+   - `user.token`
+   - `accessToken`
+   - legacy keys: `smart_iot_token`, `auth_token`
+2. เพิ่มการแสดงข้อความ error พร้อม status code เช่น:
+   - `Failed to load DB users (401)`
+   - `Failed to load DB users (500)`
+
+#### Backend
+
+1. เพิ่ม admin read-only endpoints:
+   - `/api/admin/db/summary`
+   - `/api/admin/db/users`
+   - `/api/admin/db/users/:id/details`
+   - `/api/admin/db/login-sessions`
+   - `/api/admin/db/sensor-data`
+   - `/api/admin/db/audit-logs`
+   - `/api/admin/db/otp-codes`
+2. เพิ่ม middleware ให้ map JWT payload ไปที่ `req.user`
+3. แก้ query `users` endpoint ไม่ให้อ้าง `updated_at` ที่ไม่มีใน schema จริง
+
+### 11.6 เช็กลำดับ deploy ที่ถูกต้อง
+
+1. Commit + push backend ก่อน (Render ต้องเห็น endpoint ใหม่)
+2. รอ Render deploy เสร็จ
+3. Commit + deploy frontend (`npm run deploy`)
+4. เปิดเว็บพร้อม cache-bypass:
+   - `https://phsk04.github.io/GreenCrop-NAT-IOT-WEB/?v=admin-db-ok-1`
+5. Logout/Login ใหม่ 1 รอบเพื่อรีเฟรช token
+
+### 11.7 เช็กรวดเร็วด้วย curl
+
+Health:
+
+```bash
+curl -sS https://greencrop-api.onrender.com/api/health
+```
+
+Login:
+
+```bash
+curl -sS -X POST https://greencrop-api.onrender.com/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@smartiot.com","password":"password123"}'
+```
+
+Users (ต้องใส่ Bearer token):
+
+```bash
+curl -sS -i https://greencrop-api.onrender.com/api/admin/db/users \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+### 11.8 สรุปสั้น
+
+1. ถ้า `401` ให้แก้ token/session ก่อน
+2. ถ้า `500` ให้ดู backend log + schema mismatch
+3. ถ้า endpoint ใช้งานได้ใน Postman แต่เว็บพัง ให้ดู cache/session ฝั่ง browser
+
+## 12) เพิ่มเติมฝั่งแอพ (Flutter): User Activity & Access Monitoring
+
+อัปเดต: 10 มีนาคม 2026
+
+หัวข้อนี้สรุปให้ “ข้อมูลฝั่งแอพ” ถูกเก็บในฐานเดียวกับเว็บ และเปิดดูจากหน้า Admin ได้แบบแยกผู้ใช้
+
+### 12.1 เป้าหมาย
+
+1. เก็บประวัติการใช้งานรายผู้ใช้ (User-based)
+2. แยกเวลาเข้า/ออกระบบ และสถานะ session
+3. เก็บข้อมูลอุปกรณ์ + OS + Browser/WebView + IP ให้ตรวจสอบย้อนหลังได้
+4. ค้นหา/กรองตามผู้ใช้ ช่วงเวลา อุปกรณ์ และกิจกรรมได้
+
+### 12.2 ตารางที่ใช้งานอยู่แล้วในระบบนี้
+
+1. `login_sessions`
+   - ใช้เก็บ `login_time`, `logout_time`, `status`, `device_type`, `device_name`, `browser`, `os`, `ip_address`
+2. `audit_logs`
+   - ใช้เก็บ action เช่น `LOGIN`, `LOGOUT`, `UPDATE_PROFILE`, `LOGIN_ATTEMPT`
+3. `sensor_data`
+   - ใช้เก็บการเข้าถึง/ส่งข้อมูล IoT (tenant/device/sensor/timestamp)
+
+### 12.3 ฝั่งแอพต้องทำอะไร (Flutter Checklist)
+
+1. Login แล้วเก็บ JWT ลง secure storage
+2. ทุก API ที่เป็น protected route ต้องส่ง header:
+   - `Authorization: Bearer <token>`
+3. ตอนเปิดแอพใหม่ ให้ restore token/session ก่อนเรียก API หลัก
+4. ตอน logout ให้เรียก `POST /api/logout` ทุกครั้ง (เพื่อปิด session ให้ครบ)
+5. ถ้าเจอ `401` ให้ clear token แล้วบังคับ login ใหม่
+
+### 12.4 แนะนำ header เพิ่มจาก Flutter (เพื่อให้ log ละเอียดขึ้น)
+
+แอพส่งเพิ่มได้โดยไม่กระทบ API เดิม:
+
+1. `X-Client-Platform: Flutter`
+2. `X-App-Version: <version>`
+3. `X-Device-Name: <device model>`
+4. `X-OS-Version: <os version>`
+5. `X-Network-Type: wifi|cellular|ethernet`
+
+หมายเหตุ: ตอนนี้ระบบ parse จาก `user-agent` ได้แล้วระดับหนึ่ง แต่ถ้าส่ง header เพิ่ม จะทำให้ข้อมูลแม่นกว่า โดยเฉพาะฝั่ง mobile
+
+### 12.5 มุมมองที่ Admin ใช้ดูข้อมูลรวม Web + App
+
+1. `/api/admin/db/login-sessions`
+   - ดู session ทั้งหมด, อุปกรณ์, เวลา login/logout, active/inactive
+2. `/api/admin/db/audit-logs`
+   - ดูกิจกรรมย้อนหลังและสถานะ success/failed
+3. `/api/admin/db/users/:id/details`
+   - ดูเจาะราย user เดียว (sessions + audit + sensor)
+
+### 12.6 Time Filter / Search / Filter (ที่ควรใช้เป็นมาตรฐาน)
+
+1. Daily / Weekly / Monthly / Custom Date Range
+2. Filter ตาม:
+   - user_id / email
+   - action (LOGIN, LOGOUT, UPDATE_PROFILE, ฯลฯ)
+   - status (SUCCESS/FAILED)
+   - device_type / device_name
+3. แนะนำเพิ่ม export CSV สำหรับรายงาน
+
+### 12.7 Security Alerts ที่ควรเปิดใช้งาน
+
+1. Login failed ติดต่อกันหลายครั้ง
+2. Login จากอุปกรณ์ใหม่ที่ไม่เคยเจอ
+3. Login จาก location/IP ผิดปกติ
+4. Session หมดอายุบ่อยผิดปกติ
+
+### 12.8 แนวทางไม่ให้ Web/App พังระหว่างเพิ่มฟีเจอร์
+
+1. เพิ่มคอลัมน์ใหม่แบบ optional (`NULL`) ก่อนเสมอ
+2. อย่าลบ endpoint เดิมที่ Web/App เรียกอยู่
+3. deploy backend ก่อน แล้วค่อย deploy frontend/app
+4. มี fallback ใน client เสมอเมื่อ field ใหม่ยังไม่มา
+
+### 12.9 สรุป
+
+1. ตอนนี้โครงสร้าง backend รองรับการเก็บ log ฝั่งแอพร่วมกับเว็บได้แล้ว
+2. สิ่งที่ต้องเน้นคือการส่ง JWT ให้ถูกต้องทุก request และเรียก logout endpoint ให้ครบ
+3. ถ้าต้องการข้อมูลละเอียดระดับ device/network จริง ให้เพิ่ม custom headers จาก Flutter ตามข้อ 12.4
