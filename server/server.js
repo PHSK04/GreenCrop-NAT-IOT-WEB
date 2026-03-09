@@ -406,9 +406,16 @@ async function verifyLineIdentity({ authorizationCode, redirectUri, accessToken,
     let lineIdToken = idToken || '';
 
     if (authorizationCode) {
-        const effectiveRedirectUri = String(redirectUri || LINE_REDIRECT_URI || '').trim();
+        const configuredRedirectUri = String(LINE_REDIRECT_URI || '').trim();
+        const clientRedirectUri = String(redirectUri || '').trim();
+        const effectiveRedirectUri = clientRedirectUri || configuredRedirectUri;
         if (!effectiveRedirectUri) {
             throw new Error('LINE redirect URI is missing');
+        }
+        if (configuredRedirectUri && clientRedirectUri && configuredRedirectUri !== clientRedirectUri) {
+            throw new Error(
+                `LINE redirect URI mismatch (server='${configuredRedirectUri}' client='${clientRedirectUri}')`
+            );
         }
 
         const tokenBody = new URLSearchParams({

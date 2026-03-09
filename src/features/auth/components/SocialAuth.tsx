@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { useEffect } from "react";
-import { startSocialWebAuth } from "../services/socialWebAuth";
+import { consumeLineOAuthCallback, startSocialWebAuth } from "../services/socialWebAuth";
 
 // --- Constants ---
 const FACEBOOK_APP_ID = "1585600402556361"; // Facebook App ID
@@ -92,6 +92,36 @@ export function SocialAuth({
         };
     }, []);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        const completeLineCallbackIfPresent = async () => {
+            try {
+                const payload = consumeLineOAuthCallback();
+                if (!payload) return;
+
+                setIsLoading('LINE');
+                await socialLogin('LINE', {
+                    authorizationCode: payload.authorizationCode,
+                    redirectUri: payload.redirectUri,
+                });
+                if (!cancelled && onLoginSuccess) onLoginSuccess();
+            } catch (err: any) {
+                if (!cancelled) {
+                    toast.error("LINE Login Failed", { description: err?.message || "Unknown error" });
+                }
+            } finally {
+                if (!cancelled) setIsLoading(null);
+            }
+        };
+
+        completeLineCallbackIfPresent();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [socialLogin, onLoginSuccess]);
+
     const handleFacebookLogin = () => {
         setIsLoading('Facebook');
         if (!(window as any).FB) {
@@ -164,7 +194,12 @@ export function SocialAuth({
             });
             if (onLoginSuccess) onLoginSuccess();
         } catch (err: any) {
-            toast.error("LINE Login Failed", { description: err?.message || "Unknown error" });
+            if (err?.message === 'LINE_AUTH_REDIRECT') {
+                return;
+            }
+            const message = err?.message || "Unknown error";
+            console.error("LINE Login Failed:", err);
+            toast.error("LINE Login Failed", { description: message });
         } finally {
             setIsLoading(null);
         }

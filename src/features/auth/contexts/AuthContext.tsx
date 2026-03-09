@@ -19,8 +19,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Always require login when opening the web app.
-    setUser(null);
+    // Restore persisted session so OAuth redirects/popup flows don't force logout.
+    const persistedUser = authService.getCurrentUser();
+    setUser(persistedUser);
     setIsLoading(false);
   }, []);
 
