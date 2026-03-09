@@ -412,7 +412,9 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
           </Button>
         </div>
 
-        {renderContent()}
+        <div className="flex-1 overflow-auto">
+          {renderContent()}
+        </div>
       </div>
     </div>
   );
