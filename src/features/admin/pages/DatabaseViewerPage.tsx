@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AdminDbAuditRow,
   AdminDbOtpRow,
@@ -32,6 +32,28 @@ function formatDate(v: unknown) {
   return d.toLocaleString();
 }
 
+function formatDayLabel(v: unknown) {
+  if (!v) return "-";
+  const d = new Date(String(v));
+  if (Number.isNaN(d.getTime())) return String(v);
+  return d.toLocaleDateString("th-TH", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+}
+
+type UserEvent = {
+  key: string;
+  timeMs: number;
+  timestampText: string;
+  dayKey: string;
+  dayLabel: string;
+  timeLabel: string;
+  type: "LOGIN" | "LOGOUT" | "ACTION" | "SENSOR" | "ERROR";
+  title: string;
+  detail: string;
+  device?: string;
+  browser?: string;
+  ip?: string;
+};
+
 export function DatabaseViewerPage() {
   const [summary, setSummary] = useState<AdminDbSummary | null>(null);
   const [users, setUsers] = useState<AdminDbUserRow[]>([]);
@@ -48,6 +70,10 @@ export function DatabaseViewerPage() {
   const [loadingUserDetails, setLoadingUserDetails] = useState(false);
   const [selectedUserDetails, setSelectedUserDetails] = useState<AdminDbUserDetails | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("users");
+  const [eventTypeFilter, setEventTypeFilter] = useState("all");
+  const [eventSearch, setEventSearch] = useState("");
+  const [expandedEventKey, setExpandedEventKey] = useState<string | null>(null);
+  const userDetailsRef = useRef<HTMLDivElement | null>(null);
 
   const buildQuery = (): AdminDbQuery => {
     const query: AdminDbQuery = { limit: 300 };
@@ -115,6 +141,12 @@ export function DatabaseViewerPage() {
     loadAll();
   }, []);
 
+  useEffect(() => {
+    if (selectedUserDetails && userDetailsRef.current) {
+      userDetailsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedUserDetails]);
+
   const loadUserDetails = async (userId: string | number) => {
     setLoadingUserDetails(true);
     try {
@@ -181,6 +213,113 @@ export function DatabaseViewerPage() {
     () => users.find((u) => String(u.id) === String(selectedUserId)) || null,
     [users, selectedUserId],
   );
+
+  const groupedUserEvents = useMemo(() => {
+    if (!selectedUserDetails) return [];
+    const events: UserEvent[] = [];
+
+    selectedUserDetails.sessions.forEach((s) => {
+      const loginRaw = s.login_time ? new Date(String(s.login_time)) : null;
+      if (loginRaw && !Number.isNaN(loginRaw.getTime())) {
+        events.push({
+          key: `session-login-${s.id}`,
+          timeMs: loginRaw.getTime(),
+          timestampText: String(s.login_time),
+          dayKey: loginRaw.toISOString().slice(0, 10),
+          dayLabel: formatDayLabel(loginRaw.toISOString()),
+          timeLabel: loginRaw.toLocaleTimeString(),
+          type: "LOGIN",
+          title: String(s.status || "").toLowerCase() === "failed" ? "Login failed" : "Login",
+          detail: `User login ${String(s.status || "").toLowerCase() === "failed" ? "failed" : "success"}`,
+          device: safeText(s.device_name),
+          browser: `${safeText(s.browser)} / ${safeText(s.os)}`,
+          ip: safeText(s.ip_address),
+        });
+      }
+
+      const logoutRaw = s.logout_time ? new Date(String(s.logout_time)) : null;
+      if (logoutRaw && !Number.isNaN(logoutRaw.getTime())) {
+        events.push({
+          key: `session-logout-${s.id}`,
+          timeMs: logoutRaw.getTime(),
+          timestampText: String(s.logout_time),
+          dayKey: logoutRaw.toISOString().slice(0, 10),
+          dayLabel: formatDayLabel(logoutRaw.toISOString()),
+          timeLabel: logoutRaw.toLocaleTimeString(),
+          type: "LOGOUT",
+          title: "Logout",
+          detail: "User logged out",
+          device: safeText(s.device_name),
+          browser: `${safeText(s.browser)} / ${safeText(s.os)}`,
+          ip: safeText(s.ip_address),
+        });
+      }
+    });
+
+    selectedUserDetails.audit_logs.forEach((a) => {
+      const raw = a.timestamp ? new Date(String(a.timestamp)) : null;
+      if (!raw || Number.isNaN(raw.getTime())) return;
+      const action = String(a.action || "ACTION");
+      const status = String(a.status || "");
+      events.push({
+        key: `audit-${a.id}`,
+        timeMs: raw.getTime(),
+        timestampText: String(a.timestamp),
+        dayKey: raw.toISOString().slice(0, 10),
+        dayLabel: formatDayLabel(raw.toISOString()),
+        timeLabel: raw.toLocaleTimeString(),
+        type: status.toLowerCase() === "failed" ? "ERROR" : "ACTION",
+        title: action,
+        detail: safeText(a.details),
+        device: safeText(a.device),
+      });
+    });
+
+    selectedUserDetails.sensor_data.forEach((sd) => {
+      const raw = sd.timestamp ? new Date(String(sd.timestamp)) : null;
+      if (!raw || Number.isNaN(raw.getTime())) return;
+      events.push({
+        key: `sensor-${sd.id}`,
+        timeMs: raw.getTime(),
+        timestampText: String(sd.timestamp),
+        dayKey: raw.toISOString().slice(0, 10),
+        dayLabel: formatDayLabel(raw.toISOString()),
+        timeLabel: raw.toLocaleTimeString(),
+        type: "SENSOR",
+        title: `Sensor update (${safeText(sd.sensor_id)})`,
+        detail: `Device ${safeText(sd.device_id)} | Pressure ${safeText(sd.pressure)} | Flow ${safeText(sd.flow_rate)}`,
+        device: safeText(sd.device_id),
+      });
+    });
+
+    const searchQ = eventSearch.trim().toLowerCase();
+    const startMs = startDateTime ? new Date(startDateTime).getTime() : 0;
+    const endMs = endDateTime ? new Date(endDateTime).getTime() : Number.MAX_SAFE_INTEGER;
+
+    const filtered = events
+      .filter((e) => e.timeMs >= startMs && e.timeMs <= endMs)
+      .filter((e) => eventTypeFilter === "all" || e.type === eventTypeFilter)
+      .filter((e) => {
+        if (!searchQ) return true;
+        const hay = `${e.title} ${e.detail} ${e.device || ""} ${e.browser || ""} ${e.ip || ""}`.toLowerCase();
+        return hay.includes(searchQ);
+      })
+      .sort((a, b) => b.timeMs - a.timeMs);
+
+    const grouped = new Map<string, UserEvent[]>();
+    filtered.forEach((event) => {
+      if (!grouped.has(event.dayKey)) grouped.set(event.dayKey, []);
+      grouped.get(event.dayKey)!.push(event);
+    });
+
+    return Array.from(grouped.entries())
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+      .map(([dayKey, dayEvents]) => ({
+        dayKey,
+        dayLabel: dayEvents[0]?.dayLabel || dayKey,
+        events: dayEvents,
+      }));
+  }, [selectedUserDetails, eventSearch, eventTypeFilter, startDateTime, endDateTime]);
 
   return (
     <div className="p-8 pb-24 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -412,11 +551,11 @@ export function DatabaseViewerPage() {
       </Tabs>
 
       {selectedUserDetails && (
-        <div className="space-y-4 rounded-xl border bg-white/90 p-4 dark:bg-slate-900/70">
+        <div ref={userDetailsRef} className="space-y-4 rounded-xl border-2 border-emerald-200 bg-white/95 p-4 dark:border-emerald-700/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                User Detail View: {safeText(selectedUserDetails.user.name)}
+              <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                User Detail: {safeText(selectedUserDetails.user.name)}
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-300">
                 {safeText(selectedUserDetails.user.email)} | role: {safeText(selectedUserDetails.user.role)} | user_id: {safeText(selectedUserDetails.user.id)}
@@ -425,75 +564,85 @@ export function DatabaseViewerPage() {
             <Button variant="ghost" onClick={() => setSelectedUserDetails(null)}>Close</Button>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="bg-white/85 dark:bg-slate-900/70">
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card className="bg-white dark:bg-slate-900/70">
               <CardHeader className="pb-2"><CardTitle className="text-sm">Login Sessions</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.sessions.length}</div></CardContent>
             </Card>
-            <Card className="bg-white/85 dark:bg-slate-900/70">
+            <Card className="bg-white dark:bg-slate-900/70">
               <CardHeader className="pb-2"><CardTitle className="text-sm">Sensor Records</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.sensor_data.length}</div></CardContent>
             </Card>
-            <Card className="bg-white/85 dark:bg-slate-900/70">
+            <Card className="bg-white dark:bg-slate-900/70">
               <CardHeader className="pb-2"><CardTitle className="text-sm">Audit Logs</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.audit_logs.length}</div></CardContent>
             </Card>
+            <Card className="bg-white dark:bg-slate-900/70">
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Current Filter</CardTitle></CardHeader>
+              <CardContent><div className="text-sm font-medium">{eventTypeFilter === "all" ? "All events" : eventTypeFilter}</div></CardContent>
+            </Card>
           </div>
 
-          <Tabs defaultValue="userSessions">
-            <TabsList>
-              <TabsTrigger value="userSessions">User Sessions</TabsTrigger>
-              <TabsTrigger value="userSensor">User Sensor Data</TabsTrigger>
-              <TabsTrigger value="userAudit">User Audit Logs</TabsTrigger>
-            </TabsList>
-            <TabsContent value="userSessions" className="overflow-hidden rounded-lg border bg-white/90 dark:bg-slate-900/60">
-              <Table>
-                <TableHeader><TableRow><TableHead>Login Time</TableHead><TableHead>Device</TableHead><TableHead>Browser</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {selectedUserDetails.sessions.slice(0, 120).map((row) => (
-                    <TableRow key={`us-${row.id}`}>
-                      <TableCell>{formatDate(row.login_time)}</TableCell>
-                      <TableCell>{safeText(row.device_name)}</TableCell>
-                      <TableCell>{`${safeText(row.browser)} / ${safeText(row.os)}`}</TableCell>
-                      <TableCell>{safeText(row.status)}</TableCell>
-                    </TableRow>
+          <div className="grid gap-3 md:grid-cols-4">
+            <Input
+              value={eventSearch}
+              onChange={(e) => setEventSearch(e.target.value)}
+              placeholder="Search in this user timeline..."
+            />
+            <select
+              className="h-11 rounded-md border border-slate-300 bg-background px-3 text-sm"
+              value={eventTypeFilter}
+              onChange={(e) => setEventTypeFilter(e.target.value)}
+            >
+              <option value="all">All events</option>
+              <option value="LOGIN">LOGIN</option>
+              <option value="LOGOUT">LOGOUT</option>
+              <option value="ACTION">ACTION</option>
+              <option value="SENSOR">SENSOR</option>
+              <option value="ERROR">ERROR</option>
+            </select>
+            <Button variant="outline" onClick={() => setExpandedEventKey(null)}>Collapse All</Button>
+          </div>
+
+          <div className="space-y-4">
+            {groupedUserEvents.length === 0 && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
+                No events found for this user in selected filters.
+              </div>
+            )}
+            {groupedUserEvents.map((group) => (
+              <div key={group.dayKey} className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+                <div className="border-b border-slate-200 bg-slate-100/80 px-4 py-2 text-base font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-100">
+                  {group.dayLabel}
+                </div>
+                <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                  {group.events.map((ev) => (
+                    <div key={ev.key} className="px-4 py-3">
+                      <button
+                        className="w-full text-left"
+                        onClick={() => setExpandedEventKey((prev) => (prev === ev.key ? null : ev.key))}
+                      >
+                        <div className="grid gap-2 md:grid-cols-[120px_180px_1fr]">
+                          <div className="font-mono text-sm text-slate-700 dark:text-slate-300">{ev.timeLabel}</div>
+                          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{ev.type}</div>
+                          <div className="text-sm text-slate-700 dark:text-slate-300">{ev.title}</div>
+                        </div>
+                      </button>
+                      {expandedEventKey === ev.key && (
+                        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/70">
+                          <div><span className="font-semibold">Time:</span> {formatDate(ev.timestampText)}</div>
+                          <div><span className="font-semibold">Detail:</span> {ev.detail}</div>
+                          <div><span className="font-semibold">Device:</span> {safeText(ev.device)}</div>
+                          <div><span className="font-semibold">Browser/OS:</span> {safeText(ev.browser)}</div>
+                          <div><span className="font-semibold">IP:</span> {safeText(ev.ip)}</div>
+                        </div>
+                      )}
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
-            </TabsContent>
-            <TabsContent value="userSensor" className="overflow-hidden rounded-lg border bg-white/90 dark:bg-slate-900/60">
-              <Table>
-                <TableHeader><TableRow><TableHead>Time</TableHead><TableHead>Device</TableHead><TableHead>Sensor</TableHead><TableHead>Pressure</TableHead><TableHead>Flow</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {selectedUserDetails.sensor_data.slice(0, 120).map((row) => (
-                    <TableRow key={`ud-${row.id}`}>
-                      <TableCell>{formatDate(row.timestamp)}</TableCell>
-                      <TableCell>{safeText(row.device_id)}</TableCell>
-                      <TableCell>{safeText(row.sensor_id)}</TableCell>
-                      <TableCell>{safeText(row.pressure)}</TableCell>
-                      <TableCell>{safeText(row.flow_rate)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TabsContent>
-            <TabsContent value="userAudit" className="overflow-hidden rounded-lg border bg-white/90 dark:bg-slate-900/60">
-              <Table>
-                <TableHeader><TableRow><TableHead>Time</TableHead><TableHead>Action</TableHead><TableHead>Target</TableHead><TableHead>Status</TableHead><TableHead>Details</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {selectedUserDetails.audit_logs.slice(0, 120).map((row) => (
-                    <TableRow key={`ua-${row.id}`}>
-                      <TableCell>{formatDate(row.timestamp)}</TableCell>
-                      <TableCell>{safeText(row.action)}</TableCell>
-                      <TableCell>{safeText(row.device)}</TableCell>
-                      <TableCell>{safeText(row.status)}</TableCell>
-                      <TableCell>{safeText(row.details)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TabsContent>
-          </Tabs>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
