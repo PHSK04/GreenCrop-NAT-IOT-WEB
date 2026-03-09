@@ -22,6 +22,78 @@ export interface SocialLoginPayload {
   redirectUri?: string;
 }
 
+export interface AdminDbSummary {
+  users: number;
+  login_sessions: number;
+  sensor_data: number;
+  audit_logs: number;
+  otp_codes: number;
+}
+
+export interface AdminDbUserRow {
+  id: string | number;
+  name: string;
+  email: string;
+  role: string;
+  location?: string;
+  title?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AdminDbSessionRow {
+  id: string | number;
+  user_id?: string | number;
+  user_name?: string;
+  user_email?: string;
+  device_type?: string;
+  device_name?: string;
+  browser?: string;
+  os?: string;
+  ip_address?: string;
+  login_time?: string;
+  logout_time?: string;
+  status?: string;
+}
+
+export interface AdminDbSensorRow {
+  id: string | number;
+  tenant_id?: string;
+  device_id?: string;
+  sensor_id?: string;
+  pressure?: number;
+  flow_rate?: number;
+  ec_value?: number;
+  active_tank?: number;
+  is_on?: boolean;
+  uptime_seconds?: number;
+  timestamp?: string;
+}
+
+export interface AdminDbAuditRow {
+  id: string | number;
+  user_name?: string;
+  action?: string;
+  device?: string;
+  status?: string;
+  details?: string;
+  timestamp?: string;
+}
+
+export interface AdminDbOtpRow {
+  id: string | number;
+  contact?: string;
+  expires_at?: string;
+  created_at?: string;
+}
+
+export interface AdminDbUserDetails {
+  user: AdminDbUserRow;
+  sessions: AdminDbSessionRow[];
+  sensor_data: AdminDbSensorRow[];
+  audit_logs: AdminDbAuditRow[];
+}
+
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 const SESSION_KEY = 'smart_iot_session';
 const isGithubPagesRuntime =
@@ -244,6 +316,62 @@ export const authService = {
     if (!response.ok) throw new Error("Failed to update user details");
   },
 
+  getAdminDbSummary: async (): Promise<AdminDbSummary> => {
+    const response = await fetchWithApiFallback('/admin/db/summary', {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) throw new Error('Failed to load DB summary');
+    return await response.json();
+  },
+
+  getAdminDbUsers: async (): Promise<AdminDbUserRow[]> => {
+    const response = await fetchWithApiFallback('/admin/db/users', {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) throw new Error('Failed to load DB users');
+    return await response.json();
+  },
+
+  getAdminDbLoginSessions: async (): Promise<AdminDbSessionRow[]> => {
+    const response = await fetchWithApiFallback('/admin/db/login-sessions', {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) throw new Error('Failed to load DB login sessions');
+    return await response.json();
+  },
+
+  getAdminDbSensorData: async (): Promise<AdminDbSensorRow[]> => {
+    const response = await fetchWithApiFallback('/admin/db/sensor-data', {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) throw new Error('Failed to load DB sensor data');
+    return await response.json();
+  },
+
+  getAdminDbAuditLogs: async (): Promise<AdminDbAuditRow[]> => {
+    const response = await fetchWithApiFallback('/admin/db/audit-logs', {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) throw new Error('Failed to load DB audit logs');
+    return await response.json();
+  },
+
+  getAdminDbOtpCodes: async (): Promise<AdminDbOtpRow[]> => {
+    const response = await fetchWithApiFallback('/admin/db/otp-codes', {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) throw new Error('Failed to load DB otp codes');
+    return await response.json();
+  },
+
+  getAdminDbUserDetails: async (id: string): Promise<AdminDbUserDetails> => {
+    const response = await fetchWithApiFallback(`/admin/db/users/${id}/details`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) throw new Error('Failed to load selected user details');
+    return await response.json();
+  },
+
   verifyPassword: async (email: string, password: string): Promise<boolean> => {
     try {
         const response = await fetchWithApiFallback('/verify-password', {
@@ -330,10 +458,31 @@ export const authService = {
                 avatar: 'https://ui-avatars.com/api/?name=Jane+FB&background=1877F2&color=fff'
             };
         }
+     } else if (normalizedProvider.includes('microsoft') || normalizedProvider.includes('azure')) {
+        if (payload.authorizationCode || realAccessToken || realIdToken) {
+            mockPayload = {
+                provider: 'microsoft',
+                authorizationCode: payload.authorizationCode,
+                redirectUri: payload.redirectUri,
+                accessToken: realAccessToken,
+                idToken: realIdToken,
+                email: payload.email,
+                name: payload.name,
+                avatar: payload.avatar,
+            };
+        } else {
+            mockPayload = {
+                provider: 'microsoft',
+                accessToken: 'mock_ms_' + Math.random().toString(36).substr(2, 9),
+                email: 'sarah.engineer@outlook.com',
+                name: 'Sarah Azure AD',
+                avatar: 'https://ui-avatars.com/api/?name=Sarah+Azure&background=0078D4&color=fff'
+            };
+        }
      } else {
-         // Default / Microsoft
+         // Default
          mockPayload = {
-            provider: 'apple', // Using 'apple' or 'google' as generic generic fallback since 'azure' isn't explicitly in backend list yet
+            provider: 'apple',
             accessToken: 'mock_azure_' + Math.random().toString(36).substr(2, 9), 
             email: 'sarah.engineer@outlook.com',
             name: 'Sarah Azure AD',

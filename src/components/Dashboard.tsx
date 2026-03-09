@@ -32,6 +32,7 @@ import { TankLevelsPage } from "./pages/TankLevelsPage";
 import { AdminOverview } from "@/features/admin/pages/AdminOverview";
 import { UserManagementPage } from "@/features/admin/pages/UserManagementPage";
 import { AuditLogsPage } from "@/features/admin/pages/AuditLogsPage";
+import { DatabaseViewerPage } from "@/features/admin/pages/DatabaseViewerPage";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 
 import { ModeToggle } from "./mode-toggle";
@@ -64,6 +65,7 @@ const adminItems = [
   { icon: Shield, label: "Admin Panel" },
   { icon: Users, label: "User Management" },
   { icon: Activity, label: "Audit Logs" },
+  { icon: ClipboardList, label: "Database Viewer" },
 ];
 
 const navTranslations = {
@@ -89,7 +91,8 @@ const navTranslations = {
     "System Offline": "System Offline",
     "Admin Panel": "Admin Panel",
     "User Management": "User Management",
-    "Audit Logs": "Audit Logs"
+    "Audit Logs": "Audit Logs",
+    "Database Viewer": "Database Viewer"
   },
   TH: {
     "Dashboard": "แดชบอร์ด",
@@ -113,7 +116,8 @@ const navTranslations = {
     "System Offline": "ระบบออฟไลน์",
     "Admin Panel": "แดชบอร์ดแอดมิน",
     "User Management": "จัดการผู้ใช้งาน",
-    "Audit Logs": "บันทึกกิจกรรม"
+    "Audit Logs": "บันทึกกิจกรรม",
+    "Database Viewer": "ดูฐานข้อมูล"
   }
 };
 
@@ -327,6 +331,8 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
         return isAdminUser ? <UserManagementPage /> : <DashboardPage />;
       case "Audit Logs":
         return isAdminUser ? <AuditLogsPage /> : <DashboardPage />;
+      case "Database Viewer":
+        return isAdminUser ? <DatabaseViewerPage /> : <DashboardPage />;
       default:
         return <DashboardPage />;
     }

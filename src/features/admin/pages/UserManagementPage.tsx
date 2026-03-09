@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Shield, User as UserIcon, Loader2, Trash2, ShieldCheck, MoreHorizontal, Eye, EyeOff } from "lucide-react";
+import { Users, Shield, User as UserIcon, Loader2, Trash2, ShieldCheck, MoreHorizontal, Eye, EyeOff, Briefcase, Mail, MapPin, PenLine, KeyRound, NotebookPen } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -286,7 +286,7 @@ export function UserManagementPage() {
                         variant="outline" 
                         size="sm"
                         onClick={() => handleViewDetails(user)}
-                        className="h-8"
+                        className="h-8 border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
                       >
                         <UserIcon className="h-3 w-3 mr-1" />
                         View
@@ -295,7 +295,7 @@ export function UserManagementPage() {
                         variant="outline" 
                         size="sm"
                         onClick={() => handleEditClick(user)}
-                        className="h-8"
+                        className="h-8 border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
                       >
                         Edit
                       </Button>
@@ -333,141 +333,125 @@ export function UserManagementPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-         <DialogContent>
-             <DialogHeader>
-                 <DialogTitle>Edit User Profile</DialogTitle>
+         <DialogContent className="sm:max-w-2xl bg-white text-slate-900 border-slate-200">
+             <DialogHeader className="border-b border-slate-200 pb-3">
+                 <DialogTitle className="text-xl font-semibold tracking-tight text-slate-900">Edit User Profile</DialogTitle>
              </DialogHeader>
              <div className="grid gap-4 py-4">
                  <div className="space-y-1">
-                     <div className="grid grid-cols-4 items-center gap-4">
-                         <Label htmlFor="name" className="text-right">Name</Label>
-                         <div className="col-span-3 space-y-1">
-                             <Input 
-                                id="name" 
-                                value={editName} 
-                                onChange={(e) => setEditName(e.target.value)} 
-                             />
-                             <p className="text-xs text-muted-foreground">
-                                 👤 Full name of the user
-                             </p>
-                         </div>
-                     </div>
+                     <Label htmlFor="name" className="text-slate-800 font-semibold">Name</Label>
+                     <Input
+                        id="name"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="bg-white text-slate-900 border-slate-300 placeholder:text-slate-500"
+                     />
+                     <p className="text-xs text-slate-600">
+                         <span className="inline-flex items-center gap-1"><UserIcon className="h-3.5 w-3.5" /> Full name</span>
+                     </p>
                  </div>
+
                  <div className="space-y-1">
-                     <div className="grid grid-cols-4 items-center gap-4">
-                         <Label htmlFor="title" className="text-right">Title/Role</Label>
-                         <div className="col-span-3 space-y-1">
-                             <Input 
-                                id="title" 
-                                value={editTitle} 
-                                onChange={(e) => setEditTitle(e.target.value)} 
-                                placeholder="e.g. Farm Manager, Technician"
-                             />
-                             <p className="text-xs text-muted-foreground">
-                                 💼 Job title or position (displayed on profile)
-                             </p>
-                         </div>
-                     </div>
+                     <Label htmlFor="title" className="text-slate-800 font-semibold">Title/Role</Label>
+                     <Input
+                        id="title"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        placeholder="e.g. Farm Manager, Technician"
+                        className="bg-white text-slate-900 border-slate-300 placeholder:text-slate-500"
+                     />
+                     <p className="text-xs text-slate-600">
+                         <span className="inline-flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" /> Job title shown on profile</span>
+                     </p>
                  </div>
+
                  <div className="space-y-1">
-                     <div className="grid grid-cols-4 items-center gap-4">
-                         <Label htmlFor="email" className="text-right">Email</Label>
-                         <div className="col-span-3 space-y-1">
-                             <Input 
-                                id="email" 
-                                value={editEmail} 
-                                onChange={(e) => setEditEmail(e.target.value)} 
-                             />
-                             <p className="text-xs text-muted-foreground">
-                                 📧 Login email address
-                             </p>
-                         </div>
-                     </div>
+                     <Label htmlFor="email" className="text-slate-800 font-semibold">Email</Label>
+                     <Input
+                        id="email"
+                        value={editEmail}
+                        onChange={(e) => setEditEmail(e.target.value)}
+                        className="bg-white text-slate-900 border-slate-300 placeholder:text-slate-500"
+                     />
+                     <p className="text-xs text-slate-600">
+                         <span className="inline-flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> Login email address</span>
+                     </p>
                  </div>
+
                  <div className="space-y-1">
-                     <div className="grid grid-cols-4 items-center gap-4">
-                         <Label htmlFor="location" className="text-right">Location</Label>
-                         <div className="col-span-3 space-y-1">
-                             <Input 
-                                id="location" 
-                                value={editLocation} 
-                                onChange={(e) => setEditLocation(e.target.value)} 
-                                placeholder="e.g. Bangkok, Thailand"
-                             />
-                             <p className="text-xs text-muted-foreground">
-                                 📍 City or region
-                             </p>
-                         </div>
-                     </div>
+                     <Label htmlFor="location" className="text-slate-800 font-semibold">Location</Label>
+                     <Input
+                        id="location"
+                        value={editLocation}
+                        onChange={(e) => setEditLocation(e.target.value)}
+                        placeholder="e.g. Bangkok, Thailand"
+                        className="bg-white text-slate-900 border-slate-300 placeholder:text-slate-500"
+                     />
+                     <p className="text-xs text-slate-600">
+                         <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> City or region</span>
+                     </p>
                  </div>
+
                  <div className="space-y-1">
-                     <div className="grid grid-cols-4 items-center gap-4">
-                         <Label htmlFor="bio" className="text-right">Bio</Label>
-                         <div className="col-span-3 space-y-1">
-                             <Input 
-                                id="bio" 
-                                value={editBio} 
-                                onChange={(e) => setEditBio(e.target.value)} 
-                                placeholder="Short description about the user"
-                             />
-                             <p className="text-xs text-muted-foreground">
-                                 ✍️ Brief description or notes
-                             </p>
-                         </div>
-                     </div>
+                     <Label htmlFor="bio" className="text-slate-800 font-semibold">Bio</Label>
+                     <Input
+                        id="bio"
+                        value={editBio}
+                        onChange={(e) => setEditBio(e.target.value)}
+                        placeholder="Short description about the user"
+                        className="bg-white text-slate-900 border-slate-300 placeholder:text-slate-500"
+                     />
+                     <p className="text-xs text-slate-600">
+                         <span className="inline-flex items-center gap-1"><PenLine className="h-3.5 w-3.5" /> Brief profile summary</span>
+                     </p>
                  </div>
+
                  <div className="space-y-1">
-                     <div className="grid grid-cols-4 items-center gap-4">
-                         <Label htmlFor="password" className="text-right">New Password</Label>
-                         <div className="col-span-3 space-y-1">
-                             <div className="relative">
-                                 <Input 
-                                    id="password" 
-                                    type={showPassword ? "text" : "password"}
-                                    value={editPassword} 
-                                    onChange={(e) => setEditPassword(e.target.value)} 
-                                    placeholder="Current password (editable)"
-                                    className="pr-10"
-                                 />
-                                 <Button
-                                     type="button"
-                                     variant="ghost"
-                                     size="sm"
-                                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                     onClick={handlePasswordToggle}
-                                 >
-                                     {showPassword ? (
-                                         <EyeOff className="h-4 w-4 text-muted-foreground" />
-                                     ) : (
-                                         <Eye className="h-4 w-4 text-muted-foreground" />
-                                     )}
-                                 </Button>
-                             </div>
-                             <p className="text-xs text-muted-foreground">
-                                 🔑 Current password shown - click eye icon to view/hide
-                             </p>
-                         </div>
+                     <Label htmlFor="password" className="text-slate-800 font-semibold">New Password</Label>
+                     <div className="relative">
+                         <Input
+                            id="password"
+                            type={showPassword ? "text" : "password"}
+                            value={editPassword}
+                            onChange={(e) => setEditPassword(e.target.value)}
+                            placeholder="Current password (editable)"
+                            className="pr-10 bg-white text-slate-900 border-slate-300 placeholder:text-slate-500"
+                         />
+                         <Button
+                             type="button"
+                             variant="ghost"
+                             size="sm"
+                             className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                             onClick={handlePasswordToggle}
+                         >
+                             {showPassword ? (
+                                 <EyeOff className="h-4 w-4 text-slate-600" />
+                             ) : (
+                                 <Eye className="h-4 w-4 text-slate-600" />
+                             )}
+                         </Button>
                      </div>
+                     <p className="text-xs text-slate-600">
+                         <span className="inline-flex items-center gap-1"><KeyRound className="h-3.5 w-3.5" /> Click the eye icon to show or hide</span>
+                     </p>
                  </div>
+
                  <div className="space-y-1">
-                     <div className="grid grid-cols-4 items-start gap-4">
-                         <Label htmlFor="notes" className="text-right pt-2">Admin Notes</Label>
-                         <div className="col-span-3 space-y-1">
-                             <Textarea 
-                                id="notes" 
-                                value={editNotes} 
-                                onChange={(e) => setEditNotes(e.target.value)} 
-                                placeholder="Internal notes about this user (only visible to admins)"
-                                rows={3}
-                             />
-                             <p className="text-xs text-muted-foreground">
-                                 📝 Private notes for admin reference only
-                             </p>
-                         </div>
-                     </div>
+                     <Label htmlFor="notes" className="text-slate-800 font-semibold">Admin Notes</Label>
+                     <Textarea
+                        id="notes"
+                        value={editNotes}
+                        onChange={(e) => setEditNotes(e.target.value)}
+                        placeholder="Internal notes about this user (only visible to admins)"
+                        rows={3}
+                        className="bg-white text-slate-900 border-slate-300 placeholder:text-slate-500"
+                     />
+                     <p className="text-xs text-slate-600">
+                         <span className="inline-flex items-center gap-1"><NotebookPen className="h-3.5 w-3.5" /> Private admin-only notes</span>
+                     </p>
                  </div>
              </div>
-             <DialogFooter>
+             <DialogFooter className="border-t border-slate-200 pt-3">
                  <Button type="submit" onClick={handleSaveEdit}>Save changes</Button>
              </DialogFooter>
          </DialogContent>
@@ -507,47 +491,47 @@ export function UserManagementPage() {
         </DialogContent>
       </Dialog>
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md bg-white text-slate-900 border-slate-200 [&>button]:text-slate-500 [&>button]:hover:text-slate-700">
             <DialogHeader>
-                <DialogTitle>User Profile</DialogTitle>
+                <DialogTitle className="text-xl font-semibold text-slate-900">User Profile</DialogTitle>
             </DialogHeader>
             {viewingUser && (
                 <div className="space-y-6">
-                    <div className="flex flex-col items-center justify-center p-4 bg-muted/30 rounded-xl">
-                        <div className="h-24 w-24 rounded-full bg-secondary flex items-center justify-center overflow-hidden mb-4 border-4 border-background shadow-lg">
+                    <div className="flex flex-col items-center justify-center p-4 bg-slate-100 rounded-xl border border-slate-200">
+                        <div className="h-24 w-24 rounded-full bg-white flex items-center justify-center overflow-hidden mb-4 border-2 border-slate-200 shadow-sm">
                             {viewingUser.avatar ? (
                                 <img src={viewingUser.avatar} alt={viewingUser.name} className="h-full w-full object-cover" />
                             ) : (
-                                <UserIcon className="h-10 w-10 text-muted-foreground" />
+                                <UserIcon className="h-10 w-10 text-slate-500" />
                             )}
                         </div>
-                        <h3 className="text-xl font-bold">{viewingUser.name}</h3>
-                        <p className="text-emerald-600 dark:text-emerald-400 font-medium">{viewingUser.title || viewingUser.role}</p>
+                        <h3 className="text-xl font-bold text-slate-900">{viewingUser.name}</h3>
+                        <p className="text-emerald-600 font-medium">{viewingUser.title || viewingUser.role}</p>
                     </div>
 
                     <div className="space-y-4">
-                        <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full text-blue-600 dark:text-blue-400">
+                        <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                            <div className="p-2 bg-blue-100 rounded-full text-blue-600">
                                 <Users className="w-4 h-4" />
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground">Email</p>
-                                <p className="text-sm font-medium break-all">{viewingUser.email}</p>
+                                <p className="text-xs text-slate-500">Email</p>
+                                <p className="text-sm font-medium break-all text-slate-900">{viewingUser.email}</p>
                             </div>
                         </div>
                         
-                        <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-full text-emerald-600 dark:text-emerald-400">
+                        <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                            <div className="p-2 bg-emerald-100 rounded-full text-emerald-600">
                                 <UserIcon className="w-4 h-4" />
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground">Location</p>
-                                <p className="text-sm font-medium">{viewingUser.location || "Not specified"}</p>
+                                <p className="text-xs text-slate-500">Location</p>
+                                <p className="text-sm font-medium text-slate-900">{viewingUser.location || "Not specified"}</p>
                             </div>
                         </div>
 
                         {viewingUser.bio && (
-                            <div className="p-4 rounded-lg bg-muted/50 text-sm italic text-muted-foreground">
+                            <div className="p-4 rounded-lg border border-slate-200 bg-slate-50 text-sm italic text-slate-700">
                                 "{viewingUser.bio}"
                             </div>
                         )}

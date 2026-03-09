@@ -6,6 +6,7 @@ import { ModeToggle } from "@/components/mode-toggle";
 import { UserManagementPage } from "@/features/admin/pages/UserManagementPage";
 import { AuditLogsPage } from "@/features/admin/pages/AuditLogsPage";
 import { AdminOverview } from "@/features/admin/pages/AdminOverview";
+import { DatabaseViewerPage } from "@/features/admin/pages/DatabaseViewerPage";
 import { Separator } from "@/components/ui/separator";
 
 export function AdminDashboard() {
@@ -61,6 +62,14 @@ export function AdminDashboard() {
                 <Activity className="h-4 w-4" />
                 Audit Logs
             </Button>
+            <Button
+                 variant={activeTab === "Database" ? "secondary" : "ghost"}
+                 className="w-full justify-start gap-3"
+                 onClick={() => setActiveTab("Database")}
+            >
+                <Users className="h-4 w-4" />
+                Database Viewer
+            </Button>
         </nav>
 
         <div className="p-4 border-t border-border">
@@ -97,6 +106,7 @@ export function AdminDashboard() {
         )}
 
         {activeTab === "Logs" && <AuditLogsPage />}
+        {activeTab === "Database" && <DatabaseViewerPage />}
       </main>
     </div>
   );
