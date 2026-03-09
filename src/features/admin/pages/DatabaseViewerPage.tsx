@@ -742,7 +742,10 @@ export function DatabaseViewerPage() {
             </Button>
           </div>
 
-          <div className="space-y-4">
+          <div
+            className="space-y-4 max-h-[60vh] overflow-y-scroll overscroll-contain touch-pan-y pr-1"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
             {groupedUserEvents.length === 0 && (
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
                 No events found for this user in selected filters.
