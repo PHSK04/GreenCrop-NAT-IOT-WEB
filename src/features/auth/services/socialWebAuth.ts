@@ -1,10 +1,11 @@
-export type SocialProvider = 'google' | 'facebook' | 'apple';
+export type SocialProvider = 'google' | 'facebook' | 'apple' | 'line';
 
 export type SocialAuthPayload = {
   provider: SocialProvider;
   idToken?: string;
   accessToken?: string;
   authorizationCode?: string;
+  redirectUri?: string;
   email?: string;
   name?: string;
 };
@@ -242,6 +243,99 @@ const getAppleAuth = async (): Promise<SocialAuthPayload> => {
   };
 };
 
+const randomState = (length = 32): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => chars[b % chars.length]).join('');
+};
+
+const getLineAuth = async (): Promise<SocialAuthPayload> => {
+  requireBrowser();
+  const channelId = import.meta.env.VITE_LINE_CHANNEL_ID as string | undefined;
+  if (!channelId) {
+    throw new Error('Missing VITE_LINE_CHANNEL_ID');
+  }
+
+  const redirectUri =
+    (import.meta.env.VITE_LINE_REDIRECT_URI as string | undefined) ||
+    `${window.location.origin}${window.location.pathname}`;
+  const state = randomState(24);
+  const nonce = randomState(24);
+
+  const authUrl = new URL('https://access.line.me/oauth2/v2.1/authorize');
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('client_id', channelId);
+  authUrl.searchParams.set('redirect_uri', redirectUri);
+  authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('scope', 'profile openid email');
+  authUrl.searchParams.set('nonce', nonce);
+  authUrl.searchParams.set('bot_prompt', 'normal');
+
+  const popup = window.open(authUrl.toString(), 'line_oauth', 'width=520,height=700');
+  if (!popup) {
+    throw new Error('Popup blocked. Please allow popups for LINE login.');
+  }
+
+  const result = await new Promise<SocialAuthPayload>((resolve, reject) => {
+    const startedAt = Date.now();
+    const timeoutMs = 120000;
+    const timer = window.setInterval(() => {
+      if (popup.closed) {
+        window.clearInterval(timer);
+        reject(new Error('LINE login cancelled'));
+        return;
+      }
+
+      if (Date.now() - startedAt > timeoutMs) {
+        popup.close();
+        window.clearInterval(timer);
+        reject(new Error('LINE login timeout'));
+        return;
+      }
+
+      let href: string;
+      try {
+        href = popup.location.href;
+      } catch {
+        return;
+      }
+
+      if (!href || !href.startsWith(redirectUri)) return;
+
+      const url = new URL(href);
+      const returnedState = url.searchParams.get('state') || '';
+      const code = url.searchParams.get('code') || '';
+      const error = url.searchParams.get('error') || '';
+      const errorDescription = url.searchParams.get('error_description') || '';
+
+      popup.close();
+      window.clearInterval(timer);
+
+      if (error) {
+        reject(new Error(`LINE login failed: ${errorDescription || error}`));
+        return;
+      }
+      if (!code) {
+        reject(new Error('LINE authorization code is missing'));
+        return;
+      }
+      if (returnedState !== state) {
+        reject(new Error('LINE state mismatch'));
+        return;
+      }
+
+      resolve({
+        provider: 'line',
+        authorizationCode: code,
+        redirectUri,
+      });
+    }, 400);
+  });
+
+  return result;
+};
+
 export const startSocialWebAuth = async (
   provider: SocialProvider,
 ): Promise<SocialAuthPayload> => {
@@ -252,8 +346,9 @@ export const startSocialWebAuth = async (
       return getFacebookAuth();
     case 'apple':
       return getAppleAuth();
+    case 'line':
+      return getLineAuth();
     default:
       throw new Error(`Unsupported social provider: ${provider}`);
   }
 };
-

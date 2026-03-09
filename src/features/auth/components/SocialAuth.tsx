@@ -154,6 +154,22 @@ export function SocialAuth({
         }
     };
 
+    const handleLineLogin = async () => {
+        setIsLoading('LINE');
+        try {
+            const payload = await startSocialWebAuth('line');
+            await socialLogin('LINE', {
+                authorizationCode: payload.authorizationCode,
+                redirectUri: payload.redirectUri,
+            });
+            if (onLoginSuccess) onLoginSuccess();
+        } catch (err: any) {
+            toast.error("LINE Login Failed", { description: err?.message || "Unknown error" });
+        } finally {
+            setIsLoading(null);
+        }
+    };
+
     const socialButtonBase =
         "group relative h-14 w-full overflow-hidden rounded-2xl border transition-all duration-200 disabled:opacity-60 " +
         "border-slate-200 bg-white text-slate-800 shadow-[0_10px_24px_rgba(15,23,42,0.10)] hover:border-emerald-300 hover:shadow-[0_14px_30px_rgba(15,23,42,0.14)] " +
@@ -203,7 +219,7 @@ export function SocialAuth({
                 <Button 
                     type="button"
                     variant="outline" 
-                    onClick={() => handleMockLogin('LINE')}
+                    onClick={handleLineLogin}
                     className={socialButtonBase}
                     disabled={!!isLoading}
                 >

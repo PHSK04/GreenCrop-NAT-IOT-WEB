@@ -29,6 +29,9 @@ const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID || '';
 const FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET || '';
 const APPLE_BUNDLE_ID = process.env.APPLE_BUNDLE_ID || '';
 const APPLE_SERVICE_ID = process.env.APPLE_SERVICE_ID || '';
+const LINE_CHANNEL_ID = process.env.LINE_CHANNEL_ID || '';
+const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || '';
+const LINE_REDIRECT_URI = process.env.LINE_REDIRECT_URI || '';
 const APPLE_JWKS_CACHE_MS = 6 * 60 * 60 * 1000;
 let appleJwksCache = { fetchedAt: 0, keys: [] };
 
@@ -394,6 +397,87 @@ async function verifyAppleIdentity({ idToken, email }) {
     };
 }
 
+async function verifyLineIdentity({ authorizationCode, redirectUri, accessToken, idToken }) {
+    if (!LINE_CHANNEL_ID || !LINE_CHANNEL_SECRET) {
+        throw new Error('LINE_CHANNEL_ID / LINE_CHANNEL_SECRET is not configured on server');
+    }
+
+    let lineAccessToken = accessToken || '';
+    let lineIdToken = idToken || '';
+
+    if (authorizationCode) {
+        const effectiveRedirectUri = String(redirectUri || LINE_REDIRECT_URI || '').trim();
+        if (!effectiveRedirectUri) {
+            throw new Error('LINE redirect URI is missing');
+        }
+
+        const tokenBody = new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: String(authorizationCode),
+            redirect_uri: effectiveRedirectUri,
+            client_id: LINE_CHANNEL_ID,
+            client_secret: LINE_CHANNEL_SECRET
+        });
+
+        const tokenResp = await fetch('https://api.line.me/oauth2/v2.1/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: tokenBody.toString()
+        });
+        const tokenData = await tokenResp.json().catch(() => ({}));
+        if (!tokenResp.ok || !tokenData.access_token) {
+            throw new Error(tokenData.error_description || tokenData.error || 'LINE token exchange failed');
+        }
+
+        lineAccessToken = String(tokenData.access_token || '');
+        lineIdToken = String(tokenData.id_token || lineIdToken || '');
+    }
+
+    if (!lineAccessToken && !lineIdToken) {
+        throw new Error('Missing LINE access token or authorization code');
+    }
+
+    let verified = {};
+    if (lineIdToken) {
+        const verifyBody = new URLSearchParams({
+            id_token: lineIdToken,
+            client_id: LINE_CHANNEL_ID
+        });
+        const verifyResp = await fetch('https://api.line.me/oauth2/v2.1/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: verifyBody.toString()
+        });
+        verified = await verifyResp.json().catch(() => ({}));
+        if (!verifyResp.ok) {
+            throw new Error((verified && (verified.error_description || verified.error)) || 'LINE id_token verify failed');
+        }
+    }
+
+    let profile = {};
+    if (lineAccessToken) {
+        const profileResp = await fetch('https://api.line.me/v2/profile', {
+            headers: { Authorization: `Bearer ${lineAccessToken}` }
+        });
+        profile = await profileResp.json().catch(() => ({}));
+        if (!profileResp.ok) {
+            throw new Error((profile && (profile.message || profile.error_description || profile.error)) || 'LINE profile fetch failed');
+        }
+    }
+
+    const providerUserId = String(verified.sub || profile.userId || '').trim();
+    if (!providerUserId) {
+        throw new Error('Unable to resolve LINE user id');
+    }
+
+    return {
+        providerUserId,
+        email: normalizeEmail(verified.email || ''),
+        name: (verified.name || profile.displayName || 'LINE User'),
+        avatar: verified.picture || profile.pictureUrl || null
+    };
+}
+
 async function upsertSocialUser({ provider, providerUserId, email, name, avatar }) {
     const normalizedEmail = normalizeEmail(email || '');
     const finalEmail = normalizedEmail || socialFallbackEmail(provider, providerUserId);
@@ -481,6 +565,8 @@ app.post('/api/auth/social', async (req, res) => {
         provider,
         idToken,
         accessToken,
+        authorizationCode,
+        redirectUri,
         email,
         name,
         avatar // Accepted from client for mock/simulated flows
@@ -515,9 +601,12 @@ app.post('/api/auth/social', async (req, res) => {
             } else if (normalizedProvider === 'apple') {
                 verifiedProfile = await verifyAppleIdentity({ idToken, email });
             } else if (normalizedProvider === 'line') {
-                // Future: Implement Real LINE Login Verification here
-                // For now, if not mock, throw error as we don't have LINE Verify function yet
-                throw new Error("Real LINE verification not implemented yet. Use mock_ token.");
+                verifiedProfile = await verifyLineIdentity({
+                    authorizationCode,
+                    redirectUri,
+                    accessToken,
+                    idToken
+                });
             }
         }
 

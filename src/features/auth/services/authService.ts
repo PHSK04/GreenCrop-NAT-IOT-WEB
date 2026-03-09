@@ -18,6 +18,8 @@ export interface SocialLoginPayload {
   email?: string;
   name?: string;
   avatar?: string;
+  authorizationCode?: string;
+  redirectUri?: string;
 }
 
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
@@ -290,13 +292,25 @@ export const authService = {
             };
          }
      } else if (normalizedProvider.includes('line')) {
-        mockPayload = {
+        if (payload.authorizationCode || realAccessToken || realIdToken) {
+          mockPayload = {
             provider: 'line',
-            accessToken: 'mock_line_' + Math.random().toString(36).substr(2, 9),
-            email: 'somchai.line@smartiot.com',
-            name: 'Somchai (LINE)',
-            avatar: 'https://ui-avatars.com/api/?name=Somchai+Line&background=06C755&color=fff'
-        };
+            authorizationCode: payload.authorizationCode,
+            redirectUri: payload.redirectUri,
+            accessToken: realAccessToken,
+            idToken: realIdToken,
+            email: payload.email,
+            name: payload.name,
+          };
+        } else {
+          mockPayload = {
+              provider: 'line',
+              accessToken: 'mock_line_' + Math.random().toString(36).substr(2, 9),
+              email: 'somchai.line@smartiot.com',
+              name: 'Somchai (LINE)',
+              avatar: 'https://ui-avatars.com/api/?name=Somchai+Line&background=06C755&color=fff'
+          };
+        }
      } else if (normalizedProvider.includes('facebook')) {
         if (realAccessToken || realIdToken) {
             // REAL FLOW: Use the token from Facebook SDK
