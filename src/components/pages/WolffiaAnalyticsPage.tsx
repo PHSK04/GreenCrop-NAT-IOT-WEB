@@ -114,7 +114,7 @@ export function WolffiaAnalyticsPage() {
     return lines.join("\n");
   };
 
-  const handleExport = (format: "csv" | "pdf") => {
+  const handleExport = async (format: "csv" | "pdf") => {
     try {
       if (selectedDataTypes.length === 0) {
         toast.error("Export Failed", { description: "Please select at least one data type." });
@@ -123,7 +123,7 @@ export function WolffiaAnalyticsPage() {
       const payload = buildExportPayload();
       const filename = `wolffia_analytics.${format}`;
       if (format === "pdf") {
-        downloadSimplePdf(filename, payload);
+        await downloadSimplePdf(filename, payload);
       } else {
         downloadTextFile(filename, payload, "text/csv;charset=utf-8");
       }

@@ -394,7 +394,7 @@ export function DatabaseViewerPage() {
       }));
   }, [baseUserEvents, eventSearch, eventTypeFilter, startDateTime, endDateTime]);
 
-  const handleExportUserEvents = (format: "csv" | "pdf") => {
+  const handleExportUserEvents = async (format: "csv" | "pdf") => {
     if (!selectedUserDetails) {
       toast.error("Export Failed", { description: "Select a user to export." });
       return;
@@ -447,7 +447,7 @@ export function DatabaseViewerPage() {
 
     const filename = `user_${safeText(selectedUserDetails.user.id)}_events.${format}`;
     if (format === "pdf") {
-      downloadSimplePdf(filename, csvBody);
+      await downloadSimplePdf(filename, csvBody);
     } else {
       downloadTextFile(filename, csvBody, "text/csv;charset=utf-8");
     }
