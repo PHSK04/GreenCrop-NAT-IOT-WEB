@@ -94,7 +94,7 @@ export function DatabaseViewerPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const userDetailsRef = useRef<HTMLDivElement | null>(null);
-  const modalInputClass = "bg-white text-slate-900 border-slate-300 placeholder:text-slate-400 focus-visible:ring-emerald-500/40 dark:bg-slate-950/80 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-400";
+  const modalInputClass = "bg-white text-slate-900 border-slate-300 placeholder:text-slate-400 focus-visible:ring-emerald-500/40 dark:bg-slate-800/80 dark:text-slate-100 dark:border-slate-600 dark:placeholder:text-slate-400";
 
   const buildQuery = (): AdminDbQuery => {
     const query: AdminDbQuery = { limit: 300 };
@@ -708,10 +708,10 @@ export function DatabaseViewerPage() {
       </Tabs>
 
       {selectedUserDetails && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/60 dark:bg-slate-950/90 px-4 py-8">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/25 dark:bg-black/70 px-4 py-8">
           <div
             ref={userDetailsRef}
-            className="w-full max-w-6xl max-h-[90vh] overflow-y-auto space-y-4 rounded-xl border-2 border-emerald-300/60 bg-white p-5 text-slate-900 shadow-2xl dark:bg-slate-900 dark:text-slate-100"
+            className="w-full max-w-6xl max-h-[90vh] overflow-y-auto space-y-4 rounded-xl border-2 border-emerald-300/60 bg-white p-5 text-slate-900 shadow-2xl dark:border-emerald-500/40 dark:bg-slate-900 dark:text-slate-100"
           >
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -722,31 +722,31 @@ export function DatabaseViewerPage() {
                 {safeText(selectedUserDetails.user.email)} | role: {safeText(selectedUserDetails.user.role)} | user_id: {safeText(selectedUserDetails.user.id)}
               </p>
             </div>
-            <Button variant="ghost" onClick={() => setSelectedUserDetails(null)} className="border border-slate-300 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:text-white">
+            <Button variant="ghost" onClick={() => setSelectedUserDetails(null)} className="border border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:text-white dark:hover:bg-slate-800">
               Close
             </Button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-4">
-            <Card className="bg-white border border-slate-200 dark:bg-slate-800/80 dark:border-slate-700">
+            <Card className="bg-slate-50 border border-slate-200 shadow-sm dark:bg-slate-800/70 dark:border-slate-700">
               <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-700 dark:text-slate-200">Login Sessions</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.sessions.length}</div></CardContent>
             </Card>
-            <Card className="bg-white border border-slate-200 dark:bg-slate-800/80 dark:border-slate-700">
+            <Card className="bg-slate-50 border border-slate-200 shadow-sm dark:bg-slate-800/70 dark:border-slate-700">
               <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-700 dark:text-slate-200">Sensor Records</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.sensor_data.length}</div></CardContent>
             </Card>
-            <Card className="bg-white border border-slate-200 dark:bg-slate-800/80 dark:border-slate-700">
+            <Card className="bg-slate-50 border border-slate-200 shadow-sm dark:bg-slate-800/70 dark:border-slate-700">
               <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-700 dark:text-slate-200">Audit Logs</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.audit_logs.length}</div></CardContent>
             </Card>
-            <Card className="bg-white border border-slate-200 dark:bg-slate-800/80 dark:border-slate-700">
+            <Card className="bg-slate-50 border border-slate-200 shadow-sm dark:bg-slate-800/70 dark:border-slate-700">
               <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-700 dark:text-slate-200">Current Filter</CardTitle></CardHeader>
               <CardContent><div className="text-sm font-medium">{eventTypeFilter === "all" ? "All events" : eventTypeFilter}</div></CardContent>
             </Card>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/80">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/70">
             <h3 className="text-base font-semibold mb-3 text-slate-800 dark:text-slate-200">User Profile (View / Edit)</h3>
             <div className="grid gap-3 md:grid-cols-2">
               <Input className={modalInputClass} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" />
@@ -819,7 +819,7 @@ export function DatabaseViewerPage() {
               placeholder="Search in this user timeline..."
             />
             <select
-              className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100"
+              className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-100"
               value={eventTypeFilter}
               onChange={(e) => setEventTypeFilter(e.target.value)}
             >
@@ -852,13 +852,13 @@ export function DatabaseViewerPage() {
                   loadUserDetails(String(selectedUserDetails.user.id));
                 }
               }}
-              className="border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Reload by Date
             </Button>
           </div>
 
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-500/40 dark:bg-emerald-500/10">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-500/40 dark:bg-emerald-500/10">
             <div className="flex flex-wrap items-center gap-3 mb-2 text-sm text-emerald-800 dark:text-emerald-100">
               <span className="font-semibold">Summary:</span>
               <span>{exportPreview.count} events</span>

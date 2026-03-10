@@ -37,8 +37,59 @@ function parseCsvTable(content: string): CsvTable | null {
   if (headerIndex === -1) return null;
   const metaLines = lines.slice(0, headerIndex);
   const headers = parseCsvLine(lines[headerIndex]).map((v) => v.replace(/^"|"$/g, ""));
-  const rows = lines.slice(headerIndex + 1).map(parseCsvLine).map((row) => row.map((v) => v.replace(/^"|"$/g, "")));
+  const rows = lines
+    .slice(headerIndex + 1)
+    .map(parseCsvLine)
+    .map((row) => row.map((v) => v.replace(/^"|"$/g, "")));
+
+  if (headers[0]?.toLowerCase() === "timestamp") {
+    const newHeaders = ["date", "time", ...headers.slice(1)];
+    const newRows = rows.map((row) => {
+      const ts = row[0];
+      const d = new Date(ts);
+      const date = Number.isNaN(d.getTime()) ? ts : d.toISOString().slice(0, 10);
+      const time = Number.isNaN(d.getTime())
+        ? "-"
+        : d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
+      return [date, time, ...row.slice(1)];
+    });
+    return { metaLines, headers: newHeaders, rows: newRows };
+  }
+
   return { metaLines, headers, rows };
+}
+
+function wrapText(text: string, maxWidth: number, font: any, size: number) {
+  if (!text) return [""];
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (font.widthOfTextAtSize(test, size) <= maxWidth) {
+      line = test;
+    } else {
+      if (line) lines.push(line);
+      if (font.widthOfTextAtSize(word, size) <= maxWidth) {
+        line = word;
+      } else {
+        // hard break long word
+        let chunk = "";
+        for (const ch of word) {
+          const t = chunk + ch;
+          if (font.widthOfTextAtSize(t, size) <= maxWidth) {
+            chunk = t;
+          } else {
+            if (chunk) lines.push(chunk);
+            chunk = ch;
+          }
+        }
+        line = chunk;
+      }
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
 }
 
 function drawTablePage(params: {
@@ -53,8 +104,8 @@ function drawTablePage(params: {
   const page = pdfDoc.addPage([842, 595]); // A4 landscape
   const width = page.getWidth();
   const height = page.getHeight();
-  const fontSize = 10;
-  const lineHeight = 14;
+  const fontSize = 9;
+  const lineHeight = 12;
   const marginX = 36;
   const marginY = 36;
 
@@ -67,7 +118,20 @@ function drawTablePage(params: {
 
   const colCount = headers.length;
   const availableWidth = width - marginX * 2;
-  const colWidths = new Array(colCount).fill(Math.floor(availableWidth / colCount));
+  const weightMap: Record<string, number> = {
+    date: 1.2,
+    time: 1.2,
+    timestamp: 1.5,
+    type: 1.0,
+    title: 1.4,
+    detail: 2.0,
+    device: 1.1,
+    browser: 2.2,
+    ip: 1.2,
+  };
+  const weights = headers.map((h) => weightMap[h.toLowerCase()] || 1.0);
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  const colWidths = weights.map((w) => Math.floor((availableWidth * w) / totalWeight));
   colWidths[colCount - 1] += availableWidth - colWidths.reduce((a, b) => a + b, 0);
 
   page.drawRectangle({
@@ -75,12 +139,12 @@ function drawTablePage(params: {
     y: y - lineHeight + 2,
     width: availableWidth,
     height: lineHeight + 4,
-    color: rgb(0.93, 0.95, 0.98),
+    color: rgb(0.85, 0.16, 0.16),
   });
 
   let x = marginX;
   headers.forEach((h, idx) => {
-    page.drawText(h, { x: x + 4, y, size: fontSize, font, color: rgb(0.1, 0.1, 0.1) });
+    page.drawText(h.toUpperCase(), { x: x + 4, y, size: fontSize, font, color: rgb(1, 1, 1) });
     x += colWidths[idx];
   });
   y -= lineHeight + 6;
@@ -90,12 +154,19 @@ function drawTablePage(params: {
     if (y < marginY + lineHeight) break;
     x = marginX;
     const row = rows[i];
-    row.forEach((cell, idx) => {
-      const text = cell.length > 60 ? `${cell.slice(0, 57)}...` : cell;
-      page.drawText(text, { x: x + 4, y, size: fontSize, font, color: rgb(0.1, 0.1, 0.1) });
+    const wrapped = row.map((cell, idx) => wrapText(cell, colWidths[idx] - 8, font, fontSize));
+    const maxLines = Math.max(...wrapped.map((w) => w.length), 1);
+    const rowHeight = maxLines * lineHeight;
+    if (y - rowHeight < marginY) break;
+    wrapped.forEach((lines, idx) => {
+      let yy = y;
+      lines.forEach((line) => {
+        page.drawText(line, { x: x + 4, y: yy, size: fontSize, font, color: rgb(0.1, 0.1, 0.1) });
+        yy -= lineHeight;
+      });
       x += colWidths[idx];
     });
-    y -= lineHeight;
+    y -= rowHeight;
     rowCount += 1;
   }
   return rowCount;
