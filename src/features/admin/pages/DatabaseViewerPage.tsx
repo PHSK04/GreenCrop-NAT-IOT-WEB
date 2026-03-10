@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Database, Eye, EyeOff, RefreshCcw, Save, Search, Download } from "lucide-react";
 import { toast } from "sonner";
+import { downloadTextFile } from "@/utils/download";
 
 type ActiveTab = "users" | "sessions" | "sensor" | "audit" | "otp";
 
@@ -218,6 +219,10 @@ export function DatabaseViewerPage() {
   const handleDownloadUserDevices = () => {
     if (!selectedUserDetails) return;
     const devices = selectedUserDetails.devices || [];
+    if (!devices.length) {
+      toast.error("Download Failed", { description: "No device data to export." });
+      return;
+    }
     const userName = safeText(selectedUserDetails.user.name);
     const userId = safeText(selectedUserDetails.user.id);
 
@@ -245,14 +250,7 @@ export function DatabaseViewerPage() {
       .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
       .join("\n");
 
-    const csvContent = "data:text/csv;charset=utf-8," + csvBody;
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `user_${userId}_devices.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadTextFile(`user_${userId}_devices.csv`, csvBody, "text/csv;charset=utf-8");
   };
 
   const filteredUsers = useMemo(() => {

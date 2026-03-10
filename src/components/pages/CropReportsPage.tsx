@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
 import { Download, Eye, Calendar, Filter, FileText, Share2, Sprout, Droplets, Zap, Wind } from "lucide-react";
 import { toast } from "sonner";
+import { downloadTextFile } from "@/utils/download";
 
 const reportData = [
   {
@@ -64,19 +65,16 @@ export function CropReportsPage() {
 
   const handleDownload = (data: any[], filename: string) => {
     try {
+      if (!data.length) {
+        toast.error("Download Failed", { description: "No data to export." });
+        return;
+      }
       const headers = Object.keys(data[0]).join(",");
       const csvContent =
-        "data:text/csv;charset=utf-8," +
         headers +
         "\n" +
         data.map((row) => Object.values(row).join(",")).join("\n");
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", filename);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      downloadTextFile(filename, csvContent, "text/csv;charset=utf-8");
       
       toast.success("Download Started", {
         description: `Successfully exported ${filename}`

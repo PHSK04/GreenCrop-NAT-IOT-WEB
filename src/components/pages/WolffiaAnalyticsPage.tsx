@@ -7,6 +7,7 @@ import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Respons
 import { Sprout, TrendingUp, Scale, Calendar, ArrowUpRight, Droplets, Timer, Download, FileText } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
 import { toast } from "sonner";
+import { downloadTextFile } from "@/utils/download";
 
 // Monthly Wolffia Stats: Yield vs Frequency
 const wolffiaStats = [
@@ -38,19 +39,16 @@ export function WolffiaAnalyticsPage() {
 
   const handleDownload = () => {
     try {
+      if (!wolffiaStats.length) {
+        toast.error("Export Failed", { description: "No data to export." });
+        return;
+      }
       const headers = Object.keys(wolffiaStats[0]).join(",");
       const csvContent =
-        "data:text/csv;charset=utf-8," +
         headers +
         "\n" +
         wolffiaStats.map((row) => Object.values(row).join(",")).join("\n");
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "wolffia_monthly_report.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      downloadTextFile("wolffia_monthly_report.csv", csvContent, "text/csv;charset=utf-8");
       
       toast.success("Export Successful", {
         description: "Monthly report has been downloaded."
