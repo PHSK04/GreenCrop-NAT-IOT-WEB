@@ -479,6 +479,29 @@ export function DatabaseViewerPage() {
     toast.success("Export Successful", { description: `Downloaded ${filename}` });
   };
 
+  const exportPreview = useMemo(() => {
+    if (!selectedUserDetails) {
+      return { count: 0, deviceIds: [] as string[] };
+    }
+    const searchQ = eventSearch.trim().toLowerCase();
+    const startMs = startDateTime ? new Date(startDateTime).getTime() : 0;
+    const endMs = endDateTime ? new Date(endDateTime).getTime() : Number.MAX_SAFE_INTEGER;
+    const events = baseUserEvents
+      .filter((e) => e.timeMs >= startMs && e.timeMs <= endMs)
+      .filter((e) => selectedExportTypes.includes(e.type))
+      .filter((e) => {
+        if (!searchQ) return true;
+        const hay = `${e.title} ${e.detail} ${e.device || ""} ${e.browser || ""} ${e.ip || ""}`.toLowerCase();
+        return hay.includes(searchQ);
+      });
+
+    const deviceIds = Array.from(
+      new Set(events.map((e) => safeText(e.device)).filter((v) => v && v !== "-"))
+    );
+
+    return { count: events.length, deviceIds };
+  }, [selectedUserDetails, baseUserEvents, eventSearch, startDateTime, endDateTime, selectedExportTypes]);
+
   return (
     <div className="p-8 pb-24 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center justify-between gap-4">
@@ -709,42 +732,45 @@ export function DatabaseViewerPage() {
       </Tabs>
 
       {selectedUserDetails && (
-        <div
-          ref={userDetailsRef}
-          className="space-y-4 rounded-xl border-2 border-emerald-200 bg-white/95 p-4 dark:border-emerald-700/60 dark:bg-slate-900/70"
-        >
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/80 px-4 py-8">
+          <div
+            ref={userDetailsRef}
+            className="w-full max-w-6xl space-y-4 rounded-xl border-2 border-emerald-200 bg-slate-900/95 p-4 text-slate-100 shadow-2xl"
+          >
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+              <h2 className="text-2xl font-semibold text-slate-100">
                 User Detail: {safeText(selectedUserDetails.user.name)}
               </h2>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
+              <p className="text-sm text-slate-300">
                 {safeText(selectedUserDetails.user.email)} | role: {safeText(selectedUserDetails.user.role)} | user_id: {safeText(selectedUserDetails.user.id)}
               </p>
             </div>
-            <Button variant="ghost" onClick={() => setSelectedUserDetails(null)}>Close</Button>
+            <Button variant="ghost" onClick={() => setSelectedUserDetails(null)} className="text-slate-200 hover:text-white">
+              Close
+            </Button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-4">
-            <Card className="bg-white dark:bg-slate-900/70">
+            <Card className="bg-slate-900/70 border border-slate-700">
               <CardHeader className="pb-2"><CardTitle className="text-sm">Login Sessions</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.sessions.length}</div></CardContent>
             </Card>
-            <Card className="bg-white dark:bg-slate-900/70">
+            <Card className="bg-slate-900/70 border border-slate-700">
               <CardHeader className="pb-2"><CardTitle className="text-sm">Sensor Records</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.sensor_data.length}</div></CardContent>
             </Card>
-            <Card className="bg-white dark:bg-slate-900/70">
+            <Card className="bg-slate-900/70 border border-slate-700">
               <CardHeader className="pb-2"><CardTitle className="text-sm">Audit Logs</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.audit_logs.length}</div></CardContent>
             </Card>
-            <Card className="bg-white dark:bg-slate-900/70">
+            <Card className="bg-slate-900/70 border border-slate-700">
               <CardHeader className="pb-2"><CardTitle className="text-sm">Current Filter</CardTitle></CardHeader>
               <CardContent><div className="text-sm font-medium">{eventTypeFilter === "all" ? "All events" : eventTypeFilter}</div></CardContent>
             </Card>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+          <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-base font-semibold">Linked Devices</h3>
               <div className="flex items-center gap-2">
@@ -758,11 +784,11 @@ export function DatabaseViewerPage() {
               </div>
             </div>
             {(selectedUserDetails.devices || []).length === 0 ? (
-              <div className="rounded-lg border border-dashed border-emerald-300/60 bg-emerald-50/40 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
+              <div className="rounded-lg border border-dashed border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
                 No devices paired with this user yet.
               </div>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900/70">
+              <div className="overflow-hidden rounded-lg border border-slate-700 bg-slate-900/70">
                 <Table>
                   <TableHeader className="bg-slate-100/70 dark:bg-slate-800/70">
                     <TableRow>
@@ -803,7 +829,7 @@ export function DatabaseViewerPage() {
             )}
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+          <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-4">
             <h3 className="text-base font-semibold mb-3">User Profile (View / Edit)</h3>
             <div className="grid gap-3 md:grid-cols-2">
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" />
@@ -911,11 +937,22 @@ export function DatabaseViewerPage() {
             </Button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2">
+          <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-3">
+            <div className="flex flex-wrap items-center gap-3 mb-2 text-sm text-emerald-100">
+              <span className="font-semibold">Summary:</span>
+              <span>{exportPreview.count} events</span>
+              <span>Range: {startDateTime || "-"} to {endDateTime || "-"}</span>
+              <span>Types: {selectedExportTypes.join(" / ") || "-"}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 mb-3 text-xs text-emerald-200">
+              <span className="font-semibold">Device IDs:</span>
+              {exportPreview.deviceIds.length ? exportPreview.deviceIds.join(", ") : "-"}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
             {["LOGIN", "LOGOUT", "ACTION", "SENSOR", "ERROR"].map((type) => {
               const checked = selectedExportTypes.includes(type);
               return (
-                <label key={type} className="flex items-center gap-2 text-sm text-emerald-900">
+                <label key={type} className="flex items-center gap-2 text-sm text-emerald-100">
                   <input
                     type="checkbox"
                     checked={checked}
@@ -931,15 +968,16 @@ export function DatabaseViewerPage() {
                 </label>
               );
             })}
-            <div className="flex flex-wrap gap-2 ml-auto">
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleExportUserEvents("csv")}>
-                <Download className="h-4 w-4" />
-                Download CSV
-              </Button>
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleExportUserEvents("pdf")}>
-                <FileText className="h-4 w-4" />
-                Download PDF
-              </Button>
+              <div className="flex flex-wrap gap-2 ml-auto">
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleExportUserEvents("csv")}>
+                  <Download className="h-4 w-4" />
+                  Download CSV
+                </Button>
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleExportUserEvents("pdf")}>
+                  <FileText className="h-4 w-4" />
+                  Download PDF
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -984,6 +1022,7 @@ export function DatabaseViewerPage() {
                 </div>
               </div>
             ))}
+          </div>
           </div>
         </div>
       )}
