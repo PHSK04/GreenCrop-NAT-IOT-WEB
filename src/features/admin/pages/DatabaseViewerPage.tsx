@@ -94,6 +94,7 @@ export function DatabaseViewerPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const userDetailsRef = useRef<HTMLDivElement | null>(null);
+  const modalInputClass = "bg-slate-950/80 text-slate-100 border-slate-700 placeholder:text-slate-400 focus-visible:ring-emerald-500/40";
 
   const buildQuery = (): AdminDbQuery => {
     const query: AdminDbQuery = { limit: 300 };
@@ -707,63 +708,64 @@ export function DatabaseViewerPage() {
       </Tabs>
 
       {selectedUserDetails && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/85 px-4 py-8">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/90 px-4 py-8">
           <div
             ref={userDetailsRef}
-            className="w-full max-w-6xl max-h-[90vh] overflow-y-auto space-y-4 rounded-xl border-2 border-emerald-200 bg-slate-900/95 p-4 text-slate-100 shadow-2xl"
+            className="w-full max-w-6xl max-h-[90vh] overflow-y-auto space-y-4 rounded-xl border-2 border-emerald-300/60 bg-slate-900 p-5 text-slate-100 shadow-2xl"
           >
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-semibold text-slate-100">
+              <h2 className="text-2xl font-semibold text-white">
                 User Detail: {safeText(selectedUserDetails.user.name)}
               </h2>
               <p className="text-sm text-slate-300">
                 {safeText(selectedUserDetails.user.email)} | role: {safeText(selectedUserDetails.user.role)} | user_id: {safeText(selectedUserDetails.user.id)}
               </p>
             </div>
-            <Button variant="ghost" onClick={() => setSelectedUserDetails(null)} className="text-slate-200 hover:text-white">
+            <Button variant="ghost" onClick={() => setSelectedUserDetails(null)} className="text-slate-200 hover:text-white border border-slate-700">
               Close
             </Button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-4">
-            <Card className="bg-slate-900/70 border border-slate-700">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Login Sessions</CardTitle></CardHeader>
+            <Card className="bg-slate-800/80 border border-slate-700">
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-200">Login Sessions</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.sessions.length}</div></CardContent>
             </Card>
-            <Card className="bg-slate-900/70 border border-slate-700">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Sensor Records</CardTitle></CardHeader>
+            <Card className="bg-slate-800/80 border border-slate-700">
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-200">Sensor Records</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.sensor_data.length}</div></CardContent>
             </Card>
-            <Card className="bg-slate-900/70 border border-slate-700">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Audit Logs</CardTitle></CardHeader>
+            <Card className="bg-slate-800/80 border border-slate-700">
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-200">Audit Logs</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.audit_logs.length}</div></CardContent>
             </Card>
-            <Card className="bg-slate-900/70 border border-slate-700">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Current Filter</CardTitle></CardHeader>
+            <Card className="bg-slate-800/80 border border-slate-700">
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-200">Current Filter</CardTitle></CardHeader>
               <CardContent><div className="text-sm font-medium">{eventTypeFilter === "all" ? "All events" : eventTypeFilter}</div></CardContent>
             </Card>
           </div>
 
           <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-4">
-            <h3 className="text-base font-semibold mb-3">User Profile (View / Edit)</h3>
+            <h3 className="text-base font-semibold mb-3 text-slate-200">User Profile (View / Edit)</h3>
             <div className="grid gap-3 md:grid-cols-2">
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" />
-              <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Email" />
-              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title/Role" />
-              <Input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} placeholder="Location" />
-              <Input value={editBio} onChange={(e) => setEditBio(e.target.value)} placeholder="Bio" />
-              <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Admin notes" />
+              <Input className={modalInputClass} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" />
+              <Input className={modalInputClass} value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Email" />
+              <Input className={modalInputClass} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title/Role" />
+              <Input className={modalInputClass} value={editLocation} onChange={(e) => setEditLocation(e.target.value)} placeholder="Location" />
+              <Input className={modalInputClass} value={editBio} onChange={(e) => setEditBio(e.target.value)} placeholder="Bio" />
+              <Input className={modalInputClass} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Admin notes" />
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 mt-3">
               <div className="relative">
                 <Input
+                  className={modalInputClass}
                   value={oldPassword}
                   readOnly
                   type={showOldPassword ? "text" : "password"}
                   placeholder="Old password from DB"
-                  className="pr-10"
+                  className={`pr-10 ${modalInputClass}`}
                 />
                 <Button
                   type="button"
@@ -783,11 +785,12 @@ export function DatabaseViewerPage() {
 
               <div className="relative">
                 <Input
+                  className={modalInputClass}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   type={showNewPassword ? "text" : "password"}
                   placeholder="Set new password (optional)"
-                  className="pr-10"
+                  className={`pr-10 ${modalInputClass}`}
                 />
                 <Button
                   type="button"
@@ -802,7 +805,7 @@ export function DatabaseViewerPage() {
             </div>
 
             <div className="mt-3 flex justify-end">
-              <Button onClick={handleSaveUserProfile} disabled={savingProfile}>
+              <Button onClick={handleSaveUserProfile} disabled={savingProfile} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                 <Save className="h-4 w-4 mr-2" />
                 {savingProfile ? "Saving..." : "Save User Profile"}
               </Button>
@@ -812,12 +815,13 @@ export function DatabaseViewerPage() {
 
           <div className="grid gap-3 md:grid-cols-6">
             <Input
+              className={modalInputClass}
               value={eventSearch}
               onChange={(e) => setEventSearch(e.target.value)}
               placeholder="Search in this user timeline..."
             />
             <select
-              className="h-11 rounded-md border border-slate-300 bg-background px-3 text-sm"
+              className="h-11 rounded-md border border-slate-700 bg-slate-950/80 px-3 text-sm text-slate-100"
               value={eventTypeFilter}
               onChange={(e) => setEventTypeFilter(e.target.value)}
             >
@@ -833,12 +837,14 @@ export function DatabaseViewerPage() {
               value={startDateTime}
               onChange={(e) => setStartDateTime(e.target.value)}
               aria-label="User timeline start date time"
+              className={modalInputClass}
             />
             <Input
               type="datetime-local"
               value={endDateTime}
               onChange={(e) => setEndDateTime(e.target.value)}
               aria-label="User timeline end date time"
+              className={modalInputClass}
             />
             <Button
               variant="outline"
@@ -848,12 +854,13 @@ export function DatabaseViewerPage() {
                   loadUserDetails(String(selectedUserDetails.user.id));
                 }
               }}
+              className="border-slate-700 text-slate-200 hover:bg-slate-800"
             >
               Reload by Date
             </Button>
           </div>
 
-          <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-3">
+          <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3">
             <div className="flex flex-wrap items-center gap-3 mb-2 text-sm text-emerald-100">
               <span className="font-semibold">Summary:</span>
               <span>{exportPreview.count} events</span>
@@ -902,16 +909,16 @@ export function DatabaseViewerPage() {
             style={{ WebkitOverflowScrolling: "touch" }}
           >
             {groupedUserEvents.length === 0 && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
+              <div className="rounded-lg border border-slate-700 bg-slate-800/70 px-4 py-3 text-sm text-slate-300">
                 No events found for this user in selected filters.
               </div>
             )}
             {groupedUserEvents.map((group) => (
-              <div key={group.dayKey} className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
-                <div className="border-b border-slate-200 bg-slate-100/80 px-4 py-2 text-base font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-100">
+              <div key={group.dayKey} className="rounded-xl border border-slate-700 bg-slate-900/70 shadow-sm">
+                <div className="border-b border-slate-700 bg-slate-800/80 px-4 py-2 text-base font-semibold text-slate-100">
                   {group.dayLabel}
                 </div>
-                <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                <div className="divide-y divide-slate-800">
                   {group.events.map((ev) => (
                     <div key={ev.key} className="px-4 py-3">
                       <button
@@ -919,13 +926,13 @@ export function DatabaseViewerPage() {
                         onClick={() => setExpandedEventKey((prev) => (prev === ev.key ? null : ev.key))}
                       >
                         <div className="grid gap-2 md:grid-cols-[120px_180px_1fr]">
-                          <div className="font-mono text-sm text-slate-700 dark:text-slate-300">{ev.timeLabel}</div>
-                          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{ev.type}</div>
-                          <div className="text-sm text-slate-700 dark:text-slate-300">{ev.title}</div>
+                          <div className="font-mono text-sm text-slate-300">{ev.timeLabel}</div>
+                          <div className="text-sm font-semibold text-slate-100">{ev.type}</div>
+                          <div className="text-sm text-slate-300">{ev.title}</div>
                         </div>
                       </button>
                       {expandedEventKey === ev.key && (
-                        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/70">
+                        <div className="mt-2 rounded-lg border border-slate-700 bg-slate-800/80 p-3 text-sm text-slate-200">
                           <div><span className="font-semibold">Time:</span> {formatDate(ev.timestampText)}</div>
                           <div><span className="font-semibold">Detail:</span> {ev.detail}</div>
                           <div><span className="font-semibold">Device:</span> {safeText(ev.device)}</div>
