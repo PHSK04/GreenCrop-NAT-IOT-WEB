@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ClipboardList,
   Sun,
@@ -16,6 +16,7 @@ import {
   Shield,
   PanelLeftClose,
   PanelLeftOpen,
+  Cpu,
 } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
@@ -29,10 +30,12 @@ import { WolffiaAnalyticsPage } from "./pages/WolffiaAnalyticsPage";
 import { MaintenancePage } from "./pages/MaintenancePage";
 import { MyProfilePage } from "./pages/MyProfilePage";
 import { TankLevelsPage } from "./pages/TankLevelsPage";
+import { DevicePairingPage } from "./pages/DevicePairingPage";
 import { AdminOverview } from "@/features/admin/pages/AdminOverview";
 import { UserManagementPage } from "@/features/admin/pages/UserManagementPage";
 import { AuditLogsPage } from "@/features/admin/pages/AuditLogsPage";
 import { DatabaseViewerPage } from "@/features/admin/pages/DatabaseViewerPage";
+import { AdminDbDeviceRow, authService } from "@/features/auth/services/authService";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 
 import { ModeToggle } from "./mode-toggle";
@@ -45,6 +48,7 @@ const mainNavItems = [
   { icon: ClipboardList, label: "Crop Reports" },
   { icon: Zap, label: "Sensor Intelligence" },
   { icon: Settings, label: "Farm Settings" },
+  { icon: Cpu, label: "Device Pairing" },
 ];
 
 const insightItems = [
@@ -81,6 +85,7 @@ const navTranslations = {
     "Wolffia Analytics": "Wolffia Analytics",
     "Maintenance": "Maintenance",
     "My Profile": "My Profile",
+    "Device Pairing": "Device Pairing",
     "Field Insights": "Field Insights",
     "Resources": "Resources",
     "System": "System",
@@ -106,6 +111,7 @@ const navTranslations = {
     "Wolffia Analytics": "วิเคราะห์ไข่น้ำ",
     "Maintenance": "การบำรุงรักษา",
     "My Profile": "โปรไฟล์ของฉัน",
+    "Device Pairing": "เชื่อมต่ออุปกรณ์",
     "Field Insights": "ข้อมูลเชิงลึกภาคสนาม",
     "Resources": "ทรัพยากร",
     "System": "ระบบ",
@@ -123,7 +129,7 @@ const navTranslations = {
 
 interface DashboardProps {
   onLogout: () => void;
-  user?: { name: string; email: string; role?: string }; // Made optional to be safe, but generic
+  user?: { id?: string | number; name: string; email: string; role?: string }; // Made optional to be safe, but generic
 }
 
 interface SidebarContentProps {
@@ -135,6 +141,9 @@ interface SidebarContentProps {
   onCloseMobile?: () => void;
   isAdminUser?: boolean;
   compact?: boolean;
+  devices?: AdminDbDeviceRow[];
+  activeDeviceId?: string;
+  onDeviceChange?: (deviceId: string) => void;
 }
 
 function SidebarContent({ 
@@ -146,7 +155,10 @@ function SidebarContent({
   onCloseMobile,
   user,
   isAdminUser,
-  compact = false
+  compact = false,
+  devices = [],
+  activeDeviceId,
+  onDeviceChange
 }: SidebarContentProps & { user?: { name: string; role?: string } }) {
   const { isOn } = useMachine();
   const isAdmin = isAdminUser ?? (String(user?.role || "").toLowerCase() === "admin");
@@ -214,13 +226,32 @@ function SidebarContent({
         </div>
       </div>
 
+      {!compact && devices.length > 0 && (
+        <div className="px-4 pt-3 pb-2">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Active Device</div>
+          <select
+            className="w-full h-9 rounded-md border border-border bg-background px-2 text-xs"
+            value={activeDeviceId || ""}
+            onChange={(e) => onDeviceChange?.(e.target.value)}
+          >
+            {devices.map((device) => (
+              <option key={String(device.id)} value={device.device_id}>
+                {device.device_name || device.device_id}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className={`flex-1 overflow-y-auto no-scrollbar scroll-smooth ${compact ? "p-2 space-y-4" : "p-4 space-y-7"}`}>
         {!isAdmin && (
           <>
             <div className="space-y-1">
               {!compact && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">{t["Control Center"]}</h3>}
-              {mainNavItems.map((item) => renderNavItem(item, activePage === item.label))}
+            {mainNavItems
+              .filter((item) => !(isAdmin && item.label === "Device Pairing"))
+              .map((item) => renderNavItem(item, activePage === item.label))}
             </div>
 
             {!compact && <Separator className="bg-border/50" />}
@@ -297,10 +328,54 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   const [tank3On, setTank3On] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isDesktopSidebarCompact, setIsDesktopSidebarCompact] = useState(false);
+  const [devices, setDevices] = useState<AdminDbDeviceRow[]>([]);
+  const [activeDeviceId, setActiveDeviceId] = useState<string>("");
 
   // Use machine context for sidebar status
   const { isOn } = useMachine();
   const t = (navTranslations as any)[language] || navTranslations.EN;
+
+  const loadDevices = async () => {
+    if (!user?.id) return;
+    try {
+      const rows = await authService.getMyDevices();
+      setDevices(rows);
+      const stored = typeof window !== 'undefined'
+        ? (localStorage.getItem('active_device_id') || localStorage.getItem('device_pairing_device_id'))
+        : null;
+      const hasStored = stored ? rows.some((d) => d.device_id === stored) : false;
+      const primary = rows.find((d) => d.is_primary)?.device_id;
+      const next = (hasStored ? stored : null) || primary || rows[0]?.device_id || "";
+      setActiveDeviceId(next);
+      if (typeof window !== 'undefined') {
+        if (next) localStorage.setItem('active_device_id', next);
+        else localStorage.removeItem('active_device_id');
+      }
+    } catch {
+      setDevices([]);
+      setActiveDeviceId("");
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.id) return;
+    loadDevices().catch(() => {});
+  }, [user?.id]);
+
+  const handleDeviceChange = async (deviceId: string) => {
+    setActiveDeviceId(deviceId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('active_device_id', deviceId);
+    }
+    try {
+      await authService.setPrimaryDevice(deviceId);
+      setDevices((prev) =>
+        prev.map((d) => ({ ...d, is_primary: d.device_id === deviceId }))
+      );
+    } catch {
+      // keep UI change; server will be retried later
+    }
+  };
 
   const renderContent = () => {
     switch (activePage) {
@@ -312,7 +387,38 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       case "Device Monitor":
         return <DeviceMonitorPage />;
       case "Farm Settings":
-        return <FarmSettingsPage />;
+        return (
+          <FarmSettingsPage
+            devices={devices}
+            onOpenDevicePairing={() => setActivePage("Device Pairing")}
+            onSetPrimary={handleDeviceChange}
+            onUpdateDevice={async (payload) => {
+              await authService.updateDevice(payload);
+              await loadDevices();
+            }}
+            onUnpairDevice={async (deviceId) => {
+              await authService.unpairDevice(deviceId);
+              await loadDevices();
+            }}
+          />
+        );
+      case "Device Pairing":
+        if (isAdminUser) return <AdminOverview />;
+        return (
+          <DevicePairingPage
+            user={user}
+            onPaired={({ deviceId }) => {
+              localStorage.setItem("device_pairing_completed", "true");
+              localStorage.removeItem("device_pairing_skipped");
+              localStorage.setItem("device_pairing_device_id", deviceId);
+              localStorage.setItem("active_device_id", deviceId);
+              setActiveDeviceId(deviceId);
+              authService.getMyDevices().then(setDevices).catch(() => {});
+              setActivePage("Dashboard");
+            }}
+            onSkip={() => setActivePage("Dashboard")}
+          />
+        );
       case "Weather Data":
         return <WeatherDataPage />;
       case "Machine Performance":
@@ -351,6 +457,9 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
           user={user}
           isAdminUser={isAdminUser}
           compact={isDesktopSidebarCompact}
+          devices={devices}
+          activeDeviceId={activeDeviceId}
+          onDeviceChange={handleDeviceChange}
         />
       </div>
 
@@ -379,7 +488,10 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
                     onCloseMobile={() => setIsMobileOpen(false)}
                     user={user}
                     isAdminUser={isAdminUser}
-                  />
+                    devices={devices}
+                    activeDeviceId={activeDeviceId}
+                    onDeviceChange={handleDeviceChange}
+                />
                </SheetContent>
              </Sheet>
              <div>

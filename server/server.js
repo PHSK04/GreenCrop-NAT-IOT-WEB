@@ -898,6 +898,180 @@ function maskContact(value) {
     return `${text.slice(0, 2)}***${text.slice(-2)}`;
 }
 
+// --- Device APIs (for logged-in users) ---
+app.get('/api/devices/my', async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const devices = await db.all(`
+            SELECT id, user_id, user_email, device_id, device_name, location, pairing_code, status, created_at, paired_at, last_seen, is_primary, updated_at
+            FROM device_pairings
+            WHERE user_id = ?
+            ORDER BY is_primary DESC, paired_at DESC
+        `, [userId]);
+
+        res.json(devices);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/devices/primary', async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const userName = req.user?.name || 'Unknown';
+        const deviceIdRaw = String(req.body?.device_id || '').trim();
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+        if (!deviceIdRaw) return res.status(400).json({ error: 'device_id is required' });
+
+        const deviceId = deviceIdRaw.toUpperCase();
+        const existing = await db.get(
+            "SELECT id FROM device_pairings WHERE user_id = ? AND device_id = ?",
+            [userId, deviceId]
+        );
+        if (!existing) return res.status(404).json({ error: 'Device not found for user' });
+
+        await db.run("UPDATE device_pairings SET is_primary = 0 WHERE user_id = ?", [userId]);
+        await db.run(
+            "UPDATE device_pairings SET is_primary = 1, updated_at = ? WHERE user_id = ? AND device_id = ?",
+            [new Date(), userId, deviceId]
+        );
+
+        await logAudit(userName, 'DEVICE_PRIMARY', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', `device_id=${deviceId}`);
+        res.json({ success: true, device_id: deviceId });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/devices/pair', async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const userName = req.user?.name || 'Unknown';
+        const userEmail = req.user?.email || null;
+        const deviceIdRaw = String(req.body?.device_id || '').trim();
+        const pairingCodeRaw = String(req.body?.pairing_code || '').trim();
+        const deviceName = String(req.body?.device_name || '').trim() || null;
+        const location = String(req.body?.location || '').trim() || null;
+        const requestPrimary = Boolean(req.body?.is_primary);
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        if (!deviceIdRaw) {
+            return res.status(400).json({ error: 'device_id is required' });
+        }
+        if (!pairingCodeRaw) {
+            return res.status(400).json({ error: 'pairing_code is required' });
+        }
+
+        const deviceId = deviceIdRaw.toUpperCase();
+        const pairingCode = pairingCodeRaw;
+
+        const existing = await db.get(
+            "SELECT id, user_id FROM device_pairings WHERE device_id = ?",
+            [deviceId]
+        );
+
+        if (existing && String(existing.user_id) !== String(userId)) {
+            await logAudit(userName, 'DEVICE_PAIR', auditDeviceFromRequest(req, 'Web'), 'FAILED', `device_id=${deviceId} already claimed`);
+            return res.status(409).json({ error: 'Device already claimed by another account' });
+        }
+
+        // Determine primary flag: if user has no devices, make this primary by default
+        const existingPrimary = await db.get(
+            "SELECT TOP 1 id FROM device_pairings WHERE user_id = ? AND is_primary = 1",
+            [userId]
+        );
+        const shouldBePrimary = requestPrimary || !existingPrimary;
+
+        if (shouldBePrimary) {
+            await db.run(
+                "UPDATE device_pairings SET is_primary = 0 WHERE user_id = ?",
+                [userId]
+            );
+        }
+
+        if (existing) {
+            await db.run(
+                `UPDATE device_pairings 
+                 SET pairing_code = ?, status = 'paired', paired_at = ?, user_email = ?, device_name = ?, location = ?, is_primary = ?, updated_at = ?
+                 WHERE id = ?`,
+                [pairingCode, new Date(), userEmail, deviceName, location, shouldBePrimary ? 1 : 0, new Date(), existing.id]
+            );
+        } else {
+            await db.run(
+                `INSERT INTO device_pairings (user_id, user_email, device_id, device_name, location, pairing_code, status, paired_at, is_primary, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, 'paired', ?, ?, ?)`,
+                [userId, userEmail, deviceId, deviceName, location, pairingCode, new Date(), shouldBePrimary ? 1 : 0, new Date()]
+            );
+        }
+
+        await logAudit(userName, 'DEVICE_PAIR', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', `device_id=${deviceId}`);
+        res.json({ success: true, device_id: deviceId, is_primary: shouldBePrimary });
+    } catch (err) {
+        console.error('Device pairing error:', err);
+        res.status(500).json({ error: err.message || 'Failed to pair device' });
+    }
+});
+
+app.post('/api/devices/update', async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const userName = req.user?.name || 'Unknown';
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const deviceIdRaw = String(req.body?.device_id || '').trim();
+        if (!deviceIdRaw) return res.status(400).json({ error: 'device_id is required' });
+        const deviceId = deviceIdRaw.toUpperCase();
+
+        const deviceName = String(req.body?.device_name || '').trim();
+        const location = String(req.body?.location || '').trim();
+
+        const existing = await db.get(
+            "SELECT id FROM device_pairings WHERE user_id = ? AND device_id = ?",
+            [userId, deviceId]
+        );
+        if (!existing) return res.status(404).json({ error: 'Device not found for user' });
+
+        await db.run(
+            "UPDATE device_pairings SET device_name = ?, location = ?, updated_at = ? WHERE user_id = ? AND device_id = ?",
+            [deviceName || null, location || null, new Date(), userId, deviceId]
+        );
+
+        await logAudit(userName, 'DEVICE_UPDATE', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', `device_id=${deviceId}`);
+        res.json({ success: true, device_id: deviceId });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to update device' });
+    }
+});
+
+app.post('/api/devices/unpair', async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const userName = req.user?.name || 'Unknown';
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const deviceIdRaw = String(req.body?.device_id || '').trim();
+        if (!deviceIdRaw) return res.status(400).json({ error: 'device_id is required' });
+        const deviceId = deviceIdRaw.toUpperCase();
+
+        const existing = await db.get(
+            "SELECT id FROM device_pairings WHERE user_id = ? AND device_id = ?",
+            [userId, deviceId]
+        );
+        if (!existing) return res.status(404).json({ error: 'Device not found for user' });
+
+        await db.run("DELETE FROM device_pairings WHERE user_id = ? AND device_id = ?", [userId, deviceId]);
+
+        await logAudit(userName, 'DEVICE_UNPAIR', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', `device_id=${deviceId}`);
+        res.json({ success: true, device_id: deviceId });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to unpair device' });
+    }
+});
+
 app.get('/api/admin/db/summary', requireAdmin, async (req, res) => {
     try {
         const [usersCount, loginCount, sensorCount, auditCount, otpCount] = await Promise.all([
@@ -1033,11 +1207,19 @@ app.get('/api/admin/db/users/:id/details', requireAdmin, async (req, res) => {
             `, auditParams)
         ]);
 
+        const devices = await db.all(`
+            SELECT TOP ${limit} id, user_id, user_email, device_id, device_name, location, pairing_code, status, created_at, paired_at, last_seen, is_primary, updated_at
+            FROM device_pairings
+            WHERE user_id = ?
+            ORDER BY paired_at DESC
+        `, [userId]);
+
         res.json({
             user,
             sessions,
             sensor_data: sensorData,
-            audit_logs: auditLogs
+            audit_logs: auditLogs,
+            devices
         });
     } catch (err) {
         res.status(500).json({ error: err.message });

@@ -12,10 +12,11 @@ import {
 } from "@/features/auth/services/authService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Database, Eye, EyeOff, RefreshCcw, Save, Search } from "lucide-react";
+import { Database, Eye, EyeOff, RefreshCcw, Save, Search, Download } from "lucide-react";
 import { toast } from "sonner";
 
 type ActiveTab = "users" | "sessions" | "sensor" | "audit" | "otp";
@@ -148,6 +149,23 @@ export function DatabaseViewerPage() {
     await loadAllWithQuery(query);
   };
 
+  const loadUserDetails = async (userId: string | number) => {
+    setLoadingUserDetails(true);
+    try {
+      const details = await authService.getAdminDbUserDetails(String(userId), {
+        startDate: startDateTime || undefined,
+        endDate: endDateTime || undefined,
+        limit: 120,
+      });
+      setSelectedUserDetails(details);
+      toast.success(`Loaded data for ${details.user.name}`);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to load user-specific data");
+    } finally {
+      setLoadingUserDetails(false);
+    }
+  };
+
   useEffect(() => {
     loadAll();
   }, []);
@@ -172,22 +190,6 @@ export function DatabaseViewerPage() {
     setShowNewPassword(false);
   }, [selectedUserDetails]);
 
-  const loadUserDetails = async (userId: string | number) => {
-    setLoadingUserDetails(true);
-    try {
-      const details = await authService.getAdminDbUserDetails(String(userId), {
-        startDate: startDateTime || undefined,
-        endDate: endDateTime || undefined,
-        limit: 120,
-      });
-      setSelectedUserDetails(details);
-      toast.success(`Loaded data for ${details.user.name}`);
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to load user-specific data");
-    } finally {
-      setLoadingUserDetails(false);
-    }
-  };
 
   const handleSaveUserProfile = async () => {
     if (!selectedUserDetails) return;
@@ -211,6 +213,46 @@ export function DatabaseViewerPage() {
     } finally {
       setSavingProfile(false);
     }
+  };
+
+  const handleDownloadUserDevices = () => {
+    if (!selectedUserDetails) return;
+    const devices = selectedUserDetails.devices || [];
+    const userName = safeText(selectedUserDetails.user.name);
+    const userId = safeText(selectedUserDetails.user.id);
+
+    const headerLines = [
+      ["Report", "User Devices"],
+      ["User", userName],
+      ["User ID", userId],
+      ["Total Devices", String(devices.length)],
+      [],
+      ["device_id", "pairing_code", "device_name", "location", "is_primary", "status", "paired_at", "last_seen"],
+    ];
+
+    const rows = devices.map((d) => [
+      safeText(d.device_id),
+      safeText(d.pairing_code),
+      safeText(d.device_name),
+      safeText(d.location),
+      d.is_primary ? "true" : "false",
+      safeText(d.status),
+      safeText(d.paired_at),
+      safeText(d.last_seen),
+    ]);
+
+    const csvBody = [...headerLines, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const csvContent = "data:text/csv;charset=utf-8," + csvBody;
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `user_${userId}_devices.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const filteredUsers = useMemo(() => {
@@ -636,6 +678,65 @@ export function DatabaseViewerPage() {
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-semibold">Linked Devices</h3>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">
+                  {selectedUserDetails.devices?.length || 0} device(s)
+                </Badge>
+                <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadUserDevices}>
+                  <Download className="h-4 w-4" />
+                  Download CSV
+                </Button>
+              </div>
+            </div>
+            {(selectedUserDetails.devices || []).length === 0 ? (
+              <div className="rounded-lg border border-dashed border-emerald-300/60 bg-emerald-50/40 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
+                No devices paired with this user yet.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900/70">
+                <Table>
+                  <TableHeader className="bg-slate-100/70 dark:bg-slate-800/70">
+                    <TableRow>
+                      <TableHead>Device ID</TableHead>
+                      <TableHead>Pairing Code</TableHead>
+                      <TableHead>Device Name</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Primary</TableHead>
+                      <TableHead>Last Seen</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(selectedUserDetails.devices || []).map((device) => (
+                      <TableRow key={String(device.id)}>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {safeText(device.device_id)}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {safeText(device.pairing_code)}
+                        </TableCell>
+                        <TableCell>{safeText(device.device_name)}</TableCell>
+                        <TableCell>{safeText(device.location)}</TableCell>
+                        <TableCell>
+                          {device.is_primary ? (
+                            <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-200">Primary</Badge>
+                          ) : (
+                            <Badge variant="outline">Secondary</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {formatDate(device.last_seen || device.paired_at)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/60">
             <h3 className="text-base font-semibold mb-3">User Profile (View / Edit)</h3>
             <div className="grid gap-3 md:grid-cols-2">
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" />
@@ -698,6 +799,7 @@ export function DatabaseViewerPage() {
               </Button>
             </div>
           </div>
+
 
           <div className="grid gap-3 md:grid-cols-6">
             <Input

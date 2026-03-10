@@ -224,6 +224,53 @@ async function initDb() {
         `);
         console.log('✅ Login Sessions table ready');
 
+        // Create Device Pairings Table (Hardware Ownership)
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='device_pairings' and xtype='U')
+            BEGIN
+                CREATE TABLE device_pairings (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    user_email NVARCHAR(100),
+                    device_id NVARCHAR(64) NOT NULL,
+                    device_name NVARCHAR(120) NULL,
+                    location NVARCHAR(120) NULL,
+                    pairing_code NVARCHAR(16) NOT NULL,
+                    status NVARCHAR(20) DEFAULT 'paired',
+                    created_at DATETIME DEFAULT GETDATE(),
+                    paired_at DATETIME DEFAULT GETDATE(),
+                    last_seen DATETIME NULL,
+                    is_primary BIT DEFAULT 0,
+                    updated_at DATETIME NULL
+                );
+                CREATE UNIQUE INDEX uq_device_pairings_device_id ON device_pairings(device_id);
+                CREATE INDEX ix_device_pairings_user_id ON device_pairings(user_id);
+                CREATE INDEX ix_device_pairings_user_primary ON device_pairings(user_id, is_primary);
+            END
+            ELSE
+            BEGIN
+                IF COL_LENGTH('device_pairings', 'user_email') IS NULL
+                    ALTER TABLE device_pairings ADD user_email NVARCHAR(100) NULL;
+                IF COL_LENGTH('device_pairings', 'device_name') IS NULL
+                    ALTER TABLE device_pairings ADD device_name NVARCHAR(120) NULL;
+                IF COL_LENGTH('device_pairings', 'location') IS NULL
+                    ALTER TABLE device_pairings ADD location NVARCHAR(120) NULL;
+                IF COL_LENGTH('device_pairings', 'pairing_code') IS NULL
+                    ALTER TABLE device_pairings ADD pairing_code NVARCHAR(16) NULL;
+                IF COL_LENGTH('device_pairings', 'status') IS NULL
+                    ALTER TABLE device_pairings ADD status NVARCHAR(20) DEFAULT 'paired';
+                IF COL_LENGTH('device_pairings', 'paired_at') IS NULL
+                    ALTER TABLE device_pairings ADD paired_at DATETIME NULL;
+                IF COL_LENGTH('device_pairings', 'last_seen') IS NULL
+                    ALTER TABLE device_pairings ADD last_seen DATETIME NULL;
+                IF COL_LENGTH('device_pairings', 'is_primary') IS NULL
+                    ALTER TABLE device_pairings ADD is_primary BIT DEFAULT 0;
+                IF COL_LENGTH('device_pairings', 'updated_at') IS NULL
+                    ALTER TABLE device_pairings ADD updated_at DATETIME NULL;
+            END
+        `);
+        console.log('✅ Device pairings table ready');
+
 
     } catch (err) {
         console.error('❌ Error initializing database tables:', err);

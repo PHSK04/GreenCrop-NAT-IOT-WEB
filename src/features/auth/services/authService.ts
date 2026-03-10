@@ -90,11 +90,28 @@ export interface AdminDbOtpRow {
   created_at?: string;
 }
 
+export interface AdminDbDeviceRow {
+  id: string | number;
+  user_id?: string | number;
+  user_email?: string;
+  device_id?: string;
+  device_name?: string;
+  location?: string;
+  pairing_code?: string;
+  status?: string;
+  created_at?: string;
+  paired_at?: string;
+  last_seen?: string;
+  is_primary?: boolean;
+  updated_at?: string;
+}
+
 export interface AdminDbUserDetails {
   user: AdminDbUserRow;
   sessions: AdminDbSessionRow[];
   sensor_data: AdminDbSensorRow[];
   audit_logs: AdminDbAuditRow[];
+  devices?: AdminDbDeviceRow[];
 }
 
 export interface AdminDbQuery {
@@ -425,6 +442,54 @@ export const authService = {
       headers: getAuthHeaders()
     });
     if (!response.ok) await throwHttpError(response, 'Failed to load selected user details');
+    return await response.json();
+  },
+
+  getMyDevices: async (): Promise<AdminDbDeviceRow[]> => {
+    const response = await fetchWithApiFallback('/devices/my', {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) await throwHttpError(response, 'Failed to load devices');
+    return await response.json();
+  },
+
+  setPrimaryDevice: async (deviceId: string): Promise<{ success: boolean; device_id?: string }> => {
+    const response = await fetchWithApiFallback('/devices/primary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ device_id: deviceId })
+    });
+    if (!response.ok) await throwHttpError(response, 'Failed to set primary device');
+    return await response.json();
+  },
+
+  pairDevice: async (payload: { device_id: string; pairing_code: string; device_name?: string; location?: string; is_primary?: boolean }): Promise<{ success: boolean; device_id?: string; is_primary?: boolean }> => {
+    const response = await fetchWithApiFallback('/devices/pair', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) await throwHttpError(response, 'Failed to pair device');
+    return await response.json();
+  },
+
+  updateDevice: async (payload: { device_id: string; device_name?: string; location?: string }): Promise<{ success: boolean; device_id?: string }> => {
+    const response = await fetchWithApiFallback('/devices/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) await throwHttpError(response, 'Failed to update device');
+    return await response.json();
+  },
+
+  unpairDevice: async (deviceId: string): Promise<{ success: boolean; device_id?: string }> => {
+    const response = await fetchWithApiFallback('/devices/unpair', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ device_id: deviceId })
+    });
+    if (!response.ok) await throwHttpError(response, 'Failed to unpair device');
     return await response.json();
   },
 

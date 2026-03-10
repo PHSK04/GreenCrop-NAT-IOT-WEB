@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -7,6 +7,7 @@ import { Switch } from "../ui/switch";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Slider } from "../ui/slider";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { 
   Settings, 
   Cpu, 
@@ -20,10 +21,42 @@ import {
   Sun,
   Smartphone,
   Laptop,
-  ArrowRight
+  ArrowRight,
+  Pencil,
+  Trash2,
+  Star
 } from "lucide-react";
+import { AdminDbDeviceRow } from "@/features/auth/services/authService";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../ui/dialog";
 
-export function FarmSettingsPage() {
+type FarmSettingsPageProps = {
+  devices?: AdminDbDeviceRow[];
+  onOpenDevicePairing?: () => void;
+  onUpdateDevice?: (payload: { device_id: string; device_name?: string; location?: string }) => Promise<void> | void;
+  onUnpairDevice?: (deviceId: string) => Promise<void> | void;
+  onSetPrimary?: (deviceId: string) => Promise<void> | void;
+};
+
+function formatDeviceTime(value?: string) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
+export function FarmSettingsPage({
+  devices = [],
+  onOpenDevicePairing,
+  onUpdateDevice,
+  onUnpairDevice,
+  onSetPrimary,
+}: FarmSettingsPageProps) {
   const [sessions, setSessions] = useState([
     { device: "MacBook Pro M4", type: "Web Dashboard", location: "Chiang Mai, TH", status: "Active Now", active: true },
     { device: "iPhone 15 Plus", type: "Mobile App", location: "Bangkok, TH", status: "Active 2m ago", active: true },
@@ -37,6 +70,56 @@ export function FarmSettingsPage() {
   const handleRevoke = (index: number) => {
     setSessions(sessions.filter((_, i) => i !== index));
   };
+
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingDevice, setEditingDevice] = useState<AdminDbDeviceRow | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [markPrimary, setMarkPrimary] = useState(false);
+  const [savingDevice, setSavingDevice] = useState(false);
+
+  const openEditDevice = (device: AdminDbDeviceRow) => {
+    setEditingDevice(device);
+    setEditName(device.device_name || "");
+    setEditLocation(device.location || "");
+    setMarkPrimary(Boolean(device.is_primary));
+    setIsEditOpen(true);
+  };
+
+  const handleSaveDevice = async () => {
+    if (!editingDevice?.device_id) return;
+    setSavingDevice(true);
+    try {
+      if (onUpdateDevice) {
+        await onUpdateDevice({
+          device_id: editingDevice.device_id,
+          device_name: editName.trim() || undefined,
+          location: editLocation.trim() || undefined,
+        });
+      }
+      if (markPrimary && onSetPrimary) {
+        await onSetPrimary(editingDevice.device_id);
+      }
+      setIsEditOpen(false);
+    } finally {
+      setSavingDevice(false);
+    }
+  };
+
+  const handleUnpairDevice = async () => {
+    if (!editingDevice?.device_id || !onUnpairDevice) return;
+    if (!confirm(`Unpair device ${editingDevice.device_id}?`)) return;
+    await onUnpairDevice(editingDevice.device_id);
+    setIsEditOpen(false);
+  };
+
+  const deviceSummary = useMemo(() => {
+    const primary = devices.find((d) => d.is_primary);
+    return {
+      total: devices.length,
+      primaryLabel: primary?.device_name || primary?.device_id || "-",
+    };
+  }, [devices]);
 
   return (
     <>
@@ -125,6 +208,137 @@ export function FarmSettingsPage() {
 
           {/* Devices & Calibration */}
           <TabsContent value="devices" className="space-y-6">
+            <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <Cpu className="w-5 h-5 text-emerald-500" />
+                  Linked Devices
+                </CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  {deviceSummary.total > 0
+                    ? `Primary: ${deviceSummary.primaryLabel}`
+                    : "No devices paired yet. Add your first device to start monitoring."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {devices.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-emerald-300/60 bg-emerald-50/40 p-6 text-center dark:border-emerald-500/40 dark:bg-emerald-500/10">
+                    <p className="text-sm text-emerald-700 dark:text-emerald-200">
+                      ยังไม่มีอุปกรณ์ในบัญชีนี้
+                    </p>
+                    <Button
+                      className="mt-3 gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+                      onClick={onOpenDevicePairing}
+                    >
+                      เพิ่มอุปกรณ์ใหม่
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-border bg-background/80 overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-muted/60">
+                        <TableRow>
+                          <TableHead>Device ID</TableHead>
+                          <TableHead>Device Name</TableHead>
+                          <TableHead>Location</TableHead>
+                        <TableHead>Primary</TableHead>
+                        <TableHead>Last Seen</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {devices.map((device) => (
+                        <TableRow key={String(device.id)}>
+                            <TableCell className="font-mono text-xs text-muted-foreground">
+                              {device.device_id || "-"}
+                            </TableCell>
+                            <TableCell className="font-medium text-foreground">
+                              {device.device_name || "-"}
+                            </TableCell>
+                            <TableCell>{device.location || "-"}</TableCell>
+                            <TableCell>
+                              {device.is_primary ? (
+                                <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-200">Primary</Badge>
+                              ) : (
+                                <Badge variant="outline">Secondary</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {formatDeviceTime(device.last_seen || device.paired_at)}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2"
+                                onClick={() => openEditDevice(device)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+              <DialogContent className="sm:max-w-[520px]">
+                <DialogHeader>
+                  <DialogTitle>ตั้งค่าอุปกรณ์</DialogTitle>
+                </DialogHeader>
+                {editingDevice && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Device ID (แก้ไม่ได้)</Label>
+                      <Input value={editingDevice.device_id || ""} readOnly />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Device Name</Label>
+                      <Input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="เช่น เครื่องไข่ผำ บ่อ A"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Location</Label>
+                      <Input
+                        value={editLocation}
+                        onChange={(e) => setEditLocation(e.target.value)}
+                        placeholder="เช่น โรงเรือน 1 / โซน B"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Star className="h-4 w-4 text-amber-500" />
+                        ตั้งเป็นเครื่องหลัก
+                      </div>
+                      <Switch checked={markPrimary} onCheckedChange={setMarkPrimary} />
+                    </div>
+                  </div>
+                )}
+                <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                  <Button
+                    variant="outline"
+                    className="gap-2 text-red-600 hover:text-red-700"
+                    onClick={handleUnpairDevice}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Unpair
+                  </Button>
+                  <Button onClick={handleSaveDevice} disabled={savingDevice}>
+                    {savingDevice ? "Saving..." : "Save"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
             <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
