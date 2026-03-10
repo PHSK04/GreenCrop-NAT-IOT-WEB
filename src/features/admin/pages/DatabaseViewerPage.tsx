@@ -760,7 +760,6 @@ export function DatabaseViewerPage() {
             <div className="grid gap-3 md:grid-cols-2 mt-3">
               <div className="relative">
                 <Input
-                  className={modalInputClass}
                   value={oldPassword}
                   readOnly
                   type={showOldPassword ? "text" : "password"}
@@ -785,7 +784,6 @@ export function DatabaseViewerPage() {
 
               <div className="relative">
                 <Input
-                  className={modalInputClass}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   type={showNewPassword ? "text" : "password"}
