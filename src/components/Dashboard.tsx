@@ -181,12 +181,12 @@ function SidebarContent({
           group flex items-center rounded-full text-sm font-medium transition-all duration-200 w-full
           ${compact ? "justify-center gap-0 px-2 py-3" : "gap-3 px-4 py-2.5"}
           ${isActive 
-            ? "bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-900" 
+            ? "bg-slate-900 text-white shadow-sm dark:bg-slate-900 dark:text-white" 
             : "text-slate-700 border border-transparent hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:hover:text-white"
           }
         `}
       >
-        <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? "text-white/90 dark:text-slate-900" : "text-slate-500 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-white"}`} />
+        <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? "text-white" : "text-slate-500 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-white"}`} />
         {!compact && <span className="truncate">{t[item.label] || item.label}</span>}
       </button>
     );
