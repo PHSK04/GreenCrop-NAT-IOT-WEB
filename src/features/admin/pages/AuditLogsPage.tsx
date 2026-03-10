@@ -81,12 +81,12 @@ export function AuditLogsPage() {
         <Table className="text-sm">
           <TableHeader className="bg-emerald-600 dark:bg-emerald-700">
             <TableRow>
-              <TableHead className="w-[180px] text-white font-semibold uppercase tracking-wider py-3 align-middle">Timestamp</TableHead>
-              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle">User / Source</TableHead>
-              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle">Action</TableHead>
-              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle">Device / Target</TableHead>
-              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle">Status</TableHead>
-              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle">Details</TableHead>
+              <TableHead className="w-[180px] text-white font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Timestamp</TableHead>
+              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">User / Source</TableHead>
+              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Action</TableHead>
+              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Device / Target</TableHead>
+              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Status</TableHead>
+              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Details</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
