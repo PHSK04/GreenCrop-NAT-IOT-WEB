@@ -87,8 +87,8 @@ function drawTablePage(params: {
   const page = pdfDoc.addPage([842, 595]); // A4 landscape
   const width = page.getWidth();
   const height = page.getHeight();
-  const fontSize = 9;
-  const lineHeight = 12;
+  const fontSize = 10;
+  const lineHeight = 14;
   const marginX = 36;
   const marginY = 36;
   const gridColor = rgb(0.85, 0.85, 0.85);
@@ -118,7 +118,7 @@ function drawTablePage(params: {
   const colWidths = weights.map((w) => Math.floor((availableWidth * w) / totalWeight));
   colWidths[colCount - 1] += availableWidth - colWidths.reduce((a, b) => a + b, 0);
 
-  const headerHeight = lineHeight + 8;
+  const headerHeight = lineHeight + 10;
   const headerTop = y + 4;
   const headerBottom = headerTop - headerHeight;
   page.drawRectangle({
@@ -130,7 +130,7 @@ function drawTablePage(params: {
   });
 
   let x = marginX;
-  const headerTextY = headerBottom + (headerHeight - fontSize) / 2 + 1;
+  const headerTextY = headerBottom + (headerHeight - fontSize) / 2 + 0.5;
   headers.forEach((h, idx) => {
     page.drawText(h.toUpperCase(), { x: x + 4, y: headerTextY, size: fontSize, font, color: rgb(1, 1, 1) });
     x += colWidths[idx];
@@ -141,7 +141,7 @@ function drawTablePage(params: {
   const rowHeights: number[] = [];
   for (let i = startRow; i < rows.length; i += 1) {
     if (y < marginY + lineHeight) break;
-    const rowHeight = lineHeight + 4;
+    const rowHeight = lineHeight + 6;
     if (y - rowHeight < marginY) break;
     x = marginX;
     const row = rows[i];
