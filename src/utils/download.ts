@@ -32,8 +32,7 @@ export async function downloadSimplePdf(filename: string, content: string) {
   });
 
   const bytes = await pdfDoc.save();
-  const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-  const blob = new Blob([buffer], { type: "application/pdf" });
+  const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
