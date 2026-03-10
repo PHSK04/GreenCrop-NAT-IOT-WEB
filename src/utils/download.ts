@@ -59,37 +59,20 @@ function parseCsvTable(content: string): CsvTable | null {
   return { metaLines, headers, rows };
 }
 
-function wrapText(text: string, maxWidth: number, font: any, size: number) {
-  if (!text) return [""];
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let line = "";
-  for (const word of words) {
-    const test = line ? `${line} ${word}` : word;
-    if (font.widthOfTextAtSize(test, size) <= maxWidth) {
-      line = test;
-    } else {
-      if (line) lines.push(line);
-      if (font.widthOfTextAtSize(word, size) <= maxWidth) {
-        line = word;
-      } else {
-        // hard break long word
-        let chunk = "";
-        for (const ch of word) {
-          const t = chunk + ch;
-          if (font.widthOfTextAtSize(t, size) <= maxWidth) {
-            chunk = t;
-          } else {
-            if (chunk) lines.push(chunk);
-            chunk = ch;
-          }
-        }
-        line = chunk;
-      }
+function truncateToWidth(text: string, maxWidth: number, font: any, size: number) {
+  if (!text) return "";
+  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+  const ellipsis = "...";
+  const ellipsisWidth = font.widthOfTextAtSize(ellipsis, size);
+  let out = "";
+  for (const ch of text) {
+    const next = out + ch;
+    if (font.widthOfTextAtSize(next, size) + ellipsisWidth > maxWidth) {
+      return out + ellipsis;
     }
+    out = next;
   }
-  if (line) lines.push(line);
-  return lines;
+  return out;
 }
 
 function drawTablePage(params: {
@@ -140,7 +123,7 @@ function drawTablePage(params: {
     y: y - lineHeight + 2,
     width: availableWidth,
     height: lineHeight + 4,
-    color: rgb(0.85, 0.16, 0.16),
+    color: rgb(0.02, 0.62, 0.38),
   });
 
   let x = marginX;
@@ -156,18 +139,13 @@ function drawTablePage(params: {
   const rowHeights: number[] = [];
   for (let i = startRow; i < rows.length; i += 1) {
     if (y < marginY + lineHeight) break;
+    const rowHeight = lineHeight + 4;
+    if (y - rowHeight < marginY) break;
     x = marginX;
     const row = rows[i];
-    const wrapped = row.map((cell, idx) => wrapText(cell, colWidths[idx] - 8, font, fontSize));
-    const maxLines = Math.max(...wrapped.map((w) => w.length), 1);
-    const rowHeight = maxLines * lineHeight;
-    if (y - rowHeight < marginY) break;
-    wrapped.forEach((lines, idx) => {
-      let yy = y;
-      lines.forEach((line) => {
-        page.drawText(line, { x: x + 4, y: yy, size: fontSize, font, color: rgb(0.1, 0.1, 0.1) });
-        yy -= lineHeight;
-      });
+    row.forEach((cell, idx) => {
+      const text = truncateToWidth(cell, colWidths[idx] - 8, font, fontSize);
+      page.drawText(text, { x: x + 4, y, size: fontSize, font, color: rgb(0.1, 0.1, 0.1) });
       x += colWidths[idx];
     });
     rowHeights.push(rowHeight);
