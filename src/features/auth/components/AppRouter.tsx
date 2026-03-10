@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/features/auth/contexts/AuthContext";
 import { MachineProvider } from "@/contexts/MachineContext";
 import { Dashboard } from "@/components/Dashboard";
+import { AdminDashboard } from "@/layouts/AdminLayout";
 import { Login } from "@/features/auth/components/Login";
 import { Register } from "@/features/auth/components/Register";
 import { DevicePairingPage } from "@/components/pages/DevicePairingPage";
@@ -54,9 +55,7 @@ export function AppRouter() {
     const isAdmin = String(user?.role || "").toLowerCase() === "admin";
     if (isAdmin) {
       return (
-        <MachineProvider>
-          <Dashboard onLogout={logout} user={user} />
-        </MachineProvider>
+        <AdminDashboard />
       );
     }
 
