@@ -181,12 +181,12 @@ function SidebarContent({
           group flex items-center rounded-xl text-sm font-medium transition-all duration-200 w-full
           ${compact ? "justify-center gap-0 px-2 py-3" : "gap-3 px-3 py-2.5"}
           ${isActive 
-            ? "bg-primary/10 text-primary border border-primary/30" 
+            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30" 
             : "text-muted-foreground border border-transparent hover:bg-accent/70 hover:text-accent-foreground"
           }
         `}
       >
-        <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? "text-primary" : "text-muted-foreground group-hover:text-accent-foreground"}`} />
+        <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? "text-emerald-600 dark:text-emerald-300" : "text-muted-foreground group-hover:text-accent-foreground"}`} />
         {!compact && <span className="truncate">{t[item.label] || item.label}</span>}
       </button>
     );

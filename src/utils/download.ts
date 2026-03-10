@@ -108,6 +108,7 @@ function drawTablePage(params: {
   const lineHeight = 12;
   const marginX = 36;
   const marginY = 36;
+  const gridColor = rgb(0.85, 0.85, 0.85);
 
   let y = height - marginY;
   metaLines.forEach((line) => {
@@ -147,9 +148,12 @@ function drawTablePage(params: {
     page.drawText(h.toUpperCase(), { x: x + 4, y, size: fontSize, font, color: rgb(1, 1, 1) });
     x += colWidths[idx];
   });
+  const headerTop = y + 4;
   y -= lineHeight + 6;
+  const headerBottom = y + 6 - lineHeight;
 
   let rowCount = 0;
+  const rowHeights: number[] = [];
   for (let i = startRow; i < rows.length; i += 1) {
     if (y < marginY + lineHeight) break;
     x = marginX;
@@ -166,9 +170,28 @@ function drawTablePage(params: {
       });
       x += colWidths[idx];
     });
+    rowHeights.push(rowHeight);
     y -= rowHeight;
     rowCount += 1;
   }
+  const tableBottom = y;
+  const tableTop = headerTop;
+
+  // Vertical grid lines
+  let vx = marginX;
+  page.drawLine({ start: { x: vx, y: tableBottom }, end: { x: vx, y: tableTop }, thickness: 0.5, color: gridColor });
+  colWidths.forEach((w) => {
+    vx += w;
+    page.drawLine({ start: { x: vx, y: tableBottom }, end: { x: vx, y: tableTop }, thickness: 0.5, color: gridColor });
+  });
+
+  // Horizontal grid lines (header bottom + each row)
+  page.drawLine({ start: { x: marginX, y: headerBottom }, end: { x: marginX + availableWidth, y: headerBottom }, thickness: 0.5, color: gridColor });
+  let hy = headerBottom;
+  rowHeights.forEach((h) => {
+    hy -= h;
+    page.drawLine({ start: { x: marginX, y: hy }, end: { x: marginX + availableWidth, y: hy }, thickness: 0.5, color: gridColor });
+  });
   return rowCount;
 }
 

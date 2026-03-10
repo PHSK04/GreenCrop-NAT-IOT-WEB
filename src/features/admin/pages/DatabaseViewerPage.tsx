@@ -722,7 +722,11 @@ export function DatabaseViewerPage() {
                 {safeText(selectedUserDetails.user.email)} | role: {safeText(selectedUserDetails.user.role)} | user_id: {safeText(selectedUserDetails.user.id)}
               </p>
             </div>
-            <Button variant="ghost" onClick={() => setSelectedUserDetails(null)} className="border border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:text-white dark:hover:bg-slate-800">
+            <Button
+              variant="ghost"
+              onClick={() => setSelectedUserDetails(null)}
+              className="h-9 rounded-lg border border-slate-300 px-4 text-slate-700 hover:text-slate-900 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:text-white dark:hover:bg-slate-800"
+            >
               Close
             </Button>
           </div>
@@ -835,14 +839,14 @@ export function DatabaseViewerPage() {
               value={startDateTime}
               onChange={(e) => setStartDateTime(e.target.value)}
               aria-label="User timeline start date time"
-              className={modalInputClass}
+              className={`${modalInputClass} pr-3`}
             />
             <Input
               type="datetime-local"
               value={endDateTime}
               onChange={(e) => setEndDateTime(e.target.value)}
               aria-label="User timeline end date time"
-              className={modalInputClass}
+              className={`${modalInputClass} pr-3`}
             />
             <Button
               variant="outline"
@@ -852,7 +856,7 @@ export function DatabaseViewerPage() {
                   loadUserDetails(String(selectedUserDetails.user.id));
                 }
               }}
-              className="border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="border-slate-300 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:bg-slate-800"
             >
               Reload by Date
             </Button>
