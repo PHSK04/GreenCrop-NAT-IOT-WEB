@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
+import { Input } from "../ui/input";
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Sprout, TrendingUp, Scale, Calendar, ArrowUpRight, Droplets, Timer, Download, FileText } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
@@ -36,6 +37,19 @@ const recentHarvestLogs = [
 
 export function WolffiaAnalyticsPage() {
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [exportStart, setExportStart] = useState("");
+  const [exportEnd, setExportEnd] = useState("");
+  const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([
+    "Monthly Stats",
+    "Harvest History",
+    "Pond Metrics",
+  ]);
+
+  const dataTypeOptions = [
+    "Monthly Stats",
+    "Harvest History",
+    "Pond Metrics",
+  ];
 
   const handleDownload = () => {
     try {
@@ -57,6 +71,65 @@ export function WolffiaAnalyticsPage() {
     } catch (error) {
       toast.error("Export Failed", {
         description: "Could not generate report file."
+      });
+    }
+  };
+
+  const buildExportPayload = () => {
+    const lines: string[] = [];
+    lines.push(`Report, Wolffia Pond Analytics`);
+    if (exportStart || exportEnd) {
+      lines.push(`Date Range, ${exportStart || "-"} to ${exportEnd || "-"}`);
+    }
+    lines.push(`Selected Types, ${selectedDataTypes.join(" | ") || "-"}`);
+    lines.push("");
+
+    if (selectedDataTypes.includes("Monthly Stats")) {
+      lines.push("Section, Monthly Stats");
+      lines.push("month,yield,frequency");
+      wolffiaStats.forEach((row) => {
+        lines.push(`${row.month},${row.yield},${row.frequency}`);
+      });
+      lines.push("");
+    }
+
+    if (selectedDataTypes.includes("Harvest History")) {
+      lines.push("Section, Harvest History");
+      lines.push("id,weight,date,interval");
+      recentHarvestLogs.forEach((row) => {
+        lines.push(`${row.id},${row.weight},${row.date},${row.interval}`);
+      });
+      lines.push("");
+    }
+
+    if (selectedDataTypes.includes("Pond Metrics")) {
+      lines.push("Section, Pond Metrics");
+      lines.push("metric,value,trend");
+      pondMetrics.forEach((row) => {
+        lines.push(`${row.metric},${row.value},${row.trend}`);
+      });
+      lines.push("");
+    }
+
+    return lines.join("\n");
+  };
+
+  const handleExport = (format: "csv" | "pdf") => {
+    try {
+      if (selectedDataTypes.length === 0) {
+        toast.error("Export Failed", { description: "Please select at least one data type." });
+        return;
+      }
+      const payload = buildExportPayload();
+      const filename = `wolffia_analytics.${format}`;
+      const mimeType = format === "pdf" ? "application/pdf" : "text/csv;charset=utf-8";
+      downloadTextFile(filename, payload, mimeType);
+      toast.success("Export Successful", {
+        description: `Downloaded ${filename}`
+      });
+    } catch {
+      toast.error("Export Failed", {
+        description: "Could not generate export file."
       });
     }
   };
@@ -138,6 +211,61 @@ export function WolffiaAnalyticsPage() {
       </Dialog>
 
       <main className="flex-1 overflow-auto p-8 ">
+        <Card className="rounded-xl border border-border shadow-lg bg-white/90 dark:bg-slate-900/70 mb-8">
+          <CardHeader>
+            <CardTitle className="text-foreground text-base">Export Filters</CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Select date range and data types to download CSV/PDF
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                type="date"
+                aria-label="Export start date"
+                value={exportStart}
+                onChange={(e) => setExportStart(e.target.value)}
+              />
+              <Input
+                type="date"
+                aria-label="Export end date"
+                value={exportEnd}
+                onChange={(e) => setExportEnd(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {dataTypeOptions.map((option) => {
+                const checked = selectedDataTypes.includes(option);
+                return (
+                  <label key={option} className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        setSelectedDataTypes((prev) =>
+                          prev.includes(option)
+                            ? prev.filter((v) => v !== option)
+                            : [...prev, option]
+                        );
+                      }}
+                    />
+                    {option}
+                  </label>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleExport("csv")}>
+                <Download className="w-4 h-4" />
+                Download CSV
+              </Button>
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleExport("pdf")}>
+                <FileText className="w-4 h-4" />
+                Download PDF
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
         {/* Dual Axis Chart */}
         <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md mb-8">
           <CardHeader>

@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ComposedChart, Bar, Line, Legend } from "recharts";
-import { Heart, TrendingUp, Star, AlertCircle, Activity, Zap, Factory } from "lucide-react";
+import { Heart, TrendingUp, Star, AlertCircle, Activity, Zap, Factory, Download, FileText } from "lucide-react";
+import { toast } from "sonner";
+import { downloadTextFile } from "@/utils/download";
 
 // 1. Production Output Over Time (Kg & Growth Rate)
 const productionData = [
@@ -42,6 +46,90 @@ const bottleneckIssues = [
 ];
 
 export function MachinePerformancePage() {
+  const [exportStart, setExportStart] = useState("");
+  const [exportEnd, setExportEnd] = useState("");
+  const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([
+    "Production Output",
+    "System Performance",
+    "Top Factors",
+    "Constraints",
+  ]);
+
+  const dataTypeOptions = [
+    "Production Output",
+    "System Performance",
+    "Top Factors",
+    "Constraints",
+  ];
+
+  const buildExportPayload = () => {
+    const lines: string[] = [];
+    lines.push("Report, Machine Performance Analytics");
+    if (exportStart || exportEnd) {
+      lines.push(`Date Range, ${exportStart || "-"} to ${exportEnd || "-"}`);
+    }
+    lines.push(`Selected Types, ${selectedDataTypes.join(" | ") || "-"}`);
+    lines.push("");
+
+    if (selectedDataTypes.includes("Production Output")) {
+      lines.push("Section, Production Output");
+      lines.push("date,morningYield,afternoonYield,growthRate");
+      productionData.forEach((row) => {
+        lines.push(`${row.date},${row.morningYield},${row.afternoonYield},${row.growthRate}`);
+      });
+      lines.push("");
+    }
+
+    if (selectedDataTypes.includes("System Performance")) {
+      lines.push("Section, System Performance");
+      lines.push("category,score,fullMark");
+      machinePerformanceData.forEach((row) => {
+        lines.push(`${row.category},${row.score},${row.fullMark}`);
+      });
+      lines.push("");
+    }
+
+    if (selectedDataTypes.includes("Top Factors")) {
+      lines.push("Section, Top Performance Factors");
+      lines.push("factor");
+      performanceFactors.forEach((row) => {
+        lines.push(`${row}`);
+      });
+      lines.push("");
+    }
+
+    if (selectedDataTypes.includes("Constraints")) {
+      lines.push("Section, Production Constraints");
+      lines.push("issue");
+      bottleneckIssues.forEach((row) => {
+        lines.push(`${row}`);
+      });
+      lines.push("");
+    }
+
+    return lines.join("\n");
+  };
+
+  const handleExport = (format: "csv" | "pdf") => {
+    try {
+      if (selectedDataTypes.length === 0) {
+        toast.error("Export Failed", { description: "Please select at least one data type." });
+        return;
+      }
+      const payload = buildExportPayload();
+      const filename = `machine_performance.${format}`;
+      const mimeType = format === "pdf" ? "application/pdf" : "text/csv;charset=utf-8";
+      downloadTextFile(filename, payload, mimeType);
+      toast.success("Export Successful", {
+        description: `Downloaded ${filename}`
+      });
+    } catch {
+      toast.error("Export Failed", {
+        description: "Could not generate export file."
+      });
+    }
+  };
+
   return (
     <>
       {/* Header */}
@@ -62,6 +150,61 @@ export function MachinePerformancePage() {
       </header>
 
       <main className="flex-1 overflow-auto p-8 ">
+        <Card className="rounded-xl border border-border shadow-lg bg-white/90 dark:bg-slate-900/70 mb-8">
+          <CardHeader>
+            <CardTitle className="text-foreground text-base">Export Filters</CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Select date range and data types to download CSV/PDF
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                type="date"
+                aria-label="Export start date"
+                value={exportStart}
+                onChange={(e) => setExportStart(e.target.value)}
+              />
+              <Input
+                type="date"
+                aria-label="Export end date"
+                value={exportEnd}
+                onChange={(e) => setExportEnd(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {dataTypeOptions.map((option) => {
+                const checked = selectedDataTypes.includes(option);
+                return (
+                  <label key={option} className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        setSelectedDataTypes((prev) =>
+                          prev.includes(option)
+                            ? prev.filter((v) => v !== option)
+                            : [...prev, option]
+                        );
+                      }}
+                    />
+                    {option}
+                  </label>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleExport("csv")}>
+                <Download className="w-4 h-4" />
+                Download CSV
+              </Button>
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleExport("pdf")}>
+                <FileText className="w-4 h-4" />
+                Download PDF
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           
