@@ -24,7 +24,7 @@ import {
   FileText
 } from "lucide-react";
 import { toast } from "sonner";
-import { downloadTextFile } from "@/utils/download";
+import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 
 const initialDeviceData = [
   {
@@ -201,8 +201,11 @@ export function DeviceMonitorPage() {
       }
       const payload = buildExportPayload();
       const filename = `sensor_intelligence.${format}`;
-      const mimeType = format === "pdf" ? "application/pdf" : "text/csv;charset=utf-8";
-      downloadTextFile(filename, payload, mimeType);
+      if (format === "pdf") {
+        downloadSimplePdf(filename, payload);
+      } else {
+        downloadTextFile(filename, payload, "text/csv;charset=utf-8");
+      }
       toast.success("Export Successful", {
         description: `Downloaded ${filename}`
       });

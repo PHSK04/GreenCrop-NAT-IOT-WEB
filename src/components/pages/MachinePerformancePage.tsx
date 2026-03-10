@@ -6,7 +6,7 @@ import { Input } from "../ui/input";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ComposedChart, Bar, Line, Legend } from "recharts";
 import { Heart, TrendingUp, Star, AlertCircle, Activity, Zap, Factory, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { downloadTextFile } from "@/utils/download";
+import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 
 // 1. Production Output Over Time (Kg & Growth Rate)
 const productionData = [
@@ -118,8 +118,11 @@ export function MachinePerformancePage() {
       }
       const payload = buildExportPayload();
       const filename = `machine_performance.${format}`;
-      const mimeType = format === "pdf" ? "application/pdf" : "text/csv;charset=utf-8";
-      downloadTextFile(filename, payload, mimeType);
+      if (format === "pdf") {
+        downloadSimplePdf(filename, payload);
+      } else {
+        downloadTextFile(filename, payload, "text/csv;charset=utf-8");
+      }
       toast.success("Export Successful", {
         description: `Downloaded ${filename}`
       });

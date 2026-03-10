@@ -18,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Database, Eye, EyeOff, RefreshCcw, Save, Search, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { downloadTextFile } from "@/utils/download";
+import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 
 type ActiveTab = "users" | "sessions" | "sensor" | "audit" | "otp";
 
@@ -186,6 +186,15 @@ export function DatabaseViewerPage() {
 
   useEffect(() => {
     if (!selectedUserDetails) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [selectedUserDetails]);
+
+  useEffect(() => {
+    if (!selectedUserDetails) return;
     setEditName(String(selectedUserDetails.user.name || ""));
     setEditEmail(String(selectedUserDetails.user.email || ""));
     setEditTitle(String(selectedUserDetails.user.title || ""));
@@ -221,43 +230,6 @@ export function DatabaseViewerPage() {
     } finally {
       setSavingProfile(false);
     }
-  };
-
-  const handleDownloadUserDevices = () => {
-    if (!selectedUserDetails) return;
-    const devices = selectedUserDetails.devices || [];
-    if (!devices.length) {
-      toast.error("Download Failed", { description: "No device data to export." });
-      return;
-    }
-    const userName = safeText(selectedUserDetails.user.name);
-    const userId = safeText(selectedUserDetails.user.id);
-
-    const headerLines = [
-      ["Report", "User Devices"],
-      ["User", userName],
-      ["User ID", userId],
-      ["Total Devices", String(devices.length)],
-      [],
-      ["device_id", "pairing_code", "device_name", "location", "is_primary", "status", "paired_at", "last_seen"],
-    ];
-
-    const rows = devices.map((d) => [
-      safeText(d.device_id),
-      safeText(d.pairing_code),
-      safeText(d.device_name),
-      safeText(d.location),
-      d.is_primary ? "true" : "false",
-      safeText(d.status),
-      safeText(d.paired_at),
-      safeText(d.last_seen),
-    ]);
-
-    const csvBody = [...headerLines, ...rows]
-      .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-
-    downloadTextFile(`user_${userId}_devices.csv`, csvBody, "text/csv;charset=utf-8");
   };
 
   const filteredUsers = useMemo(() => {
@@ -474,8 +446,11 @@ export function DatabaseViewerPage() {
       .join("\n");
 
     const filename = `user_${safeText(selectedUserDetails.user.id)}_events.${format}`;
-    const mimeType = format === "pdf" ? "application/pdf" : "text/csv;charset=utf-8";
-    downloadTextFile(filename, csvBody, mimeType);
+    if (format === "pdf") {
+      downloadSimplePdf(filename, csvBody);
+    } else {
+      downloadTextFile(filename, csvBody, "text/csv;charset=utf-8");
+    }
     toast.success("Export Successful", { description: `Downloaded ${filename}` });
   };
 
@@ -732,10 +707,10 @@ export function DatabaseViewerPage() {
       </Tabs>
 
       {selectedUserDetails && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/80 px-4 py-8">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/85 px-4 py-8">
           <div
             ref={userDetailsRef}
-            className="w-full max-w-6xl space-y-4 rounded-xl border-2 border-emerald-200 bg-slate-900/95 p-4 text-slate-100 shadow-2xl"
+            className="w-full max-w-6xl max-h-[90vh] overflow-y-auto space-y-4 rounded-xl border-2 border-emerald-200 bg-slate-900/95 p-4 text-slate-100 shadow-2xl"
           >
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -768,65 +743,6 @@ export function DatabaseViewerPage() {
               <CardHeader className="pb-2"><CardTitle className="text-sm">Current Filter</CardTitle></CardHeader>
               <CardContent><div className="text-sm font-medium">{eventTypeFilter === "all" ? "All events" : eventTypeFilter}</div></CardContent>
             </Card>
-          </div>
-
-          <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold">Linked Devices</h3>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">
-                  {selectedUserDetails.devices?.length || 0} device(s)
-                </Badge>
-                <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadUserDevices}>
-                  <Download className="h-4 w-4" />
-                  Download CSV
-                </Button>
-              </div>
-            </div>
-            {(selectedUserDetails.devices || []).length === 0 ? (
-              <div className="rounded-lg border border-dashed border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                No devices paired with this user yet.
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-lg border border-slate-700 bg-slate-900/70">
-                <Table>
-                  <TableHeader className="bg-slate-100/70 dark:bg-slate-800/70">
-                    <TableRow>
-                      <TableHead>Device ID</TableHead>
-                      <TableHead>Pairing Code</TableHead>
-                      <TableHead>Device Name</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Primary</TableHead>
-                      <TableHead>Last Seen</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(selectedUserDetails.devices || []).map((device) => (
-                      <TableRow key={String(device.id)}>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {safeText(device.device_id)}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {safeText(device.pairing_code)}
-                        </TableCell>
-                        <TableCell>{safeText(device.device_name)}</TableCell>
-                        <TableCell>{safeText(device.location)}</TableCell>
-                        <TableCell>
-                          {device.is_primary ? (
-                            <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-200">Primary</Badge>
-                          ) : (
-                            <Badge variant="outline">Secondary</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {formatDate(device.last_seen || device.paired_at)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
           </div>
 
           <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-4">

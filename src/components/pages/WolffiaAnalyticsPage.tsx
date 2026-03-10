@@ -8,7 +8,7 @@ import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Respons
 import { Sprout, TrendingUp, Scale, Calendar, ArrowUpRight, Droplets, Timer, Download, FileText } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
 import { toast } from "sonner";
-import { downloadTextFile } from "@/utils/download";
+import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 
 // Monthly Wolffia Stats: Yield vs Frequency
 const wolffiaStats = [
@@ -122,8 +122,11 @@ export function WolffiaAnalyticsPage() {
       }
       const payload = buildExportPayload();
       const filename = `wolffia_analytics.${format}`;
-      const mimeType = format === "pdf" ? "application/pdf" : "text/csv;charset=utf-8";
-      downloadTextFile(filename, payload, mimeType);
+      if (format === "pdf") {
+        downloadSimplePdf(filename, payload);
+      } else {
+        downloadTextFile(filename, payload, "text/csv;charset=utf-8");
+      }
       toast.success("Export Successful", {
         description: `Downloaded ${filename}`
       });
