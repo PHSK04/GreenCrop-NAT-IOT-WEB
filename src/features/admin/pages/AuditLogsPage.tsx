@@ -77,31 +77,31 @@ export function AuditLogsPage() {
         </Button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-white/75 shadow-sm backdrop-blur-sm dark:bg-slate-900/70">
-        <Table>
-          <TableHeader className="bg-slate-100/70 dark:bg-slate-800/45">
+      <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        <Table className="text-sm">
+          <TableHeader className="bg-red-600 dark:bg-red-700">
             <TableRow>
-              <TableHead className="w-[180px]">Timestamp</TableHead>
-              <TableHead>User / Source</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Device / Target</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Details</TableHead>
+              <TableHead className="w-[180px] text-white font-semibold">Timestamp</TableHead>
+              <TableHead className="text-white font-semibold">User / Source</TableHead>
+              <TableHead className="text-white font-semibold">Action</TableHead>
+              <TableHead className="text-white font-semibold">Device / Target</TableHead>
+              <TableHead className="text-white font-semibold">Status</TableHead>
+              <TableHead className="text-white font-semibold">Details</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
              {filteredLogs.map((log) => (
-                <TableRow key={log.id} className="hover:bg-muted/30 transition-colors">
-                    <TableCell className="font-mono text-xs text-muted-foreground">
+                <TableRow key={log.id} className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40">
+                    <TableCell className="font-mono text-xs text-slate-600 dark:text-slate-400">
                         {new Date(log.timestamp).toLocaleString()}
                     </TableCell>
-                    <TableCell className="font-medium">{log.user}</TableCell>
+                    <TableCell className="font-medium text-slate-900 dark:text-slate-100">{log.user}</TableCell>
                     <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">
+                        <Badge variant="outline" className="font-mono text-[11px] tracking-wide">
                             {log.action}
                         </Badge>
                     </TableCell>
-                    <TableCell>{log.device}</TableCell>
+                    <TableCell className="text-slate-800 dark:text-slate-200">{log.device}</TableCell>
                     <TableCell>
                         <Badge variant={log.status === 'success' ? 'default' : log.status === 'warning' ? 'secondary' : 'destructive'} 
                                className={
@@ -112,7 +112,7 @@ export function AuditLogsPage() {
                             {log.status}
                         </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{log.details}</TableCell>
+                    <TableCell className="text-slate-600 dark:text-slate-400">{log.details}</TableCell>
                 </TableRow>
              ))}
           </TableBody>
