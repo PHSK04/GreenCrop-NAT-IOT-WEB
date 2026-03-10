@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Database, Eye, EyeOff, RefreshCcw, Save, Search, Download } from "lucide-react";
+import { Database, Eye, EyeOff, RefreshCcw, Save, Search, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { downloadTextFile } from "@/utils/download";
 
@@ -75,6 +75,13 @@ export function DatabaseViewerPage() {
   const [eventTypeFilter, setEventTypeFilter] = useState("all");
   const [eventSearch, setEventSearch] = useState("");
   const [expandedEventKey, setExpandedEventKey] = useState<string | null>(null);
+  const [selectedExportTypes, setSelectedExportTypes] = useState<string[]>([
+    "LOGIN",
+    "LOGOUT",
+    "ACTION",
+    "SENSOR",
+    "ERROR",
+  ]);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editTitle, setEditTitle] = useState("");
@@ -303,7 +310,7 @@ export function DatabaseViewerPage() {
     [users, selectedUserId],
   );
 
-  const groupedUserEvents = useMemo(() => {
+  const baseUserEvents = useMemo(() => {
     if (!selectedUserDetails) return [];
     const events: UserEvent[] = [];
 
@@ -381,11 +388,16 @@ export function DatabaseViewerPage() {
       });
     });
 
+    return events;
+  }, [selectedUserDetails]);
+
+  const groupedUserEvents = useMemo(() => {
+    if (!baseUserEvents.length) return [];
     const searchQ = eventSearch.trim().toLowerCase();
     const startMs = startDateTime ? new Date(startDateTime).getTime() : 0;
     const endMs = endDateTime ? new Date(endDateTime).getTime() : Number.MAX_SAFE_INTEGER;
 
-    const filtered = events
+    const filtered = baseUserEvents
       .filter((e) => e.timeMs >= startMs && e.timeMs <= endMs)
       .filter((e) => eventTypeFilter === "all" || e.type === eventTypeFilter)
       .filter((e) => {
@@ -408,7 +420,64 @@ export function DatabaseViewerPage() {
         dayLabel: dayEvents[0]?.dayLabel || dayKey,
         events: dayEvents,
       }));
-  }, [selectedUserDetails, eventSearch, eventTypeFilter, startDateTime, endDateTime]);
+  }, [baseUserEvents, eventSearch, eventTypeFilter, startDateTime, endDateTime]);
+
+  const handleExportUserEvents = (format: "csv" | "pdf") => {
+    if (!selectedUserDetails) {
+      toast.error("Export Failed", { description: "Select a user to export." });
+      return;
+    }
+    if (selectedExportTypes.length === 0) {
+      toast.error("Export Failed", { description: "Please select at least one data type." });
+      return;
+    }
+    const searchQ = eventSearch.trim().toLowerCase();
+    const startMs = startDateTime ? new Date(startDateTime).getTime() : 0;
+    const endMs = endDateTime ? new Date(endDateTime).getTime() : Number.MAX_SAFE_INTEGER;
+    const events = baseUserEvents
+      .filter((e) => e.timeMs >= startMs && e.timeMs <= endMs)
+      .filter((e) => selectedExportTypes.includes(e.type))
+      .filter((e) => {
+        if (!searchQ) return true;
+        const hay = `${e.title} ${e.detail} ${e.device || ""} ${e.browser || ""} ${e.ip || ""}`.toLowerCase();
+        return hay.includes(searchQ);
+      })
+      .sort((a, b) => b.timeMs - a.timeMs);
+
+    if (!events.length) {
+      toast.error("Export Failed", { description: "No events found for selected filters." });
+      return;
+    }
+
+    const headerLines = [
+      ["Report", "User Timeline Export"],
+      ["User", safeText(selectedUserDetails.user.name)],
+      ["User ID", safeText(selectedUserDetails.user.id)],
+      ["Date Range", `${startDateTime || "-"} to ${endDateTime || "-"}`],
+      ["Selected Types", selectedExportTypes.join(" | ")],
+      [],
+      ["timestamp", "type", "title", "detail", "device", "browser", "ip"],
+    ];
+
+    const rows = events.map((e) => [
+      safeText(e.timestampText),
+      e.type,
+      safeText(e.title),
+      safeText(e.detail),
+      safeText(e.device),
+      safeText(e.browser),
+      safeText(e.ip),
+    ]);
+
+    const csvBody = [...headerLines, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const filename = `user_${safeText(selectedUserDetails.user.id)}_events.${format}`;
+    const mimeType = format === "pdf" ? "application/pdf" : "text/csv;charset=utf-8";
+    downloadTextFile(filename, csvBody, mimeType);
+    toast.success("Export Successful", { description: `Downloaded ${filename}` });
+  };
 
   return (
     <div className="p-8 pb-24 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -840,6 +909,38 @@ export function DatabaseViewerPage() {
             >
               Reload by Date
             </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2">
+            {["LOGIN", "LOGOUT", "ACTION", "SENSOR", "ERROR"].map((type) => {
+              const checked = selectedExportTypes.includes(type);
+              return (
+                <label key={type} className="flex items-center gap-2 text-sm text-emerald-900">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      setSelectedExportTypes((prev) =>
+                        prev.includes(type)
+                          ? prev.filter((v) => v !== type)
+                          : [...prev, type]
+                      );
+                    }}
+                  />
+                  {type}
+                </label>
+              );
+            })}
+            <div className="flex flex-wrap gap-2 ml-auto">
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleExportUserEvents("csv")}>
+                <Download className="h-4 w-4" />
+                Download CSV
+              </Button>
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleExportUserEvents("pdf")}>
+                <FileText className="h-4 w-4" />
+                Download PDF
+              </Button>
+            </div>
           </div>
 
           <div
