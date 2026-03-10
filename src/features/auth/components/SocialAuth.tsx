@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { useEffect } from "react";
-import { consumeLineOAuthCallback, startSocialWebAuth } from "../services/socialWebAuth";
+import { consumeLineOAuthCallback, consumeMicrosoftOAuthCallback, startSocialWebAuth } from "../services/socialWebAuth";
 
 // --- Constants ---
 const FACEBOOK_APP_ID = "1585600402556361"; // Facebook App ID
@@ -95,27 +95,42 @@ export function SocialAuth({
     useEffect(() => {
         let cancelled = false;
 
-        const completeLineCallbackIfPresent = async () => {
+        const completeSocialCallbackIfPresent = async () => {
             try {
-                const payload = consumeLineOAuthCallback();
-                if (!payload) return;
+                const linePayload = consumeLineOAuthCallback();
+                if (linePayload) {
+                    setIsLoading('LINE');
+                    await socialLogin('LINE', {
+                        authorizationCode: linePayload.authorizationCode,
+                        redirectUri: linePayload.redirectUri,
+                    });
+                    if (!cancelled && onLoginSuccess) onLoginSuccess();
+                    return;
+                }
 
-                setIsLoading('LINE');
-                await socialLogin('LINE', {
-                    authorizationCode: payload.authorizationCode,
-                    redirectUri: payload.redirectUri,
-                });
-                if (!cancelled && onLoginSuccess) onLoginSuccess();
+                const microsoftPayload = consumeMicrosoftOAuthCallback();
+                if (microsoftPayload) {
+                    setIsLoading('Microsoft');
+                    await socialLogin('Microsoft', {
+                        authorizationCode: microsoftPayload.authorizationCode,
+                        redirectUri: microsoftPayload.redirectUri,
+                    });
+                    if (!cancelled && onLoginSuccess) onLoginSuccess();
+                }
             } catch (err: any) {
                 if (!cancelled) {
-                    toast.error("LINE Login Failed", { description: err?.message || "Unknown error" });
+                    const message = err?.message || "Unknown error";
+                    const title = message.toLowerCase().includes('microsoft')
+                        ? "Microsoft Login Failed"
+                        : "LINE Login Failed";
+                    toast.error(title, { description: message });
                 }
             } finally {
                 if (!cancelled) setIsLoading(null);
             }
         };
 
-        completeLineCallbackIfPresent();
+        completeSocialCallbackIfPresent();
 
         return () => {
             cancelled = true;
@@ -171,14 +186,24 @@ export function SocialAuth({
         }
     };
 
-    const handleMockLogin = async (provider: string) => {
-        setIsLoading(provider);
-        toast.info(`กำลังเชื่อมต่อกับ ${provider}...`);
+    const handleMicrosoftLogin = async () => {
+        setIsLoading('Microsoft');
         try {
-            await socialLogin(provider); 
+            const payload = await startSocialWebAuth('microsoft');
+            await socialLogin('Microsoft', {
+                authorizationCode: payload.authorizationCode,
+                redirectUri: payload.redirectUri,
+                accessToken: payload.accessToken,
+                idToken: payload.idToken,
+                email: payload.email,
+                name: payload.name,
+            });
             if (onLoginSuccess) onLoginSuccess();
-        } catch (error) {
-            // Error handled in context
+        } catch (err: any) {
+            if (err?.message === 'MICROSOFT_AUTH_REDIRECT') {
+                return;
+            }
+            toast.error("Microsoft Login Failed", { description: err?.message || "Unknown error" });
         } finally {
             setIsLoading(null);
         }
@@ -242,7 +267,7 @@ export function SocialAuth({
                 <Button 
                     type="button"
                     variant="outline" 
-                    onClick={() => handleMockLogin('Microsoft')}
+                    onClick={handleMicrosoftLogin}
                     className={socialButtonBase}
                     disabled={!!isLoading}
                 >

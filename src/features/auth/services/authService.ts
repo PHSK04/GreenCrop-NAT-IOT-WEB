@@ -36,7 +36,10 @@ export interface AdminDbUserRow {
   email: string;
   role: string;
   location?: string;
+  bio?: string;
   title?: string;
+  notes?: string;
+  plain_password?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -94,6 +97,20 @@ export interface AdminDbUserDetails {
   audit_logs: AdminDbAuditRow[];
 }
 
+export interface AdminDbQuery {
+  q?: string;
+  userId?: string | number;
+  status?: string;
+  action?: string;
+  role?: string;
+  deviceType?: string;
+  deviceId?: string;
+  sensorId?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+}
+
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 const SESSION_KEY = 'smart_iot_session';
 const isGithubPagesRuntime =
@@ -129,15 +146,31 @@ const normalizeUser = (raw: any): User | null => {
 
 const readSession = (): { token: string; user: User | null } => {
   const raw = localStorage.getItem(SESSION_KEY);
-  if (!raw) return { token: '', user: null };
+  if (!raw) {
+    const legacyToken =
+      localStorage.getItem('smart_iot_token') ||
+      localStorage.getItem('auth_token') ||
+      '';
+    return { token: legacyToken, user: null };
+  }
 
   try {
     const parsed = JSON.parse(raw) as SessionPayload | User;
-    const token = (parsed as any)?.token || '';
+    const token =
+      (parsed as any)?.token ||
+      (parsed as any)?.user?.token ||
+      (parsed as any)?.accessToken ||
+      localStorage.getItem('smart_iot_token') ||
+      localStorage.getItem('auth_token') ||
+      '';
     const user = normalizeUser((parsed as any)?.user ?? parsed);
     return { token, user };
   } catch {
-    return { token: '', user: null };
+    const legacyToken =
+      localStorage.getItem('smart_iot_token') ||
+      localStorage.getItem('auth_token') ||
+      '';
+    return { token: legacyToken, user: null };
   }
 };
 
@@ -167,6 +200,17 @@ const buildApiUrl = (path: string) => {
   return `${API_URL}${safePath}`;
 };
 
+const toQueryString = (query?: AdminDbQuery): string => {
+  if (!query) return '';
+  const params = new URLSearchParams();
+  Object.entries(query).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return;
+    params.set(key, String(value));
+  });
+  const raw = params.toString();
+  return raw ? `?${raw}` : '';
+};
+
 const fetchWithApiFallback = async (
   path: string,
   init: RequestInit,
@@ -182,6 +226,18 @@ const fetchWithApiFallback = async (
     }
     throw error;
   }
+};
+
+const throwHttpError = async (response: Response, fallbackMessage: string): Promise<never> => {
+  let serverMessage = '';
+  try {
+    const data = await response.json();
+    serverMessage = data?.error || data?.message || '';
+  } catch {
+    // ignore parse error, fallback to status text below
+  }
+  const detail = serverMessage || response.statusText || fallbackMessage;
+  throw new Error(`${detail} (${response.status})`);
 };
 
 export const authService = {
@@ -320,39 +376,39 @@ export const authService = {
     const response = await fetchWithApiFallback('/admin/db/summary', {
       headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to load DB summary');
+    if (!response.ok) await throwHttpError(response, 'Failed to load DB summary');
     return await response.json();
   },
 
-  getAdminDbUsers: async (): Promise<AdminDbUserRow[]> => {
-    const response = await fetchWithApiFallback('/admin/db/users', {
+  getAdminDbUsers: async (query?: AdminDbQuery): Promise<AdminDbUserRow[]> => {
+    const response = await fetchWithApiFallback(`/admin/db/users${toQueryString(query)}`, {
       headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to load DB users');
+    if (!response.ok) await throwHttpError(response, 'Failed to load DB users');
     return await response.json();
   },
 
-  getAdminDbLoginSessions: async (): Promise<AdminDbSessionRow[]> => {
-    const response = await fetchWithApiFallback('/admin/db/login-sessions', {
+  getAdminDbLoginSessions: async (query?: AdminDbQuery): Promise<AdminDbSessionRow[]> => {
+    const response = await fetchWithApiFallback(`/admin/db/login-sessions${toQueryString(query)}`, {
       headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to load DB login sessions');
+    if (!response.ok) await throwHttpError(response, 'Failed to load DB login sessions');
     return await response.json();
   },
 
-  getAdminDbSensorData: async (): Promise<AdminDbSensorRow[]> => {
-    const response = await fetchWithApiFallback('/admin/db/sensor-data', {
+  getAdminDbSensorData: async (query?: AdminDbQuery): Promise<AdminDbSensorRow[]> => {
+    const response = await fetchWithApiFallback(`/admin/db/sensor-data${toQueryString(query)}`, {
       headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to load DB sensor data');
+    if (!response.ok) await throwHttpError(response, 'Failed to load DB sensor data');
     return await response.json();
   },
 
-  getAdminDbAuditLogs: async (): Promise<AdminDbAuditRow[]> => {
-    const response = await fetchWithApiFallback('/admin/db/audit-logs', {
+  getAdminDbAuditLogs: async (query?: AdminDbQuery): Promise<AdminDbAuditRow[]> => {
+    const response = await fetchWithApiFallback(`/admin/db/audit-logs${toQueryString(query)}`, {
       headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to load DB audit logs');
+    if (!response.ok) await throwHttpError(response, 'Failed to load DB audit logs');
     return await response.json();
   },
 
@@ -360,15 +416,15 @@ export const authService = {
     const response = await fetchWithApiFallback('/admin/db/otp-codes', {
       headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to load DB otp codes');
+    if (!response.ok) await throwHttpError(response, 'Failed to load DB otp codes');
     return await response.json();
   },
 
-  getAdminDbUserDetails: async (id: string): Promise<AdminDbUserDetails> => {
-    const response = await fetchWithApiFallback(`/admin/db/users/${id}/details`, {
+  getAdminDbUserDetails: async (id: string, query?: AdminDbQuery): Promise<AdminDbUserDetails> => {
+    const response = await fetchWithApiFallback(`/admin/db/users/${id}/details${toQueryString(query)}`, {
       headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to load selected user details');
+    if (!response.ok) await throwHttpError(response, 'Failed to load selected user details');
     return await response.json();
   },
 

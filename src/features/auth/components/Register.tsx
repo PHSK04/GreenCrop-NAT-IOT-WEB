@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Mail, Lock, User, ArrowLeft, Leaf, Phone } from "lucide-react";
+import { Loader2, Mail, Lock, User, ArrowLeft, Leaf, Phone, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,8 @@ interface RegisterProps {
 
 export function Register({ onSwitchToLogin }: RegisterProps) {
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const gridPatternUrl = `${import.meta.env.BASE_URL}grid-pattern.svg`;
     
     // Form setup...
@@ -182,7 +184,7 @@ export function Register({ onSwitchToLogin }: RegisterProps) {
                                                 <div className="relative">
                                                     <Mail className="absolute left-3 top-4 h-4 w-4 text-muted-foreground" />
                                                     <Input
-                                                        placeholder="user@smartiot.com"
+                                                        placeholder="Username"
                                                         className="h-11 pl-10"
                                                         autoComplete="off"
                                                         autoCorrect="off"
@@ -232,15 +234,23 @@ export function Register({ onSwitchToLogin }: RegisterProps) {
                                                  <div className="relative">
                                                     <Lock className="absolute left-3 top-4 h-4 w-4 text-muted-foreground" />
                                                     <Input
-                                                        type="password"
+                                                        type={showPassword ? "text" : "password"}
                                                         placeholder="••••••••"
-                                                        className="h-11 pl-10"
+                                                        className="h-11 pl-10 pr-10"
                                                         autoComplete="off"
                                                         autoCorrect="off"
                                                         autoCapitalize="none"
                                                         spellCheck={false}
                                                         {...field}
                                                     />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowPassword((prev) => !prev)}
+                                                        className="absolute right-3 top-4 text-muted-foreground hover:text-emerald-500"
+                                                        aria-label={showPassword ? "Hide password" : "Show password"}
+                                                    >
+                                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                    </button>
                                                 </div>
                                             </FormControl>
                                             <FormMessage />
@@ -258,15 +268,23 @@ export function Register({ onSwitchToLogin }: RegisterProps) {
                                                  <div className="relative">
                                                     <Lock className="absolute left-3 top-4 h-4 w-4 text-muted-foreground" />
                                                     <Input
-                                                        type="password"
+                                                        type={showConfirmPassword ? "text" : "password"}
                                                         placeholder="••••••••"
-                                                        className="h-11 pl-10"
+                                                        className="h-11 pl-10 pr-10"
                                                         autoComplete="off"
                                                         autoCorrect="off"
                                                         autoCapitalize="none"
                                                         spellCheck={false}
                                                         {...field}
                                                     />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                                        className="absolute right-3 top-4 text-muted-foreground hover:text-emerald-500"
+                                                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                                                    >
+                                                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                    </button>
                                                 </div>
                                             </FormControl>
                                             <FormMessage />

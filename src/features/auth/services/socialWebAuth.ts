@@ -1,4 +1,4 @@
-export type SocialProvider = 'google' | 'facebook' | 'apple' | 'line';
+export type SocialProvider = 'google' | 'facebook' | 'apple' | 'line' | 'microsoft';
 
 export type SocialAuthPayload = {
   provider: SocialProvider;
@@ -24,6 +24,8 @@ const loadedScriptPromises = new Map<string, Promise<void>>();
 const OAUTH_POPUP_NAME = 'line_oauth';
 const LINE_STATE_KEY = 'line_oauth_state';
 const LINE_REDIRECT_KEY = 'line_oauth_redirect_uri';
+const MS_STATE_KEY = 'ms_oauth_state';
+const MS_REDIRECT_KEY = 'ms_oauth_redirect_uri';
 
 const loadScript = (src: string, id: string): Promise<void> => {
   if (loadedScriptPromises.has(id)) {
@@ -333,6 +335,177 @@ export const consumeLineOAuthCallback = (): SocialAuthPayload | null => {
   };
 };
 
+const persistMicrosoftFlow = (state: string, redirectUri: string) => {
+  try {
+    sessionStorage.setItem(MS_STATE_KEY, state);
+    sessionStorage.setItem(MS_REDIRECT_KEY, redirectUri);
+  } catch {
+    // Ignore storage issues and continue.
+  }
+};
+
+const clearMicrosoftFlow = () => {
+  try {
+    sessionStorage.removeItem(MS_STATE_KEY);
+    sessionStorage.removeItem(MS_REDIRECT_KEY);
+  } catch {
+    // Ignore storage issues and continue.
+  }
+};
+
+const readMicrosoftFlow = () => {
+  try {
+    return {
+      expectedState: sessionStorage.getItem(MS_STATE_KEY) || '',
+      redirectUri: sessionStorage.getItem(MS_REDIRECT_KEY) || '',
+    };
+  } catch {
+    return { expectedState: '', redirectUri: '' };
+  }
+};
+
+export const consumeMicrosoftOAuthCallback = (): SocialAuthPayload | null => {
+  requireBrowser();
+
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get('code') || '';
+  const returnedState = url.searchParams.get('state') || '';
+  const error = url.searchParams.get('error') || '';
+  const errorDescription = url.searchParams.get('error_description') || '';
+
+  const { expectedState, redirectUri } = readMicrosoftFlow();
+  if (!expectedState) return null;
+  if (!code && !error) return null;
+
+  url.searchParams.delete('code');
+  url.searchParams.delete('state');
+  url.searchParams.delete('error');
+  url.searchParams.delete('error_description');
+  window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+
+  clearMicrosoftFlow();
+
+  if (error) {
+    throw new Error(`Microsoft login failed: ${errorDescription || error}`);
+  }
+  if (!code) {
+    throw new Error('Microsoft authorization code is missing');
+  }
+  if (!expectedState || returnedState !== expectedState) {
+    throw new Error('Microsoft state mismatch');
+  }
+  if (!redirectUri) {
+    throw new Error('Microsoft redirect URI is missing');
+  }
+
+  return {
+    provider: 'microsoft',
+    authorizationCode: code,
+    redirectUri,
+  };
+};
+
+const getMicrosoftAuth = async (): Promise<SocialAuthPayload> => {
+  requireBrowser();
+  const clientId = (import.meta.env.VITE_MICROSOFT_CLIENT_ID as string | undefined)?.trim();
+  if (!clientId) {
+    throw new Error('Missing VITE_MICROSOFT_CLIENT_ID');
+  }
+  const tenantId = (import.meta.env.VITE_MICROSOFT_TENANT_ID as string | undefined)?.trim() || 'common';
+  const redirectUri =
+    (import.meta.env.VITE_MICROSOFT_REDIRECT_URI as string | undefined)?.trim() ||
+    `${window.location.origin}${window.location.pathname}`;
+
+  const state = randomState(24);
+  persistMicrosoftFlow(state, redirectUri);
+
+  const authUrl = new URL(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`);
+  authUrl.searchParams.set('client_id', clientId);
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('redirect_uri', redirectUri);
+  authUrl.searchParams.set('response_mode', 'query');
+  authUrl.searchParams.set('scope', 'openid profile email User.Read');
+  authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('prompt', 'select_account');
+
+  const popup = window.open(authUrl.toString(), 'ms_oauth', 'width=520,height=700');
+  if (!popup) {
+    window.location.assign(authUrl.toString());
+    throw new Error('MICROSOFT_AUTH_REDIRECT');
+  }
+
+  const expectedCallback = normalizeUrlPath(redirectUri);
+
+  const result = await new Promise<SocialAuthPayload>((resolve, reject) => {
+    const startedAt = Date.now();
+    const timeoutMs = 120000;
+
+    const cleanup = () => {
+      window.clearInterval(timer);
+    };
+
+    const parseAndResolve = (params: URLSearchParams) => {
+      const returnedState = params.get('state') || '';
+      const code = params.get('code') || '';
+      const error = params.get('error') || '';
+      const errorDescription = params.get('error_description') || '';
+
+      clearMicrosoftFlow();
+      if (error) {
+        reject(new Error(`Microsoft login failed: ${errorDescription || error}`));
+        return;
+      }
+      if (!code) {
+        reject(new Error('Microsoft authorization code is missing'));
+        return;
+      }
+      if (returnedState !== state) {
+        reject(new Error('Microsoft state mismatch'));
+        return;
+      }
+
+      resolve({
+        provider: 'microsoft',
+        authorizationCode: code,
+        redirectUri,
+      });
+    };
+
+    const timer = window.setInterval(() => {
+      if (popup.closed) {
+        cleanup();
+        reject(new Error('Microsoft login cancelled'));
+        return;
+      }
+
+      if (Date.now() - startedAt > timeoutMs) {
+        popup.close();
+        cleanup();
+        reject(new Error('Microsoft login timeout'));
+        return;
+      }
+
+      let href: string;
+      try {
+        href = popup.location.href;
+      } catch {
+        return;
+      }
+
+      if (!href) return;
+      const url = new URL(href);
+      const currentCallback = normalizeUrlPath(url.toString());
+      if (currentCallback !== expectedCallback) return;
+
+      popup.close();
+      cleanup();
+      parseAndResolve(url.searchParams);
+    }, 400);
+  });
+
+  return result;
+};
+
 const getLineAuth = async (): Promise<SocialAuthPayload> => {
   requireBrowser();
   const channelId = import.meta.env.VITE_LINE_CHANNEL_ID as string | undefined;
@@ -463,6 +636,8 @@ export const startSocialWebAuth = async (
       return getAppleAuth();
     case 'line':
       return getLineAuth();
+    case 'microsoft':
+      return getMicrosoftAuth();
     default:
       throw new Error(`Unsupported social provider: ${provider}`);
   }

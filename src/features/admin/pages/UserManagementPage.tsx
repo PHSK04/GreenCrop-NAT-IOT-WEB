@@ -176,14 +176,7 @@ export function UserManagementPage() {
   };
 
   const handlePasswordToggle = () => {
-    if (showPassword) {
-        // If currently showing, just hide it directly
-        setShowPassword(false);
-    } else {
-        // If hiding, require security check before showing
-        setAdminPasswordInput("");
-        setIsSecurityCheckOpen(true);
-    }
+    setShowPassword((v) => !v);
   };
 
   return (
@@ -333,7 +326,7 @@ export function UserManagementPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-         <DialogContent className="sm:max-w-2xl bg-white text-slate-900 border-slate-200">
+         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto bg-white text-slate-900 border-slate-200">
              <DialogHeader className="border-b border-slate-200 pb-3">
                  <DialogTitle className="text-xl font-semibold tracking-tight text-slate-900">Edit User Profile</DialogTitle>
              </DialogHeader>
@@ -434,6 +427,11 @@ export function UserManagementPage() {
                      <p className="text-xs text-slate-600">
                          <span className="inline-flex items-center gap-1"><KeyRound className="h-3.5 w-3.5" /> Click the eye icon to show or hide</span>
                      </p>
+                     {!editPassword && (
+                        <p className="text-xs text-amber-600">
+                            No old password stored for this user (social login/migrated account).
+                        </p>
+                     )}
                  </div>
 
                  <div className="space-y-1">
