@@ -118,22 +118,24 @@ function drawTablePage(params: {
   const colWidths = weights.map((w) => Math.floor((availableWidth * w) / totalWeight));
   colWidths[colCount - 1] += availableWidth - colWidths.reduce((a, b) => a + b, 0);
 
+  const headerHeight = lineHeight + 8;
+  const headerTop = y + 4;
+  const headerBottom = headerTop - headerHeight;
   page.drawRectangle({
     x: marginX,
-    y: y - lineHeight + 2,
+    y: headerBottom,
     width: availableWidth,
-    height: lineHeight + 4,
+    height: headerHeight,
     color: rgb(0.02, 0.62, 0.38),
   });
 
   let x = marginX;
+  const headerTextY = headerBottom + (headerHeight - fontSize) / 2 + 1;
   headers.forEach((h, idx) => {
-    page.drawText(h.toUpperCase(), { x: x + 4, y, size: fontSize, font, color: rgb(1, 1, 1) });
+    page.drawText(h.toUpperCase(), { x: x + 4, y: headerTextY, size: fontSize, font, color: rgb(1, 1, 1) });
     x += colWidths[idx];
   });
-  const headerTop = y + 4;
-  y -= lineHeight + 6;
-  const headerBottom = y + 6 - lineHeight;
+  y = headerBottom - 6;
 
   let rowCount = 0;
   const rowHeights: number[] = [];
