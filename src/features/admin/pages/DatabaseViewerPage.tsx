@@ -329,7 +329,12 @@ export function DatabaseViewerPage() {
       const raw = a.timestamp ? new Date(String(a.timestamp)) : null;
       if (!raw || Number.isNaN(raw.getTime())) return;
       const action = String(a.action || "ACTION");
+      const actionUpper = action.toUpperCase();
       const status = String(a.status || "");
+      let derivedType: UserEvent["type"] = status.toLowerCase() === "failed" ? "ERROR" : "ACTION";
+      if (actionUpper.includes("LOGIN")) derivedType = "LOGIN";
+      if (actionUpper.includes("LOGOUT")) derivedType = "LOGOUT";
+      if (actionUpper.includes("SENSOR")) derivedType = "SENSOR";
       events.push({
         key: `audit-${a.id}`,
         timeMs: raw.getTime(),
@@ -337,7 +342,7 @@ export function DatabaseViewerPage() {
         dayKey: raw.toISOString().slice(0, 10),
         dayLabel: formatDayLabel(raw.toISOString()),
         timeLabel: raw.toLocaleTimeString(),
-        type: status.toLowerCase() === "failed" ? "ERROR" : "ACTION",
+        type: derivedType,
         title: action,
         detail: safeText(a.details),
         device: safeText(a.device),

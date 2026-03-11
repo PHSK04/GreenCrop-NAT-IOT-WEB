@@ -135,23 +135,25 @@ function drawTablePage(params: {
     page.drawText(h.toUpperCase(), { x: x + 4, y: headerTextY, size: fontSize, font, color: rgb(1, 1, 1) });
     x += colWidths[idx];
   });
-  y = headerBottom - 6;
+  y = headerBottom;
 
   let rowCount = 0;
   const rowHeights: number[] = [];
   for (let i = startRow; i < rows.length; i += 1) {
-    if (y < marginY + lineHeight) break;
     const rowHeight = lineHeight + 6;
-    if (y - rowHeight < marginY) break;
+    const rowTop = y;
+    const rowBottom = y - rowHeight;
+    if (rowBottom < marginY) break;
     x = marginX;
     const row = rows[i];
+    const textY = rowBottom + (rowHeight - fontSize) / 2;
     row.forEach((cell, idx) => {
       const text = truncateToWidth(cell, colWidths[idx] - 8, font, fontSize);
-      page.drawText(text, { x: x + 4, y, size: fontSize, font, color: rgb(0.1, 0.1, 0.1) });
+      page.drawText(text, { x: x + 4, y: textY, size: fontSize, font, color: rgb(0.1, 0.1, 0.1) });
       x += colWidths[idx];
     });
     rowHeights.push(rowHeight);
-    y -= rowHeight;
+    y = rowBottom;
     rowCount += 1;
   }
   const tableBottom = y;

@@ -35,6 +35,25 @@ const MOCK_LOGS: LogEntry[] = [
 export function AuditLogsPage() {
   const [logs, setLogs] = useState<LogEntry[]>(MOCK_LOGS);
   const [searchTerm, setSearchTerm] = useState("");
+  const autoRefreshMs = 30000;
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const nextLog: LogEntry = {
+        id: `auto-${now}`,
+        timestamp: now,
+        user: "System",
+        action: "AUTO_REFRESH",
+        device: "Log Monitor",
+        status: "success",
+        details: "Auto refresh",
+      };
+      setLogs((prev) => [nextLog, ...prev].slice(0, 200));
+    }, autoRefreshMs);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const filteredLogs = logs.filter(log => 
     log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
