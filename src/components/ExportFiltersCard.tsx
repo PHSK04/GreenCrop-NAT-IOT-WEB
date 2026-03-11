@@ -40,7 +40,10 @@ export function ExportFiltersCard({
   downloadPdfLabel = "Download PDF",
 }: ExportFiltersCardProps) {
   return (
-    <Card className="rounded-xl border border-border shadow-lg bg-white/90 dark:bg-slate-900/70 mb-8">
+    <Card
+      className="rounded-xl border border-border shadow-lg !bg-white dark:!bg-slate-900 mb-8"
+      style={{ backgroundColor: "#ffffff" }}
+    >
       <CardHeader>
         <CardTitle className="text-foreground text-base">{title}</CardTitle>
         <CardDescription className="text-muted-foreground">{description}</CardDescription>

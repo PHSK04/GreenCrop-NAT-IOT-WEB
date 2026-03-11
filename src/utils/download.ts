@@ -52,43 +52,77 @@ function normalizeCells(cols: string[]) {
   return cols.map((v) => v.replace(/^"|"$/g, ""));
 }
 
-function parseCsvTableBlock(lines: string[]): CsvTable | null {
-  if (!lines.length) return null;
-  let headerIndex = -1;
-  for (let i = 0; i < lines.length; i += 1) {
-    const cols = parseCsvLine(lines[i]);
-    const next = lines[i + 1];
-    if (!next) continue;
-    const nextCols = parseCsvLine(next);
-    if (isHeaderCandidate(cols) && nextCols.length >= cols.length) {
-      headerIndex = i;
-      break;
+function isMetaLine(line: string) {
+  const lower = line.toLowerCase();
+  return (
+    lower.startsWith("report,") ||
+    lower.startsWith("selected types,") ||
+    lower.startsWith("date range,") ||
+    lower.startsWith("section,")
+  );
+}
+
+function coerceRowLength(row: string[], width: number) {
+  if (row.length === width) return row;
+  if (row.length < width) return [...row, ...Array(width - row.length).fill("")];
+  const trimmed = row.slice(0, width - 1);
+  const last = row.slice(width - 1).join(" ");
+  return [...trimmed, last];
+}
+
+function parseCsvTableBlock(lines: string[]): CsvTable[] {
+  const tables: CsvTable[] = [];
+  if (!lines.length) return tables;
+  let meta: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (isMetaLine(line)) {
+      meta.push(line);
+      i += 1;
+      continue;
     }
-  }
-  if (headerIndex === -1) return null;
-  const metaLines = lines.slice(0, headerIndex);
-  const headers = normalizeCells(parseCsvLine(lines[headerIndex]));
-  const rows = lines
-    .slice(headerIndex + 1)
-    .map(parseCsvLine)
-    .map(normalizeCells)
-    .filter((row) => row.length && row.some((v) => v.trim().length > 0));
 
-  if (headers[0]?.toLowerCase() === "timestamp") {
-    const newHeaders = ["date", "time", ...headers.slice(1)];
-    const newRows = rows.map((row) => {
-      const ts = row[0];
-      const d = new Date(ts);
-      const date = Number.isNaN(d.getTime()) ? ts : d.toISOString().slice(0, 10);
-      const time = Number.isNaN(d.getTime())
-        ? "-"
-        : d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
-      return [date, time, ...row.slice(1)];
-    });
-    return { metaLines, headers: newHeaders, rows: newRows };
-  }
+    const cols = normalizeCells(parseCsvLine(line));
+    if (!isHeaderCandidate(cols)) {
+      meta.push(line);
+      i += 1;
+      continue;
+    }
 
-  return { metaLines, headers, rows };
+    const headers = cols;
+    i += 1;
+    const rows: string[][] = [];
+    while (i < lines.length) {
+      const rowLine = lines[i];
+      if (rowLine.trim().length === 0) break;
+      if (isMetaLine(rowLine)) break;
+      const row = normalizeCells(parseCsvLine(rowLine));
+      if (row.length && row.some((v) => v.trim().length > 0)) {
+        rows.push(coerceRowLength(row, headers.length));
+      }
+      i += 1;
+    }
+
+    if (headers[0]?.toLowerCase() === "timestamp") {
+      const newHeaders = ["date", "time", ...headers.slice(1)];
+      const newRows = rows.map((row) => {
+        const ts = row[0];
+        const d = new Date(ts);
+        const date = Number.isNaN(d.getTime()) ? ts : d.toISOString().slice(0, 10);
+        const time = Number.isNaN(d.getTime())
+          ? "-"
+          : d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
+        return coerceRowLength([date, time, ...row.slice(1)], newHeaders.length);
+      });
+      tables.push({ metaLines: meta, headers: newHeaders, rows: newRows });
+    } else {
+      tables.push({ metaLines: meta, headers, rows });
+    }
+    meta = [];
+    i += 1;
+  }
+  return tables;
 }
 
 function parseCsvTables(content: string): CsvTable[] {
@@ -109,8 +143,7 @@ function parseCsvTables(content: string): CsvTable[] {
 
   const tables: CsvTable[] = [];
   blocks.forEach((block) => {
-    const table = parseCsvTableBlock(block);
-    if (table) tables.push(table);
+    tables.push(...parseCsvTableBlock(block));
   });
   return tables;
 }
