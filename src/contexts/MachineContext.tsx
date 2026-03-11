@@ -205,13 +205,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       const apiUptime = Number(latest.uptime_seconds);
       if (Number.isFinite(apiUptime) && apiUptime >= 0 && !staleByCommand) {
         const normalized = Math.floor(apiUptime);
-        let projectedApiUptime = normalized;
-        if (apiIsOn && serverAtMs != null) {
-          const ageSeconds = Math.floor((serverNowMs - serverAtMs) / 1000);
-          if (ageSeconds > 0) {
-            projectedApiUptime += ageSeconds;
-          }
-        }
+        const projectedApiUptime = normalized;
         const pendingReset = pendingResetUntilMs != null && localNowMs < pendingResetUntilMs;
         const localUptime = getCurrentUptimeSeconds(isOn);
         const sawPositiveApiBefore = (lastApiUptimeRef.current ?? 0) > 0;

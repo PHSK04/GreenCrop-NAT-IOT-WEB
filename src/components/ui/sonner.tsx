@@ -16,6 +16,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
+          "--error-bg": "#FEF2F2",
+          "--error-text": "#B91C1C",
+          "--error-border": "#FCA5A5",
         } as React.CSSProperties
       }
       {...props}

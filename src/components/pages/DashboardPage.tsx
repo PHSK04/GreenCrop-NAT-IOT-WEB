@@ -226,7 +226,8 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border">
                    <div className="flex items-center gap-4">
-                     <div 
+                     <button
+                       type="button"
                        onClick={toggleMachine}
                        className={`
                          cursor-pointer w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all duration-300
@@ -237,7 +238,7 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
                        `}
                      >
                        <Power className={`w-8 h-8 ${isOn ? "scale-110" : "scale-100"}`} />
-                     </div>
+                     </button>
                       <div>
                         <h3 className="text-lg font-medium text-foreground">
                           {isOn ? t.running : t.stopped}
@@ -251,6 +252,7 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
                       <p className="text-xs text-muted-foreground">{t.uptime}</p>
                       <p className="font-mono text-primary">{formatUptime(uptimeSeconds)}</p>
                       <button
+                        type="button"
                         onClick={resetUptime}
                         className="mt-1 inline-flex h-9 w-28 items-center justify-center gap-1 rounded-md border border-red-400/30 bg-red-600 text-[11px] font-bold text-white transition-colors hover:bg-red-500"
                       >

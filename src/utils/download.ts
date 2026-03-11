@@ -6,6 +6,17 @@ type CsvTable = {
   rows: string[][];
 };
 
+function sanitizePdfText(input: string) {
+  if (!input) return "";
+  return input
+    .replace(/°/g, " deg ")
+    .replace(/µ/g, "u")
+    .replace(/[–—]/g, "-")
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "");
+}
+
 function parseCsvLine(line: string) {
   const out: string[] = [];
   let cur = "";
@@ -31,16 +42,37 @@ function parseCsvLine(line: string) {
   return out;
 }
 
-function parseCsvTable(content: string): CsvTable | null {
-  const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  const headerIndex = lines.findIndex((l) => l.startsWith("\"timestamp\"") || l.startsWith("timestamp,"));
+function isHeaderCandidate(cols: string[]) {
+  if (cols.length >= 3) return true;
+  const joined = cols.join(" ").toLowerCase();
+  return /(date|time|timestamp|id|name|type|status|value|yield|ph|oxygen|ec|role|email|device|browser|ip|action|factor|issue|category|metric|month)/.test(joined);
+}
+
+function normalizeCells(cols: string[]) {
+  return cols.map((v) => v.replace(/^"|"$/g, ""));
+}
+
+function parseCsvTableBlock(lines: string[]): CsvTable | null {
+  if (!lines.length) return null;
+  let headerIndex = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    const cols = parseCsvLine(lines[i]);
+    const next = lines[i + 1];
+    if (!next) continue;
+    const nextCols = parseCsvLine(next);
+    if (isHeaderCandidate(cols) && nextCols.length >= cols.length) {
+      headerIndex = i;
+      break;
+    }
+  }
   if (headerIndex === -1) return null;
   const metaLines = lines.slice(0, headerIndex);
-  const headers = parseCsvLine(lines[headerIndex]).map((v) => v.replace(/^"|"$/g, ""));
+  const headers = normalizeCells(parseCsvLine(lines[headerIndex]));
   const rows = lines
     .slice(headerIndex + 1)
     .map(parseCsvLine)
-    .map((row) => row.map((v) => v.replace(/^"|"$/g, "")));
+    .map(normalizeCells)
+    .filter((row) => row.length && row.some((v) => v.trim().length > 0));
 
   if (headers[0]?.toLowerCase() === "timestamp") {
     const newHeaders = ["date", "time", ...headers.slice(1)];
@@ -57,6 +89,30 @@ function parseCsvTable(content: string): CsvTable | null {
   }
 
   return { metaLines, headers, rows };
+}
+
+function parseCsvTables(content: string): CsvTable[] {
+  const rawLines = content.split(/\r?\n/);
+  const blocks: string[][] = [];
+  let current: string[] = [];
+  rawLines.forEach((line) => {
+    if (line.trim().length === 0) {
+      if (current.length) {
+        blocks.push(current);
+        current = [];
+      }
+      return;
+    }
+    current.push(line);
+  });
+  if (current.length) blocks.push(current);
+
+  const tables: CsvTable[] = [];
+  blocks.forEach((block) => {
+    const table = parseCsvTableBlock(block);
+    if (table) tables.push(table);
+  });
+  return tables;
 }
 
 function truncateToWidth(text: string, maxWidth: number, font: any, size: number) {
@@ -234,36 +290,47 @@ export function downloadTextFile(filename: string, content: string, mimeType = "
 export async function downloadSimplePdf(filename: string, content: string) {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const table = parseCsvTable(content);
-  if (table) {
-    let startRow = 0;
-    while (startRow < table.rows.length) {
-      const rowsDrawn = drawTablePage({
-        pdfDoc,
-        headers: table.headers,
-        rows: table.rows,
-        metaLines: table.metaLines,
-        startRow,
-        font,
-      });
-      startRow += rowsDrawn;
-      if (rowsDrawn === 0) break;
-    }
-  } else {
+  const safeContent = sanitizePdfText(content);
+  const fallbackToPlain = () => {
     const page = pdfDoc.addPage([612, 792]);
     const fontSize = 11;
     const lineHeight = 14;
     const marginX = 54;
     const marginY = 54;
     const maxY = 792 - marginY;
-
-    const lines = content.split(/\r?\n/);
+    const lines = safeContent.split(/\r?\n/);
     let y = maxY;
     lines.forEach((line) => {
       if (y < marginY) return;
       page.drawText(line, { x: marginX, y, size: fontSize, font, color: rgb(0, 0, 0) });
       y -= lineHeight;
     });
+  };
+
+  try {
+    const tables = parseCsvTables(safeContent);
+    if (tables.length) {
+      tables.forEach((table) => {
+        let startRow = 0;
+        while (startRow < table.rows.length) {
+          const rowsDrawn = drawTablePage({
+            pdfDoc,
+            headers: table.headers,
+            rows: table.rows,
+            metaLines: table.metaLines,
+            startRow,
+            font,
+          });
+          startRow += rowsDrawn;
+          if (rowsDrawn === 0) break;
+        }
+      });
+    } else {
+      fallbackToPlain();
+    }
+  } catch (err) {
+    console.error("PDF render failed, falling back to plain text:", err);
+    fallbackToPlain();
   }
 
   const bytes = await pdfDoc.save();

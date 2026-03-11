@@ -7,6 +7,7 @@ import { Checkbox } from "../ui/checkbox";
 import { Switch } from "../ui/switch";
 import { Input } from "../ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
+import { ExportFiltersCard } from "@/components/ExportFiltersCard";
 import { 
   Search, 
   Filter, 
@@ -235,61 +236,21 @@ export function DeviceMonitorPage() {
       </header>
 
       <main className="flex-1 overflow-auto p-8 relative z-10">
-        <Card className="rounded-xl border border-border shadow-lg bg-white/90 dark:bg-slate-900/70 mb-6">
-          <CardHeader>
-            <CardTitle className="text-foreground text-base">Export Filters</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              Select date range and data types to download CSV/PDF
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                type="date"
-                aria-label="Export start date"
-                value={exportStart}
-                onChange={(e) => setExportStart(e.target.value)}
-              />
-              <Input
-                type="date"
-                aria-label="Export end date"
-                value={exportEnd}
-                onChange={(e) => setExportEnd(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-wrap gap-3">
-              {dataTypeOptions.map((option) => {
-                const checked = selectedDataTypes.includes(option);
-                return (
-                  <label key={option} className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => {
-                        setSelectedDataTypes((prev) =>
-                          prev.includes(option)
-                            ? prev.filter((v) => v !== option)
-                            : [...prev, option]
-                        );
-                      }}
-                    />
-                    {option}
-                  </label>
-                );
-              })}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleExport("csv")}>
-                <Download className="w-4 h-4" />
-                Download CSV
-              </Button>
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleExport("pdf")}>
-                <FileText className="w-4 h-4" />
-                Download PDF
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <ExportFiltersCard
+          startDate={exportStart}
+          endDate={exportEnd}
+          onStartDateChange={setExportStart}
+          onEndDateChange={setExportEnd}
+          options={dataTypeOptions.map((option) => ({ key: option, label: option }))}
+          selectedKeys={selectedDataTypes}
+          onToggleKey={(key) =>
+            setSelectedDataTypes((prev) =>
+              prev.includes(key) ? prev.filter((v) => v !== key) : [...prev, key]
+            )
+          }
+          onDownloadCsv={() => handleExport("csv")}
+          onDownloadPdf={() => handleExport("pdf")}
+        />
 
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-4">

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
@@ -7,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Download, Eye, Calendar, Filter, FileText, Share2, Sprout, Droplets, Zap, Wind } from "lucide-react";
 import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
+import { ExportFiltersCard } from "@/components/ExportFiltersCard";
 
 const reportData = [
   {
@@ -62,6 +64,31 @@ const reportData = [
 
 export function CropReportsPage() {
   const [selectedReport, setSelectedReport] = useState<typeof reportData[0] | null>(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [selectedFields, setSelectedFields] = useState<string[]>(["yield", "ph", "oxygen", "ec"]);
+
+  const filteredReportData = useMemo(() => {
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    return reportData.filter((row) => {
+      const d = new Date(row.date);
+      if (Number.isNaN(d.getTime())) return false;
+      if (start && d < start) return false;
+      if (end && d > end) return false;
+      return true;
+    });
+  }, [startDate, endDate]);
+
+  const exportRows = useMemo(() => {
+    return filteredReportData.map((row) => {
+      const base: any = { date: row.date };
+      selectedFields.forEach((field) => {
+        base[field] = (row as any)[field];
+      });
+      return base;
+    });
+  }, [filteredReportData, selectedFields]);
 
   const handleDownload = async (data: any[], filename: string, format: "csv" | "pdf") => {
     try {
@@ -104,28 +131,32 @@ export function CropReportsPage() {
               <Filter className="w-4 h-4" />
               Filters
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
-              onClick={() => handleDownload(reportData, "farm_report.pdf", "pdf")}
-            >
-              <FileText className="w-4 h-4" />
-              Export PDF
-            </Button>
-            <Button
-              size="sm"
-              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
-              onClick={() => handleDownload(reportData, "farm_report.csv", "csv")}
-            >
-              <Download className="w-4 h-4" />
-              Export CSV
-            </Button>
           </div>
         </div>
       </header>
 
       <main className="flex-1 overflow-auto p-8">
+        <ExportFiltersCard
+          startDate={startDate}
+          endDate={endDate}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          options={[
+            { key: "yield", label: "Yield (g)" },
+            { key: "ph", label: "pH" },
+            { key: "oxygen", label: "Oxygen (mg/L)" },
+            { key: "ec", label: "EC (mS/cm)" },
+          ]}
+          selectedKeys={selectedFields}
+          onToggleKey={(key) =>
+            setSelectedFields((prev) =>
+              prev.includes(key) ? prev.filter((v) => v !== key) : [...prev, key]
+            )
+          }
+          onDownloadCsv={() => handleDownload(exportRows, "farm_report.csv", "csv")}
+          onDownloadPdf={() => handleDownload(exportRows, "farm_report.pdf", "pdf")}
+        />
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
           <Card className="rounded-xl border border-border shadow-sm bg-card/50 backdrop-blur-md">
             <CardContent className="p-6 text-center">
@@ -292,14 +323,26 @@ export function CropReportsPage() {
           )}
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setSelectedReport(null)} className="border-border text-muted-foreground hover:bg-muted">
+            <Button variant="outline" onClick={() => setSelectedReport(null)} className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm">
               Close
+            </Button>
+            <Button
+              variant="outline"
+              className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm"
+              onClick={() => {
+                if (selectedReport) {
+                  handleDownload([selectedReport], `daily_report_${selectedReport.date}.pdf`, "pdf");
+                }
+              }}
+            >
+              <FileText className="w-4 h-4 mr-1" />
+              Download PDF
             </Button>
             <Button 
               className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
               onClick={() => {
                 if (selectedReport) {
-                  handleDownload([selectedReport], `daily_report_${selectedReport.date}.csv`);
+                  handleDownload([selectedReport], `daily_report_${selectedReport.date}.csv`, "csv");
                 }
               }}
             >
