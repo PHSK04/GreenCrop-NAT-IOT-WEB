@@ -46,8 +46,8 @@ export function AuditLogsPage() {
     <div className="p-8 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Device Activity & Audit Logs</h1>
-          <p className="text-muted-foreground mt-2">Monitor user actions and device status changes.</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Device Activity & Audit Logs</h1>
+          <p className="text-muted-foreground mt-2">Monitor user actions, system events, and device status changes.</p>
         </div>
         <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setLogs([...MOCK_LOGS, { id: Date.now().toString(), timestamp: Date.now(), user: 'System', action: 'REFRESH', device: 'Log Monitor', status: 'success', details: 'Manual refresh' }])}>
@@ -63,58 +63,67 @@ export function AuditLogsPage() {
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search logs..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search user, action, device..."
+            className="pl-9 bg-white/80 dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-800"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-        <Button variant="outline" size="icon">
-            <Filter className="h-4 w-4" />
+        <Button variant="outline" size="icon" className="bg-white/80 dark:bg-slate-900/60">
+          <Filter className="h-4 w-4" />
         </Button>
       </div>
 
-      <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white/90 shadow-sm ring-1 ring-emerald-500/5 dark:border-slate-800 dark:bg-slate-950">
         <Table className="text-sm">
-          <TableHeader className="bg-emerald-600 dark:bg-emerald-700">
+          <TableHeader className="bg-emerald-600/95 dark:bg-emerald-700/90 sticky top-0 z-10">
             <TableRow>
-              <TableHead className="w-[180px] text-white font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Timestamp</TableHead>
-              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">User / Source</TableHead>
-              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Action</TableHead>
-              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Device / Target</TableHead>
-              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Status</TableHead>
-              <TableHead className="text-white font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Details</TableHead>
+              <TableHead className="w-[180px] text-white/90 font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Timestamp</TableHead>
+              <TableHead className="text-white/90 font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">User / Source</TableHead>
+              <TableHead className="text-white/90 font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Action</TableHead>
+              <TableHead className="text-white/90 font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Device / Target</TableHead>
+              <TableHead className="text-white/90 font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Status</TableHead>
+              <TableHead className="text-white/90 font-semibold uppercase tracking-wider py-3 align-middle h-11 leading-4">Details</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-             {filteredLogs.map((log) => (
-                <TableRow key={log.id} className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40">
-                    <TableCell className="font-mono text-xs text-slate-600 dark:text-slate-400">
-                        {new Date(log.timestamp).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="font-medium text-slate-900 dark:text-slate-100">{log.user}</TableCell>
-                    <TableCell>
-                        <Badge variant="outline" className="font-mono text-[11px] tracking-wide">
-                            {log.action}
-                        </Badge>
-                    </TableCell>
-                    <TableCell className="text-slate-800 dark:text-slate-200">{log.device}</TableCell>
-                    <TableCell>
-                        <Badge variant={log.status === 'success' ? 'default' : log.status === 'warning' ? 'secondary' : 'destructive'} 
-                               className={
-                                   log.status === 'success' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
-                                   log.status === 'warning' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
-                                   ""
-                               }>
-                            {log.status}
-                        </Badge>
-                    </TableCell>
-                    <TableCell className="text-slate-600 dark:text-slate-400">{log.details}</TableCell>
-                </TableRow>
-             ))}
+            {filteredLogs.map((log, index) => (
+              <TableRow
+                key={log.id}
+                className={`border-b border-slate-200/70 last:border-b-0 hover:bg-emerald-50/40 dark:border-slate-800 dark:hover:bg-emerald-900/10 ${
+                  index % 2 === 0 ? "bg-white" : "bg-slate-50/60 dark:bg-slate-950/40"
+                }`}
+              >
+                <TableCell className="font-mono text-xs text-slate-600 dark:text-slate-400">
+                  {new Date(log.timestamp).toLocaleString()}
+                </TableCell>
+                <TableCell className="font-medium text-slate-900 dark:text-slate-100">{log.user}</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="font-mono text-[11px] tracking-wide bg-white/70">
+                    {log.action}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-slate-800 dark:text-slate-200">{log.device}</TableCell>
+                <TableCell>
+                  <Badge
+                    variant={log.status === 'success' ? 'default' : log.status === 'warning' ? 'secondary' : 'destructive'}
+                    className={
+                      log.status === 'success'
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                        : log.status === 'warning'
+                        ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                        : ""
+                    }
+                  >
+                    {log.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-slate-600 dark:text-slate-400">{log.details}</TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </div>
