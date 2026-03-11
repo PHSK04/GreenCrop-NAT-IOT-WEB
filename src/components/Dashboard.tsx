@@ -180,13 +180,13 @@ function SidebarContent({
         className={`
           group flex items-center rounded-full text-sm font-medium transition-all duration-200 w-full
           ${compact ? "justify-center gap-0 px-2 py-3" : "gap-3 px-4 py-2.5"}
-          ${isActive 
-            ? "bg-slate-900 text-white !text-white shadow-sm" 
-            : "text-slate-900 border border-transparent hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/60 dark:hover:text-white"
+          ${isActive
+            ? "bg-emerald-600 text-white !text-white shadow-sm"
+            : "text-slate-900 border border-transparent hover:bg-emerald-50 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-emerald-900/20 dark:hover:text-white"
           }
         `}
       >
-        <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? "text-white !text-white opacity-100" : "text-slate-700 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-white"}`} />
+        <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? "text-white !text-white opacity-100" : "text-slate-700 group-hover:text-emerald-700 dark:text-slate-300 dark:group-hover:text-emerald-300"}`} />
         {!compact && (
           <span className={`truncate ${isActive ? "text-white !text-white opacity-100" : ""}`}>
             {t[item.label] || item.label}
