@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
 import { Download, Eye, Calendar, Filter, FileText, Share2, Sprout, Droplets, Zap, Wind } from "lucide-react";
 import { toast } from "sonner";
-import { downloadTextFile } from "@/utils/download";
+import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 
 const reportData = [
   {
@@ -63,7 +63,7 @@ const reportData = [
 export function CropReportsPage() {
   const [selectedReport, setSelectedReport] = useState<typeof reportData[0] | null>(null);
 
-  const handleDownload = (data: any[], filename: string) => {
+  const handleDownload = async (data: any[], filename: string, format: "csv" | "pdf") => {
     try {
       if (!data.length) {
         toast.error("Download Failed", { description: "No data to export." });
@@ -74,7 +74,12 @@ export function CropReportsPage() {
         headers +
         "\n" +
         data.map((row) => Object.values(row).join(",")).join("\n");
-      downloadTextFile(filename, csvContent, "text/csv;charset=utf-8");
+
+      if (format === "pdf") {
+        await downloadSimplePdf(filename, csvContent);
+      } else {
+        downloadTextFile(filename, csvContent, "text/csv;charset=utf-8");
+      }
       
       toast.success("Download Started", {
         description: `Successfully exported ${filename}`
@@ -99,13 +104,22 @@ export function CropReportsPage() {
               <Filter className="w-4 h-4" />
               Filters
             </Button>
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={() => handleDownload(reportData, "farm_report.pdf", "pdf")}
+            >
+              <FileText className="w-4 h-4" />
+              Export PDF
+            </Button>
+            <Button
+              size="sm"
               className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
-              onClick={() => handleDownload(reportData, "farm_report.csv")}
+              onClick={() => handleDownload(reportData, "farm_report.csv", "csv")}
             >
               <Download className="w-4 h-4" />
-              Export Report
+              Export CSV
             </Button>
           </div>
         </div>

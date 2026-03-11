@@ -9,7 +9,6 @@ import { DevicePairingPage } from "@/components/pages/DevicePairingPage";
 import { authService } from "@/features/auth/services/authService";
 
 const PAIRING_COMPLETED_KEY = "device_pairing_completed";
-const PAIRING_SKIPPED_SESSION_KEY = "device_pairing_skipped_session";
 
 export function AppRouter() {
   const { user, logout } = useAuth();
@@ -30,8 +29,6 @@ export function AppRouter() {
       return;
     }
 
-    const skippedThisSession = typeof window !== "undefined" && sessionStorage.getItem(PAIRING_SKIPPED_SESSION_KEY) === "true";
-
     authService.getMyDevices()
       .then((rows) => {
         if (!isMounted) return;
@@ -40,11 +37,11 @@ export function AppRouter() {
           localStorage.setItem(PAIRING_COMPLETED_KEY, 'true');
           return;
         }
-        setPairingStatus(skippedThisSession ? 'skipped' : 'required');
+        setPairingStatus('required');
       })
       .catch(() => {
         if (!isMounted) return;
-        setPairingStatus(skippedThisSession ? 'skipped' : 'required');
+        setPairingStatus('required');
       });
 
     return () => { isMounted = false; };
@@ -72,12 +69,10 @@ export function AppRouter() {
           user={user}
           onPaired={({ deviceId }) => {
             localStorage.setItem(PAIRING_COMPLETED_KEY, 'true');
-            sessionStorage.removeItem(PAIRING_SKIPPED_SESSION_KEY);
             localStorage.setItem('device_pairing_device_id', deviceId);
             setPairingStatus('paired');
           }}
           onSkip={() => {
-            sessionStorage.setItem(PAIRING_SKIPPED_SESSION_KEY, 'true');
             setPairingStatus('skipped');
           }}
         />

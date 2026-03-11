@@ -75,6 +75,63 @@ function truncateToWidth(text: string, maxWidth: number, font: any, size: number
   return out;
 }
 
+function resolveColumnWeights(headers: string[]) {
+  const normalize = (h: string) => h.trim().toLowerCase();
+  return headers.map((h) => {
+    const key = normalize(h);
+    if (key.includes("date") || key.includes("time") || key.includes("timestamp")) return 1.2;
+    if (key === "id" || key.endsWith("_id")) return 0.85;
+    if (key.includes("name")) return 1.6;
+    if (key.includes("email")) return 2.2;
+    if (key.includes("detail") || key.includes("description") || key.includes("note")) return 2.2;
+    if (key.includes("device")) return 1.2;
+    if (key.includes("browser") || key.includes("os")) return 2.0;
+    if (key.includes("status")) return 1.1;
+    if (key.includes("action") || key.includes("type") || key.includes("role")) return 1.1;
+    if (key.includes("location")) return 1.1;
+    return 1.0;
+  });
+}
+
+function computeColumnWidths(headers: string[], availableWidth: number) {
+  const colCount = headers.length;
+  const weights = resolveColumnWeights(headers);
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  let colWidths = weights.map((w) => Math.floor((availableWidth * w) / totalWeight));
+  const minWidth = colCount >= 8 ? 70 : 80;
+
+  let minTotal = minWidth * colCount;
+  if (minTotal > availableWidth) {
+    const shrinkMin = Math.max(48, Math.floor(availableWidth / colCount));
+    minTotal = shrinkMin * colCount;
+    colWidths = colWidths.map(() => shrinkMin);
+  } else {
+    let deficit = 0;
+    colWidths = colWidths.map((w) => {
+      if (w < minWidth) {
+        deficit += minWidth - w;
+        return minWidth;
+      }
+      return w;
+    });
+    if (deficit > 0) {
+      const adjustable = colWidths
+        .map((w, i) => ({ w, i }))
+        .filter((c) => c.w > minWidth);
+      const adjustableTotal = adjustable.reduce((a, c) => a + (c.w - minWidth), 0) || 1;
+      adjustable.forEach(({ w, i }) => {
+        const reducible = w - minWidth;
+        const cut = Math.min(reducible, Math.floor((deficit * reducible) / adjustableTotal));
+        colWidths[i] = w - cut;
+      });
+    }
+  }
+
+  const total = colWidths.reduce((a, b) => a + b, 0);
+  colWidths[colCount - 1] += availableWidth - total;
+  return colWidths;
+}
+
 function drawTablePage(params: {
   pdfDoc: PDFDocument;
   headers: string[];
@@ -87,8 +144,8 @@ function drawTablePage(params: {
   const page = pdfDoc.addPage([842, 595]); // A4 landscape
   const width = page.getWidth();
   const height = page.getHeight();
-  const fontSize = 10;
-  const lineHeight = 14;
+  const fontSize = headers.length >= 8 ? 9 : 10;
+  const lineHeight = fontSize + 4;
   const marginX = 36;
   const marginY = 36;
   const gridColor = rgb(0.85, 0.85, 0.85);
@@ -100,23 +157,8 @@ function drawTablePage(params: {
   });
   y -= 4;
 
-  const colCount = headers.length;
   const availableWidth = width - marginX * 2;
-  const weightMap: Record<string, number> = {
-    date: 1.2,
-    time: 1.2,
-    timestamp: 1.5,
-    type: 1.0,
-    title: 1.4,
-    detail: 2.0,
-    device: 1.1,
-    browser: 2.2,
-    ip: 1.2,
-  };
-  const weights = headers.map((h) => weightMap[h.toLowerCase()] || 1.0);
-  const totalWeight = weights.reduce((a, b) => a + b, 0);
-  const colWidths = weights.map((w) => Math.floor((availableWidth * w) / totalWeight));
-  colWidths[colCount - 1] += availableWidth - colWidths.reduce((a, b) => a + b, 0);
+  const colWidths = computeColumnWidths(headers, availableWidth);
 
   const headerHeight = lineHeight + 10;
   const headerTop = y + 4;
