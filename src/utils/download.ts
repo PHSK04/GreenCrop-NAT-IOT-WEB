@@ -140,13 +140,13 @@ function drawTablePage(params: {
   let rowCount = 0;
   const rowHeights: number[] = [];
   for (let i = startRow; i < rows.length; i += 1) {
-    const rowHeight = lineHeight + 6;
+    const rowHeight = lineHeight + 8;
     const rowTop = y;
     const rowBottom = y - rowHeight;
     if (rowBottom < marginY) break;
     x = marginX;
     const row = rows[i];
-    const textY = rowBottom + (rowHeight - fontSize) / 2;
+    const textY = rowBottom + (rowHeight - fontSize) / 2 - 1;
     row.forEach((cell, idx) => {
       const text = truncateToWidth(cell, colWidths[idx] - 8, font, fontSize);
       page.drawText(text, { x: x + 4, y: textY, size: fontSize, font, color: rgb(0.1, 0.1, 0.1) });
