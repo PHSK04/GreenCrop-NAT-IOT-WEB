@@ -4,10 +4,12 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { Separator } from "../ui/separator";
-import { Cpu, QrCode, ShieldCheck, PlugZap, ArrowRight } from "lucide-react";
+import { Cpu, QrCode, ShieldCheck, PlugZap, ArrowRight, Camera, Image as ImageIcon, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { authService } from "@/features/auth/services/authService";
 import QRCode from "qrcode";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import { useRef } from "react";
 
 type DevicePairingPageProps = {
   user?: { name?: string; email?: string };
@@ -24,6 +26,9 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
   const [submitting, setSubmitting] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const scannerRef = useRef<any>(null);
 
   const validate = () => {
     if (!deviceId.trim()) return "กรุณากรอก Device ID";
@@ -68,6 +73,80 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
       isMounted = false;
     };
   }, [deviceId, pairingCode]);
+
+  const applyQrPayload = (raw: string) => {
+    try {
+      const decoded = JSON.parse(raw);
+      if (decoded && typeof decoded === "object") {
+        const nextDeviceId = String(decoded.device_id || "").trim();
+        const nextPairing = String(decoded.pairing_code || "").trim();
+        if (nextDeviceId) setDeviceId(nextDeviceId);
+        if (nextPairing) setPairingCode(nextPairing);
+        toast.success("เติมข้อมูลจาก QR แล้ว");
+        return;
+      }
+    } catch {
+      // fall through
+    }
+    toast.error("ไม่พบข้อมูล QR ที่รองรับ");
+  };
+
+  useEffect(() => {
+    if (!scanOpen) return;
+    let cancelled = false;
+
+    const startScanner = async () => {
+      const { Html5Qrcode } = await import("html5-qrcode");
+      if (cancelled) return;
+      const scanner = new Html5Qrcode("qr-camera-reader");
+      scannerRef.current = scanner;
+
+      try {
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 240, height: 240 } },
+          (decodedText: string) => {
+            applyQrPayload(decodedText);
+            setScanOpen(false);
+          },
+        );
+      } catch (err: any) {
+        toast.error(err?.message || "เปิดกล้องไม่สำเร็จ");
+        setScanOpen(false);
+      }
+    };
+
+    startScanner();
+
+    return () => {
+      cancelled = true;
+      const scanner = scannerRef.current;
+      if (scanner) {
+        scanner.stop().catch(() => {});
+        scanner.clear().catch(() => {});
+      }
+    };
+  }, [scanOpen]);
+
+  const handlePickFile = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const { Html5Qrcode } = await import("html5-qrcode");
+    const scanner = new Html5Qrcode("qr-file-reader");
+    try {
+      const decodedText = await scanner.scanFile(file, true);
+      applyQrPayload(decodedText);
+    } catch {
+      toast.error("สแกนไฟล์ไม่สำเร็จ");
+    } finally {
+      scanner.clear().catch(() => {});
+      e.target.value = "";
+    }
+  };
 
   const handleSubmit = async () => {
     const nextError = validate();
@@ -234,6 +313,28 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
               <CardDescription>สร้างจาก Device ID และ Pairing Code ที่กรอก</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" className="gap-2" onClick={() => setScanOpen(true)}>
+                  <Camera className="h-4 w-4" />
+                  สแกนด้วยกล้อง
+                </Button>
+                <Button size="sm" variant="outline" className="gap-2" onClick={handlePickFile}>
+                  <ImageIcon className="h-4 w-4" />
+                  เลือกรูป QR
+                </Button>
+                <Button size="sm" variant="outline" className="gap-2" onClick={handlePickFile}>
+                  <FileUp className="h-4 w-4" />
+                  เลือกไฟล์
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <div id="qr-file-reader" className="hidden" />
+              </div>
               {qrDataUrl ? (
                 <div className="flex flex-col items-center gap-3 rounded-xl border border-border/70 bg-white/90 p-4">
                   <img src={qrDataUrl} alt="Pairing QR" className="h-44 w-44" />
@@ -249,6 +350,20 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
               )}
             </CardContent>
           </Card>
+
+          <Dialog open={scanOpen} onOpenChange={setScanOpen}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>สแกน QR ด้วยกล้อง</DialogTitle>
+              </DialogHeader>
+              <div className="overflow-hidden rounded-xl border border-border bg-black/90 p-2">
+                <div id="qr-camera-reader" className="min-h-[320px]" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                หากไม่พบกล้อง โปรดตรวจสอบสิทธิ์การเข้าถึงกล้องในเบราว์เซอร์
+              </p>
+            </DialogContent>
+          </Dialog>
 
           <Card className="rounded-2xl border-border/60 bg-card/60 shadow-lg">
             <CardHeader>
