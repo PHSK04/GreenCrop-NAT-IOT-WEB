@@ -9,6 +9,8 @@ import { Download, Eye, Calendar, Filter, FileText, Share2, Sprout, Droplets, Za
 import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
+import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
+import { seededInt, seededNumber } from "@/utils/deviceData";
 
 const reportData = [
   {
@@ -63,22 +65,51 @@ const reportData = [
 ];
 
 export function CropReportsPage() {
+  const { deviceId, seed } = useDeviceSeed();
+  const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
   const [selectedReport, setSelectedReport] = useState<typeof reportData[0] | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedFields, setSelectedFields] = useState<string[]>(["yield", "ph", "oxygen", "ec"]);
 
+  const deviceReportData = useMemo(() => {
+    return reportData.map((row, index) => ({
+      ...row,
+      yield: seededInt(row.yield, seed, index, 3, 90, 210),
+      ph: seededNumber(row.ph, seed, index, 0.05, 6.4, 7.8, 2),
+      oxygen: seededNumber(row.oxygen, seed, index, 0.08, 5.5, 8.6, 2),
+      ec: seededNumber(row.ec, seed, index, 0.05, 1.1, 2.4, 2),
+    }));
+  }, [seed]);
+
+  const reportSummary = useMemo(() => {
+    const days = deviceReportData.length;
+    const totalYield = deviceReportData.reduce((sum, row) => sum + row.yield, 0);
+    const avgPh =
+      days > 0 ? deviceReportData.reduce((sum, row) => sum + row.ph, 0) / days : 0;
+    const avgOxygen =
+      days > 0
+        ? deviceReportData.reduce((sum, row) => sum + row.oxygen, 0) / days
+        : 0;
+    return {
+      days,
+      totalYield,
+      avgPh: Math.round(avgPh * 100) / 100,
+      avgOxygen: Math.round(avgOxygen * 100) / 100,
+    };
+  }, [deviceReportData]);
+
   const filteredReportData = useMemo(() => {
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
-    return reportData.filter((row) => {
+    return deviceReportData.filter((row) => {
       const d = new Date(row.date);
       if (Number.isNaN(d.getTime())) return false;
       if (start && d < start) return false;
       if (end && d > end) return false;
       return true;
     });
-  }, [startDate, endDate]);
+  }, [startDate, endDate, deviceReportData]);
 
   const exportRows = useMemo(() => {
     return filteredReportData.map((row) => {
@@ -125,6 +156,11 @@ export function CropReportsPage() {
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Crop Reports</h1>
             <p className="text-sm text-muted-foreground mt-1">Export and analyze daily harvest and water quality data</p>
+            <div className="mt-2">
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/40">
+                {deviceLabel}
+              </Badge>
+            </div>
           </div>
           <div className="flex items-center space-x-3">
             <Button variant="outline" size="sm" className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground">
@@ -160,25 +196,25 @@ export function CropReportsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
           <Card className="rounded-xl border border-border shadow-sm bg-card/50 backdrop-blur-md">
             <CardContent className="p-6 text-center">
-              <div className="text-3xl font-bold text-foreground mb-1">7</div>
+              <div className="text-3xl font-bold text-foreground mb-1">{reportSummary.days}</div>
               <div className="text-sm text-muted-foreground">Days Recorded</div>
             </CardContent>
           </Card>
           <Card className="rounded-xl border border-border shadow-sm bg-card/50 backdrop-blur-md">
             <CardContent className="p-6 text-center">
-              <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">966 g</div>
+              <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">{reportSummary.totalYield} g</div>
               <div className="text-sm text-muted-foreground">Total Yield</div>
             </CardContent>
           </Card>
           <Card className="rounded-xl border border-border shadow-sm bg-card/50 backdrop-blur-md">
             <CardContent className="p-6 text-center">
-              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">7.1</div>
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">{reportSummary.avgPh}</div>
               <div className="text-sm text-muted-foreground">Avg pH Level</div>
             </CardContent>
           </Card>
           <Card className="rounded-xl border border-border shadow-sm bg-card/50 backdrop-blur-md">
             <CardContent className="p-6 text-center">
-              <div className="text-3xl font-bold text-cyan-600 dark:text-cyan-400 mb-1">6.7</div>
+              <div className="text-3xl font-bold text-cyan-600 dark:text-cyan-400 mb-1">{reportSummary.avgOxygen}</div>
               <div className="text-sm text-muted-foreground">Avg Oxygen (mg/L)</div>
             </CardContent>
           </Card>
@@ -204,7 +240,7 @@ export function CropReportsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {reportData.map((row) => (
+                {deviceReportData.map((row) => (
                   <TableRow 
                     key={row.date}
                     className="border-border hover:bg-muted/50 transition-colors group"

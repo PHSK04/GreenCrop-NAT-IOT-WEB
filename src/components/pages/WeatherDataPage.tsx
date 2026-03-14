@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -6,6 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Thermometer, Droplets, Activity, AlertTriangle, FileText, CloudRain } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
+import { seededNumber } from "@/utils/deviceData";
 
 // Mock Data: 24h Water Temperature Trends
 const tempHistory = [
@@ -42,6 +45,74 @@ const currentSensorReadings = [
 export function WeatherDataPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const { deviceId, seed } = useDeviceSeed();
+  const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
+
+  const adjustValue = (
+    value: string,
+    index: number,
+    step: number,
+    min: number,
+    max: number,
+    precision: number,
+  ) => {
+    const match = value.match(/-?\d+(\.\d+)?/);
+    if (!match) return value;
+    const base = Number(match[0]);
+    if (!Number.isFinite(base)) return value;
+    const adjusted = seededNumber(base, seed, index, step, min, max, precision);
+    const fixed =
+      precision === 0 ? `${Math.round(adjusted)}` : adjusted.toFixed(precision);
+    return value.replace(match[0], fixed);
+  };
+
+  const tempHistoryDevice = useMemo(
+    () =>
+      tempHistory.map((row, index) => ({
+        ...row,
+        water: seededNumber(row.water, seed, index, 0.2, 22.0, 28.8, 1),
+      })),
+    [seed],
+  );
+
+  const waterQualityHistoryDevice = useMemo(
+    () =>
+      waterQualityHistory.map((row, index) => ({
+        ...row,
+        ph: seededNumber(row.ph, seed, index, 0.05, 6.4, 7.8, 2),
+        ec: seededNumber(row.ec, seed, index, 0.05, 1.0, 2.4, 2),
+        oxygen: seededNumber(row.oxygen, seed, index, 0.07, 5.5, 8.6, 2),
+      })),
+    [seed],
+  );
+
+  const currentSensorReadingsDevice = useMemo(
+    () =>
+      currentSensorReadings.map((row, index) => {
+        const label = row.name.toLowerCase();
+        let nextValue = row.value;
+        if (label.includes("temperature")) {
+          nextValue = adjustValue(row.value, index, 0.2, 22.0, 28.8, 1);
+        } else if (label.includes("ph")) {
+          nextValue = adjustValue(row.value, index, 0.05, 6.4, 7.8, 2);
+        } else if (label.includes("ec")) {
+          nextValue = adjustValue(row.value, index, 0.05, 1.0, 2.4, 2);
+        } else if (label.includes("oxygen")) {
+          nextValue = adjustValue(row.value, index, 0.07, 5.5, 8.6, 2);
+        } else if (label.includes("co2")) {
+          nextValue = adjustValue(row.value, index, 20, 600, 1200, 0);
+        } else if (label.includes("light")) {
+          nextValue = adjustValue(row.value, index, 15, 300, 800, 0);
+        } else {
+          const numeric = row.value.match(/-?\d+(\.\d+)?/);
+          if (numeric) {
+            nextValue = adjustValue(row.value, index, 1, 0, 9999, 0);
+          }
+        }
+        return { ...row, value: nextValue };
+      }),
+    [seed],
+  );
 
   return (
     <>
@@ -53,6 +124,11 @@ export function WeatherDataPage() {
               Sensor Intelligence
             </h1>
             <p className="text-sm text-muted-foreground mt-1">Detailed real-time analytics and historical sensor data</p>
+            <div className="mt-2">
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/40">
+                {deviceLabel}
+              </Badge>
+            </div>
           </div>
           <Button variant="outline" className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground">
             <FileText className="w-4 h-4" />
@@ -85,7 +161,7 @@ export function WeatherDataPage() {
                 <CardContent>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={tempHistory} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                      <AreaChart data={tempHistoryDevice} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="colorWater" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
@@ -136,7 +212,7 @@ export function WeatherDataPage() {
                 <CardContent>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={waterQualityHistory} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                      <LineChart data={waterQualityHistoryDevice} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                         <XAxis 
                           dataKey="time" 
@@ -190,7 +266,7 @@ export function WeatherDataPage() {
                      </TableRow>
                    </TableHeader>
                    <TableBody>
-                     {currentSensorReadings.map((sensor, i) => (
+                    {currentSensorReadingsDevice.map((sensor, i) => (
                        <TableRow key={i} className="border-border hover:bg-muted/50 transition-colors">
                          <TableCell className="font-medium text-foreground">{sensor.name}</TableCell>
                          <TableCell className="text-muted-foreground font-mono text-xs">{sensor.id}</TableCell>

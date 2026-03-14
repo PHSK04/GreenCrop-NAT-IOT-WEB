@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -8,6 +8,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Heart, TrendingUp, Star, AlertCircle, Activity, Zap, Factory, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
+import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
+import { rotateBy, seededInt } from "@/utils/deviceData";
 
 // 1. Production Output Over Time (Kg & Growth Rate)
 const productionData = [
@@ -47,6 +49,8 @@ const bottleneckIssues = [
 ];
 
 export function MachinePerformancePage() {
+  const { deviceId, seed } = useDeviceSeed();
+  const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([
@@ -63,6 +67,36 @@ export function MachinePerformancePage() {
     "Constraints",
   ];
 
+  const productionDataDevice = useMemo(
+    () =>
+      productionData.map((row, index) => ({
+        ...row,
+        morningYield: seededInt(row.morningYield, seed, index, 2, 30, 70),
+        afternoonYield: seededInt(row.afternoonYield, seed, index, 2, 28, 68),
+        growthRate: seededInt(row.growthRate, seed, index, 1, 78, 99),
+      })),
+    [seed],
+  );
+
+  const machinePerformanceDataDevice = useMemo(
+    () =>
+      machinePerformanceData.map((row, index) => ({
+        ...row,
+        score: seededInt(row.score, seed, index, 2, 70, 99),
+      })),
+    [seed],
+  );
+
+  const performanceFactorsDevice = useMemo(
+    () => rotateBy(performanceFactors, seed),
+    [seed],
+  );
+
+  const bottleneckIssuesDevice = useMemo(
+    () => rotateBy(bottleneckIssues, seed + 3),
+    [seed],
+  );
+
   const buildExportPayload = () => {
     const lines: string[] = [];
     lines.push("Report, Machine Performance Analytics");
@@ -75,7 +109,7 @@ export function MachinePerformancePage() {
     if (selectedDataTypes.includes("Production Output")) {
       lines.push("Section, Production Output");
       lines.push("date,morningYield,afternoonYield,growthRate");
-      productionData.forEach((row) => {
+      productionDataDevice.forEach((row) => {
         lines.push(`${row.date},${row.morningYield},${row.afternoonYield},${row.growthRate}`);
       });
       lines.push("");
@@ -84,7 +118,7 @@ export function MachinePerformancePage() {
     if (selectedDataTypes.includes("System Performance")) {
       lines.push("Section, System Performance");
       lines.push("category,score,fullMark");
-      machinePerformanceData.forEach((row) => {
+      machinePerformanceDataDevice.forEach((row) => {
         lines.push(`${row.category},${row.score},${row.fullMark}`);
       });
       lines.push("");
@@ -93,7 +127,7 @@ export function MachinePerformancePage() {
     if (selectedDataTypes.includes("Top Factors")) {
       lines.push("Section, Top Performance Factors");
       lines.push("factor");
-      performanceFactors.forEach((row) => {
+      performanceFactorsDevice.forEach((row) => {
         lines.push(`${row}`);
       });
       lines.push("");
@@ -102,7 +136,7 @@ export function MachinePerformancePage() {
     if (selectedDataTypes.includes("Constraints")) {
       lines.push("Section, Production Constraints");
       lines.push("issue");
-      bottleneckIssues.forEach((row) => {
+      bottleneckIssuesDevice.forEach((row) => {
         lines.push(`${row}`);
       });
       lines.push("");
@@ -145,6 +179,11 @@ export function MachinePerformancePage() {
               Machine Performance Analytics
             </h1>
             <p className="text-sm text-muted-foreground mt-1">Analyze production output and system efficiency</p>
+            <div className="mt-2">
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/40">
+                {deviceLabel}
+              </Badge>
+            </div>
           </div>
           <Button variant="outline" className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground">
             <Activity className="w-4 h-4" />
@@ -184,7 +223,7 @@ export function MachinePerformancePage() {
             <CardContent>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={productionData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <ComposedChart data={productionDataDevice} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} label={{ value: 'Yield (g)', angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))' }} />
@@ -215,7 +254,7 @@ export function MachinePerformancePage() {
             <CardContent>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={machinePerformanceData}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={machinePerformanceDataDevice}>
                     <PolarGrid stroke="hsl(var(--border))" />
                     <PolarAngleAxis dataKey="category" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
                     <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
@@ -241,7 +280,7 @@ export function MachinePerformancePage() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3">
-                {performanceFactors.map((factor, index) => (
+                {performanceFactorsDevice.map((factor, index) => (
                   <div key={index} className="px-3 py-1.5 rounded-md text-sm font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center gap-2">
                     <TrendingUp className="w-3 h-3" />
                     {factor}
@@ -262,7 +301,7 @@ export function MachinePerformancePage() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3">
-                {bottleneckIssues.map((issue, index) => (
+                {bottleneckIssuesDevice.map((issue, index) => (
                   <div key={index} className="px-3 py-1.5 rounded-md text-sm font-medium text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 flex items-center gap-2">
                     <AlertCircle className="w-3 h-3" />
                     {issue}

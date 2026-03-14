@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
+import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
+import { seededNumber } from "@/utils/deviceData";
 
 const initialDeviceData = [
   {
@@ -119,7 +121,31 @@ const initialDeviceData = [
 ];
 
 export function DeviceMonitorPage() {
-  const [devices, setDevices] = useState(initialDeviceData);
+  const { deviceId, seed } = useDeviceSeed();
+  const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
+
+  const seededDeviceData = useMemo(() => {
+    return initialDeviceData.map((device, index) => {
+      const label = device.name.toLowerCase();
+      let nextValue = device.value;
+      if (label.includes("ec")) {
+        nextValue = `${seededNumber(1.8, seed, index, 0.05, 1.0, 2.4, 2)} mS/cm`;
+      } else if (label.includes("oxygen")) {
+        nextValue = `${seededNumber(6.8, seed, index, 0.07, 5.5, 8.6, 2)} mg/L`;
+      } else if (label.includes("ph")) {
+        nextValue = `${seededNumber(7.2, seed, index, 0.05, 6.4, 7.8, 2)} pH`;
+      } else if (label.includes("temperature")) {
+        nextValue = `${seededNumber(28.5, seed, index, 0.2, 22.0, 29.0, 1)} °C`;
+      } else if (label.includes("water level")) {
+        nextValue = `${seededNumber(82, seed, index, 2, 60, 95, 0)}% Level`;
+      } else if (label.includes("led")) {
+        nextValue = `${seededNumber(85, seed, index, 3, 60, 100, 0)}% Intensity`;
+      }
+      return { ...device, value: nextValue };
+    });
+  }, [seed]);
+
+  const [devices, setDevices] = useState(seededDeviceData);
   const [selectedDevices, setSelectedDevices] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDevice, setSelectedDevice] = useState<typeof initialDeviceData[0] | null>(null);
@@ -132,6 +158,12 @@ export function DeviceMonitorPage() {
   ]);
 
   const dataTypeOptions = ["Sensor", "Actuator", "System"];
+
+  useEffect(() => {
+    setDevices(seededDeviceData);
+    setSelectedDevices([]);
+    setSelectedDevice(null);
+  }, [seededDeviceData]);
 
   const handleSelectAll = () => {
     if (selectedDevices.length === devices.length) {
@@ -227,6 +259,11 @@ export function DeviceMonitorPage() {
               Sensor Intelligence
             </h1>
             <p className="text-sm text-muted-foreground mt-1">Real-time AI status of sensors and actuators</p>
+            <div className="mt-2">
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/40">
+                {deviceLabel}
+              </Badge>
+            </div>
           </div>
           <Button size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-0">
             <RefreshCw className="w-4 h-4" />

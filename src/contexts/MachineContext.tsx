@@ -160,7 +160,11 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/sensor-data?tenant_id=${tenantId}`, {
+      const activeDeviceId = typeof window !== 'undefined'
+        ? window.localStorage.getItem('active_device_id') || ''
+        : '';
+      const deviceParam = activeDeviceId ? `&device_id=${encodeURIComponent(activeDeviceId)}` : '';
+      const response = await fetch(`${API_BASE_URL}/sensor-data?tenant_id=${tenantId}${deviceParam}`, {
         headers: {
           'x-tenant-id': tenantId,
           Authorization: `Bearer ${token}`,

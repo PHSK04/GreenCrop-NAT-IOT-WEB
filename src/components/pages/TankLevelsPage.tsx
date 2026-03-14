@@ -17,6 +17,8 @@ import {
   Sun,
   Leaf
 } from "lucide-react";
+import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
+import { seededInt, seededNumber } from "@/utils/deviceData";
 
 // Generic Tank Card Component (used for Tank 3)
 const TankCard = ({ name, type, capacity, currentLevel, status, flowRate, pressure, sensors, isFilling, onToggle }: any) => {
@@ -160,8 +162,27 @@ const translations = {
 };
 
 export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, language }: MachineControlPageProps) {
+  const { deviceId, seed } = useDeviceSeed();
+  const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
   const t = translations[language as keyof typeof translations] || translations.EN;
   // Safe defaults if props not passed (e.g. before Dashboard update)
+  const totalVolume = seededInt(4250, seed, 0, 60, 3600, 5200);
+  const flowRateLive = seededNumber(24.5, seed, 1, 0.6, 12, 38, 1);
+  const pressureLive = seededInt(42, seed, 2, 2, 28, 58);
+  const activeAlerts = seededInt(0, seed, 3, 1, 0, 4);
+  const tank1Level = seededInt(85, seed, 4, 4, 60, 95);
+  const tank2Level = seededInt(45, seed, 5, 4, 30, 80);
+  const tank3Level = seededInt(30, seed, 6, 4, 20, 70);
+  const tank3Flow = seededInt(30, seed, 16, 3, 15, 45);
+  const tank1WaterCm = seededInt(85, seed, 7, 3, 60, 98);
+  const tank2Ph = seededNumber(7.8, seed, 8, 0.06, 6.6, 7.9, 2);
+  const tank2Ec = seededNumber(1.8, seed, 9, 0.06, 1.1, 2.4, 2);
+  const pondDepth = seededInt(25, seed, 10, 2, 18, 32);
+  const pondVolume = seededInt(60, seed, 11, 4, 45, 95);
+  const pondTemp = seededNumber(28.0, seed, 12, 0.3, 24.0, 30.5, 1);
+  const pondOxygen = seededNumber(6.5, seed, 13, 0.08, 5.5, 8.6, 2);
+  const pondLight = seededInt(4500, seed, 14, 120, 3000, 5200);
+  const readiness = seededInt(95, seed, 15, 2, 82, 99);
   const t2State = tank2On ?? false; // Default false for "Auto-Dose"
   const t3State = tank3On ?? false; // Default false for "Start Fill"
   
@@ -178,6 +199,11 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
               Tank Levels & Flow Control
             </h1>
             <p className="text-sm text-muted-foreground mt-1">Real-time water management and pump status</p>
+            <div className="mt-2">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/40">
+                {deviceLabel}
+              </Badge>
+            </div>
           </div>
           <div className="flex items-center gap-3">
              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
@@ -200,28 +226,28 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
               <div className="p-3 rounded-full bg-blue-500/10 text-blue-500 dark:text-blue-400"><Droplets className="w-6 h-6" /></div>
               <div>
                  <p className="text-sm text-muted-foreground">Total Reserve</p>
-                 <p className="text-2xl font-bold text-foreground">4,250 <span className="text-sm font-normal text-muted-foreground">L</span></p>
+                 <p className="text-2xl font-bold text-foreground">{totalVolume.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">L</span></p>
               </div>
            </Card>
            <Card className="rounded-xl border border-border bg-card/50 p-4 flex items-center gap-4">
               <div className="p-3 rounded-full bg-cyan-500/10 text-cyan-500 dark:text-cyan-400"><Waves className="w-6 h-6" /></div>
               <div>
                  <p className="text-sm text-muted-foreground">Net Flow In</p>
-                 <p className="text-2xl font-bold text-foreground">24.5 <span className="text-sm font-normal text-muted-foreground">L/min</span></p>
+                 <p className="text-2xl font-bold text-foreground">{flowRateLive} <span className="text-sm font-normal text-muted-foreground">L/min</span></p>
               </div>
            </Card>
            <Card className="rounded-xl border border-border bg-card/50 p-4 flex items-center gap-4">
               <div className="p-3 rounded-full bg-purple-500/10 text-purple-500 dark:text-purple-400"><Gauge className="w-6 h-6" /></div>
               <div>
                  <p className="text-sm text-muted-foreground">Sys Pressure</p>
-                 <p className="text-2xl font-bold text-foreground">42 <span className="text-sm font-normal text-muted-foreground">PSI</span></p>
+                 <p className="text-2xl font-bold text-foreground">{pressureLive} <span className="text-sm font-normal text-muted-foreground">PSI</span></p>
               </div>
            </Card>
            <Card className="rounded-xl border border-border bg-card/50 p-4 flex items-center gap-4">
               <div className="p-3 rounded-full bg-amber-500/10 text-amber-500 dark:text-amber-400"><AlertCircle className="w-6 h-6" /></div>
               <div>
                  <p className="text-sm text-muted-foreground">Alerts</p>
-                 <p className="text-2xl font-bold text-foreground">0 <span className="text-sm font-normal text-muted-foreground">Active</span></p>
+                 <p className="text-2xl font-bold text-foreground">{activeAlerts} <span className="text-sm font-normal text-muted-foreground">Active</span></p>
               </div>
            </Card>
         </div>
@@ -234,11 +260,11 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
               {/* Water Level Visual Background */}
               <div 
                 className="absolute bottom-0 left-0 w-full bg-blue-500/10 transition-all duration-1000 ease-in-out z-0" 
-                style={{ height: '85%' }}
+                style={{ height: `${tank1Level}%` }}
               />
               <div 
                 className="absolute bottom-0 left-0 w-full h-2 bg-blue-500/20 animate-pulse z-0" 
-                style={{ bottom: '85%' }}
+                style={{ bottom: `${tank1Level}%` }}
               />
               
               <CardHeader className="relative z-10 pb-4">
@@ -251,8 +277,8 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                      <CardTitle className="text-xl text-foreground">{t.tank1}</CardTitle>
                   </div>
                   <div className="text-right">
-                     <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">85%</div>
-                     <div className="text-xs text-muted-foreground">85L / 100L</div>
+                     <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{tank1Level}%</div>
+                     <div className="text-xs text-muted-foreground">{tank1Level}L / 100L</div>
                   </div>
                 </div>
               </CardHeader>
@@ -289,7 +315,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                          <Waves className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
                          <span className="text-xs text-muted-foreground">{t.waterLevel}</span>
                       </div>
-                      <div className="text-lg font-semibold text-foreground">85 <span className="text-xs text-muted-foreground">cm</span></div>
+                      <div className="text-lg font-semibold text-foreground">{tank1WaterCm} <span className="text-xs text-muted-foreground">cm</span></div>
                    </div>
                 </div>
 
@@ -311,11 +337,11 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
               {/* Water Level Visual Background */}
               <div 
                 className="absolute bottom-0 left-0 w-full bg-blue-500/10 transition-all duration-1000 ease-in-out z-0" 
-                style={{ height: '45%' }}
+                style={{ height: `${tank2Level}%` }}
               />
               <div 
                 className="absolute bottom-0 left-0 w-full h-2 bg-blue-500/20 animate-pulse z-0" 
-                style={{ bottom: '45%' }}
+                style={{ bottom: `${tank2Level}%` }}
               />
               
               <CardHeader className="relative z-10 pb-4">
@@ -328,8 +354,8 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                      <CardTitle className="text-xl text-foreground">Preparation Tank (2)</CardTitle>
                   </div>
                   <div className="text-right">
-                     <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">45%</div>
-                     <div className="text-xs text-muted-foreground">45L / 100L</div>
+                     <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{tank2Level}%</div>
+                     <div className="text-xs text-muted-foreground">{tank2Level}L / 100L</div>
                   </div>
                 </div>
               </CardHeader>
@@ -353,13 +379,13 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                     <div className="p-2 rounded bg-muted/40 border border-border">
                         <p className="text-xs text-muted-foreground">pH Level</p>
-                        <p className="text-lg font-bold text-red-600 dark:text-red-400">7.8</p>
+                        <p className="text-lg font-bold text-red-600 dark:text-red-400">{tank2Ph}</p>
                         <p className="text-[10px] text-red-600/80 dark:text-red-400/80">Basic (High)</p>
                     </div>
 
                     <div className="p-2 rounded bg-muted/40 border border-border">
                         <p className="text-xs text-muted-foreground">EC</p>
-                        <p className="text-lg font-bold text-foreground">1.8 <span className="text-xs font-normal">mS/cm</span></p>
+                        <p className="text-lg font-bold text-foreground">{tank2Ec} <span className="text-xs font-normal">mS/cm</span></p>
                     </div>
                 </div>
 
@@ -374,7 +400,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                    <div className="flex items-start gap-3 p-2 bg-red-500/10 rounded border border-red-500/20">
                       <AlertCircle className="w-4 h-4 text-red-500 mt-0.5" />
                       <div>
-                         <p className="text-xs font-bold text-red-600 dark:text-red-400">pH High (7.8 &gt; 7.0)</p>
+                         <p className="text-xs font-bold text-red-600 dark:text-red-400">pH High ({tank2Ph} &gt; 7.0)</p>
                          <p className="text-xs text-muted-foreground mt-1">Status: Basic/Alkaline</p>
                          <div className="mt-2 flex gap-2">
                             <Badge variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200 border-red-200 dark:border-red-800 text-[10px]">Add Acid (HCl)</Badge>
@@ -412,9 +438,9 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
               name="Distribution Tank (3)" 
               type="Output: Feed Lines"
               capacity={100} 
-              currentLevel={30} 
+              currentLevel={tank3Level} 
               status="Stable" 
-              flowRate={30} 
+              flowRate={tank3Flow} 
               sensors={[{name: 'Status', value: 'Standby'}, {name: 'Source', value: 'Wait for Tank 2'}]}
               isFilling={t3State}
               onToggle={toggleT3}
@@ -433,11 +459,11 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                     </div>
                     <div className="text-right flex gap-6">
                         <div>
-                           <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">25 <span className="text-lg text-muted-foreground font-normal">cm</span></div>
+                           <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{pondDepth} <span className="text-lg text-muted-foreground font-normal">cm</span></div>
                            <div className="text-xs text-muted-foreground">{t.waterDepth}</div>
                         </div>
                         <div className="border-l border-border pl-6">
-                           <div className="text-3xl font-bold text-foreground">60 <span className="text-lg text-muted-foreground font-normal">L</span></div>
+                           <div className="text-3xl font-bold text-foreground">{pondVolume} <span className="text-lg text-muted-foreground font-normal">L</span></div>
                            <div className="text-xs text-muted-foreground">{t.totalVolume}</div>
                         </div>
                     </div>
@@ -465,7 +491,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                        
                        {/* Current Level Indicator Line */}
                        <div className="absolute bottom-[70%] right-4 flex items-center gap-2">
-                          <span className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-background/80 px-2 py-0.5 rounded">25 cm</span>
+                          <span className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-background/80 px-2 py-0.5 rounded">{pondDepth} cm</span>
                           <div className="w-16 h-px bg-blue-700 dark:bg-blue-300"></div>
                        </div>
                     </div>
@@ -484,7 +510,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                           <Activity className="w-5 h-5 text-blue-500" />
                           <span className="text-sm text-muted-foreground">Water Temp</span>
                        </div>
-                       <div className="text-2xl font-bold text-foreground">28.0 <span className="text-xs text-muted-foreground font-normal">°C</span></div>
+                       <div className="text-2xl font-bold text-foreground">{pondTemp} <span className="text-xs text-muted-foreground font-normal">°C</span></div>
                     </div>
 
                     <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex flex-col justify-center">
@@ -492,7 +518,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                           <Waves className="w-5 h-5 text-cyan-500" />
                           <span className="text-sm text-muted-foreground">Oxygen (DO)</span>
                        </div>
-                       <div className="text-2xl font-bold text-foreground">6.5 <span className="text-xs text-muted-foreground font-normal">mg/L</span></div>
+                       <div className="text-2xl font-bold text-foreground">{pondOxygen} <span className="text-xs text-muted-foreground font-normal">mg/L</span></div>
                     </div>
 
                     <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 flex flex-col justify-center">
@@ -500,7 +526,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                           <Sun className="w-5 h-5 text-orange-500" />
                           <span className="text-sm text-muted-foreground">Light Intensity</span>
                        </div>
-                       <div className="text-2xl font-bold text-foreground">4,500 <span className="text-xs text-muted-foreground font-normal">Lux</span></div>
+                       <div className="text-2xl font-bold text-foreground">{pondLight.toLocaleString()} <span className="text-xs text-muted-foreground font-normal">Lux</span></div>
                     </div>
 
                  {/* Harvest Readiness - Balanced Size */}
@@ -514,12 +540,12 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                              {t.harvestStatus}
                              <Badge className="bg-emerald-600 dark:bg-emerald-500 text-white hover:bg-emerald-700 dark:hover:bg-emerald-600 text-[10px] px-1.5 py-0">{t.ready}</Badge>
                           </h4>
-                          <p className="text-xs text-muted-foreground">{t.biomassDensity} ({t.readiness} 95%)</p>
+                          <p className="text-xs text-muted-foreground">{t.biomassDensity} ({t.readiness} {readiness}%)</p>
                        </div>
                     </div>
                     <div className="flex items-center gap-3">
                        <div className="text-right hidden sm:block">
-                          <div className="text-base font-bold text-emerald-600 dark:text-emerald-400">95%</div>
+                          <div className="text-base font-bold text-emerald-600 dark:text-emerald-400">{readiness}%</div>
                           <div className="text-[10px] text-muted-foreground">{t.readiness}</div>
                        </div>
                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)] h-8 text-xs">

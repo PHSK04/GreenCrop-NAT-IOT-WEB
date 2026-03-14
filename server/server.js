@@ -1640,6 +1640,8 @@ app.get('/api/sensor-data', async (req, res) => {
         }
 
         // 2. Fetch DATA specific to this User Only
+        const deviceId = req.query.device_id ? String(req.query.device_id) : null;
+
         let query = `
             SELECT TOP 1 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp
             FROM sensor_data
@@ -1647,23 +1649,37 @@ app.get('/api/sensor-data', async (req, res) => {
             ORDER BY id DESC
         `;
         
-        let rows = await db.all(query, [tenantId]);
+        const params = [tenantId];
+        if (deviceId) {
+            query = `
+                SELECT TOP 1 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp
+                FROM sensor_data
+                WHERE tenant_id = ? AND device_id = ?
+                ORDER BY id DESC
+            `;
+            params.push(deviceId);
+        }
+
+        let rows = await db.all(query, params);
 
         // 2b. Fallback: If no user-specific data, check for 'public' legacy data
         if (rows.length === 0 && tenantId !== 'public') {
             console.log(`[READ] No data for Tenant ${tenantId}, falling back to 'public'`);
-            rows = await db.all(query, ['public']);
+            rows = await db.all(query, deviceId ? ['public', deviceId] : ['public']);
         }
 
         // History mode for charts (optional)
         if (req.query.history === 'true') {
              const targetTenant = rows.length > 0 ? (rows[0].tenant_id || tenantId) : tenantId;
-             const history = await db.all(`
+             const history = await db.all(
+                `
                 SELECT TOP 50 pressure, flow_rate, timestamp 
                 FROM sensor_data 
-                WHERE tenant_id = ?
+                WHERE tenant_id = ?${deviceId ? ' AND device_id = ?' : ''}
                 ORDER BY id DESC
-            `, [targetTenant]);
+              `,
+              deviceId ? [targetTenant, deviceId] : [targetTenant]
+            );
             for (const row of history) {
                 row.server_now = serverNowIso;
             }

@@ -41,6 +41,7 @@ import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { ModeToggle } from "./mode-toggle";
 import { useMachine } from "../contexts/MachineContext";
 import appLogoGreen from "@/assets/images/3_transparent_logo_green.png";
+import { emitActiveDeviceChanged } from "@/hooks/useActiveDeviceId";
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
@@ -230,7 +231,7 @@ function SidebarContent({
         </div>
       </div>
 
-      {!compact && devices.length > 0 && (
+      {!compact && devices.length > 1 && (
         <div className="px-4 pt-3 pb-2">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Active Device</div>
           <select
@@ -334,6 +335,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   const [isDesktopSidebarCompact, setIsDesktopSidebarCompact] = useState(false);
   const [devices, setDevices] = useState<AdminDbDeviceRow[]>([]);
   const [activeDeviceId, setActiveDeviceId] = useState<string>("");
+  const showDeviceSelector = devices.length > 1;
 
   // Use machine context for sidebar status
   const { isOn } = useMachine();
@@ -371,6 +373,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
     if (typeof window !== 'undefined') {
       localStorage.setItem('active_device_id', deviceId);
     }
+    emitActiveDeviceChanged();
     try {
       await authService.setPrimaryDevice(deviceId);
       setDevices((prev) =>
@@ -417,6 +420,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
               localStorage.setItem("device_pairing_device_id", deviceId);
               localStorage.setItem("active_device_id", deviceId);
               setActiveDeviceId(deviceId);
+              emitActiveDeviceChanged();
               authService.getMyDevices().then(setDevices).catch(() => {});
               setActivePage("Dashboard");
             }}
@@ -502,13 +506,26 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
               <p className="text-xs text-muted-foreground font-medium">
                 GreenCropNAT
               </p>
-              <h1 className="text-base font-semibold tracking-tight">
+             <h1 className="text-base font-semibold tracking-tight">
                 {t[activePage] || activePage}
               </h1>
              </div>
            </div>
            
            <div className="flex items-center gap-2">
+              {showDeviceSelector && (
+                <select
+                  className="h-8 max-w-[150px] rounded-md border border-border bg-background px-2 text-xs"
+                  value={activeDeviceId || ""}
+                  onChange={(e) => handleDeviceChange(e.target.value)}
+                >
+                  {devices.map((device) => (
+                    <option key={String(device.id)} value={device.device_id}>
+                      {device.device_name || device.device_id}
+                    </option>
+                  ))}
+                </select>
+              )}
               <span className={`relative flex h-2 w-2`}>
                 <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isOn ? "bg-primary" : "bg-muted-foreground hidden"}`}></span>
                 <span className={`relative inline-flex rounded-full h-2 w-2 ${isOn ? "bg-primary" : "bg-muted-foreground"}`}></span>

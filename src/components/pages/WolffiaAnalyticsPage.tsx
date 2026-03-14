@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -10,6 +10,8 @@ import { Sprout, TrendingUp, Scale, Calendar, ArrowUpRight, Droplets, Timer, Dow
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
 import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
+import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
+import { rotateBy, seededInt, seededNumber } from "@/utils/deviceData";
 
 // Monthly Wolffia Stats: Yield vs Frequency
 const wolffiaStats = [
@@ -37,6 +39,8 @@ const recentHarvestLogs = [
 ];
 
 export function WolffiaAnalyticsPage() {
+  const { deviceId, seed } = useDeviceSeed();
+  const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
@@ -52,17 +56,70 @@ export function WolffiaAnalyticsPage() {
     "Pond Metrics",
   ];
 
+  const wolffiaStatsDevice = useMemo(
+    () =>
+      wolffiaStats.map((row, index) => ({
+        ...row,
+        yield: seededInt(row.yield, seed, index, 12, 300, 760),
+        frequency: seededInt(row.frequency, seed, index, 1, 6, 18),
+      })),
+    [seed],
+  );
+
+  const adjustMetricValue = (
+    value: string,
+    index: number,
+    step: number,
+    min: number,
+    max: number,
+    precision: number,
+  ) => {
+    const match = value.match(/-?\d+(\.\d+)?/);
+    if (!match) return value;
+    const base = Number(match[0]);
+    if (!Number.isFinite(base)) return value;
+    const adjusted = seededNumber(base, seed, index, step, min, max, precision);
+    const fixed =
+      precision === 0 ? `${Math.round(adjusted)}` : adjusted.toFixed(precision);
+    return value.replace(match[0], fixed);
+  };
+
+  const pondMetricsDevice = useMemo(
+    () =>
+      pondMetrics.map((row, index) => {
+        let value = row.value;
+        if (row.metric.includes("Harvest / Month")) {
+          value = adjustMetricValue(row.value, index, 0.4, 8, 16, 1);
+        } else if (row.metric.includes("Yield / Harvest")) {
+          value = adjustMetricValue(row.value, index, 1.2, 30, 60, 1);
+        } else if (row.metric.includes("Total Yield")) {
+          value = adjustMetricValue(row.value, index, 60, 1800, 4200, 0);
+        }
+        return { ...row, value };
+      }),
+    [seed],
+  );
+
+  const recentHarvestLogsDevice = useMemo(
+    () =>
+      rotateBy(recentHarvestLogs, seed).map((row, index) => ({
+        ...row,
+        weight: `${seededNumber(44.8, seed, index, 0.6, 38.0, 52.0, 1)} g`,
+      })),
+    [seed],
+  );
+
   const handleDownload = () => {
     try {
-      if (!wolffiaStats.length) {
+      if (!wolffiaStatsDevice.length) {
         toast.error("Export Failed", { description: "No data to export." });
         return;
       }
-      const headers = Object.keys(wolffiaStats[0]).join(",");
+      const headers = Object.keys(wolffiaStatsDevice[0]).join(",");
       const csvContent =
         headers +
         "\n" +
-        wolffiaStats.map((row) => Object.values(row).join(",")).join("\n");
+        wolffiaStatsDevice.map((row) => Object.values(row).join(",")).join("\n");
       downloadTextFile("wolffia_monthly_report.csv", csvContent, "text/csv;charset=utf-8");
       
       toast.success("Export Successful", {
@@ -88,7 +145,7 @@ export function WolffiaAnalyticsPage() {
     if (selectedDataTypes.includes("Monthly Stats")) {
       lines.push("Section, Monthly Stats");
       lines.push("month,yield,frequency");
-      wolffiaStats.forEach((row) => {
+      wolffiaStatsDevice.forEach((row) => {
         lines.push(`${row.month},${row.yield},${row.frequency}`);
       });
       lines.push("");
@@ -97,7 +154,7 @@ export function WolffiaAnalyticsPage() {
     if (selectedDataTypes.includes("Harvest History")) {
       lines.push("Section, Harvest History");
       lines.push("id,weight,date,interval");
-      recentHarvestLogs.forEach((row) => {
+      recentHarvestLogsDevice.forEach((row) => {
         lines.push(`${row.id},${row.weight},${row.date},${row.interval}`);
       });
       lines.push("");
@@ -106,7 +163,7 @@ export function WolffiaAnalyticsPage() {
     if (selectedDataTypes.includes("Pond Metrics")) {
       lines.push("Section, Pond Metrics");
       lines.push("metric,value,trend");
-      pondMetrics.forEach((row) => {
+      pondMetricsDevice.forEach((row) => {
         lines.push(`${row.metric},${row.value},${row.trend}`);
       });
       lines.push("");
@@ -148,6 +205,11 @@ export function WolffiaAnalyticsPage() {
               Wolffia Pond Analytics
             </h1>
             <p className="text-sm text-muted-foreground mt-1">Single Pond Performance & Harvest Frequency</p>
+            <div className="mt-2">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/40">
+                {deviceLabel}
+              </Badge>
+            </div>
           </div>
           <Button 
             variant="outline" 
@@ -184,7 +246,7 @@ export function WolffiaAnalyticsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {wolffiaStats.map((row, i) => (
+                  {wolffiaStatsDevice.map((row, i) => (
                     <TableRow key={i} className="border-border hover:bg-muted/50">
                       <TableCell className="text-foreground py-2">{row.month}</TableCell>
                       <TableCell className="text-emerald-600 dark:text-emerald-400 font-medium text-right py-2">{row.yield}</TableCell>
@@ -244,7 +306,7 @@ export function WolffiaAnalyticsPage() {
           <CardContent>
             <div className="h-96">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={wolffiaStats} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <ComposedChart data={wolffiaStatsDevice} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis 
                     dataKey="month" 
@@ -302,7 +364,7 @@ export function WolffiaAnalyticsPage() {
             </CardHeader>
             <CardContent>
                <div className="grid grid-cols-2 gap-4">
-                 {pondMetrics.map((item, idx) => (
+                 {pondMetricsDevice.map((item, idx) => (
                    <div key={idx} className="p-4 rounded-lg bg-muted/30 border border-border">
                       <p className="text-xs text-muted-foreground mb-1">{item.metric}</p>
                       <div className="flex items-end justify-between">
@@ -338,7 +400,7 @@ export function WolffiaAnalyticsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentHarvestLogs.map((log, index) => (
+                  {recentHarvestLogsDevice.map((log, index) => (
                     <TableRow key={index} className="border-border hover:bg-muted/50">
                       <TableCell>
                         <span className="text-sm font-medium text-foreground">

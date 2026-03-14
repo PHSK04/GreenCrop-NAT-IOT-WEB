@@ -1,8 +1,11 @@
+import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { AlertTriangle, CheckCircle, Droplets, Wrench, History, Plus, AlertOctagon, FileText } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
+import { rotateBy, seededInt } from "@/utils/deviceData";
 
 const healthData = [
   { name: 'Operational', value: 95, color: '#10b981' },
@@ -22,6 +25,31 @@ const maintenanceLogs = [
 ];
 
 export function MaintenancePage() {
+  const { deviceId, seed } = useDeviceSeed();
+  const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
+
+  const healthScore = seededInt(95, seed, 0, 1, 85, 99);
+  const issueCount = Math.max(1, Math.round((100 - healthScore) / 5));
+  const activeNodes = seededInt(28, seed, 1, 2, 18, 40);
+
+  const healthDataDevice = useMemo(
+    () => [
+      { name: "Operational", value: healthScore, color: "#10b981" },
+      { name: "Issues", value: 100 - healthScore, color: "#ef4444" },
+    ],
+    [healthScore],
+  );
+
+  const incidentsDevice = useMemo(
+    () => rotateBy(incidents, seed).slice(0, Math.min(incidents.length, issueCount)),
+    [seed, issueCount],
+  );
+
+  const maintenanceLogsDevice = useMemo(
+    () => rotateBy(maintenanceLogs, seed + 2),
+    [seed],
+  );
+
   return (
     <>
       <header className="bg-card/50 border-b border-border px-8 py-6 backdrop-blur-sm">
@@ -32,6 +60,11 @@ export function MaintenancePage() {
               System Maintenance
             </h1>
             <p className="text-sm text-muted-foreground mt-1">Operational status, damage reports, and refill logs</p>
+            <div className="mt-2">
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/40">
+                {deviceLabel}
+              </Badge>
+            </div>
           </div>
           <Button className="bg-red-600 hover:bg-red-700 text-white gap-2">
             <AlertOctagon className="w-4 h-4" />
@@ -54,7 +87,7 @@ export function MaintenancePage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={healthData}
+                      data={healthDataDevice}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
@@ -63,24 +96,24 @@ export function MaintenancePage() {
                       dataKey="value"
                       stroke="none"
                     >
-                      {healthData.map((entry, index) => (
+                      {healthDataDevice.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex items-center justify-center flex-col mt-4 pointer-events-none">
-                  <span className="text-4xl font-bold text-emerald-600 dark:text-emerald-400">95%</span>
+                  <span className="text-4xl font-bold text-emerald-600 dark:text-emerald-400">{healthScore}%</span>
                   <span className="text-xs text-muted-foreground uppercase tracking-widest">Normal</span>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 w-full mt-4">
                  <div className="text-center p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">28</div>
+                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{activeNodes}</div>
                     <div className="text-xs text-muted-foreground">Active Nodes</div>
                  </div>
                  <div className="text-center p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                    <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">2</div>
+                    <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{issueCount}</div>
                     <div className="text-xs text-muted-foreground">Issues</div>
                  </div>
               </div>
@@ -98,7 +131,7 @@ export function MaintenancePage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {incidents.map((incident) => (
+                {incidentsDevice.map((incident) => (
                   <div key={incident.id} className="flex items-center justify-between p-4 bg-muted/40 rounded-lg border border-border hover:border-slate-400 dark:hover:border-slate-600 transition-colors cursor-pointer group">
                     <div className="flex items-center gap-4">
                       <div className={`p-3 rounded-full ${incident.severity === 'Critical' ? 'bg-red-500/10' : 'bg-amber-500/10'}`}>
@@ -114,7 +147,7 @@ export function MaintenancePage() {
                     </Badge>
                   </div>
                 ))}
-                 {incidents.length === 0 && (
+                 {incidentsDevice.length === 0 && (
                     <div className="text-center py-8 text-muted-foreground">No active incidents. System is healthy.</div>
                  )}
               </div>
@@ -141,7 +174,7 @@ export function MaintenancePage() {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-1">
-                        {maintenanceLogs.map((log) => (
+                        {maintenanceLogsDevice.map((log) => (
                             <div key={log.id} className="flex items-center justify-between p-4 bg-muted/20 rounded-lg border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
                                 <div className="flex items-center gap-4">
                                     <div className={`p-2 rounded-full ${log.type === 'refill' ? 'bg-emerald-500/10' : 'bg-blue-500/10'}`}>
