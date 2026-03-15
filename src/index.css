@@ -121,6 +121,18 @@
 }
 
 @layer utilities {
+  .page-solid-cards [data-slot="card"] {
+    background-color: #ffffff !important;
+    opacity: 1 !important;
+    backdrop-filter: none !important;
+  }
+
+  .page-solid-cards .backdrop-blur-sm,
+  .page-solid-cards .backdrop-blur-md,
+  .page-solid-cards .backdrop-blur-xl {
+    backdrop-filter: none !important;
+  }
+
   /* Legacy dark utilities mapped to semantic tokens */
   .text-dark-primary {
     @apply text-foreground;

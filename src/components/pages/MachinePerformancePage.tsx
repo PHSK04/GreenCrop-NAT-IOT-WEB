@@ -192,7 +192,7 @@ export function MachinePerformancePage() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto p-8 ">
+      <main className="page-solid-cards flex-1 overflow-auto p-8 ">
         <ExportFiltersCard
           startDate={exportStart}
           endDate={exportEnd}
