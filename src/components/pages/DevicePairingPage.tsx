@@ -175,7 +175,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-slate-950/40 text-foreground">
-      <header className="border-b border-border/60 bg-card/70 px-6 py-5 backdrop-blur-xl md:px-10">
+      <header className="border-b border-border/60 bg-white px-6 py-5 md:px-10">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-primary/15 p-2 text-primary">
@@ -195,7 +195,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
       </header>
 
       <main className="mx-auto grid w-full max-w-5xl gap-6 px-6 py-10 md:grid-cols-[1.1fr_0.9fr] md:px-10">
-        <Card className="rounded-2xl border-border/70 bg-card/70 shadow-xl backdrop-blur-xl">
+        <Card className="rounded-2xl border-border/70 bg-white shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-emerald-400" />
@@ -262,7 +262,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
         </Card>
 
         <div className="space-y-6">
-          <Card className="rounded-2xl border-border/60 bg-card/60 shadow-lg">
+          <Card className="rounded-2xl border-border/60 bg-white shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <PlugZap className="h-5 w-5 text-amber-400" />
@@ -285,7 +285,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
             </CardContent>
           </Card>
 
-            <Card className="rounded-2xl border-border/60 bg-card/60 shadow-lg">
+            <Card className="rounded-2xl border-border/60 bg-white shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <QrCode className="h-5 w-5 text-cyan-400" />
@@ -304,7 +304,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-border/60 bg-card/60 shadow-lg">
+          <Card className="rounded-2xl border-border/60 bg-white shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <QrCode className="h-5 w-5 text-emerald-400" />
@@ -356,7 +356,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
               <DialogHeader>
                 <DialogTitle>สแกน QR ด้วยกล้อง</DialogTitle>
               </DialogHeader>
-              <div className="overflow-hidden rounded-xl border border-border bg-black/90 p-2">
+              <div className="overflow-hidden rounded-xl border border-white/80 bg-black/90 p-2">
                 <div id="qr-camera-reader" className="min-h-[320px]" />
               </div>
               <p className="text-xs text-muted-foreground">
@@ -365,7 +365,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
             </DialogContent>
           </Dialog>
 
-          <Card className="rounded-2xl border-border/60 bg-card/60 shadow-lg">
+          <Card className="rounded-2xl border-border/60 bg-white shadow-lg">
             <CardHeader>
               <CardTitle className="text-base">ผู้ใช้งานปัจจุบัน</CardTitle>
               <CardDescription>ข้อมูลนี้จะผูกกับบัญชี</CardDescription>

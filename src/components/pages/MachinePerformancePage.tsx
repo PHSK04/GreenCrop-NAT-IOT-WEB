@@ -171,7 +171,7 @@ export function MachinePerformancePage() {
   return (
     <>
       {/* Header */}
-      <header className="bg-card/50 border-b border-border px-8 py-6 backdrop-blur-sm">
+      <header className="bg-white border-b border-border px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
@@ -212,7 +212,7 @@ export function MachinePerformancePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           
           {/* Chart 1: Production Output (Spans 2 columns) */}
-          <Card className="lg:col-span-2 rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+          <Card className="lg:col-span-2 rounded-xl border border-border shadow-lg !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <TrendingUp className="w-5 h-5 text-emerald-500" />
@@ -243,7 +243,7 @@ export function MachinePerformancePage() {
           </Card>
 
           {/* Chart 2: Machine Radar Stats (Spans 1 column) */}
-          <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+          <Card className="rounded-xl border border-border shadow-lg !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Zap className="w-5 h-5 text-yellow-500" />
@@ -270,7 +270,7 @@ export function MachinePerformancePage() {
         {/* Factors & Issues */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Top Performance Factors */}
-          <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+          <Card className="rounded-xl border border-border shadow-lg !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Star className="w-5 h-5 text-emerald-500" />
@@ -291,7 +291,7 @@ export function MachinePerformancePage() {
           </Card>
 
           {/* Bottlenecks */}
-          <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+          <Card className="rounded-xl border border-border shadow-lg !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <AlertCircle className="w-5 h-5 text-red-500" />

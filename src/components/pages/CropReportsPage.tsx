@@ -151,7 +151,7 @@ export function CropReportsPage() {
 
   return (
     <>
-      <header className="bg-card/50 border-b border-border px-8 py-6 backdrop-blur-sm">
+      <header className="bg-white border-b border-border px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Crop Reports</h1>
@@ -194,25 +194,25 @@ export function CropReportsPage() {
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="rounded-xl border border-border shadow-sm bg-card/50 backdrop-blur-md">
+          <Card className="rounded-xl border border-border shadow-sm !bg-white !opacity-100">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-foreground mb-1">{reportSummary.days}</div>
               <div className="text-sm text-muted-foreground">Days Recorded</div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border shadow-sm bg-card/50 backdrop-blur-md">
+          <Card className="rounded-xl border border-border shadow-sm !bg-white !opacity-100">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">{reportSummary.totalYield} g</div>
               <div className="text-sm text-muted-foreground">Total Yield</div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border shadow-sm bg-card/50 backdrop-blur-md">
+          <Card className="rounded-xl border border-border shadow-sm !bg-white !opacity-100">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">{reportSummary.avgPh}</div>
               <div className="text-sm text-muted-foreground">Avg pH Level</div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border shadow-sm bg-card/50 backdrop-blur-md">
+          <Card className="rounded-xl border border-border shadow-sm !bg-white !opacity-100">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-cyan-600 dark:text-cyan-400 mb-1">{reportSummary.avgOxygen}</div>
               <div className="text-sm text-muted-foreground">Avg Oxygen (mg/L)</div>
@@ -220,7 +220,7 @@ export function CropReportsPage() {
           </Card>
         </div>
 
-        <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+        <Card className="rounded-xl border border-border shadow-lg !bg-white !opacity-100">
           <CardHeader>
             <CardTitle className="text-foreground">Daily Harvest & Quality Report</CardTitle>
             <CardDescription className="text-muted-foreground">

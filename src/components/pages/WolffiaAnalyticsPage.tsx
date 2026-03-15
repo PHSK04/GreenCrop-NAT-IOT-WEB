@@ -197,7 +197,7 @@ export function WolffiaAnalyticsPage() {
 
   return (
     <>
-      <header className="bg-card/50 border-b border-border px-8 py-6 backdrop-blur-sm">
+      <header className="bg-white border-b border-border px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
@@ -293,7 +293,7 @@ export function WolffiaAnalyticsPage() {
           onDownloadPdf={() => handleExport("pdf")}
         />
         {/* Dual Axis Chart */}
-        <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md mb-8">
+        <Card className="rounded-xl border border-border shadow-lg !bg-white !opacity-100 mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-foreground">
               <Sprout className="w-5 h-5 text-primary" />
@@ -354,7 +354,7 @@ export function WolffiaAnalyticsPage() {
         {/* Metrics & Logs */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Performance Metrics */}
-          <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+          <Card className="rounded-xl border border-border shadow-lg !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Droplets className="w-5 h-5 text-blue-500" />
@@ -382,7 +382,7 @@ export function WolffiaAnalyticsPage() {
           </Card>
 
           {/* Recent Harvests */}
-          <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+          <Card className="rounded-xl border border-border shadow-lg !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Timer className="w-5 h-5 text-amber-500" />

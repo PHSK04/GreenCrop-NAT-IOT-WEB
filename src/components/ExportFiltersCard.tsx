@@ -41,8 +41,8 @@ export function ExportFiltersCard({
 }: ExportFiltersCardProps) {
   return (
     <Card
-      className="rounded-xl border border-border shadow-lg !bg-white dark:!bg-slate-900 mb-8"
-      style={{ backgroundColor: "#ffffff" }}
+      className="rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg !bg-white dark:!bg-slate-900 !opacity-100 mb-8"
+      style={{ backgroundColor: "#ffffff", opacity: 1 }}
     >
       <CardHeader>
         <CardTitle className="text-foreground text-base">{title}</CardTitle>
