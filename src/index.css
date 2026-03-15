@@ -121,16 +121,25 @@
 }
 
 @layer utilities {
-  .page-solid-cards [data-slot="card"] {
+  .force-solid header,
+  .force-solid [data-slot="card"] {
     background-color: #ffffff !important;
     opacity: 1 !important;
     backdrop-filter: none !important;
   }
 
-  .page-solid-cards .backdrop-blur-sm,
-  .page-solid-cards .backdrop-blur-md,
-  .page-solid-cards .backdrop-blur-xl {
+  .solid-surface {
+    background-color: #ffffff !important;
+    opacity: 1 !important;
     backdrop-filter: none !important;
+  }
+
+  [data-slot="card"] {
+    background-color: #ffffff !important;
+    opacity: 1 !important;
+    backdrop-filter: none !important;
+    position: relative;
+    z-index: 1;
   }
 
   /* Legacy dark utilities mapped to semantic tokens */

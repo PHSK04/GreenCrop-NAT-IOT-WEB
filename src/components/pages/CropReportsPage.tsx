@@ -151,7 +151,7 @@ export function CropReportsPage() {
 
   return (
     <>
-      <header className="bg-white border-b border-border px-8 py-6">
+      <header className="solid-surface border-b border-border px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Crop Reports</h1>

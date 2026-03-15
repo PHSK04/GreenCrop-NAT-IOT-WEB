@@ -175,7 +175,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-slate-950/40 text-foreground">
-      <header className="border-b border-border/60 bg-white px-6 py-5 md:px-10">
+      <header className="solid-surface border-b border-border/60 px-6 py-5 md:px-10">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-primary/15 p-2 text-primary">
