@@ -15,9 +15,12 @@ type DevicePairingPageProps = {
   user?: { name?: string; email?: string };
   onPaired: (payload: { deviceId: string; pairingCode: string }) => void;
   onSkip: () => void;
+  language?: string;
 };
 
-export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageProps) {
+export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: DevicePairingPageProps) {
+  const isTH = language === "TH";
+  const t = (th: string, en: string) => (isTH ? th : en);
   const [deviceId, setDeviceId] = useState("");
   const [pairingCode, setPairingCode] = useState("");
   const [deviceName, setDeviceName] = useState("");
@@ -31,11 +34,11 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
   const scannerRef = useRef<any>(null);
 
   const validate = () => {
-    if (!deviceId.trim()) return "กรุณากรอก Device ID";
-    if (!pairingCode.trim()) return "กรุณากรอก Pairing Code";
-    if (deviceId.trim().length < 8) return "Device ID สั้นเกินไป";
-    if (!/^[0-9A-Za-z]+$/.test(deviceId.trim())) return "Device ID ต้องเป็นตัวอักษร/ตัวเลขเท่านั้น";
-    if (!/^[0-9]{6,8}$/.test(pairingCode.trim())) return "Pairing Code ต้องเป็นตัวเลข 6-8 หลัก";
+    if (!deviceId.trim()) return t("กรุณากรอก Device ID", "Please enter Device ID");
+    if (!pairingCode.trim()) return t("กรุณากรอก Pairing Code", "Please enter Pairing Code");
+    if (deviceId.trim().length < 8) return t("Device ID สั้นเกินไป", "Device ID is too short");
+    if (!/^[0-9A-Za-z]+$/.test(deviceId.trim())) return t("Device ID ต้องเป็นตัวอักษร/ตัวเลขเท่านั้น", "Device ID must be alphanumeric");
+    if (!/^[0-9]{6,8}$/.test(pairingCode.trim())) return t("Pairing Code ต้องเป็นตัวเลข 6-8 หลัก", "Pairing Code must be 6-8 digits");
     return null;
   };
 
@@ -141,7 +144,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
       const decodedText = await scanner.scanFile(file, true);
       applyQrPayload(decodedText);
     } catch {
-      toast.error("สแกนไฟล์ไม่สำเร็จ");
+      toast.error(t("สแกนไฟล์ไม่สำเร็จ", "Failed to scan file"));
     } finally {
       scanner.clear().catch(() => {});
       e.target.value = "";
@@ -164,10 +167,10 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
         location: location.trim() || undefined,
         is_primary: true,
       });
-      toast.success("จับคู่อุปกรณ์สำเร็จ");
+      toast.success(t("จับคู่อุปกรณ์สำเร็จ", "Device paired successfully"));
       onPaired({ deviceId: normalizedDeviceId, pairingCode: normalizedPairingCode });
     } catch (err: any) {
-      toast.error(err?.message || "จับคู่อุปกรณ์ไม่สำเร็จ");
+      toast.error(err?.message || t("จับคู่อุปกรณ์ไม่สำเร็จ", "Device pairing failed"));
     } finally {
       setSubmitting(false);
     }
@@ -175,58 +178,55 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-slate-950/40 text-foreground">
-      <header
-        className="bg-white border-b border-border/60 px-6 py-5 md:px-10"
-        style={{ backgroundColor: "#ffffff", opacity: 1 }}
-      >
+      <header className="solid-surface border-b border-border/60 px-6 py-5 md:px-10">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-primary/15 p-2 text-primary">
               <Cpu className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold">จับคู่เครื่องก่อนเริ่มใช้งาน</h1>
+              <h1 className="text-lg font-semibold">{t("จับคู่เครื่องก่อนเริ่มใช้งาน", "Pair device before use")}</h1>
               <p className="text-sm text-muted-foreground">
-                ยืนยันว่าเป็นเครื่องจริงของคุณก่อนเข้าแดชบอร์ด
+                {t("ยืนยันว่าเป็นเครื่องจริงของคุณก่อนเข้าแดชบอร์ด", "Verify device ownership before accessing the dashboard")}
               </p>
             </div>
           </div>
           <Badge variant="outline" className="w-fit border-primary/30 text-primary">
-            ต้องทำครั้งแรก
+            {t("ต้องทำครั้งแรก", "First-time setup")}
           </Badge>
         </div>
       </header>
 
       <main className="page-solid-cards mx-auto grid w-full max-w-5xl gap-6 px-6 py-10 md:grid-cols-[1.1fr_0.9fr] md:px-10">
-        <Card className="rounded-2xl border-border/70 bg-white shadow-xl">
+        <Card className="rounded-2xl border-border/70 bg-card shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-emerald-400" />
-              ยืนยันความเป็นเจ้าของอุปกรณ์
+              {t("ยืนยันความเป็นเจ้าของอุปกรณ์", "Confirm device ownership")}
             </CardTitle>
             <CardDescription>
-              ใช้ Device ID และ Pairing Code จากบอร์ด ESP32 (OLED/LCD หรือ QR)
+              {t("ใช้ Device ID และ Pairing Code จากบอร์ด ESP32 (OLED/LCD หรือ QR)", "Use Device ID and Pairing Code from ESP32 board (OLED/LCD or QR)")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-3">
               <label className="text-sm font-medium text-foreground">Device ID</label>
               <Input
-                placeholder="เช่น 7C9EBDAB12CD"
+                placeholder={t("เช่น 7C9EBDAB12CD", "e.g. 7C9EBDAB12CD")}
                 value={deviceId}
                 onChange={(e) => setDeviceId(e.target.value)}
               />
             </div>
             <div className="grid gap-3">
-              <label className="text-sm font-medium text-foreground">Device Name (ตั้งชื่อเครื่อง)</label>
+              <label className="text-sm font-medium text-foreground">{t("Device Name (ตั้งชื่อเครื่อง)", "Device Name")}</label>
               <Input
-                placeholder="เช่น เครื่องไข่ผำ บ่อ A"
+                placeholder={t("เช่น เครื่องไข่ผำ บ่อ A", "e.g. Wolffia Machine Pond A")}
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}
               />
             </div>
             <div className="grid gap-3">
-              <label className="text-sm font-medium text-foreground">Location</label>
+              <label className="text-sm font-medium text-foreground">{t("Location", "Location")}</label>
               <Input
                 placeholder="เช่น โรงเรือน 1 / โซน B"
                 value={location}
@@ -265,7 +265,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
         </Card>
 
         <div className="space-y-6">
-          <Card className="rounded-2xl border-border/60 bg-white shadow-lg">
+          <Card className="rounded-2xl border-border/60 bg-card shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <PlugZap className="h-5 w-5 text-amber-400" />
@@ -288,7 +288,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
             </CardContent>
           </Card>
 
-            <Card className="rounded-2xl border-border/60 bg-white shadow-lg">
+            <Card className="rounded-2xl border-border/60 bg-card shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <QrCode className="h-5 w-5 text-cyan-400" />
@@ -307,7 +307,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-border/60 bg-white shadow-lg">
+          <Card className="rounded-2xl border-border/60 bg-card shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <QrCode className="h-5 w-5 text-emerald-400" />
@@ -339,7 +339,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
                 <div id="qr-file-reader" className="hidden" />
               </div>
               {qrDataUrl ? (
-                <div className="flex flex-col items-center gap-3 rounded-xl border border-border/70 bg-white/90 p-4">
+                <div className="flex flex-col items-center gap-3 rounded-xl border border-border/70 bg-card/90 p-4">
                   <img src={qrDataUrl} alt="Pairing QR" className="h-44 w-44" />
                   <p className="text-xs text-muted-foreground">สแกนเพื่อเติมข้อมูลจับคู่อัตโนมัติ</p>
                 </div>
@@ -368,7 +368,7 @@ export function DevicePairingPage({ user, onPaired, onSkip }: DevicePairingPageP
             </DialogContent>
           </Dialog>
 
-          <Card className="rounded-2xl border-border/60 bg-white shadow-lg">
+          <Card className="rounded-2xl border-border/60 bg-card shadow-lg">
             <CardHeader>
               <CardTitle className="text-base">ผู้ใช้งานปัจจุบัน</CardTitle>
               <CardDescription>ข้อมูลนี้จะผูกกับบัญชี</CardDescription>

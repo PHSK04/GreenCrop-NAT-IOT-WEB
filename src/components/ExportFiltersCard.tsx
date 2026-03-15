@@ -11,6 +11,8 @@ type ExportFilterOption = {
 type ExportFiltersCardProps = {
   title?: string;
   description?: string;
+  startDateLabel?: string;
+  endDateLabel?: string;
   startDate: string;
   endDate: string;
   onStartDateChange: (value: string) => void;
@@ -27,6 +29,8 @@ type ExportFiltersCardProps = {
 export function ExportFiltersCard({
   title = "Export Filters",
   description = "Select date range and data types to download CSV/PDF",
+  startDateLabel = "Start Date",
+  endDateLabel = "End Date",
   startDate,
   endDate,
   onStartDateChange,
@@ -41,8 +45,7 @@ export function ExportFiltersCard({
 }: ExportFiltersCardProps) {
   return (
     <Card
-      className="rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg !bg-white dark:!bg-slate-900 !opacity-100 mb-8"
-      style={{ backgroundColor: "#ffffff", opacity: 1 }}
+      className="rounded-xl border border-border shadow-lg bg-card !opacity-100 mb-8"
     >
       <CardHeader>
         <CardTitle className="text-foreground text-base">{title}</CardTitle>
@@ -51,7 +54,7 @@ export function ExportFiltersCard({
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Start Date</label>
+            <label className="text-xs font-medium text-muted-foreground">{startDateLabel}</label>
             <Input
               type="date"
               aria-label="Export start date"
@@ -60,7 +63,7 @@ export function ExportFiltersCard({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">End Date</label>
+            <label className="text-xs font-medium text-muted-foreground">{endDateLabel}</label>
             <Input
               type="date"
               aria-label="Export end date"
@@ -96,7 +99,7 @@ export function ExportFiltersCard({
           </Button>
           <Button
             variant="outline"
-            className="gap-2 border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm"
+            className="gap-2 border-border bg-background text-foreground hover:bg-muted shadow-sm"
             onClick={onDownloadPdf}
           >
             <FileText className="w-4 h-4" />

@@ -32,7 +32,12 @@ const MOCK_LOGS: LogEntry[] = [
   { id: '5', timestamp: Date.now() - 1000 * 60 * 60 * 24, user: 'Admin', action: 'UPDATE_CONFIG', device: 'System', status: 'success', details: 'Updated threshold values' },
 ];
 
-export function AuditLogsPage() {
+type AuditLogsPageProps = {
+  language?: string;
+};
+
+export function AuditLogsPage({ language = "TH" }: AuditLogsPageProps) {
+  const isTH = language === "TH";
   const [logs, setLogs] = useState<LogEntry[]>(MOCK_LOGS);
   const [searchTerm, setSearchTerm] = useState("");
   const autoRefreshMs = 30000;
@@ -65,17 +70,21 @@ export function AuditLogsPage() {
     <div className="p-8 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Device Activity & Audit Logs</h1>
-          <p className="text-muted-foreground mt-2">Monitor user actions, system events, and device status changes.</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+            {isTH ? "บันทึกกิจกรรมอุปกรณ์และการตรวจสอบ" : "Device Activity & Audit Logs"}
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            {isTH ? "ติดตามการกระทำของผู้ใช้ เหตุการณ์ระบบ และสถานะอุปกรณ์" : "Monitor user actions, system events, and device status changes."}
+          </p>
         </div>
         <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setLogs([...MOCK_LOGS, { id: Date.now().toString(), timestamp: Date.now(), user: 'System', action: 'REFRESH', device: 'Log Monitor', status: 'success', details: 'Manual refresh' }])}>
                 <RefreshCcw className="mr-2 h-4 w-4" />
-                Refresh
+                {isTH ? "รีเฟรช" : "Refresh"}
             </Button>
             <Button variant="outline" size="sm">
                 <Download className="mr-2 h-4 w-4" />
-                Export
+                {isTH ? "ส่งออก" : "Export"}
             </Button>
         </div>
       </div>

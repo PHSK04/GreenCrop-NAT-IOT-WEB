@@ -64,9 +64,14 @@ const reportData = [
   },
 ];
 
-export function CropReportsPage() {
+type CropReportsPageProps = {
+  language?: string;
+};
+
+export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   const { deviceId, seed } = useDeviceSeed();
-  const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
+  const isTH = language === "TH";
+  const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
   const [selectedReport, setSelectedReport] = useState<typeof reportData[0] | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -124,7 +129,7 @@ export function CropReportsPage() {
   const handleDownload = async (data: any[], filename: string, format: "csv" | "pdf") => {
     try {
       if (!data.length) {
-        toast.error("Download Failed", { description: "No data to export." });
+        toast.error(isTH ? "ดาวน์โหลดล้มเหลว" : "Download Failed", { description: isTH ? "ไม่มีข้อมูลสำหรับส่งออก" : "No data to export." });
         return;
       }
       const headers = Object.keys(data[0]).join(",");
@@ -139,26 +144,27 @@ export function CropReportsPage() {
         downloadTextFile(filename, csvContent, "text/csv;charset=utf-8");
       }
       
-      toast.success("Download Started", {
-        description: `Successfully exported ${filename}`
+      toast.success(isTH ? "เริ่มดาวน์โหลด" : "Download Started", {
+        description: isTH ? `ส่งออกสำเร็จ ${filename}` : `Successfully exported ${filename}`
       });
     } catch (error) {
-      toast.error("Download Failed", {
-        description: "Could not generate export file."
+      toast.error(isTH ? "ดาวน์โหลดล้มเหลว" : "Download Failed", {
+        description: isTH ? "ไม่สามารถสร้างไฟล์ได้" : "Could not generate export file."
       });
     }
   };
 
   return (
     <>
-      <header
-        className="bg-white border-b border-border px-8 py-6"
-        style={{ backgroundColor: "#ffffff", opacity: 1 }}
-      >
+      <header className="solid-surface border-b border-border px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Crop Reports</h1>
-            <p className="text-sm text-muted-foreground mt-1">Export and analyze daily harvest and water quality data</p>
+            <h1 className="text-2xl font-semibold text-foreground">
+              {isTH ? "รายงานผลผลิต" : "Crop Reports"}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isTH ? "ส่งออกและวิเคราะห์ผลผลิตรายวันและคุณภาพน้ำ" : "Export and analyze daily harvest and water quality data"}
+            </p>
             <div className="mt-2">
               <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/40">
                 {deviceLabel}
@@ -168,7 +174,7 @@ export function CropReportsPage() {
           <div className="flex items-center space-x-3">
             <Button variant="outline" size="sm" className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground">
               <Filter className="w-4 h-4" />
-              Filters
+              {isTH ? "ตัวกรอง" : "Filters"}
             </Button>
           </div>
         </div>
@@ -180,11 +186,15 @@ export function CropReportsPage() {
           endDate={endDate}
           onStartDateChange={setStartDate}
           onEndDateChange={setEndDate}
+          title={isTH ? "ตัวกรองสำหรับส่งออก" : "Export Filters"}
+          description={isTH ? "เลือกช่วงวันที่และประเภทข้อมูลเพื่อดาวน์โหลด CSV/PDF" : "Select date range and data types to download CSV/PDF"}
+          startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
+          endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
           options={[
-            { key: "yield", label: "Yield (g)" },
+            { key: "yield", label: isTH ? "ผลผลิต (กรัม)" : "Yield (g)" },
             { key: "ph", label: "pH" },
-            { key: "oxygen", label: "Oxygen (mg/L)" },
-            { key: "ec", label: "EC (mS/cm)" },
+            { key: "oxygen", label: isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)" },
+            { key: "ec", label: isTH ? "EC (mS/cm)" : "EC (mS/cm)" },
           ]}
           selectedKeys={selectedFields}
           onToggleKey={(key) =>
@@ -194,52 +204,56 @@ export function CropReportsPage() {
           }
           onDownloadCsv={() => handleDownload(exportRows, "farm_report.csv", "csv")}
           onDownloadPdf={() => handleDownload(exportRows, "farm_report.pdf", "pdf")}
+          downloadCsvLabel={isTH ? "ดาวน์โหลด CSV" : "Download CSV"}
+          downloadPdfLabel={isTH ? "ดาวน์โหลด PDF" : "Download PDF"}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="rounded-xl border border-border shadow-sm !bg-white !opacity-100">
+          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-foreground mb-1">{reportSummary.days}</div>
-              <div className="text-sm text-muted-foreground">Days Recorded</div>
+              <div className="text-sm text-muted-foreground">{isTH ? "จำนวนวันที่บันทึก" : "Days Recorded"}</div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border shadow-sm !bg-white !opacity-100">
+          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">{reportSummary.totalYield} g</div>
-              <div className="text-sm text-muted-foreground">Total Yield</div>
+              <div className="text-sm text-muted-foreground">{isTH ? "ผลผลิตรวม" : "Total Yield"}</div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border shadow-sm !bg-white !opacity-100">
+          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">{reportSummary.avgPh}</div>
-              <div className="text-sm text-muted-foreground">Avg pH Level</div>
+              <div className="text-sm text-muted-foreground">{isTH ? "ค่า pH เฉลี่ย" : "Avg pH Level"}</div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border shadow-sm !bg-white !opacity-100">
+          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-cyan-600 dark:text-cyan-400 mb-1">{reportSummary.avgOxygen}</div>
-              <div className="text-sm text-muted-foreground">Avg Oxygen (mg/L)</div>
+              <div className="text-sm text-muted-foreground">{isTH ? "ออกซิเจนเฉลี่ย (mg/L)" : "Avg Oxygen (mg/L)"}</div>
             </CardContent>
           </Card>
         </div>
 
-        <Card className="rounded-xl border border-border shadow-lg !bg-white !opacity-100">
+        <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100">
           <CardHeader>
-            <CardTitle className="text-foreground">Daily Harvest & Quality Report</CardTitle>
+            <CardTitle className="text-foreground">
+              {isTH ? "รายงานผลผลิตและคุณภาพรายวัน" : "Daily Harvest & Quality Report"}
+            </CardTitle>
             <CardDescription className="text-muted-foreground">
-              Breakdown of daily yield, pH, oxygen, and conductivity levels
+              {isTH ? "สรุปผลผลิตรายวัน ค่า pH ออกซิเจน และค่าการนำไฟฟ้า" : "Breakdown of daily yield, pH, oxygen, and conductivity levels"}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-muted/50">
-                  <TableHead className="font-semibold text-muted-foreground w-[180px]">Date</TableHead>
-                  <TableHead className="font-semibold text-muted-foreground">Yield (g)</TableHead>
-                  <TableHead className="font-semibold text-muted-foreground">pH Level</TableHead>
-                  <TableHead className="font-semibold text-muted-foreground">Oxygen (mg/L)</TableHead>
-                  <TableHead className="font-semibold text-muted-foreground">EC (mS/cm)</TableHead>
-                  <TableHead className="font-semibold text-muted-foreground text-right">Action</TableHead>
+                  <TableHead className="font-semibold text-muted-foreground w-[180px]">{isTH ? "วันที่" : "Date"}</TableHead>
+                  <TableHead className="font-semibold text-muted-foreground">{isTH ? "ผลผลิต (กรัม)" : "Yield (g)"}</TableHead>
+                  <TableHead className="font-semibold text-muted-foreground">{isTH ? "ค่า pH" : "pH Level"}</TableHead>
+                  <TableHead className="font-semibold text-muted-foreground">{isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)"}</TableHead>
+                  <TableHead className="font-semibold text-muted-foreground">{isTH ? "EC (mS/cm)" : "EC (mS/cm)"}</TableHead>
+                  <TableHead className="font-semibold text-muted-foreground text-right">{isTH ? "การทำงาน" : "Action"}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -251,7 +265,7 @@ export function CropReportsPage() {
                     <TableCell className="font-medium text-muted-foreground">
                       <div className="flex items-center space-x-2">
                         <Calendar className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                        <span className="group-hover:text-foreground">{new Date(row.date).toLocaleDateString('en-US', { 
+                        <span className="group-hover:text-foreground">{new Date(row.date).toLocaleDateString(isTH ? 'th-TH' : 'en-US', { 
                           month: 'short', 
                           day: 'numeric',
                           year: 'numeric'
@@ -292,7 +306,7 @@ export function CropReportsPage() {
                         onClick={() => setSelectedReport(row)}
                       >
                         <Eye className="w-4 h-4" />
-                        View
+                        {isTH ? "ดู" : "View"}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -309,10 +323,13 @@ export function CropReportsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <FileText className="w-5 h-5 text-blue-400" />
-              Daily Report Details
+              {isTH ? "รายละเอียดรายงานรายวัน" : "Daily Report Details"}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              {selectedReport && `Analysis for ${new Date(selectedReport.date).toLocaleDateString()}`}
+              {selectedReport &&
+                (isTH
+                  ? `วิเคราะห์สำหรับ ${new Date(selectedReport.date).toLocaleDateString("th-TH")}`
+                  : `Analysis for ${new Date(selectedReport.date).toLocaleDateString()}`)}
             </DialogDescription>
           </DialogHeader>
           
@@ -322,28 +339,28 @@ export function CropReportsPage() {
                 <div className="space-y-1 p-3 bg-muted/30 rounded-lg border border-border">
                   <div className="flex items-center gap-2 mb-1">
                     <Sprout className="w-3 h-3 text-emerald-500" />
-                    <p className="text-xs font-medium text-muted-foreground">Yield</p>
+                    <p className="text-xs font-medium text-muted-foreground">{isTH ? "ผลผลิต" : "Yield"}</p>
                   </div>
                   <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{selectedReport.yield} <span className="text-xs text-muted-foreground font-normal">g</span></p>
                 </div>
                 <div className="space-y-1 p-3 bg-muted/30 rounded-lg border border-border">
                    <div className="flex items-center gap-2 mb-1">
                     <Droplets className="w-3 h-3 text-blue-500" />
-                    <p className="text-xs font-medium text-muted-foreground">pH Level</p>
+                    <p className="text-xs font-medium text-muted-foreground">{isTH ? "ค่า pH" : "pH Level"}</p>
                   </div>
                   <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{selectedReport.ph}</p>
                 </div>
                 <div className="space-y-1 p-3 bg-muted/30 rounded-lg border border-border">
                    <div className="flex items-center gap-2 mb-1">
                     <Wind className="w-3 h-3 text-cyan-500" />
-                    <p className="text-xs font-medium text-muted-foreground">Oxygen</p>
+                    <p className="text-xs font-medium text-muted-foreground">{isTH ? "ออกซิเจน" : "Oxygen"}</p>
                   </div>
                   <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{selectedReport.oxygen} <span className="text-xs text-muted-foreground font-normal">mg/L</span></p>
                 </div>
                 <div className="space-y-1 p-3 bg-muted/30 rounded-lg border border-border">
                    <div className="flex items-center gap-2 mb-1">
                     <Zap className="w-3 h-3 text-yellow-500" />
-                    <p className="text-xs font-medium text-muted-foreground">Conductivity</p>
+                    <p className="text-xs font-medium text-muted-foreground">{isTH ? "การนำไฟฟ้า" : "Conductivity"}</p>
                   </div>
                   <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{selectedReport.ec} <span className="text-xs text-muted-foreground font-normal">mS/cm</span></p>
                 </div>
@@ -352,7 +369,7 @@ export function CropReportsPage() {
               <div className="bg-muted/30 p-4 rounded-lg space-y-2 border border-border">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Share2 className="w-4 h-4 text-muted-foreground" />
-                  <span className="font-medium">Report Link:</span>
+                  <span className="font-medium">{isTH ? "ลิงก์รายงาน:" : "Report Link:"}</span>
                 </div>
                 <code className="text-xs bg-muted p-2 rounded block text-muted-foreground truncate">
                   https://farm.example.com/daily/{selectedReport.date.replace(/-/g, '')}
@@ -362,12 +379,12 @@ export function CropReportsPage() {
           )}
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setSelectedReport(null)} className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm">
-              Close
+            <Button variant="outline" onClick={() => setSelectedReport(null)} className="border-border bg-background text-foreground hover:bg-muted shadow-sm">
+              {isTH ? "ปิด" : "Close"}
             </Button>
             <Button
               variant="outline"
-              className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm"
+              className="border-border bg-background text-foreground hover:bg-muted shadow-sm"
               onClick={() => {
                 if (selectedReport) {
                   handleDownload([selectedReport], `daily_report_${selectedReport.date}.pdf`, "pdf");
@@ -375,7 +392,7 @@ export function CropReportsPage() {
               }}
             >
               <FileText className="w-4 h-4 mr-1" />
-              Download PDF
+              {isTH ? "ดาวน์โหลด PDF" : "Download PDF"}
             </Button>
             <Button 
               className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
@@ -386,7 +403,7 @@ export function CropReportsPage() {
               }}
             >
               <Download className="w-4 h-4" />
-              Download CSV
+              {isTH ? "ดาวน์โหลด CSV" : "Download CSV"}
             </Button>
           </DialogFooter>
         </DialogContent>

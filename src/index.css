@@ -123,23 +123,44 @@
 @layer utilities {
   .force-solid header,
   .force-solid [data-slot="card"] {
-    background-color: #ffffff !important;
+    background-color: hsl(var(--card)) !important;
     opacity: 1 !important;
     backdrop-filter: none !important;
+    position: relative;
+    z-index: 5;
+    isolation: isolate;
+  }
+
+  .force-solid header::before,
+  .force-solid [data-slot="card"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: hsl(var(--card));
+    z-index: -1;
   }
 
   .solid-surface {
-    background-color: #ffffff !important;
+    background-color: hsl(var(--card)) !important;
     opacity: 1 !important;
     backdrop-filter: none !important;
   }
 
   [data-slot="card"] {
-    background-color: #ffffff !important;
+    background-color: hsl(var(--card)) !important;
     opacity: 1 !important;
     backdrop-filter: none !important;
     position: relative;
     z-index: 1;
+    border-radius: 16px !important;
+  }
+
+  .force-solid .rounded-2xl,
+  .force-solid .rounded-xl,
+  .force-solid .rounded-lg,
+  .force-solid .rounded-md,
+  .force-solid .rounded-sm {
+    border-radius: 16px !important;
   }
 
   /* Legacy dark utilities mapped to semantic tokens */

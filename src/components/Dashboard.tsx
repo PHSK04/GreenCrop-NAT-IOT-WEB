@@ -387,12 +387,12 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   const renderContent = () => {
     switch (activePage) {
       case "Dashboard":
-        return isAdminUser ? <AdminOverview /> : <DashboardPage language={language} />;
+        return isAdminUser ? <AdminOverview language={language} /> : <DashboardPage language={language} />;
       case "Crop Reports":
-        return <CropReportsPage />;
+        return <CropReportsPage language={language} />;
       case "Sensor Intelligence":
       case "Device Monitor":
-        return <DeviceMonitorPage />;
+        return <DeviceMonitorPage language={language} />;
       case "Farm Settings":
         return (
           <FarmSettingsPage
@@ -407,10 +407,11 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
               await authService.unpairDevice(deviceId);
               await loadDevices();
             }}
+            language={language}
           />
         );
       case "Device Pairing":
-        if (isAdminUser) return <AdminOverview />;
+        if (isAdminUser) return <AdminOverview language={language} />;
         return (
           <DevicePairingPage
             user={user}
@@ -425,30 +426,31 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
               setActivePage("Dashboard");
             }}
             onSkip={() => setActivePage("Dashboard")}
+            language={language}
           />
         );
       case "Weather Data":
-        return <WeatherDataPage />;
+        return <WeatherDataPage language={language} />;
       case "Machine Performance":
-        return <MachinePerformancePage />;
+        return <MachinePerformancePage language={language} />;
       case "Wolffia Analytics":
-        return <WolffiaAnalyticsPage />;
+        return <WolffiaAnalyticsPage language={language} />;
       case "Maintenance":
-        return <MaintenancePage />;
+        return <MaintenancePage language={language} />;
       case "Tank Levels":
         return <TankLevelsPage tank2On={tank2On} setTank2On={setTank2On} tank3On={tank3On} setTank3On={setTank3On} language={language} />;
       case "My Profile":
-        return <MyProfilePage onLogout={onLogout} />;
+        return <MyProfilePage onLogout={onLogout} language={language} />;
       case "Admin Panel":
-        return isAdminUser ? <AdminOverview /> : <DashboardPage />;
+        return isAdminUser ? <AdminOverview language={language} /> : <DashboardPage language={language} />;
       case "User Management":
-        return isAdminUser ? <UserManagementPage /> : <DashboardPage />;
+        return isAdminUser ? <UserManagementPage language={language} /> : <DashboardPage language={language} />;
       case "Audit Logs":
-        return isAdminUser ? <AuditLogsPage /> : <DashboardPage />;
+        return isAdminUser ? <AuditLogsPage language={language} /> : <DashboardPage language={language} />;
       case "Database Viewer":
-        return isAdminUser ? <DatabaseViewerPage /> : <DashboardPage />;
+        return isAdminUser ? <DatabaseViewerPage language={language} /> : <DashboardPage language={language} />;
       default:
-        return <DashboardPage />;
+        return <DashboardPage language={language} />;
     }
   };
 

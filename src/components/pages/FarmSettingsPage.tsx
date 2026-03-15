@@ -41,6 +41,7 @@ type FarmSettingsPageProps = {
   onUpdateDevice?: (payload: { device_id: string; device_name?: string; location?: string }) => Promise<void> | void;
   onUnpairDevice?: (deviceId: string) => Promise<void> | void;
   onSetPrimary?: (deviceId: string) => Promise<void> | void;
+  language?: string;
 };
 
 function formatDeviceTime(value?: string) {
@@ -56,7 +57,9 @@ export function FarmSettingsPage({
   onUpdateDevice,
   onUnpairDevice,
   onSetPrimary,
+  language = "TH",
 }: FarmSettingsPageProps) {
+  const isTH = language === "TH";
   const [sessions, setSessions] = useState([
     { device: "MacBook Pro M4", type: "Web Dashboard", location: "Chiang Mai, TH", status: "Active Now", active: true },
     { device: "iPhone 15 Plus", type: "Mobile App", location: "Bangkok, TH", status: "Active 2m ago", active: true },
@@ -128,13 +131,15 @@ export function FarmSettingsPage({
           <div>
             <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
               <Settings className="w-6 h-6 text-muted-foreground" />
-              System Configuration
+              {isTH ? "ตั้งค่าระบบฟาร์ม" : "System Configuration"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">Manage farm automation, devices, and user access</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isTH ? "จัดการระบบอัตโนมัติ อุปกรณ์ และสิทธิ์ผู้ใช้" : "Manage farm automation, devices, and user access"}
+            </p>
           </div>
           <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
             <Save className="w-4 h-4" />
-            Save Changes
+            {isTH ? "บันทึกการเปลี่ยนแปลง" : "Save Changes"}
           </Button>
         </div>
       </header>
@@ -142,10 +147,10 @@ export function FarmSettingsPage({
       <main className="flex-1 overflow-auto p-8 relative z-10">
         <Tabs defaultValue="automation" className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-8 max-w-xl bg-muted border border-border">
-            <TabsTrigger value="automation" className="data-[state=active]:bg-card data-[state=active]:text-foreground text-muted-foreground">Automation</TabsTrigger>
-            <TabsTrigger value="devices" className="data-[state=active]:bg-card data-[state=active]:text-foreground text-muted-foreground">Devices & Calibration</TabsTrigger>
-            <TabsTrigger value="notifications" className="data-[state=active]:bg-card data-[state=active]:text-foreground text-muted-foreground">Alerts</TabsTrigger>
-            <TabsTrigger value="users" className="data-[state=active]:bg-card data-[state=active]:text-foreground text-muted-foreground">User Access</TabsTrigger>
+            <TabsTrigger value="automation" className="data-[state=active]:bg-card data-[state=active]:text-foreground text-muted-foreground">{isTH ? "ระบบอัตโนมัติ" : "Automation"}</TabsTrigger>
+            <TabsTrigger value="devices" className="data-[state=active]:bg-card data-[state=active]:text-foreground text-muted-foreground">{isTH ? "อุปกรณ์และการปรับเทียบ" : "Devices & Calibration"}</TabsTrigger>
+            <TabsTrigger value="notifications" className="data-[state=active]:bg-card data-[state=active]:text-foreground text-muted-foreground">{isTH ? "แจ้งเตือน" : "Alerts"}</TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-card data-[state=active]:text-foreground text-muted-foreground">{isTH ? "สิทธิ์ผู้ใช้" : "User Access"}</TabsTrigger>
           </TabsList>
 
           {/* Automation Rules */}

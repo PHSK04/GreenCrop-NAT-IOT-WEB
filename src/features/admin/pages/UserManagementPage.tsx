@@ -32,7 +32,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-export function UserManagementPage() {
+type UserManagementPageProps = {
+  language?: string;
+};
+
+export function UserManagementPage({ language = "TH" }: UserManagementPageProps) {
+  const isTH = language === "TH";
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -183,29 +188,29 @@ export function UserManagementPage() {
     <div className="p-8 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">User Management</h1>
-          <p className="text-muted-foreground mt-2">View and manage authorized personnel.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">{isTH ? "จัดการผู้ใช้" : "User Management"}</h1>
+          <p className="text-muted-foreground mt-2">{isTH ? "ดูและจัดการบุคลากรที่ได้รับอนุญาต" : "View and manage authorized personnel."}</p>
         </div>
         <div className="flex gap-2">
             <Button onClick={loadUsers} variant="outline" size="sm">
-                Refresh List
+                {isTH ? "รีเฟรชรายการ" : "Refresh List"}
             </Button>
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="border-emerald-500/20 bg-white/75 backdrop-blur dark:bg-slate-900/70">
+        <Card className="border-emerald-500/20 bg-card backdrop-blur">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                <CardTitle className="text-sm font-medium">{isTH ? "ผู้ใช้ทั้งหมด" : "Total Users"}</CardTitle>
                 <Users className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
                 <div className="text-2xl font-bold">{users.length}</div>
             </CardContent>
         </Card>
-        <Card className="border-blue-500/20 bg-white/75 backdrop-blur dark:bg-slate-900/70">
+        <Card className="border-blue-500/20 bg-card backdrop-blur">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Admins</CardTitle>
+                <CardTitle className="text-sm font-medium">{isTH ? "ผู้ดูแลระบบ" : "Admins"}</CardTitle>
                 <Shield className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>

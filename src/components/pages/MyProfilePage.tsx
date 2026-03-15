@@ -23,9 +23,11 @@ import { useAuth } from "@/features/auth/contexts/AuthContext";
 
 interface MyProfilePageProps {
     onLogout: () => void;
+    language?: string;
 }
 
-export function MyProfilePage({ onLogout }: MyProfilePageProps) {
+export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps) {
+    const isTH = language === "TH";
     const { user, updateProfile } = useAuth();
     const API_URL = import.meta.env.VITE_API_URL || "/api";
     const [isEditing, setIsEditing] = useState(false);
@@ -160,7 +162,7 @@ export function MyProfilePage({ onLogout }: MyProfilePageProps) {
                                 className="rounded-full bg-red-500 hover:bg-red-600 border-none shadow-lg px-6 font-semibold"
                             >
                                 <LogOut className="w-4 h-4 mr-2" />
-                                Log Out
+                                {isTH ? "ออกจากระบบ" : "Log Out"}
                             </Button>
                         </div>
                         
@@ -176,7 +178,7 @@ export function MyProfilePage({ onLogout }: MyProfilePageProps) {
                                         <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-[2px]">
                                             <label htmlFor="avatar-upload" className="cursor-pointer text-white text-sm font-bold text-center p-2 flex flex-col items-center">
                                                 <Edit3 className="w-6 h-6 mb-1" />
-                                                Change
+                                                {isTH ? "เปลี่ยน" : "Change"}
                                             </label>
                                             <input
                                                 type="file"
@@ -266,15 +268,15 @@ export function MyProfilePage({ onLogout }: MyProfilePageProps) {
                                 {isEditing ? (
                                     <>
                                         <Button variant="outline" onClick={handleCancel} className="rounded-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-900/30 px-6">
-                                            <X className="w-4 h-4 mr-2" /> Cancel
+                                            <X className="w-4 h-4 mr-2" /> {isTH ? "ยกเลิก" : "Cancel"}
                                         </Button>
                                         <Button onClick={handleSave} className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 px-6">
-                                            <Save className="w-4 h-4 mr-2" /> Save Changes
+                                            <Save className="w-4 h-4 mr-2" /> {isTH ? "บันทึกการเปลี่ยนแปลง" : "Save Changes"}
                                         </Button>
                                     </>
                                 ) : (
                                     <Button onClick={handleEdit} className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 px-6">
-                                        Edit Profile
+                                        {isTH ? "แก้ไขโปรไฟล์" : "Edit Profile"}
                                     </Button>
                                 )}
                             </div>
@@ -282,13 +284,13 @@ export function MyProfilePage({ onLogout }: MyProfilePageProps) {
 
                         <div className="mt-8 flex flex-wrap gap-3">
                             <Badge variant="secondary" className="px-4 py-1.5 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/20 text-sm font-medium rounded-full">
-                                <Sprout className="w-4 h-4 mr-1.5" /> Organic Certified
+                                <Sprout className="w-4 h-4 mr-1.5" /> {isTH ? "รับรองออร์แกนิก" : "Organic Certified"}
                             </Badge>
                             <Badge variant="secondary" className="px-4 py-1.5 bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 border border-blue-200 dark:border-blue-500/20 text-sm font-medium rounded-full">
-                                <Tractor className="w-4 h-4 mr-1.5" /> Smart Tech User
+                                <Tractor className="w-4 h-4 mr-1.5" /> {isTH ? "ผู้ใช้เทคโนโลยีอัจฉริยะ" : "Smart Tech User"}
                             </Badge>
                             <Badge variant="secondary" className="px-4 py-1.5 bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20 border border-amber-200 dark:border-amber-500/20 text-sm font-medium rounded-full">
-                                <Award className="w-4 h-4 mr-1.5" /> Top Producer 2025
+                                <Award className="w-4 h-4 mr-1.5" /> {isTH ? "ผู้ผลิตยอดเยี่ยม 2025" : "Top Producer 2025"}
                             </Badge>
                         </div>
                     </CardContent>
@@ -304,7 +306,7 @@ export function MyProfilePage({ onLogout }: MyProfilePageProps) {
                                     <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
                                         <Leaf className="w-5 h-5 text-green-600 dark:text-green-400" />
                                     </div>
-                                    About Farm
+                                    {isTH ? "เกี่ยวกับฟาร์ม" : "About Farm"}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-6 pt-4">
@@ -313,7 +315,7 @@ export function MyProfilePage({ onLogout }: MyProfilePageProps) {
                                         value={editForm.bio}
                                         onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
                                         className="min-h-[150px] leading-relaxed bg-muted/30 border-muted focus:border-primary text-foreground resize-none p-4 rounded-xl text-base"
-                                        placeholder="Tell us about your farm..."
+                                        placeholder={isTH ? "เล่าเรื่องฟาร์มของคุณ..." : "Tell us about your farm..."}
                                     />
                                 ) : (
                                     <p className="text-muted-foreground leading-relaxed text-base">

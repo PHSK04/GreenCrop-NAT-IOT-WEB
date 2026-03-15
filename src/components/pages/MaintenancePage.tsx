@@ -24,7 +24,12 @@ const maintenanceLogs = [
   { id: 4, action: "Refilled Nutrient B (5L)", target: "Mixing Tank 1", user: "Admin", time: "Yesterday", type: "refill" },
 ];
 
-export function MaintenancePage() {
+type MaintenancePageProps = {
+  language?: string;
+};
+
+export function MaintenancePage({ language = "TH" }: MaintenancePageProps) {
+  const isTH = language === "TH";
   const { deviceId, seed } = useDeviceSeed();
   const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
 
@@ -57,9 +62,11 @@ export function MaintenancePage() {
           <div>
             <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
               <Wrench className="w-6 h-6 text-amber-500" />
-              System Maintenance
+              {isTH ? "บำรุงรักษาระบบ" : "System Maintenance"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">Operational status, damage reports, and refill logs</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isTH ? "สถานะการทำงาน รายงานความเสียหาย และบันทึกการเติม" : "Operational status, damage reports, and refill logs"}
+            </p>
             <div className="mt-2">
               <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/40">
                 {deviceLabel}
@@ -68,7 +75,7 @@ export function MaintenancePage() {
           </div>
           <Button className="bg-red-600 hover:bg-red-700 text-white gap-2">
             <AlertOctagon className="w-4 h-4" />
-            Report Issue
+            {isTH ? "แจ้งปัญหา" : "Report Issue"}
           </Button>
         </div>
       </header>
@@ -79,8 +86,8 @@ export function MaintenancePage() {
           {/* System Health Score */}
           <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
             <CardHeader className="text-center pb-2">
-              <CardTitle className="text-foreground">System Health</CardTitle>
-              <CardDescription className="text-muted-foreground">Overall Operational Status</CardDescription>
+              <CardTitle className="text-foreground">{isTH ? "สุขภาพระบบ" : "System Health"}</CardTitle>
+              <CardDescription className="text-muted-foreground">{isTH ? "สถานะการทำงานโดยรวม" : "Overall Operational Status"}</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center relative">
               <div className="h-48 w-full">

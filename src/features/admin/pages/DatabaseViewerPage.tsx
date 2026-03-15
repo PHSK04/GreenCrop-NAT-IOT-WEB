@@ -56,7 +56,12 @@ type UserEvent = {
   ip?: string;
 };
 
-export function DatabaseViewerPage() {
+type DatabaseViewerPageProps = {
+  language?: string;
+};
+
+export function DatabaseViewerPage({ language = "TH" }: DatabaseViewerPageProps) {
+  const isTH = language === "TH";
   const [summary, setSummary] = useState<AdminDbSummary | null>(null);
   const [users, setUsers] = useState<AdminDbUserRow[]>([]);
   const [sessions, setSessions] = useState<AdminDbSessionRow[]>([]);
@@ -487,12 +492,16 @@ export function DatabaseViewerPage() {
     <div className="p-8 pb-24 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Database Viewer</h1>
-          <p className="text-muted-foreground mt-2">Admin-only read view for core database tables (users, sessions, sensors, logs, OTP).</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            {isTH ? "ดูฐานข้อมูล" : "Database Viewer"}
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            {isTH ? "มุมมองสำหรับผู้ดูแลเพื่ออ่านตารางหลัก (ผู้ใช้, เซสชัน, เซนเซอร์, ล็อก, OTP)" : "Admin-only read view for core database tables (users, sessions, sensors, logs, OTP)."}
+          </p>
         </div>
         <Button variant="outline" onClick={loadAll} disabled={loading}>
           <RefreshCcw className="mr-2 h-4 w-4" />
-          {loading ? "Loading..." : "Refresh"}
+          {loading ? (isTH ? "กำลังโหลด..." : "Loading...") : (isTH ? "รีเฟรช" : "Refresh")}
         </Button>
       </div>
 

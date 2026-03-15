@@ -42,11 +42,16 @@ const currentSensorReadings = [
   { id: "S-CO2-01", name: "CO2 Level (Greenhouse)", value: "800 ppm", status: "Optimal", lastUpdate: "10 mins ago" },
 ];
 
-export function WeatherDataPage() {
+type WeatherDataPageProps = {
+  language?: string;
+};
+
+export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const { deviceId, seed } = useDeviceSeed();
-  const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
+  const isTH = language === "TH";
+  const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
 
   const adjustValue = (
     value: string,
@@ -121,9 +126,11 @@ export function WeatherDataPage() {
           <div>
             <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
               <Activity className="w-6 h-6 text-blue-500" />
-              Sensor Intelligence
+              {isTH ? "ข้อมูลสภาพแวดล้อมและน้ำ" : "Sensor Intelligence"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">Detailed real-time analytics and historical sensor data</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isTH ? "ข้อมูลแบบเรียลไทม์และประวัติของเซนเซอร์" : "Detailed real-time analytics and historical sensor data"}
+            </p>
             <div className="mt-2">
               <Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/40">
                 {deviceLabel}
@@ -132,7 +139,7 @@ export function WeatherDataPage() {
           </div>
           <Button variant="outline" className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground">
             <FileText className="w-4 h-4" />
-            Export Data Logs
+            {isTH ? "ส่งออกข้อมูลบันทึก" : "Export Data Logs"}
           </Button>
         </div>
       </header>
@@ -140,10 +147,10 @@ export function WeatherDataPage() {
       <main className="flex-1 overflow-auto p-8 ">
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-8 max-w-xl bg-muted border border-border">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground">Overview</TabsTrigger>
-            <TabsTrigger value="weather" className="data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground">Atmosphere</TabsTrigger>
-            <TabsTrigger value="water" className="data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground">Water Quality</TabsTrigger>
-            <TabsTrigger value="alerts" className="data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground">System Alerts</TabsTrigger>
+            <TabsTrigger value="overview" className="data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground">{isTH ? "ภาพรวม" : "Overview"}</TabsTrigger>
+            <TabsTrigger value="weather" className="data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground">{isTH ? "บรรยากาศ" : "Atmosphere"}</TabsTrigger>
+            <TabsTrigger value="water" className="data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground">{isTH ? "คุณภาพน้ำ" : "Water Quality"}</TabsTrigger>
+            <TabsTrigger value="alerts" className="data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground">{isTH ? "แจ้งเตือนระบบ" : "System Alerts"}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-8">
@@ -154,9 +161,11 @@ export function WeatherDataPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-foreground">
                       <Thermometer className="w-5 h-5 text-blue-400" />
-                      Water Temperature (24h)
+                      {isTH ? "อุณหภูมิน้ำ (24 ชม.)" : "Water Temperature (24h)"}
                     </CardTitle>
-                    <CardDescription className="text-muted-foreground">Monitor pond thermal stability</CardDescription>
+                    <CardDescription className="text-muted-foreground">
+                      {isTH ? "ติดตามเสถียรภาพอุณหภูมิบ่อ" : "Monitor pond thermal stability"}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-80">
@@ -193,7 +202,7 @@ export function WeatherDataPage() {
                            labelStyle={{ color: "hsl(var(--muted-foreground))" }}
                         />
                         <Legend wrapperStyle={{ paddingTop: "20px" }}/>
-                        <Area type="monotone" dataKey="water" stroke="#3b82f6" fillOpacity={1} fill="url(#colorWater)" name="Water Temp (°C)" />
+                        <Area type="monotone" dataKey="water" stroke="#3b82f6" fillOpacity={1} fill="url(#colorWater)" name={isTH ? "อุณหภูมิน้ำ (°C)" : "Water Temp (°C)"} />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
@@ -205,9 +214,11 @@ export function WeatherDataPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-foreground">
                       <Droplets className="w-5 h-5 text-cyan-500" />
-                      Water Quality Trends (7 Days)
+                      {isTH ? "แนวโน้มคุณภาพน้ำ (7 วัน)" : "Water Quality Trends (7 Days)"}
                     </CardTitle>
-                    <CardDescription className="text-muted-foreground">pH, Oxygen, and EC stability</CardDescription>
+                    <CardDescription className="text-muted-foreground">
+                      {isTH ? "เสถียรภาพของ pH, ออกซิเจน และ EC" : "pH, Oxygen, and EC stability"}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-80">
@@ -238,9 +249,9 @@ export function WeatherDataPage() {
                            labelStyle={{ color: "hsl(var(--muted-foreground))" }}
                         />
                         <Legend wrapperStyle={{ paddingTop: "20px" }}/>
-                        <Line type="monotone" dataKey="ph" stroke="#10b981" strokeWidth={2} name="pH Level" />
-                        <Line type="monotone" dataKey="oxygen" stroke="#0ea5e9" strokeWidth={2} name="Oxygen (mg/L)" />
-                        <Line type="monotone" dataKey="ec" stroke="#eab308" strokeWidth={2} name="EC (mS/cm)" />
+                        <Line type="monotone" dataKey="ph" stroke="#10b981" strokeWidth={2} name={isTH ? "ค่า pH" : "pH Level"} />
+                        <Line type="monotone" dataKey="oxygen" stroke="#0ea5e9" strokeWidth={2} name={isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)"} />
+                        <Line type="monotone" dataKey="ec" stroke="#eab308" strokeWidth={2} name={isTH ? "EC (mS/cm)" : "EC (mS/cm)"} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -291,22 +302,34 @@ export function WeatherDataPage() {
           <TabsContent value="weather">
             <div className="p-12 text-center border border-dashed border-border rounded-xl">
                <CloudRain className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-               <h3 className="text-lg font-medium text-foreground">Weather History Module</h3>
-               <p className="text-muted-foreground">Historical precipitation and forecast data integration.</p>
+               <h3 className="text-lg font-medium text-foreground">
+                 {isTH ? "โมดูลประวัติสภาพอากาศ" : "Weather History Module"}
+               </h3>
+               <p className="text-muted-foreground">
+                 {isTH ? "ระบบบันทึกปริมาณฝนและพยากรณ์อากาศในอดีต" : "Historical precipitation and forecast data integration."}
+               </p>
             </div>
           </TabsContent>
           <TabsContent value="water">
              <div className="p-12 text-center border border-dashed border-border rounded-xl">
                <Droplets className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-               <h3 className="text-lg font-medium text-foreground">Water Quality Detailed Logs</h3>
-               <p className="text-muted-foreground">Granular minute-by-minute water parameter logs.</p>
+               <h3 className="text-lg font-medium text-foreground">
+                 {isTH ? "บันทึกคุณภาพน้ำแบบละเอียด" : "Water Quality Detailed Logs"}
+               </h3>
+               <p className="text-muted-foreground">
+                 {isTH ? "บันทึกค่าคุณภาพน้ำแบบละเอียดรายนาที" : "Granular minute-by-minute water parameter logs."}
+               </p>
             </div>
           </TabsContent>
           <TabsContent value="alerts">
              <div className="p-12 text-center border border-dashed border-border rounded-xl">
                <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-               <h3 className="text-lg font-medium text-foreground">System Alert History</h3>
-               <p className="text-muted-foreground">Log of all sensor threshold breaches and automated responses.</p>
+               <h3 className="text-lg font-medium text-foreground">
+                 {isTH ? "ประวัติการแจ้งเตือนระบบ" : "System Alert History"}
+               </h3>
+               <p className="text-muted-foreground">
+                 {isTH ? "บันทึกการแจ้งเตือนเกินค่าและการตอบสนองอัตโนมัติ" : "Log of all sensor threshold breaches and automated responses."}
+               </p>
             </div>
           </TabsContent>
         </Tabs>

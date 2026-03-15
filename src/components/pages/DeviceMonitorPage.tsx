@@ -120,9 +120,14 @@ const initialDeviceData = [
   }
 ];
 
-export function DeviceMonitorPage() {
+type DeviceMonitorPageProps = {
+  language?: string;
+};
+
+export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   const { deviceId, seed } = useDeviceSeed();
-  const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
+  const isTH = language === "TH";
+  const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
 
   const seededDeviceData = useMemo(() => {
     return initialDeviceData.map((device, index) => {
@@ -157,7 +162,11 @@ export function DeviceMonitorPage() {
     "System",
   ]);
 
-  const dataTypeOptions = ["Sensor", "Actuator", "System"];
+  const dataTypeOptions = [
+    { key: "Sensor", label: isTH ? "เซนเซอร์" : "Sensor" },
+    { key: "Actuator", label: isTH ? "แอคชูเอเตอร์" : "Actuator" },
+    { key: "System", label: isTH ? "ระบบ" : "System" },
+  ];
 
   useEffect(() => {
     setDevices(seededDeviceData);
@@ -209,11 +218,11 @@ export function DeviceMonitorPage() {
 
   const buildExportPayload = () => {
     const lines: string[] = [];
-    lines.push("Report, Sensor Intelligence");
+    lines.push(isTH ? "รายงาน, สถานะอัจฉริยะของเซนเซอร์" : "Report, Sensor Intelligence");
     if (exportStart || exportEnd) {
-      lines.push(`Date Range, ${exportStart || "-"} to ${exportEnd || "-"}`);
+      lines.push(`${isTH ? "ช่วงวันที่" : "Date Range"}, ${exportStart || "-"} to ${exportEnd || "-"}`);
     }
-    lines.push(`Selected Types, ${selectedDataTypes.join(" | ") || "-"}`);
+    lines.push(`${isTH ? "ประเภทที่เลือก" : "Selected Types"}, ${selectedDataTypes.join(" | ") || "-"}`);
     lines.push("");
 
     lines.push("id,name,type,category,status,value,lastUpdate");
@@ -229,7 +238,7 @@ export function DeviceMonitorPage() {
   const handleExport = async (format: "csv" | "pdf") => {
     try {
       if (selectedDataTypes.length === 0) {
-        toast.error("Export Failed", { description: "Please select at least one data type." });
+        toast.error(isTH ? "ส่งออกล้มเหลว" : "Export Failed", { description: isTH ? "กรุณาเลือกอย่างน้อย 1 ประเภทข้อมูล" : "Please select at least one data type." });
         return;
       }
       const payload = buildExportPayload();
@@ -239,12 +248,12 @@ export function DeviceMonitorPage() {
       } else {
         downloadTextFile(filename, payload, "text/csv;charset=utf-8");
       }
-      toast.success("Export Successful", {
-        description: `Downloaded ${filename}`
+      toast.success(isTH ? "ส่งออกสำเร็จ" : "Export Successful", {
+        description: isTH ? `ดาวน์โหลด ${filename}` : `Downloaded ${filename}`
       });
     } catch {
-      toast.error("Export Failed", {
-        description: "Could not generate export file."
+      toast.error(isTH ? "ส่งออกล้มเหลว" : "Export Failed", {
+        description: isTH ? "ไม่สามารถสร้างไฟล์ได้" : "Could not generate export file."
       });
     }
   };
@@ -256,9 +265,11 @@ export function DeviceMonitorPage() {
           <div>
             <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
               <Activity className="w-6 h-6 text-emerald-500" />
-              Sensor Intelligence
+              {isTH ? "ระบบอัจฉริยะเซนเซอร์" : "Sensor Intelligence"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">Real-time AI status of sensors and actuators</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isTH ? "สถานะเรียลไทม์ของเซนเซอร์และแอคชูเอเตอร์" : "Real-time AI status of sensors and actuators"}
+            </p>
             <div className="mt-2">
               <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/40">
                 {deviceLabel}
@@ -267,7 +278,7 @@ export function DeviceMonitorPage() {
           </div>
           <Button size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-0">
             <RefreshCw className="w-4 h-4" />
-            Refresh Status
+            {isTH ? "รีเฟรชสถานะ" : "Refresh Status"}
           </Button>
         </div>
       </header>
@@ -278,7 +289,11 @@ export function DeviceMonitorPage() {
           endDate={exportEnd}
           onStartDateChange={setExportStart}
           onEndDateChange={setExportEnd}
-          options={dataTypeOptions.map((option) => ({ key: option, label: option }))}
+          title={isTH ? "ตัวกรองสำหรับส่งออก" : "Export Filters"}
+          description={isTH ? "เลือกช่วงวันที่และประเภทข้อมูลเพื่อดาวน์โหลด CSV/PDF" : "Select date range and data types to download CSV/PDF"}
+          startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
+          endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
+          options={dataTypeOptions}
           selectedKeys={selectedDataTypes}
           onToggleKey={(key) =>
             setSelectedDataTypes((prev) =>
@@ -287,6 +302,8 @@ export function DeviceMonitorPage() {
           }
           onDownloadCsv={() => handleExport("csv")}
           onDownloadPdf={() => handleExport("pdf")}
+          downloadCsvLabel={isTH ? "ดาวน์โหลด CSV" : "Download CSV"}
+          downloadPdfLabel={isTH ? "ดาวน์โหลด PDF" : "Download PDF"}
         />
 
         <div className="flex items-center justify-between mb-6">
@@ -294,7 +311,7 @@ export function DeviceMonitorPage() {
             <div className="relative w-80">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search devices..."
+                placeholder={isTH ? "ค้นหาอุปกรณ์..." : "Search devices..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-background border-input text-foreground placeholder:text-muted-foreground focus-visible:ring-emerald-500/50"
@@ -302,13 +319,17 @@ export function DeviceMonitorPage() {
             </div>
             <Button variant="outline" size="sm" className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground">
               <Filter className="w-4 h-4" />
-              Filter by Type
+              {isTH ? "กรองตามประเภท" : "Filter by Type"}
             </Button>
           </div>
           {selectedDevices.length > 0 && (
             <div className="flex items-center space-x-2">
-              <Badge variant="secondary" className="bg-secondary text-secondary-foreground border-secondary">{selectedDevices.length} selected</Badge>
-              <Button variant="outline" size="sm" className="border-border text-muted-foreground hover:bg-muted">Run Diagnostics</Button>
+              <Badge variant="secondary" className="bg-secondary text-secondary-foreground border-secondary">
+                {isTH ? `${selectedDevices.length} รายการ` : `${selectedDevices.length} selected`}
+              </Badge>
+              <Button variant="outline" size="sm" className="border-border text-muted-foreground hover:bg-muted">
+                {isTH ? "ตรวจสอบระบบ" : "Run Diagnostics"}
+              </Button>
             </div>
           )}
         </div>

@@ -4,7 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authService } from "@/features/auth/services/authService";
 import { Progress } from "@/components/ui/progress";
 
-export function AdminOverview() {
+type AdminOverviewProps = {
+  language?: string;
+};
+
+export function AdminOverview({ language = "TH" }: AdminOverviewProps) {
+  const isTH = language === "TH";
   const [userCount, setUserCount] = useState(0);
   const [adminCount, setAdminCount] = useState(0);
 
@@ -18,14 +23,14 @@ export function AdminOverview() {
   return (
     <div className="p-8 space-y-8 text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div>
-            <h1 className="text-3xl font-bold tracking-tight">System Overview</h1>
-            <p className="text-muted-foreground mt-2">Real-time system performance and user statistics.</p>
+            <h1 className="text-3xl font-bold tracking-tight">{isTH ? "ภาพรวมระบบ" : "System Overview"}</h1>
+            <p className="text-muted-foreground mt-2">{isTH ? "ประสิทธิภาพระบบและสถิติผู้ใช้แบบเรียลไทม์" : "Real-time system performance and user statistics."}</p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-4">
             <Card className="border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 backdrop-blur dark:from-indigo-500/15 dark:to-purple-500/12">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Users</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">{isTH ? "ผู้ใช้ทั้งหมด" : "Total Users"}</CardTitle>
                     <Users className="h-4 w-4 text-indigo-500" />
                 </CardHeader>
                 <CardContent>
@@ -36,7 +41,7 @@ export function AdminOverview() {
             
             <Card className="border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 backdrop-blur dark:from-emerald-500/15 dark:to-teal-500/12">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Active Admins</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">{isTH ? "ผู้ดูแลที่ใช้งานอยู่" : "Active Admins"}</CardTitle>
                     <User className="h-4 w-4 text-emerald-500" />
                 </CardHeader>
                 <CardContent>
@@ -47,7 +52,7 @@ export function AdminOverview() {
 
              <Card className="border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-red-500/10 backdrop-blur dark:from-orange-500/15 dark:to-red-500/12">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">System Health</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">{isTH ? "สุขภาพระบบ" : "System Health"}</CardTitle>
                     <Activity className="h-4 w-4 text-orange-500" />
                 </CardHeader>
                 <CardContent>
@@ -58,7 +63,7 @@ export function AdminOverview() {
 
             <Card className="border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 backdrop-blur dark:from-blue-500/15 dark:to-cyan-500/12">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Database</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">{isTH ? "ฐานข้อมูล" : "Database"}</CardTitle>
                     <Server className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>

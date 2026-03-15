@@ -38,22 +38,27 @@ const recentHarvestLogs = [
   { id: "#B-06-06-1", weight: "42.9 g", date: "Jun 06", interval: "2 days" },
 ];
 
-export function WolffiaAnalyticsPage() {
+type WolffiaAnalyticsPageProps = {
+  language?: string;
+};
+
+export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPageProps) {
   const { deviceId, seed } = useDeviceSeed();
-  const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
+  const isTH = language === "TH";
+  const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([
-    "Monthly Stats",
-    "Harvest History",
-    "Pond Metrics",
+    "monthly",
+    "harvest",
+    "metrics",
   ]);
 
   const dataTypeOptions = [
-    "Monthly Stats",
-    "Harvest History",
-    "Pond Metrics",
+    { key: "monthly", label: isTH ? "สถิติรายเดือน" : "Monthly Stats" },
+    { key: "harvest", label: isTH ? "ประวัติเก็บเกี่ยว" : "Harvest History" },
+    { key: "metrics", label: isTH ? "ค่าชี้วัดบ่อ" : "Pond Metrics" },
   ];
 
   const wolffiaStatsDevice = useMemo(
@@ -112,7 +117,7 @@ export function WolffiaAnalyticsPage() {
   const handleDownload = () => {
     try {
       if (!wolffiaStatsDevice.length) {
-        toast.error("Export Failed", { description: "No data to export." });
+        toast.error(isTH ? "ส่งออกล้มเหลว" : "Export Failed", { description: isTH ? "ไม่มีข้อมูลสำหรับส่งออก" : "No data to export." });
         return;
       }
       const headers = Object.keys(wolffiaStatsDevice[0]).join(",");
@@ -122,28 +127,28 @@ export function WolffiaAnalyticsPage() {
         wolffiaStatsDevice.map((row) => Object.values(row).join(",")).join("\n");
       downloadTextFile("wolffia_monthly_report.csv", csvContent, "text/csv;charset=utf-8");
       
-      toast.success("Export Successful", {
-        description: "Monthly report has been downloaded."
+      toast.success(isTH ? "ส่งออกสำเร็จ" : "Export Successful", {
+        description: isTH ? "ดาวน์โหลดรายงานรายเดือนแล้ว" : "Monthly report has been downloaded."
       });
       setIsExportOpen(false);
     } catch (error) {
-      toast.error("Export Failed", {
-        description: "Could not generate report file."
+      toast.error(isTH ? "ส่งออกล้มเหลว" : "Export Failed", {
+        description: isTH ? "ไม่สามารถสร้างไฟล์รายงานได้" : "Could not generate report file."
       });
     }
   };
 
   const buildExportPayload = () => {
     const lines: string[] = [];
-    lines.push(`Report, Wolffia Pond Analytics`);
+    lines.push(isTH ? "รายงาน, วิเคราะห์บ่อวูล์ฟเฟีย" : "Report, Wolffia Pond Analytics");
     if (exportStart || exportEnd) {
-      lines.push(`Date Range, ${exportStart || "-"} to ${exportEnd || "-"}`);
+      lines.push(`${isTH ? "ช่วงวันที่" : "Date Range"}, ${exportStart || "-"} to ${exportEnd || "-"}`);
     }
-    lines.push(`Selected Types, ${selectedDataTypes.join(" | ") || "-"}`);
+    lines.push(`${isTH ? "ประเภทที่เลือก" : "Selected Types"}, ${selectedDataTypes.map((key) => dataTypeOptions.find((opt) => opt.key === key)?.label || key).join(" | ") || "-"}`);
     lines.push("");
 
-    if (selectedDataTypes.includes("Monthly Stats")) {
-      lines.push("Section, Monthly Stats");
+    if (selectedDataTypes.includes("monthly")) {
+      lines.push(`${isTH ? "ส่วน" : "Section"}, ${isTH ? "สถิติรายเดือน" : "Monthly Stats"}`);
       lines.push("month,yield,frequency");
       wolffiaStatsDevice.forEach((row) => {
         lines.push(`${row.month},${row.yield},${row.frequency}`);
@@ -151,8 +156,8 @@ export function WolffiaAnalyticsPage() {
       lines.push("");
     }
 
-    if (selectedDataTypes.includes("Harvest History")) {
-      lines.push("Section, Harvest History");
+    if (selectedDataTypes.includes("harvest")) {
+      lines.push(`${isTH ? "ส่วน" : "Section"}, ${isTH ? "ประวัติเก็บเกี่ยว" : "Harvest History"}`);
       lines.push("id,weight,date,interval");
       recentHarvestLogsDevice.forEach((row) => {
         lines.push(`${row.id},${row.weight},${row.date},${row.interval}`);
@@ -160,8 +165,8 @@ export function WolffiaAnalyticsPage() {
       lines.push("");
     }
 
-    if (selectedDataTypes.includes("Pond Metrics")) {
-      lines.push("Section, Pond Metrics");
+    if (selectedDataTypes.includes("metrics")) {
+      lines.push(`${isTH ? "ส่วน" : "Section"}, ${isTH ? "ค่าชี้วัดบ่อ" : "Pond Metrics"}`);
       lines.push("metric,value,trend");
       pondMetricsDevice.forEach((row) => {
         lines.push(`${row.metric},${row.value},${row.trend}`);
@@ -175,7 +180,7 @@ export function WolffiaAnalyticsPage() {
   const handleExport = async (format: "csv" | "pdf") => {
     try {
       if (selectedDataTypes.length === 0) {
-        toast.error("Export Failed", { description: "Please select at least one data type." });
+        toast.error(isTH ? "ส่งออกล้มเหลว" : "Export Failed", { description: isTH ? "กรุณาเลือกอย่างน้อย 1 ประเภทข้อมูล" : "Please select at least one data type." });
         return;
       }
       const payload = buildExportPayload();
@@ -185,29 +190,28 @@ export function WolffiaAnalyticsPage() {
       } else {
         downloadTextFile(filename, payload, "text/csv;charset=utf-8");
       }
-      toast.success("Export Successful", {
-        description: `Downloaded ${filename}`
+      toast.success(isTH ? "ส่งออกสำเร็จ" : "Export Successful", {
+        description: isTH ? `ดาวน์โหลด ${filename}` : `Downloaded ${filename}`
       });
     } catch {
-      toast.error("Export Failed", {
-        description: "Could not generate export file."
+      toast.error(isTH ? "ส่งออกล้มเหลว" : "Export Failed", {
+        description: isTH ? "ไม่สามารถสร้างไฟล์ได้" : "Could not generate export file."
       });
     }
   };
 
   return (
     <>
-      <header
-        className="bg-white border-b border-border px-8 py-6"
-        style={{ backgroundColor: "#ffffff", opacity: 1 }}
-      >
+      <header className="solid-surface border-b border-border px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
               <Scale className="w-6 h-6 text-primary" />
-              Wolffia Pond Analytics
+              {isTH ? "วิเคราะห์บ่อวูล์ฟเฟีย" : "Wolffia Pond Analytics"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">Single Pond Performance & Harvest Frequency</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isTH ? "ประสิทธิภาพบ่อเดียวและความถี่การเก็บเกี่ยว" : "Single Pond Performance & Harvest Frequency"}
+            </p>
             <div className="mt-2">
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/40">
                 {deviceLabel}
@@ -220,7 +224,7 @@ export function WolffiaAnalyticsPage() {
             onClick={() => setIsExportOpen(true)}
           >
             <TrendingUp className="w-4 h-4" />
-            Export Monthly Report
+            {isTH ? "ส่งออกรายงานรายเดือน" : "Export Monthly Report"}
           </Button>
         </div>
       </header>
@@ -231,10 +235,10 @@ export function WolffiaAnalyticsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <FileText className="w-5 h-5 text-primary" />
-              Export Monthly Report
+              {isTH ? "ส่งออกรายงานรายเดือน" : "Export Monthly Report"}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Preview of data to be exported for the current period.
+              {isTH ? "ตัวอย่างข้อมูลที่จะส่งออกในช่วงปัจจุบัน" : "Preview of data to be exported for the current period."}
             </DialogDescription>
           </DialogHeader>
           
@@ -243,9 +247,9 @@ export function WolffiaAnalyticsPage() {
               <Table>
                 <TableHeader className="bg-muted/50">
                   <TableRow className="border-border">
-                    <TableHead className="text-muted-foreground h-8">Month</TableHead>
-                    <TableHead className="text-muted-foreground h-8 text-right">Yield (g)</TableHead>
-                    <TableHead className="text-muted-foreground h-8 text-right">Frequency</TableHead>
+                    <TableHead className="text-muted-foreground h-8">{isTH ? "เดือน" : "Month"}</TableHead>
+                    <TableHead className="text-muted-foreground h-8 text-right">{isTH ? "ผลผลิต (กรัม)" : "Yield (g)"}</TableHead>
+                    <TableHead className="text-muted-foreground h-8 text-right">{isTH ? "ความถี่" : "Frequency"}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -266,14 +270,14 @@ export function WolffiaAnalyticsPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsExportOpen(false)} className="border-border text-muted-foreground hover:bg-muted">
-              Cancel
+              {isTH ? "ยกเลิก" : "Cancel"}
             </Button>
             <Button 
               className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
               onClick={handleDownload}
             >
               <Download className="w-4 h-4" />
-              Download CSV
+              {isTH ? "ดาวน์โหลด CSV" : "Download CSV"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -285,7 +289,11 @@ export function WolffiaAnalyticsPage() {
           endDate={exportEnd}
           onStartDateChange={setExportStart}
           onEndDateChange={setExportEnd}
-          options={dataTypeOptions.map((option) => ({ key: option, label: option }))}
+          title={isTH ? "ตัวกรองสำหรับส่งออก" : "Export Filters"}
+          description={isTH ? "เลือกช่วงวันที่และประเภทข้อมูลเพื่อดาวน์โหลด CSV/PDF" : "Select date range and data types to download CSV/PDF"}
+          startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
+          endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
+          options={dataTypeOptions}
           selectedKeys={selectedDataTypes}
           onToggleKey={(key) =>
             setSelectedDataTypes((prev) =>
@@ -294,16 +302,18 @@ export function WolffiaAnalyticsPage() {
           }
           onDownloadCsv={() => handleExport("csv")}
           onDownloadPdf={() => handleExport("pdf")}
+          downloadCsvLabel={isTH ? "ดาวน์โหลด CSV" : "Download CSV"}
+          downloadPdfLabel={isTH ? "ดาวน์โหลด PDF" : "Download PDF"}
         />
         {/* Dual Axis Chart */}
-        <Card className="rounded-xl border border-border shadow-lg !bg-white !opacity-100 mb-8">
+        <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100 mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-foreground">
               <Sprout className="w-5 h-5 text-primary" />
-              Yield vs. Harvest Frequency
+              {isTH ? "ผลผลิตเทียบความถี่การเก็บเกี่ยว" : "Yield vs. Harvest Frequency"}
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              Comparing Total Biomass (g) with Harvest Count (times/month)
+              {isTH ? "เปรียบเทียบผลผลิตรวม (กรัม) กับจำนวนครั้งที่เก็บเกี่ยว (ครั้ง/เดือน)" : "Comparing Total Biomass (g) with Harvest Count (times/month)"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -324,7 +334,7 @@ export function WolffiaAnalyticsPage() {
                     fontSize={12}
                     tickLine={false}
                     axisLine={false}
-                    label={{ value: 'Yield (g)', angle: -90, position: 'insideLeft', fill: '#10b981' }}
+                    label={{ value: isTH ? "ผลผลิต (กรัม)" : "Yield (g)", angle: -90, position: 'insideLeft', fill: '#10b981' }}
                   />
                   <YAxis 
                     yAxisId="right"
@@ -346,8 +356,8 @@ export function WolffiaAnalyticsPage() {
                     cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar yAxisId="left" dataKey="yield" fill="#10b981" name="Biomass Yield (g)" radius={[4, 4, 0, 0]} barSize={40} />
-                  <Line yAxisId="right" type="monotone" dataKey="frequency" stroke="#f59e0b" strokeWidth={3} name="Harvests (times/month)" dot={{ r: 4, fill: "#f59e0b" }} />
+                  <Bar yAxisId="left" dataKey="yield" fill="#10b981" name={isTH ? "ผลผลิตชีวมวล (กรัม)" : "Biomass Yield (g)"} radius={[4, 4, 0, 0]} barSize={40} />
+                  <Line yAxisId="right" type="monotone" dataKey="frequency" stroke="#f59e0b" strokeWidth={3} name={isTH ? "จำนวนเก็บเกี่ยว (ครั้ง/เดือน)" : "Harvests (times/month)"} dot={{ r: 4, fill: "#f59e0b" }} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -357,19 +367,30 @@ export function WolffiaAnalyticsPage() {
         {/* Metrics & Logs */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Performance Metrics */}
-          <Card className="rounded-xl border border-border shadow-lg !bg-white !opacity-100">
+          <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Droplets className="w-5 h-5 text-blue-500" />
-                Key Performance Indicators
+                {isTH ? "ตัวชี้วัดประสิทธิภาพหลัก" : "Key Performance Indicators"}
               </CardTitle>
-              <CardDescription className="text-muted-foreground">Efficiency stats for the current pond</CardDescription>
+              <CardDescription className="text-muted-foreground">
+                {isTH ? "สถิติประสิทธิภาพของบ่อปัจจุบัน" : "Efficiency stats for the current pond"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
                <div className="grid grid-cols-2 gap-4">
                  {pondMetricsDevice.map((item, idx) => (
                    <div key={idx} className="p-4 rounded-lg bg-muted/30 border border-border">
-                      <p className="text-xs text-muted-foreground mb-1">{item.metric}</p>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        {isTH
+                          ? ({
+                              "Avg Harvest / Month": "เก็บเกี่ยวเฉลี่ย/เดือน",
+                              "Avg Yield / Harvest": "ผลผลิตเฉลี่ย/ครั้ง",
+                              "Total Yield": "ผลผลิตรวม",
+                              "Cycle Duration": "ระยะเวลารอบการผลิต",
+                            } as Record<string, string>)[item.metric] || item.metric
+                          : item.metric}
+                      </p>
                       <div className="flex items-end justify-between">
                         <span className="text-xl font-bold text-foreground">{item.value}</span>
                         {item.trend !== "0" && (
@@ -385,21 +406,23 @@ export function WolffiaAnalyticsPage() {
           </Card>
 
           {/* Recent Harvests */}
-          <Card className="rounded-xl border border-border shadow-lg !bg-white !opacity-100">
+          <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Timer className="w-5 h-5 text-amber-500" />
-                Harvest History
+                {isTH ? "ประวัติเก็บเกี่ยว" : "Harvest History"}
               </CardTitle>
-              <CardDescription className="text-muted-foreground">Log of recent collection cycles</CardDescription>
+              <CardDescription className="text-muted-foreground">
+                {isTH ? "บันทึกรอบการเก็บเกี่ยวล่าสุด" : "Log of recent collection cycles"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow className="border-border hover:bg-muted/50">
-                    <TableHead className="font-semibold text-muted-foreground">Batch ID</TableHead>
-                    <TableHead className="font-semibold text-muted-foreground">Interval</TableHead>
-                    <TableHead className="font-semibold text-muted-foreground text-right">Yield</TableHead>
+                    <TableHead className="font-semibold text-muted-foreground">{isTH ? "รหัสรอบ" : "Batch ID"}</TableHead>
+                    <TableHead className="font-semibold text-muted-foreground">{isTH ? "ช่วงเวลา" : "Interval"}</TableHead>
+                    <TableHead className="font-semibold text-muted-foreground text-right">{isTH ? "ผลผลิต" : "Yield"}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
