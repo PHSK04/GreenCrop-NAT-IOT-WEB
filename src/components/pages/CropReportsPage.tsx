@@ -156,7 +156,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
 
   return (
     <>
-      <header className="solid-surface border-b border-border px-8 py-6">
+      <header className="solid-surface border-b border-border px-8 py-6 animate-in fade-in slide-in-from-bottom-2 duration-700 motion-reduce:animate-none">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">
@@ -181,53 +181,55 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
       </header>
 
       <main className="page-solid-cards flex-1 overflow-auto p-8">
-        <ExportFiltersCard
-          startDate={startDate}
-          endDate={endDate}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
-          title={isTH ? "ตัวกรองสำหรับส่งออก" : "Export Filters"}
-          description={isTH ? "เลือกช่วงวันที่และประเภทข้อมูลเพื่อดาวน์โหลด CSV/PDF" : "Select date range and data types to download CSV/PDF"}
-          startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
-          endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
-          options={[
-            { key: "yield", label: isTH ? "ผลผลิต (กรัม)" : "Yield (g)" },
-            { key: "ph", label: "pH" },
-            { key: "oxygen", label: isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)" },
-            { key: "ec", label: isTH ? "EC (mS/cm)" : "EC (mS/cm)" },
-          ]}
-          selectedKeys={selectedFields}
-          onToggleKey={(key) =>
-            setSelectedFields((prev) =>
-              prev.includes(key) ? prev.filter((v) => v !== key) : [...prev, key]
-            )
-          }
-          onDownloadCsv={() => handleDownload(exportRows, "farm_report.csv", "csv")}
-          onDownloadPdf={() => handleDownload(exportRows, "farm_report.pdf", "pdf")}
-          downloadCsvLabel={isTH ? "ดาวน์โหลด CSV" : "Download CSV"}
-          downloadPdfLabel={isTH ? "ดาวน์โหลด PDF" : "Download PDF"}
-        />
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 motion-reduce:animate-none">
+          <ExportFiltersCard
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+            title={isTH ? "ตัวกรองสำหรับส่งออก" : "Export Filters"}
+            description={isTH ? "เลือกช่วงวันที่และประเภทข้อมูลเพื่อดาวน์โหลด CSV/PDF" : "Select date range and data types to download CSV/PDF"}
+            startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
+            endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
+            options={[
+              { key: "yield", label: isTH ? "ผลผลิต (กรัม)" : "Yield (g)" },
+              { key: "ph", label: "pH" },
+              { key: "oxygen", label: isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)" },
+              { key: "ec", label: isTH ? "EC (mS/cm)" : "EC (mS/cm)" },
+            ]}
+            selectedKeys={selectedFields}
+            onToggleKey={(key) =>
+              setSelectedFields((prev) =>
+                prev.includes(key) ? prev.filter((v) => v !== key) : [...prev, key]
+              )
+            }
+            onDownloadCsv={() => handleDownload(exportRows, "farm_report.csv", "csv")}
+            onDownloadPdf={() => handleDownload(exportRows, "farm_report.pdf", "pdf")}
+            downloadCsvLabel={isTH ? "ดาวน์โหลด CSV" : "Download CSV"}
+            downloadPdfLabel={isTH ? "ดาวน์โหลด PDF" : "Download PDF"}
+          />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100">
+          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-150 motion-reduce:animate-none">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-foreground mb-1">{reportSummary.days}</div>
               <div className="text-sm text-muted-foreground">{isTH ? "จำนวนวันที่บันทึก" : "Days Recorded"}</div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100">
+          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-200 motion-reduce:animate-none">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">{reportSummary.totalYield} g</div>
               <div className="text-sm text-muted-foreground">{isTH ? "ผลผลิตรวม" : "Total Yield"}</div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100">
+          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-250 motion-reduce:animate-none">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">{reportSummary.avgPh}</div>
               <div className="text-sm text-muted-foreground">{isTH ? "ค่า pH เฉลี่ย" : "Avg pH Level"}</div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100">
+          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-300 motion-reduce:animate-none">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-cyan-600 dark:text-cyan-400 mb-1">{reportSummary.avgOxygen}</div>
               <div className="text-sm text-muted-foreground">{isTH ? "ออกซิเจนเฉลี่ย (mg/L)" : "Avg Oxygen (mg/L)"}</div>
@@ -235,7 +237,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
           </Card>
         </div>
 
-        <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100">
+        <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-350 motion-reduce:animate-none">
           <CardHeader>
             <CardTitle className="text-foreground">
               {isTH ? "รายงานผลผลิตและคุณภาพรายวัน" : "Daily Harvest & Quality Report"}
@@ -319,7 +321,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
 
       {/* Report Detail Dialog */}
       <Dialog open={!!selectedReport} onOpenChange={() => setSelectedReport(null)}>
-        <DialogContent className="bg-card border-border text-foreground sm:max-w-[425px]">
+        <DialogContent className="bg-card border-border text-foreground sm:max-w-[425px] animate-in fade-in zoom-in-95 duration-200 motion-reduce:animate-none">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <FileText className="w-5 h-5 text-blue-400" />
