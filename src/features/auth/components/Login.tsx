@@ -135,6 +135,10 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
           50% { transform: translateX(4%) skewX(2deg); opacity: .55; }
           100% { transform: translateX(-6%) skewX(-4deg); opacity: .25; }
         }
+        @keyframes gcCardFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
+        }
         .gc-sweep { animation: gcSweep 4.6s ease-in-out infinite; }
         .gc-pulse { animation: gcPulse 3s ease-in-out infinite; }
         .gc-float { animation: gcFloat 6.2s ease-in-out infinite; }
@@ -150,8 +154,9 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
         .gc-bloom { animation: gcBloom 8s ease-in-out infinite; }
         .gc-spin-slow { animation: gcSpinSlow 26s linear infinite; }
         .gc-wave { animation: gcWave 10s ease-in-out infinite; }
+        .gc-card-float { animation: gcCardFloat 10s ease-in-out infinite; }
         @media (prefers-reduced-motion: reduce) {
-          .gc-sweep, .gc-pulse, .gc-float, .gc-orbit, .gc-fade-up, .gc-spark-a, .gc-spark-b, .gc-link-pulse, .gc-link-flow, .gc-light-sheen, .gc-light-breathe, .gc-drift, .gc-bloom, .gc-spin-slow, .gc-wave { animation: none !important; }
+          .gc-sweep, .gc-pulse, .gc-float, .gc-orbit, .gc-fade-up, .gc-spark-a, .gc-spark-b, .gc-link-pulse, .gc-link-flow, .gc-light-sheen, .gc-light-breathe, .gc-drift, .gc-bloom, .gc-spin-slow, .gc-wave, .gc-card-float { animation: none !important; }
         }
       `}</style>
 
@@ -173,7 +178,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
         </div>
 
         <div className="relative z-10 flex h-full w-full flex-col justify-between px-12 py-12">
-          <div className="flex items-center gap-3">
+          <div className="gc-fade-up flex items-center gap-3" style={{ animationDelay: "60ms" }}>
             <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-9 w-9 object-contain" />
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700/80 dark:text-emerald-300/80">
@@ -184,7 +189,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
           </div>
 
           <div className="grid w-full items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-            <div>
+            <div className="gc-fade-up" style={{ animationDelay: "160ms" }}>
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-white/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-700 backdrop-blur dark:border-emerald-400/30 dark:bg-slate-900/50 dark:text-emerald-200">
                 Bio-Precision
               </div>
@@ -202,7 +207,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
               <div className="mt-6 h-px w-32 bg-gradient-to-r from-emerald-500/70 via-teal-400/60 to-transparent" />
             </div>
 
-            <div className="relative h-[360px] w-full">
+            <div className="relative h-[360px] w-full gc-fade-up" style={{ animationDelay: "220ms" }}>
               <div className="gc-bloom absolute inset-6 rounded-[44px] bg-gradient-to-br from-white/80 via-emerald-100/60 to-purple-200/50 blur-2xl dark:from-slate-800/70 dark:via-slate-900/70 dark:to-emerald-900/30" />
               <div className="gc-spin-slow absolute left-1/2 top-1/2 h-[260px] w-[260px] -translate-x-1/2 -translate-y-1/2 rounded-[40%] bg-[conic-gradient(from_160deg,rgba(16,185,129,0.14),rgba(168,85,247,0.18),rgba(14,165,233,0.16),rgba(16,185,129,0.14))] blur-2xl" />
               <div className="gc-drift absolute left-[8%] top-[12%] h-24 w-24 rounded-[30%] bg-gradient-to-br from-emerald-200/70 to-white/40 blur-xl dark:from-emerald-500/25 dark:to-slate-700/40" />
@@ -213,7 +218,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+          <div className="gc-fade-up flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400" style={{ animationDelay: "300ms" }}>
             Connected sensors
             <span className="h-1 w-1 rounded-full bg-emerald-400" />
             Adaptive climate
@@ -233,19 +238,19 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
         </div>
 
         <section
-          className={`relative w-full max-w-[620px] overflow-hidden rounded-[34px] border border-slate-200/85 bg-white/92 p-6 shadow-[0_26px_70px_rgba(15,23,42,0.16)] backdrop-blur-xl transition-all duration-700 dark:border-slate-800/80 dark:bg-slate-900/76 dark:shadow-[0_22px_62px_rgba(2,8,18,0.72)] sm:p-8 ${
+          className={`gc-card-float relative w-full max-w-[620px] overflow-hidden rounded-[34px] border border-slate-200/85 bg-white/92 p-6 shadow-[0_26px_70px_rgba(15,23,42,0.16)] backdrop-blur-xl transition-all duration-700 dark:border-slate-800/80 dark:bg-slate-900/76 dark:shadow-[0_22px_62px_rgba(2,8,18,0.72)] sm:p-8 ${
             mounted ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
           }`}
         >
           <span className="pointer-events-none absolute inset-0 rounded-[34px] border border-emerald-200/70 dark:hidden" />
           <span className="gc-light-sheen pointer-events-none absolute -top-8 left-0 h-14 w-1/3 rounded-full bg-gradient-to-r from-transparent via-emerald-200/75 to-transparent blur-sm dark:hidden" />
           <span className="gc-sweep pointer-events-none absolute -top-9 left-0 h-14 w-1/3 rounded-full bg-gradient-to-r from-transparent via-emerald-300/65 to-transparent blur-sm dark:via-emerald-400/45" />
-          <div className="mb-4 inline-flex items-center rounded-full border border-emerald-500/25 bg-emerald-50/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+          <div className="gc-fade-up mb-4 inline-flex items-center rounded-full border border-emerald-500/25 bg-emerald-50/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300" style={{ animationDelay: "120ms" }}>
             <span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 gc-pulse" />
             PORTAL ACCESS
           </div>
 
-          <div className="gc-fade-up mb-8 text-center">
+          <div className="gc-fade-up mb-8 text-center" style={{ animationDelay: "200ms" }}>
             <img
               src={appLogoGreen}
               alt="GreenCropNAT logo"
@@ -267,7 +272,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
           </div>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" autoComplete="off">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="gc-fade-up space-y-5" style={{ animationDelay: "320ms" }} autoComplete="off">
               <FormField
                 control={form.control}
                 name="email"
@@ -362,7 +367,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
             </form>
           </Form>
 
-          <div className="mt-7 space-y-4">
+          <div className="gc-fade-up mt-7 space-y-4" style={{ animationDelay: "420ms" }}>
             <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
 
             <div className="pt-1 text-center text-sm text-slate-600 dark:text-slate-400">
@@ -377,7 +382,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
             </div>
           </div>
 
-          <div className="mt-7 flex items-center justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+          <div className="gc-fade-up mt-7 flex items-center justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400" style={{ animationDelay: "520ms" }}>
             <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             Secured by edge-grade quantum-256 encryption
             <ArrowUpRight className="h-3.5 w-3.5" />
