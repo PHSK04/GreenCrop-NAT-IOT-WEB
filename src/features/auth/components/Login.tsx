@@ -69,7 +69,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   }
 
   return (
-    <div className="relative flex min-h-screen w-full overflow-hidden bg-[#eaf0f7] text-slate-900 transition-colors duration-500 dark:bg-[#04111d] dark:text-slate-100">
+    <div className="relative flex min-h-screen w-full overflow-hidden bg-[#f1f0ee] text-slate-900 transition-colors duration-500 dark:bg-[#04111d] dark:text-slate-100">
       <style>{`
         @keyframes gcSweep {
           0% { transform: translateX(-130%); opacity: 0; }
@@ -118,6 +118,23 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
           0%, 100% { opacity: .45; transform: scale(1); }
           50% { opacity: .9; transform: scale(1.04); }
         }
+        @keyframes gcDrift {
+          0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+          50% { transform: translate3d(18px, -12px, 0) rotate(6deg); }
+        }
+        @keyframes gcBloom {
+          0%, 100% { transform: scale(0.96); opacity: .45; }
+          50% { transform: scale(1.05); opacity: .85; }
+        }
+        @keyframes gcSpinSlow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes gcWave {
+          0% { transform: translateX(-6%) skewX(-4deg); opacity: .25; }
+          50% { transform: translateX(4%) skewX(2deg); opacity: .55; }
+          100% { transform: translateX(-6%) skewX(-4deg); opacity: .25; }
+        }
         .gc-sweep { animation: gcSweep 4.6s ease-in-out infinite; }
         .gc-pulse { animation: gcPulse 3s ease-in-out infinite; }
         .gc-float { animation: gcFloat 6.2s ease-in-out infinite; }
@@ -129,14 +146,18 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
         .gc-link-flow { animation: gcLinkFlow 4.8s ease-in-out infinite; }
         .gc-light-sheen { animation: gcLightSheen 6.8s ease-in-out 1s infinite; }
         .gc-light-breathe { animation: gcLightBreathe 5.4s ease-in-out infinite; }
+        .gc-drift { animation: gcDrift 12s ease-in-out infinite; }
+        .gc-bloom { animation: gcBloom 8s ease-in-out infinite; }
+        .gc-spin-slow { animation: gcSpinSlow 26s linear infinite; }
+        .gc-wave { animation: gcWave 10s ease-in-out infinite; }
         @media (prefers-reduced-motion: reduce) {
-          .gc-sweep, .gc-pulse, .gc-float, .gc-orbit, .gc-fade-up, .gc-spark-a, .gc-spark-b, .gc-link-pulse, .gc-link-flow, .gc-light-sheen, .gc-light-breathe { animation: none !important; }
+          .gc-sweep, .gc-pulse, .gc-float, .gc-orbit, .gc-fade-up, .gc-spark-a, .gc-spark-b, .gc-link-pulse, .gc-link-flow, .gc-light-sheen, .gc-light-breathe, .gc-drift, .gc-bloom, .gc-spin-slow, .gc-wave { animation: none !important; }
         }
       `}</style>
 
-      <div className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-emerald-300/35 blur-3xl dark:bg-emerald-500/18" />
-      <div className="pointer-events-none absolute -right-24 bottom-12 h-72 w-72 rounded-full bg-cyan-300/35 blur-3xl dark:bg-cyan-500/16" />
-      <div className="pointer-events-none absolute inset-0 dark:hidden bg-[radial-gradient(circle_at_20%_18%,rgba(74,181,110,0.18),transparent_35%),radial-gradient(circle_at_84%_14%,rgba(56,189,248,0.14),transparent_30%),radial-gradient(circle_at_82%_88%,rgba(16,185,129,0.12),transparent_32%)]" />
+      <div className="pointer-events-none absolute -left-24 top-8 h-72 w-72 rounded-full bg-emerald-300/28 blur-3xl dark:bg-emerald-500/18" />
+      <div className="pointer-events-none absolute -right-32 bottom-10 h-80 w-80 rounded-full bg-purple-200/45 blur-3xl dark:bg-cyan-500/16" />
+      <div className="pointer-events-none absolute inset-0 dark:hidden bg-[radial-gradient(circle_at_18%_18%,rgba(214,201,187,0.55),transparent_38%),radial-gradient(circle_at_84%_12%,rgba(199,210,254,0.36),transparent_32%),radial-gradient(circle_at_78%_88%,rgba(16,185,129,0.1),transparent_34%)]" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(15,23,42,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.04)_1px,transparent_1px)] bg-[size:34px_34px] dark:bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)]" />
       <div className="pointer-events-none absolute left-[47%] top-0 hidden h-full w-px xl:block">
         <span className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-300/55 to-transparent dark:via-emerald-400/35" />
@@ -145,43 +166,59 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
       </div>
 
       <aside className="relative hidden w-[47%] items-center justify-center overflow-hidden border-r border-slate-200/70 bg-transparent xl:flex dark:border-slate-800/70">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(74,181,110,0.12),transparent_38%),radial-gradient(circle_at_84%_82%,rgba(56,189,248,0.1),transparent_36%)] dark:bg-[radial-gradient(circle_at_18%_22%,rgba(16,185,129,0.16),transparent_38%),radial-gradient(circle_at_84%_82%,rgba(56,189,248,0.12),transparent_36%)]" />
-        <div className="absolute left-8 top-8 rounded-full border border-emerald-500/30 bg-emerald-100/70 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:border-emerald-400/35 dark:bg-emerald-500/10 dark:text-emerald-300">
-          NODE SECURE
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.55),transparent_36%),radial-gradient(circle_at_88%_24%,rgba(232,221,207,0.65),transparent_40%),radial-gradient(circle_at_75%_82%,rgba(165,208,195,0.28),transparent_35%)] dark:bg-[radial-gradient(circle_at_20%_18%,rgba(15,23,42,0.6),transparent_36%),radial-gradient(circle_at_88%_24%,rgba(30,41,59,0.7),transparent_40%),radial-gradient(circle_at_75%_82%,rgba(16,185,129,0.12),transparent_35%)]" />
+        <div className="pointer-events-none absolute inset-0 opacity-70 dark:opacity-40">
+          <div className="gc-wave absolute left-[-10%] top-[12%] h-52 w-[120%] rounded-[40%] bg-gradient-to-r from-transparent via-white/70 to-transparent blur-2xl dark:via-slate-700/70" />
+          <div className="gc-wave absolute bottom-[8%] left-[-12%] h-44 w-[130%] rounded-[40%] bg-gradient-to-r from-transparent via-emerald-200/65 to-transparent blur-2xl dark:via-emerald-500/30" />
         </div>
-        <div className="pointer-events-none absolute left-[14%] top-[18%] h-5 w-5 rounded-md bg-emerald-300/50 gc-spark-a dark:bg-emerald-400/30" />
-        <div className="pointer-events-none absolute left-[22%] top-[30%] h-3.5 w-3.5 rounded bg-emerald-300/45 gc-spark-b dark:bg-emerald-400/25" />
-        <div className="pointer-events-none absolute right-[18%] top-[24%] h-4 w-4 rounded-sm bg-cyan-300/45 gc-spark-a dark:bg-cyan-400/25" />
-        <div className="pointer-events-none absolute right-[14%] bottom-[24%] h-6 w-6 rounded-lg bg-emerald-300/35 gc-spark-b dark:bg-emerald-400/20" />
 
-        <div className="gc-fade-up relative z-10 w-full max-w-[560px] px-10">
-          <div className="relative overflow-hidden rounded-[34px] border border-white/65 bg-white/62 p-10 shadow-[0_22px_56px_rgba(15,23,42,0.14)] backdrop-blur-sm dark:border-slate-700/70 dark:bg-slate-900/52 dark:shadow-[0_20px_56px_rgba(2,8,18,0.6)]">
-            <span className="gc-light-sheen pointer-events-none absolute -top-10 left-0 h-16 w-1/3 rounded-full bg-gradient-to-r from-transparent via-white/80 to-transparent blur-sm dark:hidden" />
-            <span className="gc-light-breathe pointer-events-none absolute right-8 top-8 h-14 w-14 rounded-full bg-emerald-300/35 blur-2xl dark:hidden" />
-            <div className="relative mx-auto mb-6 grid h-[300px] w-[300px] place-items-center">
-              <span className="pointer-events-none absolute h-[300px] w-[300px] rounded-full border border-slate-300/55 dark:border-slate-500/28" />
-              <span className="gc-orbit pointer-events-none absolute h-[236px] w-[236px] rounded-full border border-emerald-400/28 dark:border-emerald-400/22" />
-              <span className="pointer-events-none absolute h-[132px] w-[132px] rounded-full bg-emerald-400/15 blur-2xl dark:bg-emerald-400/12" />
-              <span className="pointer-events-none absolute h-[190px] w-[190px] rounded-full bg-white/80 blur-xl dark:bg-emerald-100/12" />
-              <img
-                src={appLogoGreen}
-                alt="GreenCropNAT logo"
-                className="gc-float relative w-[300px] max-w-[92%] object-contain brightness-110 contrast-125 saturate-125 drop-shadow-[0_14px_30px_rgba(16,185,129,0.34)]"
-                draggable={false}
-              />
+        <div className="relative z-10 flex h-full w-full flex-col justify-between px-12 py-12">
+          <div className="flex items-center gap-3">
+            <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-9 w-9 object-contain" />
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700/80 dark:text-emerald-300/80">
+                GreenCropNAT
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">Precision command portal</div>
+            </div>
+          </div>
+
+          <div className="grid w-full items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+            <div>
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-white/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-700 backdrop-blur dark:border-emerald-400/30 dark:bg-slate-900/50 dark:text-emerald-200">
+                Bio-Precision
+              </div>
+              <h2 className="text-[2.6rem] font-semibold leading-[1.05] text-slate-900 dark:text-slate-100">
+                The Smarter,
+                <br />
+                Greener Farm
+                <br />
+                Intelligence Mesh
+              </h2>
+              <p className="mt-5 max-w-md text-base leading-relaxed text-slate-600 dark:text-slate-300">
+                Monitor, automate, and optimize every node. GreenCropNAT keeps your farm command surface calm,
+                responsive, and deeply connected.
+              </p>
+              <div className="mt-6 h-px w-32 bg-gradient-to-r from-emerald-500/70 via-teal-400/60 to-transparent" />
             </div>
 
-            <h3
-              className="text-center text-[2rem] leading-tight text-slate-900 dark:text-slate-100"
-              style={brandWordmarkStyle}
-            >
-              GreenCropNAT
-            </h3>
-            <p className="mt-2 text-center text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-              Precision command portal
-            </p>
-            <div className="mx-auto mt-6 h-px w-44 bg-gradient-to-r from-transparent via-emerald-400/70 to-transparent dark:via-emerald-400/45" />
-            <div className="mx-auto mt-4 h-2 w-40 rounded-full bg-gradient-to-r from-emerald-500/70 via-green-400/70 to-teal-400/70" />
+            <div className="relative h-[360px] w-full">
+              <div className="gc-bloom absolute inset-6 rounded-[44px] bg-gradient-to-br from-white/80 via-emerald-100/60 to-purple-200/50 blur-2xl dark:from-slate-800/70 dark:via-slate-900/70 dark:to-emerald-900/30" />
+              <div className="gc-spin-slow absolute left-1/2 top-1/2 h-[260px] w-[260px] -translate-x-1/2 -translate-y-1/2 rounded-[40%] bg-[conic-gradient(from_160deg,rgba(16,185,129,0.14),rgba(168,85,247,0.18),rgba(14,165,233,0.16),rgba(16,185,129,0.14))] blur-2xl" />
+              <div className="gc-drift absolute left-[8%] top-[12%] h-24 w-24 rounded-[30%] bg-gradient-to-br from-emerald-200/70 to-white/40 blur-xl dark:from-emerald-500/25 dark:to-slate-700/40" />
+              <div className="gc-drift absolute right-[12%] bottom-[18%] h-28 w-28 rounded-[32%] bg-gradient-to-br from-purple-200/60 to-white/50 blur-xl dark:from-purple-500/20 dark:to-slate-700/40" />
+              <div className="absolute left-1/2 top-1/2 h-[240px] w-[240px] -translate-x-1/2 -translate-y-1/2 rounded-[34%] border border-white/70 bg-white/50 shadow-[0_30px_80px_rgba(99,102,241,0.18)] backdrop-blur-xl dark:border-slate-600/40 dark:bg-slate-900/40" />
+              <div className="absolute left-1/2 top-1/2 h-[150px] w-[150px] -translate-x-1/2 -translate-y-1/2 rounded-[28%] bg-gradient-to-br from-emerald-400/35 via-white/70 to-purple-300/35 blur-md" />
+              <div className="gc-float absolute left-1/2 top-1/2 h-[110px] w-[110px] -translate-x-1/2 -translate-y-1/2 rounded-[26%] bg-gradient-to-br from-emerald-200/80 via-white/70 to-cyan-200/60 shadow-[0_20px_60px_rgba(16,185,129,0.25)]" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+            Connected sensors
+            <span className="h-1 w-1 rounded-full bg-emerald-400" />
+            Adaptive climate
+            <span className="h-1 w-1 rounded-full bg-teal-400" />
+            AI forecast
           </div>
         </div>
       </aside>

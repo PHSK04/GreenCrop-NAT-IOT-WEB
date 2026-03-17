@@ -463,7 +463,7 @@ export const authService = {
     return await response.json();
   },
 
-  pairDevice: async (payload: { device_id: string; pairing_code: string; device_name?: string; location?: string; is_primary?: boolean }): Promise<{ success: boolean; device_id?: string; is_primary?: boolean }> => {
+  pairDevice: async (payload: { device_id: string; pairing_code: string; device_name?: string; location?: string; is_primary?: boolean; user_id?: string | number }): Promise<{ success: boolean; device_id?: string; is_primary?: boolean }> => {
     const response = await fetchWithApiFallback('/devices/pair', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },

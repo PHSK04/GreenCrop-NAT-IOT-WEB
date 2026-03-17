@@ -97,6 +97,13 @@ export function DatabaseViewerPage({ language = "TH" }: DatabaseViewerPageProps)
   const [newPassword, setNewPassword] = useState("");
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [deviceEdits, setDeviceEdits] = useState<Record<string, { name: string; location: string }>>({});
+  const [newDeviceId, setNewDeviceId] = useState("");
+  const [newDeviceName, setNewDeviceName] = useState("");
+  const [newDeviceLocation, setNewDeviceLocation] = useState("");
+  const [newPairingCode, setNewPairingCode] = useState("");
+  const [savingDeviceId, setSavingDeviceId] = useState<string | null>(null);
+  const [addingDevice, setAddingDevice] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const userDetailsRef = useRef<HTMLDivElement | null>(null);
   const modalInputClass = "bg-white text-slate-900 border-slate-300 placeholder:text-slate-400 focus-visible:ring-emerald-500/40 dark:bg-slate-800/80 dark:text-slate-100 dark:border-slate-600 dark:placeholder:text-slate-400";
@@ -211,6 +218,20 @@ export function DatabaseViewerPage({ language = "TH" }: DatabaseViewerPageProps)
     setNewPassword("");
     setShowOldPassword(false);
     setShowNewPassword(false);
+    const nextEdits: Record<string, { name: string; location: string }> = {};
+    (selectedUserDetails.devices || []).forEach((d) => {
+      const key = String(d.device_id || d.id || "");
+      if (!key) return;
+      nextEdits[key] = {
+        name: String(d.device_name || ""),
+        location: String(d.location || ""),
+      };
+    });
+    setDeviceEdits(nextEdits);
+    setNewDeviceId("");
+    setNewDeviceName("");
+    setNewDeviceLocation("");
+    setNewPairingCode("");
   }, [selectedUserDetails]);
 
 
@@ -235,6 +256,60 @@ export function DatabaseViewerPage({ language = "TH" }: DatabaseViewerPageProps)
       toast.error(error?.message || "Failed to update user");
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleSaveDevice = async (deviceId: string) => {
+    if (!deviceId) return;
+    const edits = deviceEdits[deviceId];
+    if (!edits) return;
+    try {
+      setSavingDeviceId(deviceId);
+      await authService.updateDevice({
+        device_id: deviceId,
+        device_name: edits.name || undefined,
+        location: edits.location || undefined,
+      });
+      toast.success(isTH ? "บันทึกอุปกรณ์แล้ว" : "Device updated");
+      if (selectedUserDetails) {
+        await loadUserDetails(String(selectedUserDetails.user.id));
+      }
+    } catch (err: any) {
+      toast.error(isTH ? "บันทึกอุปกรณ์ไม่สำเร็จ" : "Failed to update device", {
+        description: err?.message || undefined,
+      });
+    } finally {
+      setSavingDeviceId(null);
+    }
+  };
+
+  const handleAddDevice = async () => {
+    if (!selectedUserDetails) return;
+    if (!newDeviceId.trim() || !newPairingCode.trim()) {
+      toast.error(isTH ? "กรุณากรอก Device ID และ Pairing Code" : "Device ID and Pairing Code are required");
+      return;
+    }
+    try {
+      setAddingDevice(true);
+      await authService.pairDevice({
+        device_id: newDeviceId.trim(),
+        pairing_code: newPairingCode.trim(),
+        device_name: newDeviceName.trim() || undefined,
+        location: newDeviceLocation.trim() || undefined,
+        user_id: selectedUserDetails.user.id,
+      });
+      toast.success(isTH ? "เพิ่มอุปกรณ์แล้ว" : "Device added");
+      await loadUserDetails(String(selectedUserDetails.user.id));
+      setNewDeviceId("");
+      setNewDeviceName("");
+      setNewDeviceLocation("");
+      setNewPairingCode("");
+    } catch (err: any) {
+      toast.error(isTH ? "เพิ่มอุปกรณ์ไม่สำเร็จ" : "Failed to add device", {
+        description: err?.message || undefined,
+      });
+    } finally {
+      setAddingDevice(false);
     }
   };
 
@@ -825,6 +900,94 @@ export function DatabaseViewerPage({ language = "TH" }: DatabaseViewerPageProps)
                 <Save className="h-4 w-4 mr-2" />
                 {savingProfile ? "Saving..." : "Save User Profile"}
               </Button>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">Devices (Connected)</h3>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {selectedUserDetails.devices?.length || 0} devices
+              </span>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-4">
+              <Input className={modalInputClass} value={newDeviceId} onChange={(e) => setNewDeviceId(e.target.value)} placeholder="Device ID" />
+              <Input className={modalInputClass} value={newDeviceName} onChange={(e) => setNewDeviceName(e.target.value)} placeholder="Device Name" />
+              <Input className={modalInputClass} value={newDeviceLocation} onChange={(e) => setNewDeviceLocation(e.target.value)} placeholder="Location" />
+              <Input className={modalInputClass} value={newPairingCode} onChange={(e) => setNewPairingCode(e.target.value)} placeholder="Pairing Code" />
+            </div>
+            <div className="mt-3 flex justify-end">
+              <Button onClick={handleAddDevice} disabled={addingDevice} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Save className="h-4 w-4 mr-2" />
+                {addingDevice ? "Adding..." : "Add Device"}
+              </Button>
+            </div>
+
+            <div className="mt-4 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-slate-200/70 dark:border-slate-700/70">
+                    <TableHead className="text-slate-600 dark:text-slate-300">Device ID</TableHead>
+                    <TableHead className="text-slate-600 dark:text-slate-300">Name</TableHead>
+                    <TableHead className="text-slate-600 dark:text-slate-300">Location</TableHead>
+                    <TableHead className="text-slate-600 dark:text-slate-300">Primary</TableHead>
+                    <TableHead className="text-right text-slate-600 dark:text-slate-300">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(selectedUserDetails.devices || []).map((d) => {
+                    const key = String(d.device_id || d.id || "");
+                    const edits = deviceEdits[key] || { name: String(d.device_name || ""), location: String(d.location || "") };
+                    return (
+                      <TableRow key={key} className="border-b border-slate-200/60 dark:border-slate-700/60">
+                        <TableCell className="font-mono text-xs text-slate-700 dark:text-slate-200">{safeText(d.device_id || d.id)}</TableCell>
+                        <TableCell>
+                          <Input
+                            className={modalInputClass}
+                            value={edits.name}
+                            onChange={(e) => setDeviceEdits((prev) => ({ ...prev, [key]: { ...edits, name: e.target.value } }))}
+                            placeholder="Device name"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            className={modalInputClass}
+                            value={edits.location}
+                            onChange={(e) => setDeviceEdits((prev) => ({ ...prev, [key]: { ...edits, location: e.target.value } }))}
+                            placeholder="Location"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          {d.is_primary ? (
+                            <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-300 bg-emerald-500/10">Primary</Badge>
+                          ) : (
+                            <span className="text-xs text-slate-500 dark:text-slate-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSaveDevice(String(d.device_id || d.id || ""))}
+                            disabled={savingDeviceId === String(d.device_id || d.id || "")}
+                            className="border-slate-300 dark:border-slate-600"
+                          >
+                            {savingDeviceId === String(d.device_id || d.id || "") ? "Saving..." : "Save"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {(!selectedUserDetails.devices || selectedUserDetails.devices.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-sm text-slate-500 dark:text-slate-400">
+                        No devices linked to this user.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </div>
           </div>
 
