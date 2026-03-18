@@ -153,6 +153,11 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
           0%, 100% { transform: translate3d(0, 0, 0); opacity: .55; }
           50% { transform: translate3d(14px, -10px, 0); opacity: .85; }
         }
+        @keyframes gcAurora {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
         .gc-sweep { animation: gcSweep 4.6s ease-in-out infinite; }
         .gc-pulse { animation: gcPulse 3s ease-in-out infinite; }
         .gc-float { animation: gcFloat 6.2s ease-in-out infinite; }
@@ -172,13 +177,15 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
         .gc-bg-shift { animation: gcBgShift 18s ease-in-out infinite; }
         .gc-grid-drift { animation: gcGridDrift 24s ease-in-out infinite; }
         .gc-orb { animation: gcOrbFloat 12s ease-in-out infinite; }
+        .gc-aurora { animation: gcAurora 22s ease-in-out infinite; background-size: 220% 220%; }
         @media (prefers-reduced-motion: reduce) {
-          .gc-sweep, .gc-pulse, .gc-float, .gc-orbit, .gc-fade-up, .gc-spark-a, .gc-spark-b, .gc-link-pulse, .gc-link-flow, .gc-light-sheen, .gc-light-breathe, .gc-drift, .gc-bloom, .gc-spin-slow, .gc-wave, .gc-card-float, .gc-bg-shift, .gc-grid-drift, .gc-orb { animation: none !important; }
+          .gc-sweep, .gc-pulse, .gc-float, .gc-orbit, .gc-fade-up, .gc-spark-a, .gc-spark-b, .gc-link-pulse, .gc-link-flow, .gc-light-sheen, .gc-light-breathe, .gc-drift, .gc-bloom, .gc-spin-slow, .gc-wave, .gc-card-float, .gc-bg-shift, .gc-grid-drift, .gc-orb, .gc-aurora { animation: none !important; }
         }
       `}</style>
 
       <div className="pointer-events-none absolute -left-24 top-8 h-72 w-72 rounded-full bg-emerald-300/28 blur-3xl dark:bg-emerald-500/18 gc-orb" />
       <div className="pointer-events-none absolute -right-32 bottom-10 h-80 w-80 rounded-full bg-purple-200/45 blur-3xl dark:bg-cyan-500/16 gc-orb" style={{ animationDelay: "1.5s" }} />
+      <div className="pointer-events-none absolute inset-0 gc-aurora opacity-50 mix-blend-soft-light dark:opacity-35" style={{ backgroundImage: "linear-gradient(120deg, rgba(16,185,129,0.16), rgba(59,130,246,0.12), rgba(236,72,153,0.12), rgba(16,185,129,0.16))" }} />
       <div className="pointer-events-none absolute inset-0 dark:hidden bg-[radial-gradient(circle_at_18%_18%,rgba(214,201,187,0.55),transparent_38%),radial-gradient(circle_at_84%_12%,rgba(199,210,254,0.36),transparent_32%),radial-gradient(circle_at_78%_88%,rgba(16,185,129,0.1),transparent_34%)] gc-bg-shift" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(15,23,42,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.04)_1px,transparent_1px)] bg-[size:34px_34px] dark:bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] gc-grid-drift" />
       <div className="pointer-events-none absolute left-[8%] top-[22%] h-4 w-4 rounded-full bg-emerald-300/80 shadow-[0_0_24px_rgba(16,185,129,0.35)] gc-orb" style={{ animationDelay: "2.2s" }} />
