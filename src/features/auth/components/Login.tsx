@@ -111,8 +111,8 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
       <div className="pointer-events-none absolute left-[-4rem] top-10 h-52 w-52 rounded-full bg-emerald-200/15 blur-3xl gc-glow-float dark:bg-emerald-500/10" />
       <div className="pointer-events-none absolute bottom-0 right-[-5rem] h-72 w-72 rounded-full bg-slate-200/18 blur-3xl gc-glow-float dark:bg-cyan-500/8" style={{ animationDelay: "1.5s" }} />
 
-      <div className="relative z-10 grid min-h-screen lg:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)]">
-        <section className="flex min-h-screen flex-col justify-between px-6 pb-10 pt-8 sm:px-10 lg:px-14 lg:pb-12 lg:pt-10">
+      <div className="relative z-10 min-h-screen">
+        <section className="flex min-h-screen flex-col justify-between px-5 pb-8 pt-6 sm:px-8 sm:pb-10 sm:pt-8 lg:px-12 xl:px-16 lg:pb-12 lg:pt-10">
           <div className="flex items-start justify-between gap-4">
             <div className="gc-fade-up flex items-center gap-4" style={{ animationDelay: "60ms" }}>
               <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-14 w-14 object-contain sm:h-20 sm:w-20" />
@@ -129,18 +129,18 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
             </div>
           </div>
 
-          <div className="grid flex-1 items-center gap-10 py-8 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)] xl:gap-10">
-            <div className="max-w-[920px]">
+          <div className="grid flex-1 items-start gap-8 py-6 lg:grid-cols-[minmax(0,1.22fr)_minmax(360px,0.78fr)] lg:gap-8 xl:gap-10">
+            <div className="order-2 max-w-[1120px] pt-2 sm:pt-4 lg:order-1 lg:pt-14">
               <div className="gc-fade-up mt-2" style={{ animationDelay: "200ms" }}>
-                <h1 className="max-w-[820px] text-[3.3rem] leading-[0.92] text-emerald-600 sm:text-[4.8rem] lg:text-[5.8rem] xl:text-[6.4rem]" style={brandWordmarkStyle}>
-                  <span className="block">GREENCROP NAT</span>
+                <h1 className="max-w-[1380px] text-[2.7rem] leading-[0.92] text-emerald-600 sm:text-[4rem] md:text-[4.8rem] lg:text-[5.5rem] xl:text-[7.25rem]" style={brandWordmarkStyle}>
+                  <span className="block lg:whitespace-nowrap">GREENCROP NAT</span>
                 </h1>
-                <p className="mt-7 max-w-[780px] text-xl leading-tight text-slate-700 sm:text-2xl lg:text-[2.05rem] dark:text-slate-200">
+                <p className="mt-6 max-w-[1050px] text-lg leading-tight text-slate-700 sm:text-xl md:text-2xl lg:mt-10 lg:text-[2.05rem] dark:text-slate-200">
                   THE SMARTER GREENER FARM INTELLIGENCE MESH
                 </p>
               </div>
 
-              <div className="gc-fade-up mt-14 grid max-w-[760px] gap-5 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" style={{ animationDelay: "280ms" }}>
+              <div className="gc-fade-up mt-10 grid max-w-[980px] gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:mt-20 lg:gap-8" style={{ animationDelay: "280ms" }}>
                 <div className="space-y-4">
                   <section className="relative overflow-hidden rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] dark:border-slate-800/80 dark:bg-slate-900/70">
                     <div className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -224,7 +224,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                     type="submit"
                     disabled={isLoading}
                     onClick={form.handleSubmit(onSubmit)}
-                    className="group relative h-[64px] w-full overflow-hidden rounded-[20px] border border-white/20 bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 text-lg font-bold text-white shadow-[0_16px_34px_rgba(16,185,129,0.25)] transition-all hover:brightness-105"
+                    className="group relative h-[68px] w-full overflow-hidden rounded-[20px] border border-white/20 bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 text-lg font-bold text-white shadow-[0_16px_34px_rgba(16,185,129,0.25)] transition-all hover:brightness-105"
                   >
                     <span className="gc-sheen pointer-events-none absolute inset-y-0 left-[-35%] w-1/3 bg-gradient-to-r from-transparent via-white/50 to-transparent" />
                     <span className="relative z-10 flex items-center justify-center gap-2">
@@ -266,31 +266,27 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
               </div>
             </div>
 
-            <aside className="gc-fade-up relative flex min-h-[620px] items-center justify-center" style={{ animationDelay: "360ms" }}>
-              <div className="absolute inset-x-[10%] inset-y-[10%] rounded-[44px] bg-gradient-to-b from-white to-slate-50/90 shadow-[0_40px_100px_rgba(15,23,42,0.10)] dark:from-slate-950/50 dark:to-slate-900/40" />
-              <div className="absolute left-1/2 top-1/2 h-[78%] w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-emerald-100/70 via-white to-slate-100/80 blur-3xl dark:from-emerald-500/10 dark:via-slate-900/5 dark:to-slate-900/10" />
+            <aside className="gc-fade-up relative order-1 flex min-h-[420px] items-start justify-center pt-2 sm:min-h-[520px] lg:order-2 lg:min-h-[900px] lg:pt-8" style={{ animationDelay: "360ms" }}>
+              <div className="absolute inset-x-[2%] inset-y-[2%] rounded-[8px] border-[3px] border-black bg-white shadow-[0_24px_70px_rgba(15,23,42,0.06)] dark:border-slate-200 dark:bg-slate-950/35 lg:inset-x-[4%] lg:border-[4px]" />
 
-              <div className="absolute top-[11%] z-10 text-center">
-                <div className="text-[0.72rem] font-semibold uppercase tracking-[0.32em] text-emerald-700 dark:text-emerald-300">
-                  Product Showcase
-                </div>
-                <div className="mt-3 text-[1.75rem] font-semibold tracking-tight text-slate-700 dark:text-slate-200">
-                  GreenCropNAT Smart Farm Unit
+              <div className="absolute top-[4.5%] z-10 w-full px-4 text-center lg:top-[5.5%]">
+                <div className="mt-3 text-[1.05rem] font-medium tracking-tight text-slate-700 sm:text-[1.4rem] lg:text-[2rem] dark:text-slate-200">
+                  อยากได้โมเดล แบบหมุนอัตโนมัติ
                 </div>
               </div>
 
-              <div className="relative z-10 flex h-full w-full items-center justify-center px-10 py-24">
+              <div className="relative z-10 flex h-full w-full items-start justify-center px-4 pb-6 pt-16 sm:px-6 sm:pt-20 lg:px-6 lg:pb-10 lg:pt-24">
                 <img
                   src={machineHero}
                   alt="GreenCropNAT machine hero"
-                  className="gc-machine-float relative z-10 h-auto max-h-[760px] w-full max-w-[520px] object-contain drop-shadow-[0_30px_40px_rgba(15,23,42,0.12)] dark:drop-shadow-[0_40px_60px_rgba(0,0,0,0.45)]"
+                  className="gc-machine-float relative z-10 h-auto max-h-[360px] w-full max-w-[260px] object-contain drop-shadow-[0_20px_30px_rgba(15,23,42,0.08)] sm:max-h-[460px] sm:max-w-[320px] lg:max-h-[830px] lg:max-w-[520px] dark:drop-shadow-[0_40px_60px_rgba(0,0,0,0.45)]"
                   draggable={false}
                 />
               </div>
             </aside>
           </div>
 
-          <div className="gc-fade-up pt-4 text-[clamp(1.8rem,4vw,3rem)] font-medium tracking-tight text-slate-700 dark:text-slate-300" style={{ animationDelay: "420ms" }}>
+          <div className="gc-fade-up pt-6 text-[clamp(1.2rem,4vw,3rem)] font-medium tracking-tight text-slate-700 dark:text-slate-300" style={{ animationDelay: "420ms" }}>
             WWW.GREENCROPNATIOT.COM
           </div>
         </section>
