@@ -17,7 +17,7 @@ import {
 import { ModeToggle } from "@/components/mode-toggle";
 import { useAuth } from "../contexts/AuthContext";
 import appLogoGreen from "@/assets/images/3_transparent_logo_green.png";
-import machineModel from "@/assets/images/machine_model.png";
+import machineHero from "@/assets/images/machine_hero.png";
 
 import { SocialAuth } from "./SocialAuth";
 
@@ -80,10 +80,9 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
           0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: .42; }
           50% { transform: translate3d(18px, -16px, 0) scale(1.08); opacity: .78; }
         }
-        @keyframes gcMachineSpin {
-          0% { transform: perspective(1200px) rotateY(-10deg) rotateZ(-1deg) translateY(0); }
-          50% { transform: perspective(1200px) rotateY(10deg) rotateZ(1deg) translateY(-10px); }
-          100% { transform: perspective(1200px) rotateY(-10deg) rotateZ(-1deg) translateY(0); }
+        @keyframes gcMachineFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
         }
         @keyframes gcRingSpin {
           from { transform: translate(-50%, -50%) rotate(0deg); }
@@ -100,28 +99,28 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
         }
         .gc-fade-up { animation: gcFadeUp .8s cubic-bezier(.2,.8,.2,1) both; }
         .gc-glow-float { animation: gcGlowFloat 10s ease-in-out infinite; }
-        .gc-machine-spin { animation: gcMachineSpin 12s ease-in-out infinite; transform-style: preserve-3d; }
+        .gc-machine-float { animation: gcMachineFloat 8s ease-in-out infinite; }
         .gc-ring-spin { animation: gcRingSpin 22s linear infinite; }
         .gc-sheen { animation: gcSheen 5.8s ease-in-out infinite; }
         .gc-pulse { animation: gcPulse 2.8s ease-in-out infinite; }
         @media (prefers-reduced-motion: reduce) {
-          .gc-fade-up, .gc-glow-float, .gc-machine-spin, .gc-ring-spin, .gc-sheen, .gc-pulse { animation: none !important; }
+          .gc-fade-up, .gc-glow-float, .gc-machine-float, .gc-ring-spin, .gc-sheen, .gc-pulse { animation: none !important; }
         }
       `}</style>
 
-      <div className="pointer-events-none absolute left-[-4rem] top-10 h-52 w-52 rounded-full bg-emerald-200/20 blur-3xl gc-glow-float dark:bg-emerald-500/15" />
-      <div className="pointer-events-none absolute bottom-0 right-[-5rem] h-72 w-72 rounded-full bg-slate-200/25 blur-3xl gc-glow-float dark:bg-cyan-500/12" style={{ animationDelay: "1.5s" }} />
+      <div className="pointer-events-none absolute left-[-4rem] top-10 h-52 w-52 rounded-full bg-emerald-200/15 blur-3xl gc-glow-float dark:bg-emerald-500/10" />
+      <div className="pointer-events-none absolute bottom-0 right-[-5rem] h-72 w-72 rounded-full bg-slate-200/18 blur-3xl gc-glow-float dark:bg-cyan-500/8" style={{ animationDelay: "1.5s" }} />
 
-      <div className="relative z-10 grid min-h-screen lg:grid-cols-[minmax(0,1.28fr)_minmax(420px,0.72fr)]">
-        <section className="flex min-h-screen flex-col justify-between px-6 pb-10 pt-8 sm:px-10 lg:px-16 lg:pb-12 lg:pt-10">
+      <div className="relative z-10 grid min-h-screen lg:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)]">
+        <section className="flex min-h-screen flex-col justify-between px-6 pb-10 pt-8 sm:px-10 lg:px-14 lg:pb-12 lg:pt-10">
           <div className="flex items-start justify-between gap-4">
-            <div className="gc-fade-up flex items-center gap-3" style={{ animationDelay: "60ms" }}>
+            <div className="gc-fade-up flex items-center gap-4" style={{ animationDelay: "60ms" }}>
               <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-14 w-14 object-contain sm:h-20 sm:w-20" />
               <div>
-                <div className="text-base font-semibold uppercase tracking-[0.04em] text-emerald-700 dark:text-emerald-300 sm:text-[2rem] sm:leading-none">
+                <div className="text-base font-semibold uppercase tracking-[0.04em] text-emerald-700 dark:text-emerald-300 sm:text-[1.8rem] sm:leading-none">
                   GREENCROPNATIOT
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 sm:hidden">Precision farming command system</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Precision farming command system</div>
               </div>
             </div>
 
@@ -130,20 +129,20 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
             </div>
           </div>
 
-          <div className="grid flex-1 items-center gap-10 py-10 xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)] xl:gap-8">
-            <div className="max-w-5xl">
-              <div className="gc-fade-up mt-2 max-w-[1040px]" style={{ animationDelay: "200ms" }}>
-                <h1 className="text-[3.4rem] leading-[0.95] text-emerald-600 sm:text-[4.8rem] lg:text-[6rem] xl:text-[7.4rem]" style={brandWordmarkStyle}>
-                  GREENCROP NAT
+          <div className="grid flex-1 items-center gap-10 py-8 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)] xl:gap-10">
+            <div className="max-w-[920px]">
+              <div className="gc-fade-up mt-2" style={{ animationDelay: "200ms" }}>
+                <h1 className="max-w-[820px] text-[3.3rem] leading-[0.92] text-emerald-600 sm:text-[4.8rem] lg:text-[5.8rem] xl:text-[6.4rem]" style={brandWordmarkStyle}>
+                  <span className="block">GREENCROP NAT</span>
                 </h1>
-                <p className="mt-7 max-w-5xl text-xl leading-tight text-slate-700 sm:text-2xl lg:text-[2.25rem] dark:text-slate-200">
+                <p className="mt-7 max-w-[780px] text-xl leading-tight text-slate-700 sm:text-2xl lg:text-[2.05rem] dark:text-slate-200">
                   THE SMARTER GREENER FARM INTELLIGENCE MESH
                 </p>
               </div>
 
-              <div className="gc-fade-up mt-16 grid max-w-[780px] gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" style={{ animationDelay: "280ms" }}>
+              <div className="gc-fade-up mt-14 grid max-w-[760px] gap-5 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" style={{ animationDelay: "280ms" }}>
                 <div className="space-y-4">
-                  <section className="relative overflow-hidden rounded-none border border-slate-200 bg-slate-50/85 p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] dark:border-slate-800/80 dark:bg-slate-900/70">
+                  <section className="relative overflow-hidden rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] dark:border-slate-800/80 dark:bg-slate-900/70">
                     <div className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
                       Email
                     </div>
@@ -160,7 +159,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                                   <Mail className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-emerald-500" />
                                   <Input
                                     placeholder="Username"
-                                    className="h-12 rounded-2xl border-slate-200/80 bg-white pl-11 text-[15px] text-slate-900 placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-700/80 dark:bg-slate-950/70 dark:text-slate-100"
+                                    className="h-12 rounded-2xl border-slate-200/80 bg-slate-50 pl-11 text-[15px] text-slate-900 placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-700/80 dark:bg-slate-950/70 dark:text-slate-100"
                                     autoComplete="off"
                                     autoCorrect="off"
                                     autoCapitalize="none"
@@ -196,7 +195,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                                   <Input
                                     type={showPassword ? "text" : "password"}
                                     placeholder="••••••••"
-                                    className="h-12 rounded-2xl border-slate-200/80 bg-white pl-11 pr-11 text-[15px] text-slate-900 placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-700/80 dark:bg-slate-950/70 dark:text-slate-100"
+                                    className="h-12 rounded-2xl border-slate-200/80 bg-slate-50 pl-11 pr-11 text-[15px] text-slate-900 placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-700/80 dark:bg-slate-950/70 dark:text-slate-100"
                                     autoComplete="off"
                                     autoCorrect="off"
                                     autoCapitalize="none"
@@ -225,7 +224,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                     type="submit"
                     disabled={isLoading}
                     onClick={form.handleSubmit(onSubmit)}
-                    className="group relative h-[68px] w-full overflow-hidden rounded-none border border-white/20 bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 text-lg font-bold text-white shadow-[0_16px_34px_rgba(16,185,129,0.3)] transition-all hover:brightness-105"
+                    className="group relative h-[64px] w-full overflow-hidden rounded-[20px] border border-white/20 bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 text-lg font-bold text-white shadow-[0_16px_34px_rgba(16,185,129,0.25)] transition-all hover:brightness-105"
                   >
                     <span className="gc-sheen pointer-events-none absolute inset-y-0 left-[-35%] w-1/3 bg-gradient-to-r from-transparent via-white/50 to-transparent" />
                     <span className="relative z-10 flex items-center justify-center gap-2">
@@ -244,7 +243,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                   </Button>
                 </div>
 
-                <section className="rounded-none border border-slate-200 bg-slate-50/85 p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] dark:border-slate-800/80 dark:bg-slate-900/70">
+                <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] dark:border-slate-800/80 dark:bg-slate-900/70">
                   <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
 
                   <div className="mt-5 text-center text-sm text-slate-600 dark:text-slate-400">
@@ -267,22 +266,24 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
               </div>
             </div>
 
-            <aside className="gc-fade-up relative flex min-h-[520px] items-center justify-center" style={{ animationDelay: "360ms" }}>
-              <div className="absolute inset-x-[6%] inset-y-[3%] border-[4px] border-slate-900 bg-white dark:border-slate-200 dark:bg-slate-950/35" />
-              <div className="absolute left-1/2 top-1/2 h-[80%] w-[80%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-slate-100 via-white to-slate-100/80 blur-3xl dark:from-slate-900/10 dark:via-slate-900/5 dark:to-slate-900/10" />
-              <div className="absolute left-1/2 top-1/2 h-[86%] w-[86%]">
-                <div className="gc-ring-spin absolute left-1/2 top-1/2 h-[88%] w-[88%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-emerald-200/40 dark:border-emerald-500/18" />
+            <aside className="gc-fade-up relative flex min-h-[620px] items-center justify-center" style={{ animationDelay: "360ms" }}>
+              <div className="absolute inset-x-[10%] inset-y-[10%] rounded-[44px] bg-gradient-to-b from-white to-slate-50/90 shadow-[0_40px_100px_rgba(15,23,42,0.10)] dark:from-slate-950/50 dark:to-slate-900/40" />
+              <div className="absolute left-1/2 top-1/2 h-[78%] w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-emerald-100/70 via-white to-slate-100/80 blur-3xl dark:from-emerald-500/10 dark:via-slate-900/5 dark:to-slate-900/10" />
+
+              <div className="absolute top-[11%] z-10 text-center">
+                <div className="text-[0.72rem] font-semibold uppercase tracking-[0.32em] text-emerald-700 dark:text-emerald-300">
+                  Product Showcase
+                </div>
+                <div className="mt-3 text-[1.75rem] font-semibold tracking-tight text-slate-700 dark:text-slate-200">
+                  GreenCropNAT Smart Farm Unit
+                </div>
               </div>
 
-              <div className="absolute top-[8%] z-10 px-5 py-2 text-center text-[2rem] font-medium text-slate-700 dark:text-slate-200">
-                อยากได้โมเดล แบบหมุนอัตโนมัติ
-              </div>
-
-              <div className="relative z-10 flex h-full w-full items-center justify-center px-8 py-14">
+              <div className="relative z-10 flex h-full w-full items-center justify-center px-10 py-24">
                 <img
-                  src={machineModel}
-                  alt="GreenCropNAT machine showcase"
-                  className="gc-machine-spin relative z-10 h-auto max-h-[660px] w-full max-w-[470px] object-contain drop-shadow-[0_40px_50px_rgba(15,23,42,0.18)] dark:drop-shadow-[0_40px_60px_rgba(0,0,0,0.5)]"
+                  src={machineHero}
+                  alt="GreenCropNAT machine hero"
+                  className="gc-machine-float relative z-10 h-auto max-h-[760px] w-full max-w-[520px] object-contain drop-shadow-[0_30px_40px_rgba(15,23,42,0.12)] dark:drop-shadow-[0_40px_60px_rgba(0,0,0,0.45)]"
                   draggable={false}
                 />
               </div>
