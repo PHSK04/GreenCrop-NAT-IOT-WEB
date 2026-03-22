@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail, ArrowRight, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,20 +36,13 @@ interface LoginProps {
 export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [heroRotation, setHeroRotation] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
+    defaultValues: { email: "", password: "" },
   });
 
   async function onSubmit(data: LoginFormValues) {
@@ -68,9 +61,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
     const rect = event.currentTarget.getBoundingClientRect();
     const px = (event.clientX - rect.left) / rect.width;
     const py = (event.clientY - rect.top) / rect.height;
-    const rotateY = (px - 0.5) * 18;
-    const rotateX = (0.5 - py) * 14;
-    setHeroRotation({ x: rotateX, y: rotateY });
+    setHeroRotation({ x: (0.5 - py) * 12, y: (px - 0.5) * 16 });
   }
 
   function resetHeroRotation() {
@@ -78,220 +69,367 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-white text-slate-900 dark:bg-[#071319] dark:text-slate-100">
+    <div className="relative min-h-screen overflow-hidden bg-[#f8faf9] text-slate-900 dark:bg-[#060e0c] dark:text-slate-100">
       <style>{`
-        @keyframes loginFadeUp {
-          from { opacity: 0; transform: translateY(22px); }
-          to { opacity: 1; transform: translateY(0); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+        * { font-family: 'Inter', sans-serif; }
+
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
         @keyframes heroFloat {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-8px); }
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          33%       { transform: translateY(-10px) rotate(0.5deg); }
+          66%       { transform: translateY(-5px) rotate(-0.3deg); }
         }
-        .login-fade-up { animation: loginFadeUp .7s cubic-bezier(.2,.8,.2,1) both; }
-        .hero-float { animation: heroFloat 7s ease-in-out infinite; transform-style: preserve-3d; }
+        @keyframes shimmer {
+          from { background-position: -200% center; }
+          to   { background-position: 200% center; }
+        }
+        @keyframes pulseGlow {
+          0%, 100% { opacity: 0.6; transform: scale(1); }
+          50%       { opacity: 1;   transform: scale(1.05); }
+        }
+        @keyframes bgDrift {
+          0%   { transform: translateX(0)   translateY(0); }
+          50%  { transform: translateX(20px) translateY(-15px); }
+          100% { transform: translateX(0)   translateY(0); }
+        }
+        @keyframes scanLine {
+          from { transform: translateY(-100%); }
+          to   { transform: translateY(100vh); }
+        }
+
+        .fade-up { animation: fadeUp 0.65s cubic-bezier(0.16,1,0.3,1) both; }
+
+        .btn-shimmer {
+          background: linear-gradient(105deg,
+            #059669 0%, #10b981 30%, #34d399 50%, #10b981 70%, #059669 100%
+          );
+          background-size: 200% auto;
+          animation: shimmer 3s linear infinite;
+        }
+        .btn-shimmer:hover {
+          animation: shimmer 1.5s linear infinite;
+          filter: brightness(1.08);
+        }
+
+        .hero-float {
+          animation: heroFloat 8s ease-in-out infinite;
+          transform-style: preserve-3d;
+        }
+
+        .glow-orb {
+          animation: pulseGlow 4s ease-in-out infinite;
+        }
+        .bg-drift {
+          animation: bgDrift 18s ease-in-out infinite;
+        }
+
+        .input-field {
+          transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+        }
+        .input-field:focus {
+          border-color: #10b981;
+          box-shadow: 0 0 0 3px rgba(16,185,129,0.15);
+        }
+
+        .social-btn {
+          transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+        .social-btn:hover {
+          transform: translateY(-2px);
+        }
+        .social-btn:active {
+          transform: translateY(0);
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .login-fade-up, .hero-float { animation: none !important; }
+          .fade-up, .btn-shimmer, .hero-float, .glow-orb, .bg-drift { animation: none !important; }
         }
       `}</style>
 
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(16,185,129,0.06),transparent_18%),radial-gradient(circle_at_92%_88%,rgba(148,163,184,0.06),transparent_20%)]" />
+      {/* ── Left panel (Form) ── */}
+      <div className="flex min-h-screen flex-col lg:flex-row">
+        <div className="relative flex flex-1 flex-col justify-between px-6 py-8 sm:px-10 lg:max-w-[52%] lg:px-14 lg:py-10 xl:px-20">
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1900px] flex-col px-5 py-5 sm:px-8 sm:py-8 xl:px-10">
-        <header className="mb-4 flex items-start justify-between gap-4 lg:mb-8">
-          <div className="login-fade-up flex items-center gap-4" style={{ animationDelay: "40ms" }}>
-            <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-16 w-16 object-contain sm:h-20 sm:w-20" />
-            <div>
-              <div className="text-lg font-semibold uppercase tracking-[0.02em] text-emerald-700 dark:text-emerald-300 sm:text-[2.1rem]">
-                GREENCROPNATIOT
+          {/* Subtle background texture */}
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_0%_0%,rgba(16,185,129,0.07),transparent_55%),radial-gradient(ellipse_at_100%_100%,rgba(52,211,153,0.05),transparent_50%)]" />
+
+          {/* Header */}
+          <header className="fade-up relative z-10 flex items-center justify-between" style={{ animationDelay: "0ms" }}>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-full bg-emerald-400/20 blur-md" />
+                <img src={appLogoGreen} alt="GreenCropNAT logo" className="relative h-11 w-11 object-contain" />
               </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
-                Precision farming command system
+              <div>
+                <div className="text-[0.95rem] font-bold uppercase tracking-[0.06em] text-emerald-700 dark:text-emerald-400">
+                  GreenCrop<span className="text-slate-500 dark:text-slate-400">NATIOT</span>
+                </div>
+                <div className="text-[0.65rem] font-medium uppercase tracking-[0.12em] text-slate-400">
+                  Precision Farming
+                </div>
               </div>
             </div>
-          </div>
-
-          <div className="login-fade-up" style={{ animationDelay: "90ms" }}>
             <ModeToggle />
-          </div>
-        </header>
+          </header>
 
-        <section className="grid flex-1 gap-8 lg:grid-cols-[minmax(0,1.45fr)_minmax(440px,0.72fr)] xl:gap-14">
-          <div className="order-2 flex min-h-full flex-col lg:order-1">
-            <div className="login-fade-up pt-4 sm:pt-8 lg:pt-20" style={{ animationDelay: "140ms" }}>
-              <h1 className="max-w-[1200px] text-[3rem] font-semibold uppercase leading-[0.9] tracking-tight text-emerald-600 sm:text-[4.7rem] lg:text-[6.15rem] xl:text-[7.35rem] dark:text-emerald-400">
-                GREENCROP NAT
+          {/* Main form area */}
+          <main className="relative z-10 flex flex-1 flex-col justify-center py-10 lg:py-0" style={{ maxWidth: "480px" }}>
+            {/* Title */}
+            <div className="fade-up mb-8" style={{ animationDelay: "80ms" }}>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 dark:border-emerald-800/60 dark:bg-emerald-950/60">
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400">
+                  Secure Access
+                </span>
+              </div>
+              <h1 className="mt-3 text-4xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-5xl dark:text-white">
+                Welcome back
               </h1>
-              <p className="mt-8 max-w-[1100px] text-xl leading-tight text-slate-700 sm:text-[1.9rem] lg:text-[2.15rem] dark:text-slate-200">
-                THE SMARTER GREENER FARM INTELLIGENCE MESH
+              <p className="mt-2 text-[1rem] text-slate-500 dark:text-slate-400">
+                Sign in to your GreenCrop dashboard
               </p>
             </div>
 
-            <div className="login-fade-up mt-10 grid max-w-[1180px] gap-5 md:grid-cols-2 xl:mt-16 xl:gap-8" style={{ animationDelay: "220ms" }}>
-              <div className="space-y-4">
-                <div
-                  className={`rounded-[26px] border border-slate-200 bg-slate-50/90 p-5 shadow-[0_18px_46px_rgba(15,23,42,0.06)] transition-all duration-700 dark:border-slate-800/80 dark:bg-slate-950/72 ${
-                    mounted ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
-                  }`}
-                >
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" autoComplete="off">
-                      <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">Email</div>
+            {/* Form card */}
+            <div
+              className="fade-up rounded-2xl border border-slate-200/80 bg-white/80 p-6 shadow-[0_8px_32px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60"
+              style={{ animationDelay: "160ms" }}
+            >
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" autoComplete="off">
+                  {/* Email */}
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem className="space-y-1.5">
+                        <FormLabel className="text-[0.8rem] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
+                          Email
+                        </FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Mail
+                              className={`pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors duration-200 ${
+                                focusedField === "email"
+                                  ? "text-emerald-500"
+                                  : "text-slate-400"
+                              }`}
+                            />
+                            <Input
+                              placeholder="you@example.com"
+                              className="input-field h-12 rounded-xl border-slate-200 bg-slate-50 pl-10 text-[0.925rem] text-slate-900 placeholder:text-slate-300 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-600"
+                              autoComplete="off"
+                              autoCorrect="off"
+                              autoCapitalize="none"
+                              spellCheck={false}
+                              onFocus={() => setFocusedField("email")}
+                              onBlur={() => setFocusedField(null)}
+                              {...field}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                      <FormField
-                        control={form.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem className="space-y-2">
-                            <FormControl>
-                              <div className="group relative">
-                                <Mail className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-emerald-500" />
-                                <Input
-                                  placeholder="Username"
-                                  className="h-12 rounded-2xl border-slate-200 bg-white pl-11 text-[15px] text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                                  autoComplete="off"
-                                  autoCorrect="off"
-                                  autoCapitalize="none"
-                                  spellCheck={false}
-                                  {...field}
-                                />
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                  {/* Password */}
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="text-[0.8rem] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
+                            Password
+                          </FormLabel>
+                          <button
+                            type="button"
+                            className="text-[0.78rem] font-semibold text-emerald-600 transition-colors hover:text-emerald-500 dark:text-emerald-400"
+                          >
+                            Forgot password?
+                          </button>
+                        </div>
+                        <FormControl>
+                          <div className="relative">
+                            <Lock
+                              className={`pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors duration-200 ${
+                                focusedField === "password"
+                                  ? "text-emerald-500"
+                                  : "text-slate-400"
+                              }`}
+                            />
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="••••••••"
+                              className="input-field h-12 rounded-xl border-slate-200 bg-slate-50 pl-10 pr-11 text-[0.925rem] text-slate-900 placeholder:text-slate-300 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-600"
+                              autoComplete="off"
+                              autoCorrect="off"
+                              autoCapitalize="none"
+                              spellCheck={false}
+                              onFocus={() => setFocusedField("password")}
+                              onBlur={() => setFocusedField(null)}
+                              {...field}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword((p) => !p)}
+                              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-emerald-500"
+                              aria-label={showPassword ? "Hide password" : "Show password"}
+                            >
+                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                      <FormField
-                        control={form.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <FormLabel className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                Password
-                              </FormLabel>
-                              <button
-                                type="button"
-                                className="text-sm font-medium text-emerald-600 transition-colors hover:text-emerald-500 dark:text-emerald-400"
-                              >
-                                Reset
-                              </button>
-                            </div>
-                            <FormControl>
-                              <div className="group relative">
-                                <Lock className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-emerald-500" />
-                                <Input
-                                  type={showPassword ? "text" : "password"}
-                                  placeholder="••••••••"
-                                  className="h-12 rounded-2xl border-slate-200 bg-white pl-11 pr-11 text-[15px] text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                                  autoComplete="off"
-                                  autoCorrect="off"
-                                  autoCapitalize="none"
-                                  spellCheck={false}
-                                  {...field}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowPassword((prev) => !prev)}
-                                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-emerald-500"
-                                  aria-label={showPassword ? "Hide password" : "Show password"}
-                                >
-                                  {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
-                                </button>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </form>
-                  </Form>
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  onClick={form.handleSubmit(onSubmit)}
-                  className="h-[68px] w-full rounded-[18px] bg-gradient-to-r from-emerald-600 to-teal-500 text-lg font-semibold text-white shadow-[0_18px_38px_rgba(16,185,129,0.28)] transition-all hover:brightness-105"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4.5 w-4.5 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    <>
-                      Sign In
-                      <ShieldCheck className="ml-2 h-4.5 w-4.5" />
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              <div
-                className={`rounded-[26px] border border-slate-200 bg-slate-50/90 p-5 shadow-[0_18px_46px_rgba(15,23,42,0.06)] transition-all duration-700 dark:border-slate-800/80 dark:bg-slate-950/72 ${
-                  mounted ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
-                }`}
-                style={{ transitionDelay: "80ms" }}
-              >
-                <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
-
-                <div className="mt-5 text-center text-sm text-slate-600 dark:text-slate-400">
-                  Don&apos;t have an account?{" "}
-                  <button
-                    type="button"
-                    onClick={onSwitchToRegister}
-                    className="font-semibold text-emerald-600 underline decoration-emerald-400/70 underline-offset-4 transition-colors hover:text-emerald-500 dark:text-emerald-400"
+                  {/* Sign In Button */}
+                  <Button
+                    type="submit"
+                    disabled={isLoading}
+                    className="btn-shimmer mt-2 h-12 w-full rounded-xl text-[1rem] font-bold text-white shadow-[0_8px_24px_rgba(16,185,129,0.35)] transition-all hover:shadow-[0_12px_32px_rgba(16,185,129,0.45)] disabled:opacity-70"
                   >
-                    Create Account
-                  </button>
-                </div>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Signing in...
+                      </>
+                    ) : (
+                      <>
+                        Sign In
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </Form>
+            </div>
 
-                <div className="mt-5 flex items-center justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                  <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  Secured by edge-grade quantum-256 encryption
-                </div>
+            {/* Social Auth */}
+            <div
+              className="fade-up mt-4 rounded-2xl border border-slate-200/80 bg-white/60 p-5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/40"
+              style={{ animationDelay: "240ms" }}
+            >
+              <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
+
+              <div className="mt-4 text-center text-[0.85rem] text-slate-500 dark:text-slate-400">
+                Don&apos;t have an account?{" "}
+                <button
+                  type="button"
+                  onClick={onSwitchToRegister}
+                  className="font-semibold text-emerald-600 underline decoration-emerald-400/50 underline-offset-4 transition-colors hover:text-emerald-500 dark:text-emerald-400"
+                >
+                  Create Account
+                </button>
               </div>
             </div>
 
-            <div className="mt-12 pb-2 text-[clamp(1.5rem,3vw,3rem)] font-medium tracking-tight text-slate-700 dark:text-slate-300">
-              WWW.GREENCROPNATIOT.COM
+            {/* Security badge */}
+            <div className="fade-up mt-5 flex items-center justify-center gap-2" style={{ animationDelay: "300ms" }}>
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Secured by edge-grade quantum-256 encryption
+              </span>
             </div>
-          </div>
+          </main>
 
-          <div className="order-1 flex items-start justify-center lg:order-2 lg:pt-2">
-            <div className="login-fade-up relative w-full max-w-[620px]" style={{ animationDelay: "180ms" }}>
-              <div className="absolute inset-0 rounded-[2px] border-[4px] border-black bg-white dark:border-slate-200 dark:bg-slate-950/55" />
-              <div className="relative flex min-h-[420px] flex-col items-center px-4 pb-6 pt-7 sm:min-h-[560px] sm:px-6 lg:min-h-[950px] lg:px-8 lg:pb-10 lg:pt-8">
-                <div className="text-center text-[1.15rem] font-medium tracking-tight text-slate-700 sm:text-[1.55rem] lg:text-[2.05rem] dark:text-slate-200">
+          {/* Footer */}
+          <footer className="fade-up relative z-10 flex items-center justify-between" style={{ animationDelay: "350ms" }}>
+            <span className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
+              www.greencropnatiot.com
+            </span>
+            <span className="text-[0.65rem] text-slate-300 dark:text-slate-600">© 2025 GreenCrop</span>
+          </footer>
+        </div>
 
-                </div>
+        {/* ── Right panel (Hero) ── */}
+        <div className="relative hidden flex-1 overflow-hidden lg:flex lg:items-center lg:justify-center">
+          {/* Deep emerald gradient background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#022c22] via-[#064e3b] to-[#065f46]" />
 
-                <div
-                  className="mt-4 flex flex-1 items-center justify-center sm:mt-6 [perspective:1600px]"
-                  onMouseMove={handleHeroMove}
-                  onMouseLeave={resetHeroRotation}
-                >
-                  <div
-                    className="hero-float flex h-full w-full items-center justify-center transition-transform duration-200 ease-out"
-                    style={{
-                      transform: `rotateX(${heroRotation.x}deg) rotateY(${heroRotation.y}deg)`,
-                    }}
-                  >
-                    <img
-                      src={machineHero}
-                      alt="GreenCropNAT farm unit"
-                      className="h-auto max-h-[360px] w-full max-w-[270px] object-contain sm:max-h-[500px] sm:max-w-[360px] lg:max-h-[820px] lg:max-w-[520px]"
-                      draggable={false}
-                    />
+          {/* Animated background orbs */}
+          <div className="bg-drift absolute -left-20 -top-20 h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
+          <div className="bg-drift absolute -bottom-20 -right-16 h-96 w-96 rounded-full bg-teal-300/10 blur-3xl" style={{ animationDelay: "-9s" }} />
+          <div className="glow-orb absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/8 blur-2xl" />
+
+          {/* Mesh grid overlay */}
+          <div
+            className="absolute inset-0 opacity-[0.04]"
+            style={{
+              backgroundImage: `linear-gradient(rgba(110,231,183,1) 1px, transparent 1px),
+                                linear-gradient(90deg, rgba(110,231,183,1) 1px, transparent 1px)`,
+              backgroundSize: "48px 48px",
+            }}
+          />
+
+          {/* Corner accents */}
+          <div className="absolute left-6 top-6 h-10 w-10 rounded-tl-xl border-l-2 border-t-2 border-emerald-400/40" />
+          <div className="absolute bottom-6 right-6 h-10 w-10 rounded-br-xl border-b-2 border-r-2 border-emerald-400/40" />
+
+          {/* Machine hero */}
+          <div
+            className="relative z-10 flex flex-col items-center px-10"
+            onMouseMove={handleHeroMove}
+            onMouseLeave={resetHeroRotation}
+            style={{ perspective: "1400px" }}
+          >
+            {/* Top label */}
+            <div className="fade-up mb-6 text-center" style={{ animationDelay: "200ms" }}>
+              <div className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-emerald-400/70">
+                GreenCrop NAT Series
+              </div>
+              <div className="mt-1 text-2xl font-extrabold uppercase tracking-tight text-white">
+                The Smarter Greener
+              </div>
+              <div className="text-2xl font-extrabold uppercase tracking-tight text-emerald-400">
+                Farm Intelligence Mesh
+              </div>
+            </div>
+
+            {/* Machine image with 3D tilt */}
+            <div
+              className="hero-float transition-transform duration-200 ease-out"
+              style={{
+                transform: `rotateX(${heroRotation.x}deg) rotateY(${heroRotation.y}deg)`,
+                transformStyle: "preserve-3d",
+              }}
+            >
+              {/* Glow beneath machine */}
+              <div className="mx-auto mb-[-20px] h-10 w-48 rounded-full bg-emerald-400/25 blur-xl" />
+              <img
+                src={machineHero}
+                alt="GreenCropNAT farm unit"
+                className="relative z-10 h-auto max-h-[480px] w-auto max-w-[360px] object-contain drop-shadow-2xl xl:max-h-[580px] xl:max-w-[440px]"
+                draggable={false}
+              />
+            </div>
+
+            {/* Bottom stats strip */}
+            <div className="fade-up mt-8 flex items-center gap-6" style={{ animationDelay: "280ms" }}>
+              {[
+                { label: "Uptime", value: "99.9%" },
+                { label: "Sensors", value: "24/7" },
+                { label: "AI-Powered", value: "✓" },
+              ].map((stat) => (
+                <div key={stat.label} className="text-center">
+                  <div className="text-lg font-extrabold text-white">{stat.value}</div>
+                  <div className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-emerald-400/70">
+                    {stat.label}
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
-        </section>
-      </main>
+        </div>
+      </div>
     </div>
   );
 }
