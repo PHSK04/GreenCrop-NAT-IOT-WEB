@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowUpRight, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Leaf, Loader2, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,11 +33,11 @@ interface LoginProps {
   onLogin?: () => void;
 }
 
-const brandWordmarkStyle = {
-  fontFamily: '"Montserrat", "Inter", sans-serif',
-  fontWeight: 700,
-  letterSpacing: "0.025em",
-} as const;
+const heroStats = [
+  "Precision nutrient control",
+  "Live sensor monitoring",
+  "Farm automation ready",
+];
 
 export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   const { login } = useAuth();
@@ -70,234 +70,241 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-white text-slate-900 transition-colors duration-500 dark:bg-[#05131a] dark:text-slate-100">
+    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fbf9_0%,#f3f7f5_100%)] text-slate-900 dark:bg-[#071319] dark:text-slate-100">
       <style>{`
-        @keyframes gcFadeUp {
+        @keyframes loginFadeUp {
           from { opacity: 0; transform: translateY(24px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes gcGlowFloat {
-          0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: .42; }
-          50% { transform: translate3d(18px, -16px, 0) scale(1.08); opacity: .78; }
-        }
-        @keyframes gcMachineFloat {
-          0%, 100% { transform: translateY(0); }
+        @keyframes heroFloat {
+          0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-10px); }
         }
-        @keyframes gcRingSpin {
-          from { transform: translate(-50%, -50%) rotate(0deg); }
-          to { transform: translate(-50%, -50%) rotate(360deg); }
-        }
-        @keyframes gcSheen {
-          0% { transform: translateX(-160%); opacity: 0; }
-          30% { opacity: .7; }
-          100% { transform: translateX(220%); opacity: 0; }
-        }
-        @keyframes gcPulse {
-          0%, 100% { transform: scale(1); opacity: .55; }
-          50% { transform: scale(1.15); opacity: 1; }
-        }
-        .gc-fade-up { animation: gcFadeUp .8s cubic-bezier(.2,.8,.2,1) both; }
-        .gc-glow-float { animation: gcGlowFloat 10s ease-in-out infinite; }
-        .gc-machine-float { animation: gcMachineFloat 8s ease-in-out infinite; }
-        .gc-ring-spin { animation: gcRingSpin 22s linear infinite; }
-        .gc-sheen { animation: gcSheen 5.8s ease-in-out infinite; }
-        .gc-pulse { animation: gcPulse 2.8s ease-in-out infinite; }
+        .login-fade-up { animation: loginFadeUp .7s cubic-bezier(.2,.8,.2,1) both; }
+        .hero-float { animation: heroFloat 7s ease-in-out infinite; }
         @media (prefers-reduced-motion: reduce) {
-          .gc-fade-up, .gc-glow-float, .gc-machine-float, .gc-ring-spin, .gc-sheen, .gc-pulse { animation: none !important; }
+          .login-fade-up, .hero-float { animation: none !important; }
         }
       `}</style>
 
-      <div className="pointer-events-none absolute left-[-4rem] top-10 h-52 w-52 rounded-full bg-emerald-200/15 blur-3xl gc-glow-float dark:bg-emerald-500/10" />
-      <div className="pointer-events-none absolute bottom-0 right-[-5rem] h-72 w-72 rounded-full bg-slate-200/18 blur-3xl gc-glow-float dark:bg-cyan-500/8" style={{ animationDelay: "1.5s" }} />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(148,163,184,0.12),transparent_28%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(15,23,42,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.04)_1px,transparent_1px)] bg-[size:38px_38px] opacity-30 dark:opacity-10" />
 
-      <div className="relative z-10 min-h-screen">
-        <section className="flex min-h-screen flex-col justify-between px-5 pb-8 pt-6 sm:px-8 sm:pb-10 sm:pt-8 lg:px-12 xl:px-16 lg:pb-12 lg:pt-10">
-          <div className="flex items-start justify-between gap-4">
-            <div className="gc-fade-up flex items-center gap-4" style={{ animationDelay: "60ms" }}>
-              <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-14 w-14 object-contain sm:h-20 sm:w-20" />
-              <div>
-                <div className="text-base font-semibold uppercase tracking-[0.04em] text-emerald-700 dark:text-emerald-300 sm:text-[1.8rem] sm:leading-none">
-                  GREENCROPNATIOT
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Precision farming command system</div>
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1600px] flex-col px-5 py-5 sm:px-8 sm:py-8 xl:px-10">
+        <div className="mb-6 flex items-start justify-between gap-4 lg:mb-10">
+          <div className="login-fade-up flex items-center gap-3" style={{ animationDelay: "60ms" }}>
+            <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
+            <div>
+              <div className="text-lg font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300 sm:text-xl">
+                GREENCROPNATIOT
               </div>
-            </div>
-
-            <div className="gc-fade-up flex items-center gap-3" style={{ animationDelay: "140ms" }}>
-              <ModeToggle />
+              <div className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+                Precision farming command system
+              </div>
             </div>
           </div>
 
-          <div className="grid flex-1 items-start gap-8 py-6 lg:grid-cols-[minmax(0,1.22fr)_minmax(360px,0.78fr)] lg:gap-8 xl:gap-10">
-            <div className="order-2 max-w-[1120px] pt-2 sm:pt-4 lg:order-1 lg:pt-14">
-              <div className="gc-fade-up mt-2" style={{ animationDelay: "200ms" }}>
-                <h1 className="max-w-[1380px] text-[2.7rem] leading-[0.92] text-emerald-600 sm:text-[4rem] md:text-[4.8rem] lg:text-[5.5rem] xl:text-[7.25rem]" style={brandWordmarkStyle}>
-                  <span className="block lg:whitespace-nowrap">GREENCROP NAT</span>
+          <div className="login-fade-up" style={{ animationDelay: "120ms" }}>
+            <ModeToggle />
+          </div>
+        </div>
+
+        <div className="grid flex-1 items-stretch gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(420px,520px)] xl:gap-10">
+          <section className="order-2 flex flex-col justify-between rounded-[32px] border border-white/70 bg-white/70 p-6 shadow-[0_30px_80px_rgba(15,23,42,0.07)] backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/50 lg:order-1 lg:p-10 xl:p-12">
+            <div>
+              <div className="login-fade-up inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300" style={{ animationDelay: "140ms" }}>
+                <Leaf className="h-3.5 w-3.5" />
+                Smart Farm Portal
+              </div>
+
+              <div className="login-fade-up mt-6 max-w-[760px]" style={{ animationDelay: "220ms" }}>
+                <h1 className="text-[2.8rem] font-semibold leading-[0.92] tracking-tight text-emerald-600 sm:text-[4rem] xl:text-[5.6rem] dark:text-emerald-400">
+                  GreenCrop NAT
                 </h1>
-                <p className="mt-6 max-w-[1050px] text-lg leading-tight text-slate-700 sm:text-xl md:text-2xl lg:mt-10 lg:text-[2.05rem] dark:text-slate-200">
-                  THE SMARTER GREENER FARM INTELLIGENCE MESH
+                <p className="mt-5 max-w-[760px] text-xl leading-tight text-slate-700 sm:text-[1.9rem] xl:text-[2.15rem] dark:text-slate-200">
+                  The smarter greener farm intelligence mesh
+                </p>
+                <p className="mt-6 max-w-[640px] text-sm leading-7 text-slate-600 sm:text-base dark:text-slate-300">
+                  A clean, focused control surface for monitoring growth systems, coordinating devices,
+                  and keeping the entire farm environment responsive in real time.
                 </p>
               </div>
 
-              <div className="gc-fade-up mt-10 grid max-w-[980px] gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:mt-20 lg:gap-8" style={{ animationDelay: "280ms" }}>
-                <div className="space-y-4">
-                  <section className="relative overflow-hidden rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] dark:border-slate-800/80 dark:bg-slate-900/70">
-                    <div className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                      Email
-                    </div>
+              <div className="login-fade-up mt-8 flex flex-wrap gap-3" style={{ animationDelay: "300ms" }}>
+                {heroStats.map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-slate-200 bg-white/80 px-4 py-2 text-sm text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-900/65 dark:text-slate-200"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
 
-                    <Form {...form}>
-                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" autoComplete="off">
-                        <FormField
-                          control={form.control}
-                          name="email"
-                          render={({ field }) => (
-                            <FormItem className="space-y-1.5">
-                              <FormControl>
-                                <div className="group relative">
-                                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-emerald-500" />
-                                  <Input
-                                    placeholder="Username"
-                                    className="h-12 rounded-2xl border-slate-200/80 bg-slate-50 pl-11 text-[15px] text-slate-900 placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-700/80 dark:bg-slate-950/70 dark:text-slate-100"
-                                    autoComplete="off"
-                                    autoCorrect="off"
-                                    autoCapitalize="none"
-                                    spellCheck={false}
-                                    {...field}
-                                  />
-                                </div>
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+            <div className="login-fade-up mt-10 grid items-end gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,460px)]" style={{ animationDelay: "380ms" }}>
+              <div className="space-y-6">
+                <div className="max-w-[440px]">
+                  <div className="text-[clamp(1.3rem,2.4vw,2.4rem)] font-medium tracking-tight text-slate-700 dark:text-slate-200">
+                    www.greencropnatiot.com
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    Purpose-built for clean visibility, reliable access, and a calmer farm operations workflow.
+                  </p>
+                </div>
 
-                        <FormField
-                          control={form.control}
-                          name="password"
-                          render={({ field }) => (
-                            <FormItem className="space-y-1.5">
-                              <div className="flex items-center justify-between">
-                                <FormLabel className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                  Password
-                                </FormLabel>
-                                <button
-                                  type="button"
-                                  className="text-sm font-medium text-emerald-600 transition-colors hover:text-emerald-500 dark:text-emerald-400"
-                                >
-                                  Reset
-                                </button>
-                              </div>
-                              <FormControl>
-                                <div className="group relative">
-                                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-emerald-500" />
-                                  <Input
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="••••••••"
-                                    className="h-12 rounded-2xl border-slate-200/80 bg-slate-50 pl-11 pr-11 text-[15px] text-slate-900 placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-700/80 dark:bg-slate-950/70 dark:text-slate-100"
-                                    autoComplete="off"
-                                    autoCorrect="off"
-                                    autoCapitalize="none"
-                                    spellCheck={false}
-                                    {...field}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowPassword((prev) => !prev)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-emerald-500"
-                                    aria-label={showPassword ? "Hide password" : "Show password"}
-                                  >
-                                    {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
-                                  </button>
-                                </div>
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </form>
-                    </Form>
-                  </section>
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  Secured command access
+                </div>
+              </div>
+
+              <div className="relative mx-auto w-full max-w-[430px]">
+                <div className="absolute inset-0 rounded-[28px] bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.14),transparent_62%)] blur-2xl" />
+                <div className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-gradient-to-b from-white to-slate-50 p-4 shadow-[0_30px_80px_rgba(15,23,42,0.12)] dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
+                  <img
+                    src={machineHero}
+                    alt="GreenCropNAT farm unit"
+                    className="hero-float mx-auto h-auto max-h-[540px] w-full object-contain"
+                    draggable={false}
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="order-1 flex items-center justify-center lg:order-2">
+            <div
+              className={`w-full max-w-[520px] rounded-[32px] border border-white/80 bg-white/88 p-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-700 dark:border-slate-800/80 dark:bg-slate-950/72 sm:p-8 ${
+                mounted ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
+              }`}
+            >
+              <div className="mb-8 text-center">
+                <img src={appLogoGreen} alt="GreenCropNAT logo" className="mx-auto mb-4 h-16 w-16 object-contain sm:h-20 sm:w-20" />
+                <h2 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-4xl">
+                  Sign in
+                </h2>
+                <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
+                  Open your secure GreenCropNAT dashboard and continue managing your farm system.
+                </p>
+              </div>
+
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" autoComplete="off">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          Email
+                        </FormLabel>
+                        <FormControl>
+                          <div className="group relative">
+                            <Mail className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-emerald-500" />
+                            <Input
+                              placeholder="you@example.com"
+                              className="h-12 rounded-2xl border-slate-200 bg-slate-50 pl-11 text-[15px] text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                              autoComplete="off"
+                              autoCorrect="off"
+                              autoCapitalize="none"
+                              spellCheck={false}
+                              {...field}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            Password
+                          </FormLabel>
+                          <button
+                            type="button"
+                            className="text-sm font-medium text-emerald-600 transition-colors hover:text-emerald-500 dark:text-emerald-400"
+                          >
+                            Reset
+                          </button>
+                        </div>
+                        <FormControl>
+                          <div className="group relative">
+                            <Lock className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-emerald-500" />
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="••••••••"
+                              className="h-12 rounded-2xl border-slate-200 bg-slate-50 pl-11 pr-11 text-[15px] text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                              autoComplete="off"
+                              autoCorrect="off"
+                              autoCapitalize="none"
+                              spellCheck={false}
+                              {...field}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword((prev) => !prev)}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-emerald-500"
+                              aria-label={showPassword ? "Hide password" : "Show password"}
+                            >
+                              {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    onClick={form.handleSubmit(onSubmit)}
-                    className="group relative h-[68px] w-full overflow-hidden rounded-[20px] border border-white/20 bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 text-lg font-bold text-white shadow-[0_16px_34px_rgba(16,185,129,0.25)] transition-all hover:brightness-105"
+                    className="h-12 w-full rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 text-base font-semibold text-white shadow-[0_18px_40px_rgba(16,185,129,0.28)] transition-all hover:brightness-105"
                   >
-                    <span className="gc-sheen pointer-events-none absolute inset-y-0 left-[-35%] w-1/3 bg-gradient-to-r from-transparent via-white/50 to-transparent" />
-                    <span className="relative z-10 flex items-center justify-center gap-2">
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="h-4.5 w-4.5 animate-spin" />
-                          Signing in...
-                        </>
-                      ) : (
-                        <>
-                          Sign In
-                          <ShieldCheck className="h-4.5 w-4.5 transition-transform duration-300 group-hover:scale-110" />
-                        </>
-                      )}
-                    </span>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4.5 w-4.5 animate-spin" />
+                        Signing in...
+                      </>
+                    ) : (
+                      <>
+                        Sign In
+                        <ArrowRight className="ml-2 h-4.5 w-4.5" />
+                      </>
+                    )}
                   </Button>
-                </div>
+                </form>
+              </Form>
 
-                <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] dark:border-slate-800/80 dark:bg-slate-900/70">
-                  <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
+              <div className="mt-7">
+                <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
+              </div>
 
-                  <div className="mt-5 text-center text-sm text-slate-600 dark:text-slate-400">
-                    Don&apos;t have an account?{" "}
-                    <button
-                      type="button"
-                      onClick={onSwitchToRegister}
-                      className="font-semibold text-emerald-600 underline decoration-emerald-400/70 underline-offset-4 transition-colors hover:text-emerald-500 dark:text-emerald-400"
-                    >
-                      Create Account
-                    </button>
-                  </div>
+              <div className="mt-6 text-center text-sm text-slate-600 dark:text-slate-400">
+                Don&apos;t have an account?{" "}
+                <button
+                  type="button"
+                  onClick={onSwitchToRegister}
+                  className="font-semibold text-emerald-600 underline decoration-emerald-400/70 underline-offset-4 transition-colors hover:text-emerald-500 dark:text-emerald-400"
+                >
+                  Create Account
+                </button>
+              </div>
 
-                  <div className="mt-5 flex items-center justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                    <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                    Secured by edge-grade quantum-256 encryption
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                  </div>
-                </section>
+              <div className="mt-6 flex items-center justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                Protected access for registered operators
               </div>
             </div>
-
-            <aside className="gc-fade-up relative order-1 flex min-h-[420px] items-start justify-center pt-2 sm:min-h-[520px] lg:order-2 lg:min-h-[900px] lg:pt-8" style={{ animationDelay: "360ms" }}>
-              <div className="absolute inset-x-[2%] inset-y-[2%] rounded-[8px] border-[3px] border-black bg-white shadow-[0_24px_70px_rgba(15,23,42,0.06)] dark:border-slate-200 dark:bg-slate-950/35 lg:inset-x-[4%] lg:border-[4px]" />
-
-              <div className="absolute top-[4.5%] z-10 w-full px-4 text-center lg:top-[5.5%]">
-                <div className="mt-3 text-[1.05rem] font-medium tracking-tight text-slate-700 sm:text-[1.4rem] lg:text-[2rem] dark:text-slate-200">
-                  อยากได้โมเดล แบบหมุนอัตโนมัติ
-                </div>
-              </div>
-
-              <div className="relative z-10 flex h-full w-full items-start justify-center px-4 pb-6 pt-16 sm:px-6 sm:pt-20 lg:px-6 lg:pb-10 lg:pt-24">
-                <img
-                  src={machineHero}
-                  alt="GreenCropNAT machine hero"
-                  className="gc-machine-float relative z-10 h-auto max-h-[360px] w-full max-w-[260px] object-contain drop-shadow-[0_20px_30px_rgba(15,23,42,0.08)] sm:max-h-[460px] sm:max-w-[320px] lg:max-h-[830px] lg:max-w-[520px] dark:drop-shadow-[0_40px_60px_rgba(0,0,0,0.45)]"
-                  draggable={false}
-                />
-              </div>
-            </aside>
-          </div>
-
-          <div className="gc-fade-up pt-6 text-[clamp(1.2rem,4vw,3rem)] font-medium tracking-tight text-slate-700 dark:text-slate-300" style={{ animationDelay: "420ms" }}>
-            WWW.GREENCROPNATIOT.COM
-          </div>
-        </section>
-      </div>
-
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-emerald-500/75 to-transparent" />
-      <div
-        className={`pointer-events-none absolute inset-0 bg-white/55 transition-opacity duration-700 dark:bg-slate-950/40 ${
-          mounted ? "opacity-0" : "opacity-100"
-        }`}
-      />
+          </section>
+        </div>
+      </main>
     </div>
   );
 }
