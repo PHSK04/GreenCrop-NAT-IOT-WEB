@@ -297,6 +297,114 @@ async function initDb() {
         `);
         console.log('✅ Device pairings table ready');
 
+        // Create Chat Threads Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='chat_threads' and xtype='U')
+            BEGIN
+                CREATE TABLE chat_threads (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    customer_user_id INT NOT NULL,
+                    customer_name NVARCHAR(100) NOT NULL,
+                    customer_email NVARCHAR(100) NOT NULL,
+                    customer_phone NVARCHAR(30) NULL,
+                    subject NVARCHAR(200) NULL,
+                    status NVARCHAR(30) DEFAULT 'open',
+                    priority NVARCHAR(20) DEFAULT 'normal',
+                    assigned_admin_id INT NULL,
+                    assigned_admin_name NVARCHAR(100) NULL,
+                    is_archived BIT DEFAULT 0,
+                    is_pinned BIT DEFAULT 0,
+                    last_message_at DATETIME DEFAULT GETDATE(),
+                    last_message_preview NVARCHAR(500) NULL,
+                    customer_unread_count INT DEFAULT 0,
+                    admin_unread_count INT DEFAULT 0,
+                    customer_last_read_at DATETIME NULL,
+                    admin_last_read_at DATETIME NULL,
+                    created_at DATETIME DEFAULT GETDATE(),
+                    updated_at DATETIME DEFAULT GETDATE(),
+                    closed_at DATETIME NULL
+                );
+                CREATE UNIQUE INDEX uq_chat_threads_customer_user_id ON chat_threads(customer_user_id);
+                CREATE INDEX ix_chat_threads_status ON chat_threads(status, is_archived, last_message_at);
+                CREATE INDEX ix_chat_threads_assigned_admin_id ON chat_threads(assigned_admin_id, last_message_at);
+            END
+            ELSE
+            BEGIN
+                IF COL_LENGTH('chat_threads', 'customer_phone') IS NULL
+                    ALTER TABLE chat_threads ADD customer_phone NVARCHAR(30) NULL;
+                IF COL_LENGTH('chat_threads', 'subject') IS NULL
+                    ALTER TABLE chat_threads ADD subject NVARCHAR(200) NULL;
+                IF COL_LENGTH('chat_threads', 'status') IS NULL
+                    ALTER TABLE chat_threads ADD status NVARCHAR(30) DEFAULT 'open';
+                IF COL_LENGTH('chat_threads', 'priority') IS NULL
+                    ALTER TABLE chat_threads ADD priority NVARCHAR(20) DEFAULT 'normal';
+                IF COL_LENGTH('chat_threads', 'assigned_admin_id') IS NULL
+                    ALTER TABLE chat_threads ADD assigned_admin_id INT NULL;
+                IF COL_LENGTH('chat_threads', 'assigned_admin_name') IS NULL
+                    ALTER TABLE chat_threads ADD assigned_admin_name NVARCHAR(100) NULL;
+                IF COL_LENGTH('chat_threads', 'is_archived') IS NULL
+                    ALTER TABLE chat_threads ADD is_archived BIT DEFAULT 0;
+                IF COL_LENGTH('chat_threads', 'is_pinned') IS NULL
+                    ALTER TABLE chat_threads ADD is_pinned BIT DEFAULT 0;
+                IF COL_LENGTH('chat_threads', 'last_message_at') IS NULL
+                    ALTER TABLE chat_threads ADD last_message_at DATETIME DEFAULT GETDATE();
+                IF COL_LENGTH('chat_threads', 'last_message_preview') IS NULL
+                    ALTER TABLE chat_threads ADD last_message_preview NVARCHAR(500) NULL;
+                IF COL_LENGTH('chat_threads', 'customer_unread_count') IS NULL
+                    ALTER TABLE chat_threads ADD customer_unread_count INT DEFAULT 0;
+                IF COL_LENGTH('chat_threads', 'admin_unread_count') IS NULL
+                    ALTER TABLE chat_threads ADD admin_unread_count INT DEFAULT 0;
+                IF COL_LENGTH('chat_threads', 'customer_last_read_at') IS NULL
+                    ALTER TABLE chat_threads ADD customer_last_read_at DATETIME NULL;
+                IF COL_LENGTH('chat_threads', 'admin_last_read_at') IS NULL
+                    ALTER TABLE chat_threads ADD admin_last_read_at DATETIME NULL;
+                IF COL_LENGTH('chat_threads', 'updated_at') IS NULL
+                    ALTER TABLE chat_threads ADD updated_at DATETIME DEFAULT GETDATE();
+                IF COL_LENGTH('chat_threads', 'closed_at') IS NULL
+                    ALTER TABLE chat_threads ADD closed_at DATETIME NULL;
+            END
+        `);
+        console.log('✅ Chat threads table ready');
+
+        // Create Chat Messages Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='chat_messages' and xtype='U')
+            BEGIN
+                CREATE TABLE chat_messages (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    thread_id INT NOT NULL,
+                    sender_user_id INT NOT NULL,
+                    sender_name NVARCHAR(100) NOT NULL,
+                    sender_role NVARCHAR(20) NOT NULL,
+                    message_type NVARCHAR(20) DEFAULT 'text',
+                    body NVARCHAR(MAX) NULL,
+                    attachment_name NVARCHAR(255) NULL,
+                    attachment_url NVARCHAR(MAX) NULL,
+                    reply_to_message_id INT NULL,
+                    edited_at DATETIME NULL,
+                    deleted_at DATETIME NULL,
+                    created_at DATETIME DEFAULT GETDATE()
+                );
+                CREATE INDEX ix_chat_messages_thread_id_created_at ON chat_messages(thread_id, created_at);
+            END
+            ELSE
+            BEGIN
+                IF COL_LENGTH('chat_messages', 'message_type') IS NULL
+                    ALTER TABLE chat_messages ADD message_type NVARCHAR(20) DEFAULT 'text';
+                IF COL_LENGTH('chat_messages', 'attachment_name') IS NULL
+                    ALTER TABLE chat_messages ADD attachment_name NVARCHAR(255) NULL;
+                IF COL_LENGTH('chat_messages', 'attachment_url') IS NULL
+                    ALTER TABLE chat_messages ADD attachment_url NVARCHAR(MAX) NULL;
+                IF COL_LENGTH('chat_messages', 'reply_to_message_id') IS NULL
+                    ALTER TABLE chat_messages ADD reply_to_message_id INT NULL;
+                IF COL_LENGTH('chat_messages', 'edited_at') IS NULL
+                    ALTER TABLE chat_messages ADD edited_at DATETIME NULL;
+                IF COL_LENGTH('chat_messages', 'deleted_at') IS NULL
+                    ALTER TABLE chat_messages ADD deleted_at DATETIME NULL;
+            END
+        `);
+        console.log('✅ Chat messages table ready');
+
 
     } catch (err) {
         console.error('❌ Error initializing database tables:', err);
