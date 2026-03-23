@@ -14,6 +14,13 @@ type AdminChatInboxPageProps = {
 
 const POLL_MS = 4000;
 
+const safeSenderLabel = (message: Pick<ChatMessage, "sender_name" | "sender_role">, isTH: boolean) => {
+  if (message.sender_role === "admin") {
+    return "Admin nat";
+  }
+  return message.sender_name || (isTH ? "ลูกค้า" : "Customer");
+};
+
 const quickReplies = [
   "สวัสดีครับ ทีมงานกำลังตรวจสอบให้และจะอัปเดตโดยเร็วที่สุด",
   "ได้รับข้อมูลแล้วครับ รบกวนแจ้งเวลาเกิดปัญหาและชื่ออุปกรณ์เพิ่มเติม",
@@ -49,7 +56,7 @@ async function exportTranscriptPdf(thread: ChatThread | null, messages: ChatMess
   writeLine(`Exported: ${new Date().toLocaleString()}`);
   writeLine("");
   messages.forEach((message) => {
-    writeLine(`[${formatTime(message.created_at)}] ${message.sender_name} (${message.sender_role})`, true);
+    writeLine(`[${formatTime(message.created_at)}] ${safeSenderLabel(message, true)} (${message.sender_role})`, true);
     String(message.body || "").split("\n").forEach((line) => writeLine(line || " "));
     writeLine("");
   });
@@ -64,7 +71,7 @@ function exportTranscriptTxt(thread: ChatThread | null, messages: ChatMessage[])
     `Exported: ${new Date().toLocaleString()}`,
     "",
     ...messages.flatMap((message) => [
-      `[${formatTime(message.created_at)}] ${message.sender_name} (${message.sender_role})`,
+      `[${formatTime(message.created_at)}] ${safeSenderLabel(message, true)} (${message.sender_role})`,
       String(message.body || ""),
       "",
     ]),
@@ -81,6 +88,8 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "mine" | "archive">("all");
+  const [historyStart, setHistoryStart] = useState("");
+  const [historyEnd, setHistoryEnd] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -111,7 +120,10 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
 
   const loadMessages = async (threadId: number, silently = false) => {
     try {
-      const data = await chatService.getThreadMessages(threadId);
+      const data = await chatService.getThreadMessages(threadId, {
+        startDate: historyStart || undefined,
+        endDate: historyEnd || undefined,
+      });
       setMessages(data.messages);
       await chatService.markRead(threadId);
       if (!silently) {
@@ -139,12 +151,12 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
       if (selectedThreadId) loadMessages(selectedThreadId, true).catch(() => {});
     }, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [selectedThreadId, query, filter]);
+  }, [selectedThreadId, query, filter, historyStart, historyEnd]);
 
   useEffect(() => {
     if (!selectedThreadId) return;
     loadMessages(selectedThreadId).catch(() => {});
-  }, [selectedThreadId]);
+  }, [selectedThreadId, historyStart, historyEnd]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
@@ -252,6 +264,18 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
               </div>
               {selectedThread && (
                 <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="datetime-local"
+                    value={historyStart}
+                    onChange={(event) => setHistoryStart(event.target.value)}
+                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                  />
+                  <input
+                    type="datetime-local"
+                    value={historyEnd}
+                    onChange={(event) => setHistoryEnd(event.target.value)}
+                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                  />
                   <select
                     className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
                     value={selectedThread.status}
@@ -282,6 +306,9 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                   <Button variant="outline" size="icon" onClick={() => exportTranscriptPdf(selectedThread, messages)}>
                     <Download className="h-4 w-4" />
                   </Button>
+                  <Button variant="outline" onClick={() => { setHistoryStart(""); setHistoryEnd(""); }}>
+                    {isTH ? "ล้างช่วงเวลา" : "Clear range"}
+                  </Button>
                 </div>
               )}
             </div>
@@ -306,6 +333,11 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                   <div className="rounded-2xl bg-muted/40 p-4">
                     <div className="mb-1 text-sm font-medium">{isTH ? "ประวัติลูกค้า" : "History"}</div>
                     <div className="text-sm text-muted-foreground">{messages.length} {isTH ? "ข้อความที่บันทึกไว้" : "messages stored"}</div>
+                    {(historyStart || historyEnd) && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {isTH ? "กำลังกรองตามช่วงวันเวลา" : "Filtered by selected date range"}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -316,7 +348,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                       <div key={message.id} className={`flex ${isAdminMessage ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
                         <div className={`max-w-[80%] rounded-[1.5rem] px-4 py-3 shadow-sm ${isAdminMessage ? "bg-slate-900 text-white dark:bg-emerald-600" : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"}`}>
                           <div className={`mb-1 text-[11px] ${isAdminMessage ? "text-slate-300" : "text-slate-500 dark:text-slate-400"}`}>
-                            {message.sender_name} · {formatTime(message.created_at)}
+                            {safeSenderLabel(message, isTH)} · {formatTime(message.created_at)}
                           </div>
                           <div className="whitespace-pre-wrap text-sm leading-6">{message.body}</div>
                         </div>
