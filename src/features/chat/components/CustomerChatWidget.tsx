@@ -561,7 +561,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       <div
         ref={listRef}
         onScroll={updateStickToBottom}
-        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain touch-pan-y bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] px-4 py-4"
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain touch-pan-y bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] px-3 py-3 sm:space-y-4 sm:px-4 sm:py-4"
       >
         {isLoading && <div className="text-sm text-slate-500">{isTH ? "กำลังโหลด..." : "Loading..."}</div>}
         {!isLoading && messages.length === 0 && (
@@ -589,24 +589,24 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                 </div>
               )}
               <div className={`flex ${isOwn ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
-                <div className={`max-w-[85%] rounded-[1.5rem] px-4 py-3 shadow-sm ${isOwn ? "bg-emerald-600 text-white" : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"}`}>
-                  <div className={`mb-1 flex items-center gap-2 text-[11px] ${isOwn ? "text-emerald-100" : "text-slate-500 dark:text-slate-400"}`}>
-                    <span>{safeSenderLabel(message, isTH)}</span>
+                <div className={`max-w-[88%] rounded-[1.35rem] px-3 py-3 shadow-sm sm:max-w-[85%] sm:rounded-[1.5rem] sm:px-4 ${isOwn ? "bg-emerald-600 text-white" : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"}`}>
+                  <div className={`mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] ${isOwn ? "text-emerald-100" : "text-slate-500 dark:text-slate-400"}`}>
+                    <span className="max-w-full truncate">{safeSenderLabel(message, isTH)}</span>
                     <span className="opacity-70">{formatMessageTime(message.created_at, locale)}</span>
                     {message.edited_at ? <span className="opacity-70">{isTH ? "แก้ไขแล้ว" : "edited"}</span> : null}
                   </div>
-                  <div className="whitespace-pre-wrap text-sm leading-6">{message.body}</div>
-                  <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] ${isOwn ? "text-emerald-100" : "text-slate-400"}`}>
+                  <div className="whitespace-pre-wrap break-words text-[15px] leading-6 sm:text-sm">{message.body}</div>
+                  <div className={`mt-2 flex items-center justify-end gap-1.5 text-[11px] ${isOwn ? "text-emerald-100" : "text-slate-400"}`}>
                     {isOwn && (
                       <>
                         {isMessageReadByAdmin ? <span className="mr-1 opacity-90">{isTH ? "อ่านแล้ว" : "Read"}</span> : null}
-                        <button type="button" onClick={() => setReplyTo(message)} className="rounded-full p-1 hover:bg-white/10">
+                        <button type="button" onClick={() => setReplyTo(message)} className="rounded-full p-1.5 hover:bg-white/10">
                           <Reply className="h-3.5 w-3.5" />
                         </button>
-                        <button type="button" onClick={() => startEdit(message)} className="rounded-full p-1 hover:bg-white/10">
+                        <button type="button" onClick={() => startEdit(message)} className="rounded-full p-1.5 hover:bg-white/10">
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
-                        <button type="button" onClick={() => removeMessage(message.id)} className="rounded-full p-1 hover:bg-white/10">
+                        <button type="button" onClick={() => removeMessage(message.id)} className="rounded-full p-1.5 hover:bg-white/10">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </>
@@ -619,7 +619,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         })}
       </div>
 
-      <div className="border-t border-slate-200/80 bg-white/96 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/96">
+      <div className="border-t border-slate-200/80 bg-white/96 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4 sm:py-4 dark:border-slate-800 dark:bg-slate-950/96">
         {replyTo && (
           <div className="mb-3 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             <div className="truncate">
@@ -643,7 +643,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder={isTH ? "พิมพ์ข้อความถึงเจ้าหน้าที่..." : "Type a message to support..."}
-            className="h-12 rounded-2xl"
+            className="h-12 rounded-2xl text-base sm:text-sm"
             disabled={isClosedForCustomer}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
@@ -652,9 +652,9 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
               }
             }}
           />
-          <Button className="h-12 rounded-2xl px-4" onClick={() => submitMessage().catch(() => {})} disabled={isSending || !draft.trim() || isClosedForCustomer}>
-            <Send className="mr-2 h-4 w-4" />
-            {editingMessageId ? (isTH ? "อัปเดต" : "Update") : isTH ? "ส่ง" : "Send"}
+          <Button className="h-12 min-w-12 rounded-2xl px-3 sm:px-4" onClick={() => submitMessage().catch(() => {})} disabled={isSending || !draft.trim() || isClosedForCustomer}>
+            <Send className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">{editingMessageId ? (isTH ? "อัปเดต" : "Update") : isTH ? "ส่ง" : "Send"}</span>
           </Button>
         </div>
 
@@ -669,15 +669,15 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   return (
     <div className="pointer-events-none fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 sm:bottom-8 sm:right-8">
       {isOpen && (
-        <div className="pointer-events-auto flex h-[min(100dvh-1rem,720px)] min-h-0 w-[min(440px,calc(100vw-1rem))] flex-col overflow-hidden overscroll-contain rounded-[1.5rem] border border-slate-200/80 bg-white/96 shadow-[0_30px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:h-[min(78vh,720px)] sm:w-[min(440px,calc(100vw-1.5rem))] sm:rounded-[2rem] dark:border-slate-800 dark:bg-slate-950/96">
-          <div className="flex items-center justify-between border-b border-slate-200/80 px-3 py-3 sm:px-5 sm:py-4 dark:border-slate-800">
-            <div className="min-w-0 flex items-center gap-3">
+        <div className="pointer-events-auto fixed inset-x-0 bottom-0 top-0 flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-none border border-slate-200/80 bg-white/96 shadow-[0_30px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:inset-auto sm:h-[min(78vh,720px)] sm:w-[min(440px,calc(100vw-1.5rem))] sm:rounded-[2rem] dark:border-slate-800 dark:bg-slate-950/96">
+          <div className="flex items-start justify-between border-b border-slate-200/80 px-3 py-3 sm:items-center sm:px-5 sm:py-4 dark:border-slate-800">
+            <div className="min-w-0 flex items-start gap-3">
               <img src={supportIcon} alt="Support" className="h-10 w-10 rounded-full object-cover sm:h-11 sm:w-11" draggable={false} />
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-slate-900 sm:text-base dark:text-slate-100">
+              <div className="min-w-0 flex-1">
+                <div className="line-clamp-2 text-base font-semibold leading-5 text-slate-900 sm:truncate sm:text-base dark:text-slate-100">
                   {mode === "assistant" ? (isTH ? "AI ช่วยตอบปัญหาเบื้องต้น" : "AI support assistant") : isTH ? "แชทคุยกับเจ้าหน้าที่" : "Chat with support"}
                 </div>
-                <div className="line-clamp-2 text-[11px] text-slate-500 sm:text-xs dark:text-slate-400">
+                <div className="line-clamp-2 pr-2 text-[12px] leading-5 text-slate-500 sm:text-xs dark:text-slate-400">
                   {mode === "assistant"
                     ? isTH ? "เลือกปัญหาที่พบ แล้วให้ AI ช่วยตอบก่อน" : "Pick an issue and let AI guide you first"
                     : humanHeaderMeta}
@@ -690,7 +690,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                 )}
               </div>
             </div>
-            <div className="ml-2 flex shrink-0 items-center gap-1 sm:gap-2">
+            <div className="ml-2 flex shrink-0 flex-wrap justify-end gap-1 sm:flex-nowrap sm:gap-2">
               {mode === "assistant" ? (
                 <Button size="icon" variant="ghost" onClick={resetAssistant} title="Reset">
                   <RotateCcw className="h-4 w-4" />
