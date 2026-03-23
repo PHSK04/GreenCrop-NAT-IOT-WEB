@@ -953,6 +953,8 @@ function mapChatThread(row) {
         is_pinned: Boolean(row.is_pinned),
         last_message_at: row.last_message_at,
         last_message_preview: row.last_message_preview,
+        last_message_sender_role: row.last_message_sender_role || null,
+        last_message_sender_name: row.last_message_sender_name || null,
         customer_unread_count: Number(row.customer_unread_count || 0),
         admin_unread_count: Number(row.admin_unread_count || 0),
         customer_last_read_at: row.customer_last_read_at,
@@ -1124,33 +1126,42 @@ app.get('/api/chat/threads', async (req, res) => {
         const params = [];
 
         if (isAdmin) {
-            where.push('is_archived = ?');
+            where.push('t.is_archived = ?');
             params.push(archived ? 1 : 0);
             if (mine) {
-                where.push('assigned_admin_id = ?');
+                where.push('t.assigned_admin_id = ?');
                 params.push(req.user.id);
             }
             if (unread) {
-                where.push('admin_unread_count > 0');
+                where.push('t.admin_unread_count > 0');
             }
             if (status) {
-                where.push('status = ?');
+                where.push('t.status = ?');
                 params.push(status);
             }
             if (q) {
-                where.push('(customer_name LIKE ? OR customer_email LIKE ? OR last_message_preview LIKE ?)');
+                where.push('(t.customer_name LIKE ? OR t.customer_email LIKE ? OR t.last_message_preview LIKE ?)');
                 params.push(`%${q}%`, `%${q}%`, `%${q}%`);
             }
         } else {
-            where.push('customer_user_id = ?');
+            where.push('t.customer_user_id = ?');
             params.push(req.user.id);
         }
 
         const sql = `
-            SELECT *
-            FROM chat_threads
+            SELECT
+                t.*,
+                lm.sender_role AS last_message_sender_role,
+                lm.sender_name AS last_message_sender_name
+            FROM chat_threads t
+            OUTER APPLY (
+                SELECT TOP 1 sender_role, sender_name
+                FROM chat_messages
+                WHERE thread_id = t.id
+                ORDER BY created_at DESC, id DESC
+            ) lm
             ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-            ORDER BY is_pinned DESC, last_message_at DESC, id DESC
+            ORDER BY t.is_pinned DESC, t.last_message_at DESC, t.id DESC
         `;
         const rows = await db.all(sql, params);
         res.json(rows.map(mapChatThread));
