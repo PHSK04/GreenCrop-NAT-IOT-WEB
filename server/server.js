@@ -932,6 +932,49 @@ function formatAuditTimestamp(date = new Date()) {
     return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
+const CHAT_TYPING_TTL_MS = 7000;
+const chatTypingState = new Map();
+
+function getChatTypingSnapshot(threadId) {
+    const raw = chatTypingState.get(Number(threadId)) || {};
+    const now = Date.now();
+    const snapshot = {};
+
+    for (const role of ['user', 'admin']) {
+        const entry = raw[role];
+        if (entry && entry.expiresAt > now) {
+            snapshot[role] = entry;
+        }
+    }
+
+    if (!snapshot.user && !snapshot.admin) {
+        chatTypingState.delete(Number(threadId));
+        return {};
+    }
+
+    chatTypingState.set(Number(threadId), snapshot);
+    return snapshot;
+}
+
+function setChatTypingState(threadId, role, payload) {
+    const normalizedThreadId = Number(threadId);
+    const current = getChatTypingSnapshot(normalizedThreadId);
+    const next = { ...current };
+
+    if (!payload) {
+        delete next[role];
+    } else {
+        next[role] = payload;
+    }
+
+    if (!next.user && !next.admin) {
+        chatTypingState.delete(normalizedThreadId);
+        return;
+    }
+
+    chatTypingState.set(normalizedThreadId, next);
+}
+
 function buildChatAuditDetail(date, text) {
     return `${formatAuditTimestamp(date)} auto: ${text}`;
 }
@@ -1226,6 +1269,58 @@ app.post('/api/chat/threads/:threadId/messages', async (req, res) => {
     }
 });
 
+app.post('/api/chat/threads/:threadId/typing', async (req, res) => {
+    try {
+        const threadId = parsePositiveInt(req.params.threadId, 0);
+        if (!threadId) return res.status(400).json({ error: 'Invalid thread id' });
+        const thread = await getChatThreadForRequest(threadId, req);
+        if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
+
+        const senderRole = String(req.user?.role || '').toLowerCase() === 'admin' ? 'admin' : 'user';
+        const isTyping = Boolean(req.body?.is_typing);
+
+        if (isTyping) {
+            setChatTypingState(threadId, senderRole, {
+                sender_name: safeChatSenderName(req.user),
+                sender_role: senderRole,
+                expiresAt: Date.now() + CHAT_TYPING_TTL_MS,
+            });
+        } else {
+            setChatTypingState(threadId, senderRole, null);
+        }
+
+        const snapshot = getChatTypingSnapshot(threadId);
+        res.json({
+            success: true,
+            admin_typing: Boolean(snapshot.admin),
+            admin_name: snapshot.admin?.sender_name || null,
+            user_typing: Boolean(snapshot.user),
+            user_name: snapshot.user?.sender_name || null,
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to update typing state' });
+    }
+});
+
+app.get('/api/chat/threads/:threadId/typing', async (req, res) => {
+    try {
+        const threadId = parsePositiveInt(req.params.threadId, 0);
+        if (!threadId) return res.status(400).json({ error: 'Invalid thread id' });
+        const thread = await getChatThreadForRequest(threadId, req);
+        if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
+
+        const snapshot = getChatTypingSnapshot(threadId);
+        res.json({
+            admin_typing: Boolean(snapshot.admin),
+            admin_name: snapshot.admin?.sender_name || null,
+            user_typing: Boolean(snapshot.user),
+            user_name: snapshot.user?.sender_name || null,
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to load typing state' });
+    }
+});
+
 app.post('/api/chat/threads/:threadId/read', async (req, res) => {
     try {
         const threadId = parsePositiveInt(req.params.threadId, 0);
@@ -1306,6 +1401,25 @@ app.post('/api/chat/threads/:threadId/meta', requireAdmin, async (req, res) => {
         res.json({ success: true, thread: mapChatThread(updated) });
     } catch (err) {
         res.status(500).json({ error: err.message || 'Failed to update chat thread' });
+    }
+});
+
+app.post('/api/chat/threads/:threadId/delete', requireAdmin, async (req, res) => {
+    try {
+        const threadId = parsePositiveInt(req.params.threadId, 0);
+        if (!threadId) return res.status(400).json({ error: 'Invalid thread id' });
+
+        const thread = await db.get("SELECT * FROM chat_threads WHERE id = ?", [threadId]);
+        if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
+
+        const now = new Date();
+        await db.run("DELETE FROM chat_messages WHERE thread_id = ?", [threadId]);
+        await db.run("DELETE FROM chat_threads WHERE id = ?", [threadId]);
+        await logAudit('Admin nat', 'CHAT_DELETE', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', buildChatAuditDetail(now, `delete chat #${threadId} by Admin nat`));
+
+        res.json({ success: true, threadId });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to delete chat thread' });
     }
 });
 
