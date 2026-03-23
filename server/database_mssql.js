@@ -24,6 +24,32 @@ function getAzureSqlServerName(host) {
 
 let pool;
 
+function isTransientSqlError(err) {
+    const message = String(err?.message || '').toLowerCase();
+    const code = String(err?.code || '').toLowerCase();
+    return (
+        message.includes('closed') ||
+        message.includes('connection') ||
+        message.includes('timeout') ||
+        message.includes('econnreset') ||
+        message.includes('socket') ||
+        message.includes('transport') ||
+        code === 'econnreset' ||
+        code === 'etimeout'
+    );
+}
+
+async function resetPool() {
+    if (pool) {
+        try {
+            await pool.close();
+        } catch (closeErr) {
+            console.warn('Warning: failed to close MSSQL pool cleanly:', closeErr.message);
+        }
+    }
+    pool = null;
+}
+
 async function connectToDatabase() {
     try {
         if (!pool) {
@@ -283,31 +309,42 @@ async function executeQuery(sqlText, params = []) {
     if (!pool) {
         throw new Error('Database is unavailable. Please verify DB host/network/firewall settings.');
     }
-    
-    const request = pool.request();
-    let query = sqlText;
 
-    // Convert ? to @p1, @p2... and bind parameters
-    // Note: This logic assumes parameters appear in order '?'.
-    // If params is an object (named params), logic would differ but SQLite wrapper usually uses array.
-    if (Array.isArray(params)) {
-        params.forEach((value, index) => {
-            const paramName = `p${index + 1}`;
-            // If value is undefined, tedious might throw. Use null instead.
-            request.input(paramName, value === undefined ? null : value);
-            // Replace the FIRST occurrence of ? with @pX
-            query = query.replace('?', `@${paramName}`);
-        });
-    }
+    const runOnce = async () => {
+        const request = pool.request();
+        let query = sqlText;
 
-    try {       
-        const result = await request.query(query);
-        return result;
+        if (Array.isArray(params)) {
+            params.forEach((value, index) => {
+                const paramName = `p${index + 1}`;
+                request.input(paramName, value === undefined ? null : value);
+                query = query.replace('?', `@${paramName}`);
+            });
+        }
+
+        try {
+            return await request.query(query);
+        } catch (err) {
+            console.error('SQL Error:', err);
+            console.error('Query:', query);
+            console.error('Params:', params);
+            throw err;
+        }
+    };
+
+    try {
+        return await runOnce();
     } catch (err) {
-        console.error('SQL Error:', err);
-        console.error('Query:', query);
-        console.error('Params:', params);
-        throw err;
+        if (!isTransientSqlError(err)) {
+            throw err;
+        }
+        console.warn('Transient MSSQL error detected, retrying query once...');
+        await resetPool();
+        await connectToDatabase();
+        if (!pool) {
+            throw new Error('Database is temporarily unavailable. Please try again.');
+        }
+        return await runOnce();
     }
 }
 
@@ -365,6 +402,7 @@ connectToDatabase().catch((err) => {
 async function setSessionContext(tenantId) {
     if (!tenantId) return; // Skip if no tenant ID
     if (!pool) await connectToDatabase();
+    if (!pool) return;
     try {
         await pool.request()
             .input('key', sql.NVarChar, 'tenant_id')

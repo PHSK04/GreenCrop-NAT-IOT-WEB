@@ -712,6 +712,10 @@ const handleLogin = async (req, res) => {
 
     } catch (err) {
         console.error("Login Error:", err);
+        const message = String(err?.message || '');
+        if (message.toLowerCase().includes('database is unavailable') || message.toLowerCase().includes('temporarily unavailable')) {
+            return res.status(503).json({ error: 'Login service is temporarily unavailable. Please try again.' });
+        }
         res.status(500).json({ error: err.message });
     }
 };
