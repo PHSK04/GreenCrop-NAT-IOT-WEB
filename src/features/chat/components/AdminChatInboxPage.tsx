@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, FileText, MessageSquare, Pin, Search, Send, ShieldAlert, UserCheck } from "lucide-react";
+import { Download, FileText, MessageSquare, Pin, RefreshCw, Search, Send, ShieldAlert, UserCheck } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,6 +77,14 @@ const isMessageOnSelectedDate = (value: string | null | undefined, dateValue: st
   return toDateInputValue(new Date(value)) === dateValue;
 };
 
+const compareThreads = (left: ChatThread, right: ChatThread) => {
+  if (left.is_pinned !== right.is_pinned) return Number(right.is_pinned) - Number(left.is_pinned);
+  const leftTime = new Date(left.last_message_at || left.updated_at || left.created_at || 0).getTime();
+  const rightTime = new Date(right.last_message_at || right.updated_at || right.created_at || 0).getTime();
+  if (leftTime !== rightTime) return rightTime - leftTime;
+  return right.id - left.id;
+};
+
 const downloadBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -143,6 +151,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const [historyStart, setHistoryStart] = useState("");
   const [historyEnd, setHistoryEnd] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
   const dateFilterCacheRef = useRef<Record<string, number[]>>({});
@@ -188,12 +197,31 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const loadThreads = async (silently = false) => {
     if (!silently) setIsLoading(true);
     try {
-      const nextThreads = await chatService.listThreads({
-        q: query || undefined,
-        mine: filter === "mine",
-        unread: filter === "unread",
-        archived: filter === "archive",
-      });
+      const nextThreads = await (
+        filter === "all"
+          ? (() => {
+              return Promise.all([
+                chatService.listThreads({
+                  q: query || undefined,
+                  archived: false,
+                }),
+                chatService.listThreads({
+                  q: query || undefined,
+                  archived: true,
+                }),
+              ]).then(([activeThreads, archivedThreads]) => {
+                const mergedThreads = [...activeThreads, ...archivedThreads];
+                const uniqueThreads = Array.from(new Map(mergedThreads.map((thread) => [thread.id, thread])).values());
+                return uniqueThreads.sort(compareThreads);
+              });
+            })()
+          : chatService.listThreads({
+              q: query || undefined,
+              mine: filter === "mine",
+              unread: filter === "unread",
+              archived: filter === "archive",
+            })
+      );
       setThreads(nextThreads);
       setSelectedThreadId((current) => current ?? nextThreads[0]?.id ?? null);
       setError("");
@@ -360,6 +388,18 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
     setSelectedThreadId(threads[0]?.id ?? null);
   };
 
+  const refreshInbox = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadThreads(true);
+      if (selectedThreadId) {
+        await loadMessages(selectedThreadId, true);
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const selectedFilterLabel = useMemo(() => {
     if (filter === "unread") return isTH ? "ยังไม่อ่าน" : "Unread";
     if (filter === "mine") return isTH ? "ของฉัน" : "Mine";
@@ -385,10 +425,24 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
       <div className="grid min-h-0 flex-1 gap-6 overflow-hidden xl:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="flex min-h-0 flex-col overflow-hidden border-border bg-card/80">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-emerald-600" />
-              {isTH ? "Inbox" : "Inbox"}
-            </CardTitle>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-emerald-600" />
+                {isTH ? "Inbox" : "Inbox"}
+              </CardTitle>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="rounded-full"
+                onClick={() => refreshInbox().catch(() => {})}
+                disabled={isRefreshing}
+                title={isTH ? "รีเฟรชรายการแชท" : "Refresh chat list"}
+                aria-label={isTH ? "รีเฟรชรายการแชท" : "Refresh chat list"}
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
             <div className="relative">
