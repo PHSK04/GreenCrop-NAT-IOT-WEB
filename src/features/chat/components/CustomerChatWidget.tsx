@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   Bot,
+  CalendarRange,
+  CheckCheck,
   Download,
   FileText,
   MessageCircleMore,
@@ -10,13 +12,17 @@ import {
   RotateCcw,
   Send,
   Trash2,
+  UserCheck,
+  UserRoundX,
   X,
 } from "lucide-react";
 import supportIcon from "@/assets/images/icon_support.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { chatService, ChatMessage, ChatThread } from "@/features/chat/services/chatService";
+import { toast } from "sonner";
 
 type CustomerChatWidgetProps = {
   language?: string;
@@ -198,9 +204,14 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const [isSending, setIsSending] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const assistantListRef = useRef<HTMLDivElement | null>(null);
   const shouldStickToBottomRef = useRef(true);
   const previousMessageCountRef = useRef(0);
+  const latestAdminMessageIdRef = useRef<number | null>(null);
+  const hasPrimedAdminMessageRef = useRef(false);
+  const previousAssistantMessageCountRef = useRef(assistantMessages.length);
 
   const draftKey = useMemo(() => `chat_draft_${thread?.id || "pending"}`, [thread?.id]);
   const humanListRef = listRef;
@@ -222,11 +233,21 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     });
   };
 
+  const scrollAssistantToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const node = assistantListRef.current;
+    if (!node) return;
+    node.scrollTo({
+      top: node.scrollHeight,
+      behavior,
+    });
+  };
+
   const loadChat = async (silently = false) => {
     if (!silently) setIsLoading(true);
     try {
       const data = await chatService.getMyThread();
       setThread(data.thread);
+      setUnreadCount(data.thread.customer_unread_count || 0);
       if (historyStart || historyEnd) {
         const filtered = await chatService.getThreadMessages(data.thread.id, {
           startDate: historyStart || undefined,
@@ -238,6 +259,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       }
       setError("");
       await chatService.markRead(data.thread.id);
+      setUnreadCount(0);
       if (!silently) {
         shouldStickToBottomRef.current = true;
       }
@@ -245,6 +267,36 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       setError(err instanceof Error ? err.message : "Failed to load chat");
     } finally {
       if (!silently) setIsLoading(false);
+    }
+  };
+
+  const refreshThreadState = async () => {
+    try {
+      const data = await chatService.getMyThread();
+      setThread(data.thread);
+      setUnreadCount(data.thread.customer_unread_count || 0);
+
+      const latestAdminMessage = [...data.messages].reverse().find((message) => message.sender_role === "admin");
+      if (!latestAdminMessage) return;
+
+      if (!hasPrimedAdminMessageRef.current) {
+        latestAdminMessageIdRef.current = latestAdminMessage.id;
+        hasPrimedAdminMessageRef.current = true;
+        return;
+      }
+
+      const hasNewAdminReply = latestAdminMessage.id !== latestAdminMessageIdRef.current;
+      latestAdminMessageIdRef.current = latestAdminMessage.id;
+
+      if (hasNewAdminReply && (!isOpen || mode !== "human")) {
+        toast.success(isTH ? "เจ้าหน้าที่ตอบกลับแล้ว" : "Support replied", {
+          description:
+            String(latestAdminMessage.body || "").slice(0, 96) ||
+            (isTH ? "เปิดแชทเพื่อดูข้อความล่าสุด" : "Open chat to see the latest reply."),
+        });
+      }
+    } catch {
+      // Ignore background refresh errors for badge/status updates.
     }
   };
 
@@ -256,6 +308,14 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     }, POLL_MS);
     return () => window.clearInterval(timer);
   }, [isOpen, mode, historyStart, historyEnd]);
+
+  useEffect(() => {
+    refreshThreadState().catch(() => {});
+    const timer = window.setInterval(() => {
+      refreshThreadState().catch(() => {});
+    }, POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [isOpen, mode, isTH]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -284,6 +344,15 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     previousMessageCountRef.current = 0;
     shouldStickToBottomRef.current = true;
   }, [thread?.id, mode]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== "assistant") return;
+    const hasNewAssistantMessages = assistantMessages.length > previousAssistantMessageCountRef.current;
+    window.requestAnimationFrame(() => {
+      scrollAssistantToBottom(hasNewAssistantMessages ? "smooth" : "auto");
+    });
+    previousAssistantMessageCountRef.current = assistantMessages.length;
+  }, [assistantMessages, isOpen, mode]);
 
   const resetAssistant = () => {
     setMode("assistant");
@@ -363,16 +432,58 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
   };
 
+  const updateCaseStatus = async (nextStatus: ChatThread["status"]) => {
+    if (!thread) return;
+    setIsSending(true);
+    try {
+      const updated = await chatService.updateThreadMeta(thread.id, { status: nextStatus });
+      setThread(updated);
+      setUnreadCount(updated.customer_unread_count || 0);
+      toast.success(nextStatus === "closed"
+        ? (isTH ? "ปิดเคสแล้ว" : "Case closed")
+        : (isTH ? "เปิดเคสอีกครั้งแล้ว" : "Case reopened"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update case");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   const ownLastMessageRead =
     thread?.admin_last_read_at &&
     messages.length > 0 &&
     new Date(thread.admin_last_read_at).getTime() >= new Date(messages[messages.length - 1].created_at).getTime();
 
   const isClosedForCustomer = mode === "human" && thread?.status === "closed";
+  const hasHistoryFilter = Boolean(historyStart || historyEnd);
+  const assignedAdminName = thread?.assigned_admin_name?.trim();
+  const statusToneClass =
+    thread?.status === "closed"
+      ? "bg-slate-400"
+      : assignedAdminName
+        ? "bg-emerald-500"
+        : "bg-amber-500";
+  const humanHeaderStatus = thread?.status === "closed"
+    ? (isTH ? "ปิดเคสแล้ว" : "Case closed")
+    : assignedAdminName
+      ? `${assignedAdminName}${isTH ? " กำลังดูแลเคส" : " is handling this case"}`
+      : thread?.status === "waiting"
+        ? (isTH ? "รอเจ้าหน้าที่รับเคส" : "Waiting for support")
+        : (isTH ? "มีเจ้าหน้าที่ดูแล" : "Support available");
+  const humanHeaderMeta = thread?.status === "closed"
+    ? (isTH ? "ดูประวัติได้ แต่ส่งข้อความต่อไม่ได้" : "History is available, but replies are disabled")
+    : ownLastMessageRead
+      ? (isTH ? "อ่านข้อความล่าสุดแล้ว" : "Latest message read")
+      : unreadCount > 0
+        ? (isTH ? `มีข้อความใหม่ ${unreadCount} ข้อความ` : `${unreadCount} new message${unreadCount > 1 ? "s" : ""}`)
+        : (isTH ? "ตอบกลับแบบเรียลไทม์" : "Realtime replies");
 
   const assistantView = (
     <>
-      <div className="flex-1 space-y-4 overflow-auto bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] px-4 py-4">
+      <div
+        ref={assistantListRef}
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain touch-pan-y bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] px-4 py-4"
+      >
         {assistantMessages.map((message) => (
           <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
             <div className={`max-w-[88%] rounded-[1.6rem] px-4 py-3 shadow-sm ${message.sender === "user" ? "bg-emerald-600 text-white" : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"}`}>
@@ -450,7 +561,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       <div
         ref={listRef}
         onScroll={updateStickToBottom}
-        className="flex-1 space-y-4 overflow-auto bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] px-4 py-4"
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain touch-pan-y bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] px-4 py-4"
       >
         {isLoading && <div className="text-sm text-slate-500">{isTH ? "กำลังโหลด..." : "Loading..."}</div>}
         {!isLoading && messages.length === 0 && (
@@ -503,37 +614,6 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       </div>
 
       <div className="border-t border-slate-200/80 bg-white/96 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/96">
-        <div className="mb-3 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-900/60">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
-              {isTH ? "กรองประวัติแชทตามวันเวลา" : "Filter chat history by date and time"}
-            </div>
-            <Button variant="ghost" size="sm" className="h-8 rounded-xl px-2 text-xs" onClick={() => { setHistoryStart(""); setHistoryEnd(""); }}>
-              {isTH ? "ล้างช่วงเวลา" : "Clear range"}
-            </Button>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="grid gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-              <span>{isTH ? "เริ่มจาก" : "From"}</span>
-              <input
-                type="datetime-local"
-                value={historyStart}
-                onChange={(event) => setHistoryStart(event.target.value)}
-                className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-              />
-            </label>
-            <label className="grid gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-              <span>{isTH ? "ถึง" : "To"}</span>
-              <input
-                type="datetime-local"
-                value={historyEnd}
-                onChange={(event) => setHistoryEnd(event.target.value)}
-                className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-              />
-            </label>
-          </div>
-        </div>
-
         {replyTo && (
           <div className="mb-3 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             <div className="truncate">
@@ -574,7 +654,10 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
         <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
           <span>{isTH ? "draft จะถูกเก็บไว้ให้อัตโนมัติ" : "Draft is saved automatically"}</span>
-          <Badge variant="outline">{ownLastMessageRead ? (isTH ? "อ่านแล้ว" : "Read") : isTH ? "ส่งแล้ว" : "Sent"}</Badge>
+          <Badge variant="outline" className="gap-1">
+            {ownLastMessageRead ? <CheckCheck className="h-3.5 w-3.5" /> : null}
+            {ownLastMessageRead ? (isTH ? "อ่านแล้ว" : "Read") : isTH ? "ส่งแล้ว" : "Sent"}
+          </Badge>
         </div>
       </div>
     </>
@@ -583,7 +666,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   return (
     <div className="pointer-events-none fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 sm:bottom-8 sm:right-8">
       {isOpen && (
-        <div className="pointer-events-auto flex h-[min(100dvh-1rem,720px)] w-[min(440px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white/96 shadow-[0_30px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:h-[min(78vh,720px)] sm:w-[min(440px,calc(100vw-1.5rem))] sm:rounded-[2rem] dark:border-slate-800 dark:bg-slate-950/96">
+        <div className="pointer-events-auto flex h-[min(100dvh-1rem,720px)] min-h-0 w-[min(440px,calc(100vw-1rem))] flex-col overflow-hidden overscroll-contain rounded-[1.5rem] border border-slate-200/80 bg-white/96 shadow-[0_30px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:h-[min(78vh,720px)] sm:w-[min(440px,calc(100vw-1.5rem))] sm:rounded-[2rem] dark:border-slate-800 dark:bg-slate-950/96">
           <div className="flex items-center justify-between border-b border-slate-200/80 px-3 py-3 sm:px-5 sm:py-4 dark:border-slate-800">
             <div className="min-w-0 flex items-center gap-3">
               <img src={supportIcon} alt="Support" className="h-10 w-10 rounded-full object-cover sm:h-11 sm:w-11" draggable={false} />
@@ -594,8 +677,14 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                 <div className="line-clamp-2 text-[11px] text-slate-500 sm:text-xs dark:text-slate-400">
                   {mode === "assistant"
                     ? isTH ? "เลือกปัญหาที่พบ แล้วให้ AI ช่วยตอบก่อน" : "Pick an issue and let AI guide you first"
-                    : ownLastMessageRead ? (isTH ? "อ่านข้อความล่าสุดแล้ว" : "Latest message read") : isTH ? "ตอบกลับแบบเรียลไทม์" : "Realtime replies"}
+                    : humanHeaderMeta}
                 </div>
+                {mode === "human" && (
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                    <span className={`h-2 w-2 rounded-full ${statusToneClass}`} />
+                    <span className="truncate">{humanHeaderStatus}</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="ml-2 flex shrink-0 items-center gap-1 sm:gap-2">
@@ -605,12 +694,104 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                 </Button>
               ) : (
                 <>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title={isTH ? "กรองช่วงเวลา" : "Filter by date"}
+                        className={hasHistoryFilter ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60" : ""}
+                      >
+                        <CalendarRange className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[min(20rem,calc(100vw-2rem))] rounded-[1.25rem] p-3">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                              {isTH ? "กรองประวัติแชท" : "Filter chat history"}
+                            </div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {isTH ? "เลือกช่วงเวลาที่ต้องการดู" : "Choose the date range to review"}
+                            </div>
+                          </div>
+                          {hasHistoryFilter && (
+                            <Badge variant="outline" className="border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300">
+                              {isTH ? "กำลังกรอง" : "Filtered"}
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="grid gap-2">
+                          <label className="grid gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            <span>{isTH ? "เริ่มจาก" : "From"}</span>
+                            <input
+                              type="datetime-local"
+                              value={historyStart}
+                              onChange={(event) => setHistoryStart(event.target.value)}
+                              className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            <span>{isTH ? "ถึง" : "To"}</span>
+                            <input
+                              type="datetime-local"
+                              value={historyEnd}
+                              onChange={(event) => setHistoryEnd(event.target.value)}
+                              className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 rounded-xl px-3 text-xs"
+                            onClick={() => {
+                              setHistoryStart("");
+                              setHistoryEnd("");
+                            }}
+                          >
+                            {isTH ? "ล้างช่วงเวลา" : "Clear range"}
+                          </Button>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {hasHistoryFilter
+                              ? (isTH ? "ระบบจะรีเฟรชแชทตามช่วงเวลานี้" : "Chat refreshes using this range")
+                              : (isTH ? "ถ้าไม่เลือกจะแสดงทั้งหมด" : "Shows all messages by default")}
+                          </div>
+                        </div>
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button size="icon" variant="ghost" onClick={() => exportTranscriptTxt(thread, messages)} title="TXT">
                     <FileText className="h-4 w-4" />
                   </Button>
                   <Button size="icon" variant="ghost" onClick={() => exportTranscriptPdf(thread, messages)} title="PDF">
                     <Download className="h-4 w-4" />
                   </Button>
+                  {thread?.status === "closed" ? (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => updateCaseStatus("open").catch(() => {})}
+                      title={isTH ? "เปิดเคสอีกครั้ง" : "Reopen case"}
+                      disabled={isSending}
+                    >
+                      <UserCheck className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => updateCaseStatus("closed").catch(() => {})}
+                      title={isTH ? "ปิดเคส" : "Close case"}
+                      disabled={isSending}
+                    >
+                      <UserRoundX className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button size="icon" variant="ghost" onClick={resetAssistant} title="Back to AI">
                     <Bot className="h-4 w-4" />
                   </Button>
@@ -629,7 +810,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
-        className="pointer-events-auto transition hover:-translate-y-0.5"
+        className="pointer-events-auto relative transition hover:-translate-y-0.5"
         aria-label={isTH ? "เปิดแชทช่วยเหลือ" : "Open support chat"}
       >
         <img
@@ -638,6 +819,11 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
           className="h-16 w-16 rounded-full object-cover shadow-[0_18px_40px_rgba(15,23,42,0.2)] sm:h-24 sm:w-24"
           draggable={false}
         />
+        {unreadCount > 0 && (
+          <span className="absolute -right-1 -top-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[11px] font-semibold text-white shadow-lg ring-2 ring-white dark:ring-slate-950">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
       </button>
     </div>
   );
