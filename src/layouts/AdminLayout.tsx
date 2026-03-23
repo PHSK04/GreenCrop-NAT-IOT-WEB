@@ -44,9 +44,9 @@ export function AdminDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background font-sans text-foreground flex">
+    <div className="flex h-[100dvh] overflow-hidden bg-background font-sans text-foreground">
       {/* Admin Sidebar */}
-      <div className="w-64 border-r border-border bg-gradient-to-b from-white via-emerald-50/30 to-white dark:from-slate-950 dark:via-emerald-900/10 dark:to-slate-950 flex flex-col">
+      <div className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-gradient-to-b from-white via-emerald-50/30 to-white dark:from-slate-950 dark:via-emerald-900/10 dark:to-slate-950">
         <div className="p-6 border-b border-border/80">
           <div className="flex items-center gap-3">
             <div className="h-11 w-11 rounded-xl bg-emerald-500/15 flex items-center justify-center border border-emerald-500/20 shadow-sm">
@@ -59,7 +59,7 @@ export function AdminDashboard() {
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="min-h-0 flex-1 overflow-y-auto p-4 space-y-2">
           <div className="px-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.2em] mb-2">Management</div>
           <Button
             variant="ghost"
@@ -161,7 +161,7 @@ export function AdminDashboard() {
       </div>
 
       {/* Main Admin Content */}
-      <main className="flex-1 overflow-auto bg-slate-50/50 dark:bg-slate-950/50">
+      <main className="min-h-0 flex-1 overflow-hidden bg-slate-50/50 dark:bg-slate-950/50">
         {activeTab === "Overview" && <AdminOverview />}
         {activeTab === "Users" && <UserManagementPage />}
         
