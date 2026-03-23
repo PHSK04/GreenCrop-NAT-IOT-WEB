@@ -137,6 +137,7 @@
     position: absolute;
     inset: 0;
     background-color: hsl(var(--card));
+    border-radius: inherit;
     z-index: -1;
   }
 
