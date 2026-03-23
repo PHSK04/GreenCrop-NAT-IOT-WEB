@@ -3,7 +3,6 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   Bot,
   CalendarRange,
-  CheckCheck,
   Download,
   FileText,
   MessageCircleMore,
@@ -20,7 +19,7 @@ import supportIcon from "@/assets/images/icon_support.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { chatService, ChatMessage, ChatThread } from "@/features/chat/services/chatService";
 import { toast } from "sonner";
 
@@ -205,6 +204,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isHistoryFilterOpen, setIsHistoryFilterOpen] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
   const assistantListRef = useRef<HTMLDivElement | null>(null);
   const shouldStickToBottomRef = useRef(true);
@@ -572,6 +572,11 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
         {messages.map((message, index) => {
           const isOwn = message.sender_role === "user";
+          const isMessageReadByAdmin = Boolean(
+            isOwn &&
+            thread?.admin_last_read_at &&
+            new Date(thread.admin_last_read_at).getTime() >= new Date(message.created_at).getTime(),
+          );
           const previousMessage = index > 0 ? messages[index - 1] : null;
           const shouldShowDayDivider = !previousMessage || !isSameCalendarDay(previousMessage.created_at, message.created_at);
           return (
@@ -594,6 +599,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                   <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] ${isOwn ? "text-emerald-100" : "text-slate-400"}`}>
                     {isOwn && (
                       <>
+                        {isMessageReadByAdmin ? <span className="mr-1 opacity-90">{isTH ? "อ่านแล้ว" : "Read"}</span> : null}
                         <button type="button" onClick={() => setReplyTo(message)} className="rounded-full p-1 hover:bg-white/10">
                           <Reply className="h-3.5 w-3.5" />
                         </button>
@@ -654,10 +660,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
         <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
           <span>{isTH ? "draft จะถูกเก็บไว้ให้อัตโนมัติ" : "Draft is saved automatically"}</span>
-          <Badge variant="outline" className="gap-1">
-            {ownLastMessageRead ? <CheckCheck className="h-3.5 w-3.5" /> : null}
-            {ownLastMessageRead ? (isTH ? "อ่านแล้ว" : "Read") : isTH ? "ส่งแล้ว" : "Sent"}
-          </Badge>
+          <Badge variant="outline">{isTH ? "ส่งแล้ว" : "Sent"}</Badge>
         </div>
       </div>
     </>
@@ -694,57 +697,53 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                 </Button>
               ) : (
                 <>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                  <Sheet open={isHistoryFilterOpen} onOpenChange={setIsHistoryFilterOpen}>
+                    <SheetTrigger asChild>
                       <Button
                         size="icon"
                         variant="ghost"
                         title={isTH ? "กรองช่วงเวลา" : "Filter by date"}
+                        aria-label={isTH ? "กรองช่วงเวลา" : "Filter by date"}
                         className={hasHistoryFilter ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60" : ""}
                       >
                         <CalendarRange className="h-4 w-4" />
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-[min(20rem,calc(100vw-2rem))] rounded-[1.25rem] p-3">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                              {isTH ? "กรองประวัติแชท" : "Filter chat history"}
-                            </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                              {isTH ? "เลือกช่วงเวลาที่ต้องการดู" : "Choose the date range to review"}
-                            </div>
-                          </div>
-                          {hasHistoryFilter && (
-                            <Badge variant="outline" className="border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300">
-                              {isTH ? "กำลังกรอง" : "Filtered"}
-                            </Badge>
-                          )}
-                        </div>
-
-                        <div className="grid gap-2">
-                          <label className="grid gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                            <span>{isTH ? "เริ่มจาก" : "From"}</span>
-                            <input
-                              type="datetime-local"
-                              value={historyStart}
-                              onChange={(event) => setHistoryStart(event.target.value)}
-                              className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                            />
-                          </label>
-                          <label className="grid gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                            <span>{isTH ? "ถึง" : "To"}</span>
-                            <input
-                              type="datetime-local"
-                              value={historyEnd}
-                              onChange={(event) => setHistoryEnd(event.target.value)}
-                              className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                            />
-                          </label>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2">
+                    </SheetTrigger>
+                    <SheetContent
+                      side="bottom"
+                      className="rounded-t-[28px] border-slate-200 bg-white text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                    >
+                      <SheetHeader className="pb-2">
+                        <SheetTitle>{isTH ? "กรองประวัติแชท" : "Filter chat history"}</SheetTitle>
+                        <SheetDescription>
+                          {isTH ? "เลือกช่วงเวลาที่ต้องการดูข้อความ" : "Choose the date range you want to review."}
+                        </SheetDescription>
+                      </SheetHeader>
+                      <div className="grid gap-3 px-4 pb-4">
+                        {hasHistoryFilter && (
+                          <Badge variant="outline" className="w-fit border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300">
+                            {isTH ? "กำลังกรอง" : "Filtered"}
+                          </Badge>
+                        )}
+                        <label className="grid gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                          <span>{isTH ? "เริ่มจาก" : "From"}</span>
+                          <input
+                            type="datetime-local"
+                            value={historyStart}
+                            onChange={(event) => setHistoryStart(event.target.value)}
+                            className="h-11 rounded-xl border border-border bg-background px-3 text-sm"
+                          />
+                        </label>
+                        <label className="grid gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                          <span>{isTH ? "ถึง" : "To"}</span>
+                          <input
+                            type="datetime-local"
+                            value={historyEnd}
+                            onChange={(event) => setHistoryEnd(event.target.value)}
+                            className="h-11 rounded-xl border border-border bg-background px-3 text-sm"
+                          />
+                        </label>
+                        <div className="flex items-center justify-between gap-3 pt-1">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -756,19 +755,31 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                           >
                             {isTH ? "ล้างช่วงเวลา" : "Clear range"}
                           </Button>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                          <div className="text-right text-[11px] text-slate-500 dark:text-slate-400">
                             {hasHistoryFilter
-                              ? (isTH ? "ระบบจะรีเฟรชแชทตามช่วงเวลานี้" : "Chat refreshes using this range")
+                              ? (isTH ? "ระบบจะรีเฟรชตามช่วงเวลานี้" : "Chat refreshes using this range")
                               : (isTH ? "ถ้าไม่เลือกจะแสดงทั้งหมด" : "Shows all messages by default")}
                           </div>
                         </div>
                       </div>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button size="icon" variant="ghost" onClick={() => exportTranscriptTxt(thread, messages)} title="TXT">
+                    </SheetContent>
+                  </Sheet>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => exportTranscriptTxt(thread, messages)}
+                    title={isTH ? "ดาวน์โหลดเป็นไฟล์ข้อความ" : "Download as text"}
+                    aria-label={isTH ? "ดาวน์โหลดเป็นไฟล์ข้อความ" : "Download as text"}
+                  >
                     <FileText className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => exportTranscriptPdf(thread, messages)} title="PDF">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => exportTranscriptPdf(thread, messages)}
+                    title={isTH ? "ดาวน์โหลดเป็น PDF" : "Download as PDF"}
+                    aria-label={isTH ? "ดาวน์โหลดเป็น PDF" : "Download as PDF"}
+                  >
                     <Download className="h-4 w-4" />
                   </Button>
                   {thread?.status === "closed" ? (
@@ -777,6 +788,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                       variant="ghost"
                       onClick={() => updateCaseStatus("open").catch(() => {})}
                       title={isTH ? "เปิดเคสอีกครั้ง" : "Reopen case"}
+                      aria-label={isTH ? "เปิดเคสอีกครั้ง" : "Reopen case"}
                       disabled={isSending}
                     >
                       <UserCheck className="h-4 w-4" />
@@ -787,17 +799,30 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                       variant="ghost"
                       onClick={() => updateCaseStatus("closed").catch(() => {})}
                       title={isTH ? "ปิดเคส" : "Close case"}
+                      aria-label={isTH ? "ปิดเคส" : "Close case"}
                       disabled={isSending}
                     >
                       <UserRoundX className="h-4 w-4" />
                     </Button>
                   )}
-                  <Button size="icon" variant="ghost" onClick={resetAssistant} title="Back to AI">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={resetAssistant}
+                    title={isTH ? "กลับไปหน้า AI" : "Back to AI"}
+                    aria-label={isTH ? "กลับไปหน้า AI" : "Back to AI"}
+                  >
                     <Bot className="h-4 w-4" />
                   </Button>
                 </>
               )}
-              <Button size="icon" variant="ghost" onClick={() => setIsOpen(false)}>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setIsOpen(false)}
+                title={isTH ? "ปิดหน้าต่างแชท" : "Close chat"}
+                aria-label={isTH ? "ปิดหน้าต่างแชท" : "Close chat"}
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>
