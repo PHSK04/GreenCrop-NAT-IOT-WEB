@@ -124,6 +124,7 @@ function exportTranscriptTxt(thread: ChatThread | null, messages: ChatMessage[])
 
 export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps) {
   const isTH = language === "TH";
+  const todayDateValue = toDateInputValue(new Date());
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -131,7 +132,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "mine" | "archive">("all");
-  const [selectedInboxDate, setSelectedInboxDate] = useState(() => toDateInputValue(new Date()));
+  const [selectedInboxDate, setSelectedInboxDate] = useState(() => todayDateValue);
   const [matchingThreadIdsByDate, setMatchingThreadIdsByDate] = useState<number[] | null>(null);
   const [isInboxDateLoading, setIsInboxDateLoading] = useState(false);
   const [historyStart, setHistoryStart] = useState("");
@@ -167,6 +168,16 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
     () => filteredThreadsByDay.find((thread) => thread.id === selectedThreadId) || null,
     [filteredThreadsByDay, selectedThreadId],
   );
+  const selectedDateLabel = useMemo(() => {
+    if (!selectedInboxDate) return isTH ? "ทุกวัน" : "All dates";
+    if (selectedInboxDate === todayDateValue) return isTH ? "วันนี้" : "Today";
+    return new Date(selectedInboxDate).toLocaleDateString(locale, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }, [isTH, locale, selectedInboxDate, todayDateValue]);
 
   const loadThreads = async (silently = false) => {
     if (!silently) setIsLoading(true);
@@ -345,12 +356,21 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
-                className={selectedInboxDate === toDateInputValue(new Date())
+                className={selectedInboxDate === todayDateValue
                   ? "rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 px-5 text-white hover:from-emerald-400 hover:to-teal-400"
                   : "rounded-full border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-300 dark:hover:bg-emerald-950/30"}
-                onClick={() => setSelectedInboxDate(toDateInputValue(new Date()))}
+                onClick={() => setSelectedInboxDate(todayDateValue)}
               >
                 {isTH ? "วันนี้" : "Today"}
+              </Button>
+              <Button
+                variant="ghost"
+                className={!selectedInboxDate
+                  ? "rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 px-5 text-white hover:from-emerald-400 hover:to-teal-400"
+                  : "rounded-full border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-300 dark:hover:bg-emerald-950/30"}
+                onClick={() => setSelectedInboxDate("")}
+              >
+                {isTH ? "ทั้งหมด" : "All dates"}
               </Button>
               <input
                 type="date"
@@ -358,6 +378,10 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                 onChange={(event) => setSelectedInboxDate(event.target.value)}
                 className="h-10 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
               />
+            </div>
+
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">
+              {isTH ? "กำลังดูรายการของ:" : "Showing threads for:"} <span className="font-semibold">{selectedDateLabel}</span>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -484,8 +508,17 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
 
           <CardContent className="min-h-0 flex-1 overflow-hidden p-0">
             {!selectedThread ? (
-              <div className="flex min-h-[560px] items-center justify-center text-sm text-muted-foreground">
-                {isTH ? "เลือกห้องแชทจาก inbox ด้านซ้าย" : "Select a conversation from the inbox"}
+              <div className="flex min-h-[560px] items-center justify-center px-6">
+                <div className="max-w-md text-center">
+                  <div className="text-base font-medium text-foreground">
+                    {isTH ? "เลือกห้องแชทจาก inbox ด้านซ้าย" : "Select a conversation from the inbox"}
+                  </div>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    {isTH
+                      ? `ตอนนี้กำลังดูรายการของ ${selectedDateLabel} หากหาไม่เจอให้เปลี่ยนวันหรือกด "ทั้งหมด"`
+                      : `You are currently viewing threads for ${selectedDateLabel}. Change the date or select "All dates" if needed.`}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="flex h-full min-h-0 flex-col">
