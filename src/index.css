@@ -153,7 +153,8 @@
     backdrop-filter: none !important;
     position: relative;
     z-index: 1;
-    border-radius: 16px !important;
+    overflow: hidden;
+    border-radius: 20px !important;
   }
 
   .force-solid .rounded-2xl,
