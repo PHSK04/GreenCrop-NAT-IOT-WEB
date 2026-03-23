@@ -902,6 +902,398 @@ function maskContact(value) {
     return `${text.slice(0, 2)}***${text.slice(-2)}`;
 }
 
+function normalizeChatStatus(value) {
+    const allowed = new Set(['open', 'waiting', 'closed']);
+    const normalized = String(value || '').trim().toLowerCase();
+    return allowed.has(normalized) ? normalized : 'open';
+}
+
+function normalizeChatPriority(value) {
+    const allowed = new Set(['low', 'normal', 'high', 'urgent']);
+    const normalized = String(value || '').trim().toLowerCase();
+    return allowed.has(normalized) ? normalized : 'normal';
+}
+
+function mapChatThread(row) {
+    if (!row) return null;
+    return {
+        id: row.id,
+        customer_user_id: row.customer_user_id,
+        customer_name: row.customer_name,
+        customer_email: row.customer_email,
+        customer_phone: row.customer_phone,
+        subject: row.subject,
+        status: row.status,
+        priority: row.priority,
+        assigned_admin_id: row.assigned_admin_id,
+        assigned_admin_name: row.assigned_admin_name,
+        is_archived: Boolean(row.is_archived),
+        is_pinned: Boolean(row.is_pinned),
+        last_message_at: row.last_message_at,
+        last_message_preview: row.last_message_preview,
+        customer_unread_count: Number(row.customer_unread_count || 0),
+        admin_unread_count: Number(row.admin_unread_count || 0),
+        customer_last_read_at: row.customer_last_read_at,
+        admin_last_read_at: row.admin_last_read_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        closed_at: row.closed_at,
+    };
+}
+
+function mapChatMessage(row) {
+    if (!row) return null;
+    return {
+        id: row.id,
+        thread_id: row.thread_id,
+        sender_user_id: row.sender_user_id,
+        sender_name: row.sender_name,
+        sender_role: row.sender_role,
+        message_type: row.message_type,
+        body: row.body,
+        attachment_name: row.attachment_name,
+        attachment_url: row.attachment_url,
+        reply_to_message_id: row.reply_to_message_id,
+        edited_at: row.edited_at,
+        deleted_at: row.deleted_at,
+        created_at: row.created_at,
+    };
+}
+
+async function ensureChatThreadForUser(user) {
+    const existing = await db.get(
+        `SELECT TOP 1 *
+         FROM chat_threads
+         WHERE customer_user_id = ?
+         ORDER BY created_at DESC`,
+        [user.id]
+    );
+    if (existing) return mapChatThread(existing);
+
+    const now = new Date();
+    const subject = `Support for ${user.name}`;
+    const created = await db.run(
+        `INSERT INTO chat_threads (
+            customer_user_id, customer_name, customer_email, customer_phone, subject,
+            status, priority, last_message_at, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, 'open', 'normal', ?, ?, ?)`,
+        [user.id, user.name, user.email, user.phone || null, subject, now, now, now]
+    );
+
+    const thread = await db.get("SELECT * FROM chat_threads WHERE id = ?", [created.id]);
+    return mapChatThread(thread);
+}
+
+async function getChatThreadForRequest(threadId, req) {
+    const thread = await db.get("SELECT * FROM chat_threads WHERE id = ?", [threadId]);
+    if (!thread) return null;
+    const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
+    if (isAdmin) return thread;
+    if (String(thread.customer_user_id) !== String(req.user?.id || '')) {
+        return null;
+    }
+    return thread;
+}
+
+async function appendChatMessage({ threadId, sender, body, messageType = 'text', replyToMessageId = null, attachmentName = null, attachmentUrl = null }) {
+    const now = new Date();
+    const preview = String(body || attachmentName || '').trim().slice(0, 400) || '[attachment]';
+    const senderRole = String(sender.role || '').toLowerCase() === 'admin' ? 'admin' : 'user';
+    const isAdminMessage = senderRole === 'admin';
+
+    const result = await db.run(
+        `INSERT INTO chat_messages (
+            thread_id, sender_user_id, sender_name, sender_role, message_type, body,
+            attachment_name, attachment_url, reply_to_message_id, created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            threadId,
+            sender.id,
+            sender.name || sender.email || 'Unknown',
+            senderRole,
+            messageType,
+            body || null,
+            attachmentName,
+            attachmentUrl,
+            replyToMessageId,
+            now,
+        ]
+    );
+
+    await db.run(
+        `UPDATE chat_threads
+         SET last_message_at = ?,
+             last_message_preview = ?,
+             updated_at = ?,
+             status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+             admin_unread_count = CASE WHEN ? = 1 THEN admin_unread_count ELSE admin_unread_count + 1 END,
+             customer_unread_count = CASE WHEN ? = 1 THEN customer_unread_count + 1 ELSE customer_unread_count END
+         WHERE id = ?`,
+        [now, preview, now, isAdminMessage ? 1 : 0, isAdminMessage ? 1 : 0, threadId]
+    );
+
+    const createdMessage = await db.get("SELECT * FROM chat_messages WHERE id = ?", [result.id]);
+    return mapChatMessage(createdMessage);
+}
+
+async function loadChatThreadMessages(threadId, limit = 200) {
+    const safeLimit = Math.max(1, Math.min(500, Number(limit) || 200));
+    const rows = await db.all(
+        `SELECT TOP ${safeLimit} *
+         FROM chat_messages
+         WHERE thread_id = ?
+         ORDER BY created_at ASC, id ASC`,
+        [threadId]
+    );
+    return rows.map(mapChatMessage);
+}
+
+// --- Chat APIs ---
+app.get('/api/chat/thread/me', async (req, res) => {
+    try {
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const thread = await ensureChatThreadForUser(req.user);
+        const messages = await loadChatThreadMessages(thread.id, req.query.limit);
+        res.json({ thread, messages });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to load chat thread' });
+    }
+});
+
+app.get('/api/chat/threads', async (req, res) => {
+    try {
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
+        const mine = String(req.query.mine || '').toLowerCase() === 'true';
+        const unread = String(req.query.unread || '').toLowerCase() === 'true';
+        const archived = String(req.query.archived || '').toLowerCase() === 'true';
+        const q = String(req.query.q || '').trim();
+        const status = req.query.status ? normalizeChatStatus(req.query.status) : '';
+
+        const where = [];
+        const params = [];
+
+        if (isAdmin) {
+            where.push('is_archived = ?');
+            params.push(archived ? 1 : 0);
+            if (mine) {
+                where.push('assigned_admin_id = ?');
+                params.push(req.user.id);
+            }
+            if (unread) {
+                where.push('admin_unread_count > 0');
+            }
+            if (status) {
+                where.push('status = ?');
+                params.push(status);
+            }
+            if (q) {
+                where.push('(customer_name LIKE ? OR customer_email LIKE ? OR last_message_preview LIKE ?)');
+                params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+            }
+        } else {
+            where.push('customer_user_id = ?');
+            params.push(req.user.id);
+        }
+
+        const sql = `
+            SELECT *
+            FROM chat_threads
+            ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+            ORDER BY is_pinned DESC, last_message_at DESC, id DESC
+        `;
+        const rows = await db.all(sql, params);
+        res.json(rows.map(mapChatThread));
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to load chat inbox' });
+    }
+});
+
+app.get('/api/chat/threads/:threadId/messages', async (req, res) => {
+    try {
+        const threadId = parsePositiveInt(req.params.threadId, 0);
+        if (!threadId) return res.status(400).json({ error: 'Invalid thread id' });
+        const thread = await getChatThreadForRequest(threadId, req);
+        if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
+
+        const messages = await loadChatThreadMessages(threadId, req.query.limit);
+        res.json({ thread: mapChatThread(thread), messages });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to load chat messages' });
+    }
+});
+
+app.post('/api/chat/threads/:threadId/messages', async (req, res) => {
+    try {
+        const threadId = parsePositiveInt(req.params.threadId, 0);
+        if (!threadId) return res.status(400).json({ error: 'Invalid thread id' });
+        const thread = await getChatThreadForRequest(threadId, req);
+        if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
+
+        const body = String(req.body?.body || '').trim();
+        if (!body) return res.status(400).json({ error: 'Message body is required' });
+
+        const message = await appendChatMessage({
+            threadId,
+            sender: req.user,
+            body,
+            messageType: 'text',
+            replyToMessageId: req.body?.reply_to_message_id || null,
+        });
+
+        await logAudit(req.user?.name || 'Unknown', 'CHAT_SEND', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', `thread_id=${threadId}`);
+        res.json({ success: true, message });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to send chat message' });
+    }
+});
+
+app.post('/api/chat/threads/:threadId/read', async (req, res) => {
+    try {
+        const threadId = parsePositiveInt(req.params.threadId, 0);
+        if (!threadId) return res.status(400).json({ error: 'Invalid thread id' });
+        const thread = await getChatThreadForRequest(threadId, req);
+        if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
+
+        const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
+        const now = new Date();
+        if (isAdmin) {
+            await db.run(
+                "UPDATE chat_threads SET admin_unread_count = 0, admin_last_read_at = ?, updated_at = ? WHERE id = ?",
+                [now, now, threadId]
+            );
+        } else {
+            await db.run(
+                "UPDATE chat_threads SET customer_unread_count = 0, customer_last_read_at = ?, updated_at = ? WHERE id = ?",
+                [now, now, threadId]
+            );
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to mark chat as read' });
+    }
+});
+
+app.post('/api/chat/threads/:threadId/meta', requireAdmin, async (req, res) => {
+    try {
+        const threadId = parsePositiveInt(req.params.threadId, 0);
+        if (!threadId) return res.status(400).json({ error: 'Invalid thread id' });
+        const thread = await db.get("SELECT * FROM chat_threads WHERE id = ?", [threadId]);
+        if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
+
+        const status = req.body?.status ? normalizeChatStatus(req.body.status) : thread.status;
+        const priority = req.body?.priority ? normalizeChatPriority(req.body.priority) : (thread.priority || 'normal');
+        const isArchived = req.body?.is_archived === undefined ? Number(thread.is_archived || 0) : (req.body.is_archived ? 1 : 0);
+        const isPinned = req.body?.is_pinned === undefined ? Number(thread.is_pinned || 0) : (req.body.is_pinned ? 1 : 0);
+        const assignedAdminId = req.body?.assigned_admin_id === undefined || req.body?.assigned_admin_id === null || req.body?.assigned_admin_id === ''
+            ? null
+            : Number(req.body.assigned_admin_id);
+
+        let assignedAdminName = null;
+        if (assignedAdminId) {
+            const assignedAdmin = await db.get("SELECT id, name FROM users WHERE id = ? AND role = 'admin'", [assignedAdminId]);
+            if (!assignedAdmin) return res.status(404).json({ error: 'Assigned admin not found' });
+            assignedAdminName = assignedAdmin.name;
+        }
+
+        const now = new Date();
+        await db.run(
+            `UPDATE chat_threads
+             SET status = ?, priority = ?, is_archived = ?, is_pinned = ?, assigned_admin_id = ?, assigned_admin_name = ?, updated_at = ?, closed_at = ?
+             WHERE id = ?`,
+            [status, priority, isArchived, isPinned, assignedAdminId, assignedAdminName, now, status === 'closed' ? now : null, threadId]
+        );
+
+        const updated = await db.get("SELECT * FROM chat_threads WHERE id = ?", [threadId]);
+        res.json({ success: true, thread: mapChatThread(updated) });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to update chat thread' });
+    }
+});
+
+app.put('/api/chat/messages/:messageId', async (req, res) => {
+    try {
+        const messageId = parsePositiveInt(req.params.messageId, 0);
+        if (!messageId) return res.status(400).json({ error: 'Invalid message id' });
+        const nextBody = String(req.body?.body || '').trim();
+        if (!nextBody) return res.status(400).json({ error: 'Message body is required' });
+
+        const message = await db.get("SELECT * FROM chat_messages WHERE id = ?", [messageId]);
+        if (!message) return res.status(404).json({ error: 'Message not found' });
+        const thread = await getChatThreadForRequest(message.thread_id, req);
+        if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
+
+        const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
+        if (!isAdmin && String(message.sender_user_id) !== String(req.user?.id || '')) {
+            return res.status(403).json({ error: 'Cannot edit this message' });
+        }
+
+        await db.run(
+            "UPDATE chat_messages SET body = ?, edited_at = ? WHERE id = ?",
+            [nextBody, new Date(), messageId]
+        );
+        if (Number(messageId) === Number((await db.get("SELECT TOP 1 id FROM chat_messages WHERE thread_id = ? ORDER BY created_at DESC, id DESC", [message.thread_id]))?.id)) {
+            await db.run(
+                "UPDATE chat_threads SET last_message_preview = ?, updated_at = ? WHERE id = ?",
+                [nextBody.slice(0, 400), new Date(), message.thread_id]
+            );
+        }
+        const updated = await db.get("SELECT * FROM chat_messages WHERE id = ?", [messageId]);
+        res.json({ success: true, message: mapChatMessage(updated) });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to edit message' });
+    }
+});
+
+app.post('/api/chat/messages/:messageId/delete', async (req, res) => {
+    try {
+        const messageId = parsePositiveInt(req.params.messageId, 0);
+        if (!messageId) return res.status(400).json({ error: 'Invalid message id' });
+        const message = await db.get("SELECT * FROM chat_messages WHERE id = ?", [messageId]);
+        if (!message) return res.status(404).json({ error: 'Message not found' });
+        const thread = await getChatThreadForRequest(message.thread_id, req);
+        if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
+
+        const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
+        if (!isAdmin && String(message.sender_user_id) !== String(req.user?.id || '')) {
+            return res.status(403).json({ error: 'Cannot delete this message' });
+        }
+
+        await db.run(
+            "UPDATE chat_messages SET body = ?, deleted_at = ? WHERE id = ?",
+            ['This message was deleted', new Date(), messageId]
+        );
+        const updated = await db.get("SELECT * FROM chat_messages WHERE id = ?", [messageId]);
+        res.json({ success: true, message: mapChatMessage(updated) });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to delete message' });
+    }
+});
+
+app.get('/api/chat/unread-summary', async (req, res) => {
+    try {
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
+
+        if (isAdmin) {
+            const row = await db.get("SELECT COUNT(*) AS threads, COALESCE(SUM(admin_unread_count), 0) AS messages FROM chat_threads WHERE admin_unread_count > 0 AND is_archived = 0");
+            return res.json({
+                unread_threads: Number(row?.threads || 0),
+                unread_messages: Number(row?.messages || 0),
+            });
+        }
+
+        const thread = await ensureChatThreadForUser(req.user);
+        return res.json({
+            unread_threads: Number(thread?.customer_unread_count > 0 ? 1 : 0),
+            unread_messages: Number(thread?.customer_unread_count || 0),
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to load unread summary' });
+    }
+});
+
 // --- Device APIs (for logged-in users) ---
 app.get('/api/devices/my', async (req, res) => {
     try {
