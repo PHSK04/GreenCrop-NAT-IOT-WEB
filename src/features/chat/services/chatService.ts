@@ -55,6 +55,12 @@ type ChatThreadListQuery = {
   status?: ChatStatus;
 };
 
+type ChatMessageQuery = {
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+};
+
 const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 const SESSION_KEY = "smart_iot_session";
 
@@ -111,8 +117,8 @@ export const chatService = {
     return parseJson(response, "Failed to load chats");
   },
 
-  async getThreadMessages(threadId: number): Promise<{ thread: ChatThread; messages: ChatMessage[] }> {
-    const response = await fetch(buildApiUrl(`/chat/threads/${threadId}/messages`), {
+  async getThreadMessages(threadId: number, query?: ChatMessageQuery): Promise<{ thread: ChatThread; messages: ChatMessage[] }> {
+    const response = await fetch(buildApiUrl(`/chat/threads/${threadId}/messages${toQueryString(query)}`), {
       headers: getAuthHeaders(),
     });
     return parseJson(response, "Failed to load messages");
