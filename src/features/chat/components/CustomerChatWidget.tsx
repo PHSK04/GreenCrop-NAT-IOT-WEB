@@ -92,6 +92,37 @@ const formatTime = (value?: string | null) => {
   return date.toLocaleString();
 };
 
+const formatMessageTime = (value?: string | null, locale = "th-TH") => {
+  if (!value) return "";
+  const date = new Date(value);
+  return date.toLocaleTimeString(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const formatMessageDay = (value?: string | null, locale = "th-TH") => {
+  if (!value) return "";
+  const date = new Date(value);
+  return date.toLocaleDateString(locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const isSameCalendarDay = (left?: string | null, right?: string | null) => {
+  if (!left || !right) return false;
+  const a = new Date(left);
+  const b = new Date(right);
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+};
+
 const downloadBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -168,9 +199,28 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
+  const shouldStickToBottomRef = useRef(true);
+  const previousMessageCountRef = useRef(0);
 
   const draftKey = useMemo(() => `chat_draft_${thread?.id || "pending"}`, [thread?.id]);
   const humanListRef = listRef;
+  const locale = isTH ? "th-TH" : "en-US";
+
+  const updateStickToBottom = () => {
+    const node = humanListRef.current;
+    if (!node) return;
+    const distanceFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight;
+    shouldStickToBottomRef.current = distanceFromBottom < 80;
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const node = humanListRef.current;
+    if (!node) return;
+    node.scrollTo({
+      top: node.scrollHeight,
+      behavior,
+    });
+  };
 
   const loadChat = async (silently = false) => {
     if (!silently) setIsLoading(true);
@@ -188,6 +238,9 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       }
       setError("");
       await chatService.markRead(data.thread.id);
+      if (!silently) {
+        shouldStickToBottomRef.current = true;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load chat");
     } finally {
@@ -217,11 +270,20 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
   useEffect(() => {
     if (!isOpen || mode !== "human") return;
-    humanListRef.current?.scrollTo({
-      top: humanListRef.current.scrollHeight,
-      behavior: "smooth",
-    });
+    const hasNewMessages = messages.length > previousMessageCountRef.current;
+    const shouldScroll = shouldStickToBottomRef.current || hasNewMessages;
+    if (shouldScroll) {
+      window.requestAnimationFrame(() => {
+        scrollToBottom(hasNewMessages ? "smooth" : "auto");
+      });
+    }
+    previousMessageCountRef.current = messages.length;
   }, [messages, isOpen, mode, humanListRef]);
+
+  useEffect(() => {
+    previousMessageCountRef.current = 0;
+    shouldStickToBottomRef.current = true;
+  }, [thread?.id, mode]);
 
   const resetAssistant = () => {
     setMode("assistant");
@@ -278,6 +340,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         const created = await chatService.sendMessage(thread.id, body, replyTo?.id || null);
         setMessages((current) => [...current, created]);
       }
+      shouldStickToBottomRef.current = true;
       setDraft("");
       setReplyTo(null);
       localStorage.removeItem(draftKey);
@@ -384,7 +447,11 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
   const humanView = (
     <>
-      <div ref={listRef} className="flex-1 space-y-4 overflow-auto bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] px-4 py-4">
+      <div
+        ref={listRef}
+        onScroll={updateStickToBottom}
+        className="flex-1 space-y-4 overflow-auto bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] px-4 py-4"
+      >
         {isLoading && <div className="text-sm text-slate-500">{isTH ? "กำลังโหลด..." : "Loading..."}</div>}
         {!isLoading && messages.length === 0 && (
           <div className="rounded-3xl bg-white/90 p-6 text-center text-sm text-slate-500 shadow-sm dark:bg-slate-900/80">
@@ -392,29 +459,42 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
           </div>
         )}
 
-        {messages.map((message) => {
+        {messages.map((message, index) => {
           const isOwn = message.sender_role === "user";
+          const previousMessage = index > 0 ? messages[index - 1] : null;
+          const shouldShowDayDivider = !previousMessage || !isSameCalendarDay(previousMessage.created_at, message.created_at);
           return (
-            <div key={message.id} className={`flex ${isOwn ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
-              <div className={`max-w-[85%] rounded-[1.5rem] px-4 py-3 shadow-sm ${isOwn ? "bg-emerald-600 text-white" : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"}`}>
-                <div className={`mb-1 text-[11px] ${isOwn ? "text-emerald-100" : "text-slate-500 dark:text-slate-400"}`}>
-                  {safeSenderLabel(message, isTH)} · {formatTime(message.created_at)} {message.edited_at ? `· ${isTH ? "แก้ไขแล้ว" : "edited"}` : ""}
+            <div key={message.id} className="space-y-3">
+              {shouldShowDayDivider && (
+                <div className="sticky top-0 z-10 flex justify-center py-1">
+                  <div className="rounded-full border border-slate-200/80 bg-white/92 px-3 py-1 text-[11px] font-medium text-slate-500 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/92 dark:text-slate-300">
+                    {formatMessageDay(message.created_at, locale)}
+                  </div>
                 </div>
-                <div className="whitespace-pre-wrap text-sm leading-6">{message.body}</div>
-                <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] ${isOwn ? "text-emerald-100" : "text-slate-400"}`}>
-                  {isOwn && (
-                    <>
-                      <button type="button" onClick={() => setReplyTo(message)} className="rounded-full p-1 hover:bg-white/10">
-                        <Reply className="h-3.5 w-3.5" />
-                      </button>
-                      <button type="button" onClick={() => startEdit(message)} className="rounded-full p-1 hover:bg-white/10">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button type="button" onClick={() => removeMessage(message.id)} className="rounded-full p-1 hover:bg-white/10">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </>
-                  )}
+              )}
+              <div className={`flex ${isOwn ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
+                <div className={`max-w-[85%] rounded-[1.5rem] px-4 py-3 shadow-sm ${isOwn ? "bg-emerald-600 text-white" : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"}`}>
+                  <div className={`mb-1 flex items-center gap-2 text-[11px] ${isOwn ? "text-emerald-100" : "text-slate-500 dark:text-slate-400"}`}>
+                    <span>{safeSenderLabel(message, isTH)}</span>
+                    <span className="opacity-70">{formatMessageTime(message.created_at, locale)}</span>
+                    {message.edited_at ? <span className="opacity-70">{isTH ? "แก้ไขแล้ว" : "edited"}</span> : null}
+                  </div>
+                  <div className="whitespace-pre-wrap text-sm leading-6">{message.body}</div>
+                  <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] ${isOwn ? "text-emerald-100" : "text-slate-400"}`}>
+                    {isOwn && (
+                      <>
+                        <button type="button" onClick={() => setReplyTo(message)} className="rounded-full p-1 hover:bg-white/10">
+                          <Reply className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => startEdit(message)} className="rounded-full p-1 hover:bg-white/10">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => removeMessage(message.id)} className="rounded-full p-1 hover:bg-white/10">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -423,22 +503,35 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       </div>
 
       <div className="border-t border-slate-200/80 bg-white/96 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/96">
-        <div className="mb-3 flex flex-wrap gap-2">
-          <input
-            type="datetime-local"
-            value={historyStart}
-            onChange={(event) => setHistoryStart(event.target.value)}
-            className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-          />
-          <input
-            type="datetime-local"
-            value={historyEnd}
-            onChange={(event) => setHistoryEnd(event.target.value)}
-            className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-          />
-          <Button variant="outline" onClick={() => { setHistoryStart(""); setHistoryEnd(""); }}>
-            {isTH ? "ล้างช่วงเวลา" : "Clear range"}
-          </Button>
+        <div className="mb-3 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              {isTH ? "กรองประวัติแชทตามวันเวลา" : "Filter chat history by date and time"}
+            </div>
+            <Button variant="ghost" size="sm" className="h-8 rounded-xl px-2 text-xs" onClick={() => { setHistoryStart(""); setHistoryEnd(""); }}>
+              {isTH ? "ล้างช่วงเวลา" : "Clear range"}
+            </Button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="grid gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+              <span>{isTH ? "เริ่มจาก" : "From"}</span>
+              <input
+                type="datetime-local"
+                value={historyStart}
+                onChange={(event) => setHistoryStart(event.target.value)}
+                className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+              />
+            </label>
+            <label className="grid gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+              <span>{isTH ? "ถึง" : "To"}</span>
+              <input
+                type="datetime-local"
+                value={historyEnd}
+                onChange={(event) => setHistoryEnd(event.target.value)}
+                className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+              />
+            </label>
+          </div>
         </div>
 
         {replyTo && (
@@ -488,24 +581,24 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   );
 
   return (
-    <div className="pointer-events-none fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3 sm:bottom-8 sm:right-8">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 sm:bottom-8 sm:right-8">
       {isOpen && (
-        <div className="pointer-events-auto flex h-[min(78vh,720px)] w-[min(440px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/96 shadow-[0_30px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/96">
-          <div className="flex items-center justify-between border-b border-slate-200/80 px-5 py-4 dark:border-slate-800">
-            <div className="flex items-center gap-3">
-              <img src={supportIcon} alt="Support" className="h-11 w-11 rounded-full object-cover" draggable={false} />
-              <div>
-                <div className="font-semibold text-slate-900 dark:text-slate-100">
+        <div className="pointer-events-auto flex h-[min(100dvh-1rem,720px)] w-[min(440px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white/96 shadow-[0_30px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:h-[min(78vh,720px)] sm:w-[min(440px,calc(100vw-1.5rem))] sm:rounded-[2rem] dark:border-slate-800 dark:bg-slate-950/96">
+          <div className="flex items-center justify-between border-b border-slate-200/80 px-3 py-3 sm:px-5 sm:py-4 dark:border-slate-800">
+            <div className="min-w-0 flex items-center gap-3">
+              <img src={supportIcon} alt="Support" className="h-10 w-10 rounded-full object-cover sm:h-11 sm:w-11" draggable={false} />
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-900 sm:text-base dark:text-slate-100">
                   {mode === "assistant" ? (isTH ? "AI ช่วยตอบปัญหาเบื้องต้น" : "AI support assistant") : isTH ? "แชทคุยกับเจ้าหน้าที่" : "Chat with support"}
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">
+                <div className="line-clamp-2 text-[11px] text-slate-500 sm:text-xs dark:text-slate-400">
                   {mode === "assistant"
                     ? isTH ? "เลือกปัญหาที่พบ แล้วให้ AI ช่วยตอบก่อน" : "Pick an issue and let AI guide you first"
                     : ownLastMessageRead ? (isTH ? "อ่านข้อความล่าสุดแล้ว" : "Latest message read") : isTH ? "ตอบกลับแบบเรียลไทม์" : "Realtime replies"}
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="ml-2 flex shrink-0 items-center gap-1 sm:gap-2">
               {mode === "assistant" ? (
                 <Button size="icon" variant="ghost" onClick={resetAssistant} title="Reset">
                   <RotateCcw className="h-4 w-4" />
@@ -542,7 +635,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         <img
           src={supportIcon}
           alt="Support"
-          className="h-20 w-20 rounded-full object-cover shadow-[0_18px_40px_rgba(15,23,42,0.2)] sm:h-24 sm:w-24"
+          className="h-16 w-16 rounded-full object-cover shadow-[0_18px_40px_rgba(15,23,42,0.2)] sm:h-24 sm:w-24"
           draggable={false}
         />
       </button>

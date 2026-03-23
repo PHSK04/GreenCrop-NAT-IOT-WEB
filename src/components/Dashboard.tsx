@@ -464,9 +464,9 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   };
 
   return (
-    <div className="flex h-screen bg-background font-sans selection:bg-primary/30 text-foreground transition-colors duration-300">
+    <div className="flex min-h-[100dvh] bg-background font-sans selection:bg-primary/30 text-foreground transition-colors duration-300">
       {/* Desktop Sidebar */}
-      <div className={`hidden lg:block h-full z-20 relative border-r border-border/60 transition-[width] duration-300 ${isDesktopSidebarCompact ? "w-24" : "w-72"}`}>
+      <div className={`hidden lg:block min-h-[100dvh] z-20 relative border-r border-border/60 transition-[width] duration-300 ${isDesktopSidebarCompact ? "w-24" : "w-72"}`}>
         <SidebarContent 
           activePage={activePage} 
           setActivePage={setActivePage} 
@@ -489,8 +489,9 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_800px_at_50%_-30%,rgba(16,185,129,0.14),transparent)] dark:bg-[radial-gradient(circle_800px_at_50%_-30%,rgba(16,185,129,0.2),transparent)]"></div>
          
          {/* Mobile Header */}
-         <div className="lg:hidden flex items-center p-4 border-b border-border bg-card/85 backdrop-blur-md sticky top-0 z-30 justify-between">
-           <div className="flex items-center gap-2">
+         <div className="lg:hidden sticky top-0 z-30 border-b border-border bg-card/85 px-3 py-3 backdrop-blur-md">
+           <div className="flex items-center justify-between gap-3">
+           <div className="min-w-0 flex items-center gap-2">
              <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                <SheetTrigger asChild>
                  <Button variant="ghost" size="icon" className="mr-1">
@@ -513,35 +514,38 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
                 />
                </SheetContent>
              </Sheet>
-             <div>
+             <div className="min-w-0">
               <p className="text-xs text-muted-foreground font-medium">
                 GreenCropNAT
               </p>
-             <h1 className="text-base font-semibold tracking-tight">
+             <h1 className="truncate text-sm font-semibold tracking-tight sm:text-base">
                 {t[activePage] || activePage}
               </h1>
              </div>
            </div>
            
-           <div className="flex items-center gap-2">
-              {showDeviceSelector && (
-                <select
-                  className="h-8 max-w-[150px] rounded-md border border-border bg-background px-2 text-xs"
-                  value={activeDeviceId || ""}
-                  onChange={(e) => handleDeviceChange(e.target.value)}
-                >
-                  {devices.map((device) => (
-                    <option key={String(device.id)} value={device.device_id}>
-                      {device.device_name || device.device_id}
-                    </option>
-                  ))}
-                </select>
-              )}
+           <div className="flex shrink-0 items-center gap-2">
               <span className={`relative flex h-2 w-2`}>
                 <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isOn ? "bg-primary" : "bg-muted-foreground hidden"}`}></span>
                 <span className={`relative inline-flex rounded-full h-2 w-2 ${isOn ? "bg-primary" : "bg-muted-foreground"}`}></span>
               </span>
            </div>
+           </div>
+           {showDeviceSelector && (
+             <div className="mt-3">
+               <select
+                 className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs"
+                 value={activeDeviceId || ""}
+                 onChange={(e) => handleDeviceChange(e.target.value)}
+               >
+                 {devices.map((device) => (
+                   <option key={String(device.id)} value={device.device_id}>
+                     {device.device_name || device.device_id}
+                   </option>
+                 ))}
+               </select>
+             </div>
+           )}
          </div>
 
         <div className="hidden lg:block absolute top-4 left-4 z-30">

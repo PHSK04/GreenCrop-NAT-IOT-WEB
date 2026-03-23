@@ -38,7 +38,7 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 158 64% 52%; /* Emerald-500 */
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
     /* Chart Colors (HSL) */
     --chart-1: 158 64% 52%;
@@ -161,6 +161,32 @@
   .force-solid .rounded-md,
   .force-solid .rounded-sm {
     border-radius: 16px !important;
+  }
+
+  .rounded-sm {
+    border-radius: 0.875rem !important;
+  }
+
+  .rounded,
+  .rounded-md {
+    border-radius: 1rem !important;
+  }
+
+  .rounded-lg,
+  .rounded-xl {
+    border-radius: 1.25rem !important;
+  }
+
+  .rounded-2xl {
+    border-radius: 1.5rem !important;
+  }
+
+  .rounded-3xl {
+    border-radius: 1.75rem !important;
+  }
+
+  .rounded-full {
+    border-radius: 9999px !important;
   }
 
   /* Legacy dark utilities mapped to semantic tokens */

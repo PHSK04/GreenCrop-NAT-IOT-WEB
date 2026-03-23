@@ -29,6 +29,37 @@ const quickReplies = [
 
 const formatTime = (value?: string | null) => (value ? new Date(value).toLocaleString() : "");
 
+const formatMessageTime = (value?: string | null, locale = "th-TH") => {
+  if (!value) return "";
+  const date = new Date(value);
+  return date.toLocaleTimeString(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const formatMessageDay = (value?: string | null, locale = "th-TH") => {
+  if (!value) return "";
+  const date = new Date(value);
+  return date.toLocaleDateString(locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const isSameCalendarDay = (left?: string | null, right?: string | null) => {
+  if (!left || !right) return false;
+  const a = new Date(left);
+  const b = new Date(right);
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+};
+
 const downloadBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -93,6 +124,22 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
+  const shouldStickToBottomRef = useRef(true);
+  const previousMessageCountRef = useRef(0);
+  const locale = isTH ? "th-TH" : "en-US";
+
+  const updateStickToBottom = () => {
+    const node = listRef.current;
+    if (!node) return;
+    const distanceFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight;
+    shouldStickToBottomRef.current = distanceFromBottom < 80;
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const node = listRef.current;
+    if (!node) return;
+    node.scrollTo({ top: node.scrollHeight, behavior });
+  };
 
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.id === selectedThreadId) || null,
@@ -127,6 +174,9 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
       setMessages(data.messages);
       await chatService.markRead(threadId);
       if (!silently) {
+        shouldStickToBottomRef.current = true;
+      }
+      if (!silently) {
         setThreads((current) =>
           current.map((thread) => (thread.id === threadId ? { ...thread, admin_unread_count: 0 } : thread)),
         );
@@ -159,13 +209,26 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   }, [selectedThreadId, historyStart, historyEnd]);
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+    const hasNewMessages = messages.length > previousMessageCountRef.current;
+    const shouldScroll = shouldStickToBottomRef.current || hasNewMessages;
+    if (shouldScroll) {
+      window.requestAnimationFrame(() => {
+        scrollToBottom(hasNewMessages ? "smooth" : "auto");
+      });
+    }
+    previousMessageCountRef.current = messages.length;
   }, [messages]);
+
+  useEffect(() => {
+    previousMessageCountRef.current = 0;
+    shouldStickToBottomRef.current = true;
+  }, [selectedThreadId]);
 
   const sendMessage = async () => {
     if (!selectedThread || !draft.trim()) return;
     const created = await chatService.sendMessage(selectedThread.id, draft.trim());
     setMessages((current) => [...current, created]);
+    shouldStickToBottomRef.current = true;
     setDraft("");
     loadThreads(true).catch(() => {});
   };
@@ -264,18 +327,24 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
               </div>
               {selectedThread && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="datetime-local"
-                    value={historyStart}
-                    onChange={(event) => setHistoryStart(event.target.value)}
-                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                  />
-                  <input
-                    type="datetime-local"
-                    value={historyEnd}
-                    onChange={(event) => setHistoryEnd(event.target.value)}
-                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                  />
+                  <div className="grid gap-1 rounded-2xl border border-border bg-background/70 px-3 py-2">
+                    <div className="text-[11px] text-muted-foreground">{isTH ? "เริ่มจาก" : "From"}</div>
+                    <input
+                      type="datetime-local"
+                      value={historyStart}
+                      onChange={(event) => setHistoryStart(event.target.value)}
+                      className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
+                    />
+                  </div>
+                  <div className="grid gap-1 rounded-2xl border border-border bg-background/70 px-3 py-2">
+                    <div className="text-[11px] text-muted-foreground">{isTH ? "ถึง" : "To"}</div>
+                    <input
+                      type="datetime-local"
+                      value={historyEnd}
+                      onChange={(event) => setHistoryEnd(event.target.value)}
+                      className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
+                    />
+                  </div>
                   <select
                     className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
                     value={selectedThread.status}
@@ -341,16 +410,32 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                   </div>
                 </div>
 
-                <div ref={listRef} className="flex-1 space-y-4 overflow-auto bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] p-4">
-                  {messages.map((message) => {
+                <div
+                  ref={listRef}
+                  onScroll={updateStickToBottom}
+                  className="flex-1 space-y-4 overflow-auto bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] p-4"
+                >
+                  {messages.map((message, index) => {
                     const isAdminMessage = message.sender_role === "admin";
+                    const previousMessage = index > 0 ? messages[index - 1] : null;
+                    const shouldShowDayDivider = !previousMessage || !isSameCalendarDay(previousMessage.created_at, message.created_at);
                     return (
-                      <div key={message.id} className={`flex ${isAdminMessage ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
-                        <div className={`max-w-[80%] rounded-[1.5rem] px-4 py-3 shadow-sm ${isAdminMessage ? "bg-slate-900 text-white dark:bg-emerald-600" : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"}`}>
-                          <div className={`mb-1 text-[11px] ${isAdminMessage ? "text-slate-300" : "text-slate-500 dark:text-slate-400"}`}>
-                            {safeSenderLabel(message, isTH)} · {formatTime(message.created_at)}
+                      <div key={message.id} className="space-y-3">
+                        {shouldShowDayDivider && (
+                          <div className="sticky top-0 z-10 flex justify-center py-1">
+                            <div className="rounded-full border border-slate-200/80 bg-white/92 px-3 py-1 text-[11px] font-medium text-slate-500 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/92 dark:text-slate-300">
+                              {formatMessageDay(message.created_at, locale)}
+                            </div>
                           </div>
-                          <div className="whitespace-pre-wrap text-sm leading-6">{message.body}</div>
+                        )}
+                        <div className={`flex ${isAdminMessage ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
+                          <div className={`max-w-[80%] rounded-[1.5rem] px-4 py-3 shadow-sm ${isAdminMessage ? "bg-slate-900 text-white dark:bg-emerald-600" : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"}`}>
+                            <div className={`mb-1 flex items-center gap-2 text-[11px] ${isAdminMessage ? "text-slate-300" : "text-slate-500 dark:text-slate-400"}`}>
+                              <span>{safeSenderLabel(message, isTH)}</span>
+                              <span className="opacity-70">{formatMessageTime(message.created_at, locale)}</span>
+                            </div>
+                            <div className="whitespace-pre-wrap text-sm leading-6">{message.body}</div>
+                          </div>
                         </div>
                       </div>
                     );

@@ -9,11 +9,11 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className="relative w-full overflow-x-auto rounded-[20px]"
     >
       <table
         data-slot="table"
-        className={cn("w-full caption-bottom text-sm", className)}
+        className={cn("w-full caption-bottom text-sm overflow-hidden", className)}
         {...props}
       />
     </div>
@@ -25,7 +25,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
     <thead
       data-slot="table-header"
       className={cn(
-        "sticky top-0 z-20 !bg-emerald-600/95 !text-white [&_tr]:border-b [&_tr]:border-emerald-700/60 [&_tr>th:first-chiงทำไม โฟลเดอร์งานนี้githup มัน ไม่อัพเดต ลงเครื่องด้วยอ่า งงld]:rounded-tl-lg [&_tr>th:last-child]:rounded-tr-lg dark:!bg-emerald-700/90",
+        "sticky top-0 z-20 !bg-emerald-600/95 !text-white [&_tr]:border-b [&_tr]:border-emerald-700/60 [&_tr>th:first-child]:rounded-tl-[20px] [&_tr>th:last-child]:rounded-tr-[20px] dark:!bg-emerald-700/90",
         className,
       )}
       {...props}
@@ -74,7 +74,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-11 px-3 text-left align-middle font-semibold uppercase tracking-wider !text-white/90 whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "h-12 px-4 text-left align-middle font-semibold uppercase tracking-[0.18em] !text-white/90 whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className,
       )}
       {...props}

@@ -116,8 +116,8 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
       <header className="sticky top-0 z-10 border-b border-border/60 bg-card/75 px-4 py-4 backdrop-blur-xl md:px-8 md:py-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
           <div>
-            <h1 className="flex items-center gap-3 text-xl font-bold tracking-tight text-foreground md:text-2xl">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/15 text-primary">
+            <h1 className="flex items-center gap-3 text-lg font-bold tracking-tight text-foreground sm:text-xl md:text-2xl">
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary/15 text-primary sm:h-9 sm:w-9">
                 <Activity className="h-5 w-5" />
               </span>
               {t.title}
@@ -147,7 +147,7 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
       </header>
 
       <main className="relative z-10 flex-1 overflow-auto p-4 md:p-8">
-        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:grid-cols-3">
           <Card className="rounded-2xl border-border/60 bg-card/70 shadow-sm backdrop-blur-sm">
             <CardContent className="flex items-center justify-between p-4">
               <div>
@@ -184,16 +184,16 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
         </div>
 
         {/* Machine Control Section (Hero) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+        <div className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-8">
           
           {/* Left Column: Visual Model */}
           <div className="lg:col-span-7 space-y-6">
-            <Card className="h-full min-h-[500px] overflow-hidden rounded-2xl border-border/70 bg-card/65 shadow-lg backdrop-blur-xl">
+            <Card className="h-full min-h-[320px] overflow-hidden rounded-2xl border-border/70 bg-card/65 shadow-lg backdrop-blur-xl sm:min-h-[420px] lg:min-h-[500px]">
               <CardHeader>
                 <CardTitle className="text-foreground">{t.visualizer}</CardTitle>
                 <CardDescription className="text-muted-foreground">{t.visualizerDesc}</CardDescription>
               </CardHeader>
-              <CardContent className="flex h-full items-center justify-center rounded-b-2xl bg-gradient-to-b from-transparent to-background/30 p-8">
+              <CardContent className="flex h-full items-center justify-center rounded-b-2xl bg-gradient-to-b from-transparent to-background/30 p-4 sm:p-6 lg:p-8">
                 <div className="relative w-full h-full flex items-center justify-center">
                    {/* Glow effect */}
                    {isOn && <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full transition-all duration-1000"></div>}
@@ -201,7 +201,7 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
                    <img 
                     src={machineModel} 
                     alt="Water System Model" 
-                    className="max-h-[500px] w-auto object-contain drop-shadow-2xl transition-all duration-700"
+                    className="max-h-[260px] w-auto object-contain drop-shadow-2xl transition-all duration-700 sm:max-h-[380px] lg:max-h-[500px]"
                     style={{ 
                       filter: isOn ? 'brightness(1.1) contrast(1.05)' : 'grayscale(1)',
                       transform: isOn ? 'scale(1.02)' : 'scale(1)'
@@ -224,7 +224,7 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border">
+                <div className="flex flex-col gap-4 rounded-xl border border-border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
                    <div className="flex items-center gap-4">
                      <button
                        type="button"
@@ -248,13 +248,13 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right space-y-1">
+                    <div className="space-y-1 text-left sm:text-right">
                       <p className="text-xs text-muted-foreground">{t.uptime}</p>
                       <p className="font-mono text-primary">{formatUptime(uptimeSeconds)}</p>
                       <button
                         type="button"
                         onClick={resetUptime}
-                        className="mt-1 inline-flex h-9 w-28 items-center justify-center gap-1 rounded-md border border-red-400/30 bg-red-600 text-[11px] font-bold text-white transition-colors hover:bg-red-500"
+                        className="mt-1 inline-flex h-9 w-full items-center justify-center gap-1 rounded-md border border-red-400/30 bg-red-600 px-3 text-[11px] font-bold text-white transition-colors hover:bg-red-500 sm:w-28"
                       >
                         <span>↺</span>
                         {language === "TH" ? "รีเซ็ตเวลา" : "RESET"}
@@ -349,7 +349,7 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
         </div>
         
         {/* Water Quality & Analytics Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-10">
+        <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:gap-6">
           {[
             {
               title: t.metrics.ph.title,

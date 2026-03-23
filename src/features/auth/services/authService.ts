@@ -132,8 +132,9 @@ const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 const SESSION_KEY = 'smart_iot_session';
 const isGithubPagesRuntime =
   typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
-const REQUEST_TIMEOUT_MS = isGithubPagesRuntime ? 65000 : 12000;
+const REQUEST_TIMEOUT_MS = isGithubPagesRuntime ? 15000 : 12000;
 const TRANSIENT_RETRY_DELAY_MS = 700;
+const DEFAULT_QUICK_TIMEOUT_MS = 4500;
 
 type SessionPayload = {
   token?: string;
@@ -275,18 +276,44 @@ const toQueryString = (query?: AdminDbQuery): string => {
 
 const fetchWithApiFallback = async (
   path: string,
-  init: RequestInit,
+  init: RequestInit & { timeoutMs?: number },
 ): Promise<Response> => {
   if (isGithubPagesRuntime && API_URL === '/api') {
     throw new Error('Production API is not configured. Set VITE_API_URL in GitHub Actions secrets.');
   }
+
+  const { timeoutMs = REQUEST_TIMEOUT_MS, signal, ...requestInit } = init;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  const abortFromCaller = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) {
+      clearTimeout(timeoutId);
+      controller.abort();
+    } else {
+      signal.addEventListener('abort', abortFromCaller, { once: true });
+    }
+  }
+
   try {
-    return await fetch(buildApiUrl(path), init);
+    return await fetch(buildApiUrl(path), {
+      ...requestInit,
+      signal: controller.signal,
+    });
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Cannot connect to server/DB (timeout)');
+    }
     if (error instanceof Error && (error.message === 'Failed to fetch' || error.message.includes('connect'))) {
       throw new Error('Cannot connect to server/DB');
     }
     throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    if (signal) {
+      signal.removeEventListener('abort', abortFromCaller);
+    }
   }
 };
 
@@ -515,9 +542,10 @@ export const authService = {
     return await response.json();
   },
 
-  getMyDevices: async (): Promise<AdminDbDeviceRow[]> => {
+  getMyDevices: async (options?: { timeoutMs?: number }): Promise<AdminDbDeviceRow[]> => {
     const response = await fetchWithApiFallback('/devices/my', {
-      headers: getAuthHeaders()
+      headers: getAuthHeaders(),
+      timeoutMs: options?.timeoutMs ?? DEFAULT_QUICK_TIMEOUT_MS,
     });
     if (!response.ok) await throwHttpError(response, 'Failed to load devices');
     return await response.json();

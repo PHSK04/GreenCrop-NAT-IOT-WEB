@@ -9,6 +9,7 @@ import { DevicePairingPage } from "@/components/pages/DevicePairingPage";
 import { authService } from "@/features/auth/services/authService";
 
 const PAIRING_COMPLETED_KEY = "device_pairing_completed";
+const PAIRING_DEVICE_ID_KEY = "device_pairing_device_id";
 
 export function AppRouter() {
   const { user, logout } = useAuth();
@@ -29,19 +30,35 @@ export function AppRouter() {
       return;
     }
 
+    const hasCachedPairing = typeof window !== 'undefined' && (
+      localStorage.getItem(PAIRING_COMPLETED_KEY) === 'true' ||
+      Boolean(localStorage.getItem(PAIRING_DEVICE_ID_KEY))
+    );
+
+    if (hasCachedPairing) {
+      setPairingStatus('paired');
+    } else {
+      setPairingStatus('unknown');
+    }
+
     authService.getMyDevices()
       .then((rows) => {
         if (!isMounted) return;
         if (rows.length > 0) {
           setPairingStatus('paired');
           localStorage.setItem(PAIRING_COMPLETED_KEY, 'true');
+          if (rows[0]?.device_id) {
+            localStorage.setItem(PAIRING_DEVICE_ID_KEY, String(rows[0].device_id));
+          }
           return;
         }
+        localStorage.removeItem(PAIRING_COMPLETED_KEY);
+        localStorage.removeItem(PAIRING_DEVICE_ID_KEY);
         setPairingStatus('required');
       })
       .catch(() => {
         if (!isMounted) return;
-        setPairingStatus('required');
+        setPairingStatus(hasCachedPairing ? 'paired' : 'required');
       });
 
     return () => { isMounted = false; };

@@ -279,7 +279,7 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
 
   return (
     <div className="flex-1 overflow-auto bg-background">
-      <header className="border-b border-border bg-card/70 px-8 py-7 backdrop-blur-md">
+      <header className="border-b border-border bg-card/70 px-4 py-5 backdrop-blur-md sm:px-6 sm:py-6 lg:px-8 lg:py-7">
         <div className="mx-auto max-w-7xl">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
@@ -287,7 +287,7 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
                 <Headset className="h-3.5 w-3.5" />
                 Customer Support Playbook
               </div>
-              <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
                 {isTH ? "ศูนย์ช่วยตอบปัญหาลูกค้า" : "Customer Help Center"}
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -312,7 +312,7 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-8 p-8">
+      <main className="mx-auto max-w-7xl space-y-6 p-4 sm:space-y-8 sm:p-6 lg:p-8">
         <section className="grid gap-4 md:grid-cols-3">
           {quickStats.map((stat) => {
             const Icon = stat.icon;
@@ -332,7 +332,7 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
           })}
         </section>
 
-        <section className="grid gap-8 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <section className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)] xl:gap-8">
           <div className="space-y-6">
             <Card className="border-border bg-card/80">
               <CardHeader>
@@ -419,8 +419,8 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
                       </div>
                     </CardHeader>
 
-                    <CardContent className="space-y-6 p-6">
-                      <div className="grid gap-6 xl:grid-cols-2">
+                    <CardContent className="space-y-5 p-4 sm:p-5 lg:space-y-6 lg:p-6">
+                      <div className="grid gap-5 xl:grid-cols-2 lg:gap-6">
                         <div>
                           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
                             <AlertCircle className="h-4 w-4 text-amber-500" />
