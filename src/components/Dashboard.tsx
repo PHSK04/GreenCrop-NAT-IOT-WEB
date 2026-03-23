@@ -255,7 +255,7 @@ function SidebarContent({
       )}
 
       {/* Navigation */}
-      <nav className={`flex-1 min-h-0 overflow-y-hidden ${compact ? "p-2 space-y-4" : "p-4 space-y-7"}`}>
+      <nav className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${compact ? "p-2 space-y-4" : "p-4 space-y-7"}`}>
         {!isAdmin && (
           <>
             <div className="space-y-1">
@@ -560,7 +560,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
           </Button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
           {renderContent()}
         </div>
 
