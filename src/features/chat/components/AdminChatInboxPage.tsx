@@ -240,7 +240,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   };
 
   return (
-    <div className="p-8">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden p-8">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">{isTH ? "ศูนย์แชทลูกค้า" : "Customer Chat Inbox"}</h1>
@@ -254,15 +254,15 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <Card className="border-border bg-card/80">
+      <div className="grid min-h-0 flex-1 gap-6 overflow-hidden xl:grid-cols-[360px_minmax(0,1fr)]">
+        <Card className="flex min-h-0 flex-col overflow-hidden border-border bg-card/80">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-emerald-600" />
               {isTH ? "Inbox" : "Inbox"}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-10" placeholder={isTH ? "ค้นหาจากชื่อ อีเมล หรือข้อความ" : "Search by customer, email, or message"} />
@@ -281,7 +281,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
               ))}
             </div>
 
-            <div className="max-h-[65vh] space-y-3 overflow-auto pr-1">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
               {isLoading && <div className="text-sm text-muted-foreground">{isTH ? "กำลังโหลด..." : "Loading..."}</div>}
               {!isLoading && threads.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -318,8 +318,8 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card/80">
-          <CardHeader className="border-b border-border">
+        <Card className="flex min-h-0 flex-col overflow-hidden border-border bg-card/80">
+          <CardHeader className="shrink-0 border-b border-border">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <CardTitle>{selectedThread?.customer_name || (isTH ? "เลือกห้องแชท" : "Select a thread")}</CardTitle>
@@ -383,14 +383,14 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
             </div>
           </CardHeader>
 
-          <CardContent className="p-0">
+          <CardContent className="min-h-0 flex-1 overflow-hidden p-0">
             {!selectedThread ? (
               <div className="flex min-h-[560px] items-center justify-center text-sm text-muted-foreground">
                 {isTH ? "เลือกห้องแชทจาก inbox ด้านซ้าย" : "Select a conversation from the inbox"}
               </div>
             ) : (
-              <div className="flex min-h-[560px] flex-col">
-                <div className="grid gap-3 border-b border-border p-4 md:grid-cols-3">
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="shrink-0 grid gap-3 border-b border-border p-4 md:grid-cols-3">
                   <div className="rounded-2xl bg-muted/40 p-4">
                     <div className="mb-1 flex items-center gap-2 text-sm font-medium"><UserCheck className="h-4 w-4 text-emerald-600" />{isTH ? "ผู้รับผิดชอบ" : "Owner"}</div>
                     <div className="text-sm text-muted-foreground">{selectedThread.assigned_admin_name || (isTH ? "ยังไม่กำหนด" : "Unassigned")}</div>
@@ -413,7 +413,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                 <div
                   ref={listRef}
                   onScroll={updateStickToBottom}
-                  className="flex-1 space-y-4 overflow-auto bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] p-4"
+                  className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] p-4"
                 >
                   {messages.map((message, index) => {
                     const isAdminMessage = message.sender_role === "admin";
@@ -442,7 +442,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                   })}
                 </div>
 
-                <div className="space-y-3 border-t border-border p-4">
+                <div className="shrink-0 space-y-3 border-t border-border p-4">
                   <div className="flex flex-wrap gap-2">
                     {quickReplies.map((reply) => (
                       <button
