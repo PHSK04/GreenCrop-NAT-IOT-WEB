@@ -60,6 +60,13 @@ const isSameCalendarDay = (left?: string | null, right?: string | null) => {
   );
 };
 
+const toDateInputValue = (value: Date) => {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const downloadBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -119,6 +126,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "mine" | "archive">("all");
+  const [selectedInboxDate, setSelectedInboxDate] = useState(() => toDateInputValue(new Date()));
   const [historyStart, setHistoryStart] = useState("");
   const [historyEnd, setHistoryEnd] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -141,9 +149,18 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
     node.scrollTo({ top: node.scrollHeight, behavior });
   };
 
+  const filteredThreadsByDay = useMemo(() => {
+    if (!selectedInboxDate) return threads;
+    return threads.filter((thread) => {
+      const sourceDate = thread.last_message_at || thread.created_at;
+      if (!sourceDate) return false;
+      return toDateInputValue(new Date(sourceDate)) === selectedInboxDate;
+    });
+  }, [selectedInboxDate, threads]);
+
   const selectedThread = useMemo(
-    () => threads.find((thread) => thread.id === selectedThreadId) || null,
-    [selectedThreadId, threads],
+    () => filteredThreadsByDay.find((thread) => thread.id === selectedThreadId) || null,
+    [filteredThreadsByDay, selectedThreadId],
   );
 
   const loadThreads = async (silently = false) => {
@@ -196,6 +213,13 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   }, [query, filter]);
 
   useEffect(() => {
+    setSelectedThreadId((current) => {
+      if (current && filteredThreadsByDay.some((thread) => thread.id === current)) return current;
+      return filteredThreadsByDay[0]?.id ?? null;
+    });
+  }, [filteredThreadsByDay]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => {
       loadThreads(true).catch(() => {});
       if (selectedThreadId) loadMessages(selectedThreadId, true).catch(() => {});
@@ -240,8 +264,8 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden p-8">
-      <div className="mb-6 flex items-end justify-between gap-4">
+    <div className="box-border flex h-full min-h-0 flex-col overflow-hidden p-8">
+      <div className="mb-6 shrink-0 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">{isTH ? "ศูนย์แชทลูกค้า" : "Customer Chat Inbox"}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -268,6 +292,24 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
               <Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-10" placeholder={isTH ? "ค้นหาจากชื่อ อีเมล หรือข้อความ" : "Search by customer, email, or message"} />
             </div>
 
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                className={selectedInboxDate === toDateInputValue(new Date())
+                  ? "rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 px-5 text-white hover:from-emerald-400 hover:to-teal-400"
+                  : "rounded-full border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-300 dark:hover:bg-emerald-950/30"}
+                onClick={() => setSelectedInboxDate(toDateInputValue(new Date()))}
+              >
+                {isTH ? "วันนี้" : "Today"}
+              </Button>
+              <input
+                type="date"
+                value={selectedInboxDate}
+                onChange={(event) => setSelectedInboxDate(event.target.value)}
+                className="h-10 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               {[
                 { id: "all", label: isTH ? "ทั้งหมด" : "All" },
@@ -275,7 +317,14 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                 { id: "mine", label: isTH ? "ของฉัน" : "Mine" },
                 { id: "archive", label: isTH ? "Archive" : "Archive" },
               ].map((item) => (
-                <Button key={item.id} variant={filter === item.id ? "default" : "outline"} onClick={() => setFilter(item.id as typeof filter)}>
+                <Button
+                  key={item.id}
+                  variant="ghost"
+                  className={filter === item.id
+                    ? "rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 text-white hover:from-emerald-400 hover:to-teal-400"
+                    : "rounded-full border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-300 dark:hover:bg-emerald-950/30"}
+                  onClick={() => setFilter(item.id as typeof filter)}
+                >
                   {item.label}
                 </Button>
               ))}
@@ -283,12 +332,12 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
               {isLoading && <div className="text-sm text-muted-foreground">{isTH ? "กำลังโหลด..." : "Loading..."}</div>}
-              {!isLoading && threads.length === 0 && (
+              {!isLoading && filteredThreadsByDay.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                  {isTH ? "ยังไม่มีแชทในหมวดนี้" : "No chat threads in this filter"}
+                  {isTH ? "ยังไม่มีแชทในวันที่เลือก" : "No chat threads for the selected date"}
                 </div>
               )}
-              {threads.map((thread) => (
+              {filteredThreadsByDay.map((thread) => (
                 <button
                   key={thread.id}
                   type="button"
@@ -429,8 +478,8 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                           </div>
                         )}
                         <div className={`flex ${isAdminMessage ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
-                          <div className={`max-w-[80%] rounded-[1.5rem] px-4 py-3 shadow-sm ${isAdminMessage ? "bg-slate-900 text-white dark:bg-emerald-600" : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"}`}>
-                            <div className={`mb-1 flex items-center gap-2 text-[11px] ${isAdminMessage ? "text-slate-300" : "text-slate-500 dark:text-slate-400"}`}>
+                          <div className={`max-w-[80%] rounded-[1.5rem] px-4 py-3 shadow-sm ${isAdminMessage ? "bg-emerald-600 text-white dark:bg-emerald-600" : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"}`}>
+                            <div className={`mb-1 flex items-center gap-2 text-[11px] ${isAdminMessage ? "text-emerald-100" : "text-slate-500 dark:text-slate-400"}`}>
                               <span>{safeSenderLabel(message, isTH)}</span>
                               <span className="opacity-70">{formatMessageTime(message.created_at, locale)}</span>
                             </div>
