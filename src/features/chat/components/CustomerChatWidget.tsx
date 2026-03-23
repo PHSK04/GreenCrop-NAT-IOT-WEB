@@ -205,6 +205,8 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const [error, setError] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
   const [isHistoryFilterOpen, setIsHistoryFilterOpen] = useState(false);
+  const [isAdminTyping, setIsAdminTyping] = useState(false);
+  const [typingAdminName, setTypingAdminName] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
   const assistantListRef = useRef<HTMLDivElement | null>(null);
   const shouldStickToBottomRef = useRef(true);
@@ -212,6 +214,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const latestAdminMessageIdRef = useRef<number | null>(null);
   const hasPrimedAdminMessageRef = useRef(false);
   const previousAssistantMessageCountRef = useRef(assistantMessages.length);
+  const typingTimeoutRef = useRef<number | null>(null);
 
   const draftKey = useMemo(() => `chat_draft_${thread?.id || "pending"}`, [thread?.id]);
   const humanListRef = listRef;
@@ -257,6 +260,11 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       } else {
         setMessages(data.messages);
       }
+      const typingState = await chatService.getTypingStatus(data.thread.id).catch(() => null);
+      if (typingState) {
+        setIsAdminTyping(Boolean(typingState.admin_typing));
+        setTypingAdminName(String(typingState.admin_name || data.thread.assigned_admin_name || "Admin nat"));
+      }
       setError("");
       await chatService.markRead(data.thread.id);
       setUnreadCount(0);
@@ -267,6 +275,21 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       setError(err instanceof Error ? err.message : "Failed to load chat");
     } finally {
       if (!silently) setIsLoading(false);
+    }
+  };
+
+  const reportCustomerTyping = (isTyping: boolean) => {
+    if (!thread || mode !== "human") return;
+    chatService.setTypingStatus(thread.id, isTyping).catch(() => {});
+    if (typingTimeoutRef.current) {
+      window.clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    if (isTyping) {
+      typingTimeoutRef.current = window.setTimeout(() => {
+        chatService.setTypingStatus(thread.id, false).catch(() => {});
+        typingTimeoutRef.current = null;
+      }, 3000);
     }
   };
 
@@ -308,6 +331,25 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     }, POLL_MS);
     return () => window.clearInterval(timer);
   }, [isOpen, mode, historyStart, historyEnd]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        window.clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && mode === "human" && thread) return;
+    if (typingTimeoutRef.current) {
+      window.clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    if (thread) {
+      chatService.setTypingStatus(thread.id, false).catch(() => {});
+    }
+  }, [isOpen, mode, thread]);
 
   useEffect(() => {
     refreshThreadState().catch(() => {});
@@ -413,6 +455,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       setDraft("");
       setReplyTo(null);
       localStorage.removeItem(draftKey);
+      reportCustomerTyping(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send message");
     } finally {
@@ -472,6 +515,8 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         : (isTH ? "มีเจ้าหน้าที่ดูแล" : "Support available");
   const humanHeaderMeta = thread?.status === "closed"
     ? (isTH ? "ดูประวัติได้ แต่ส่งข้อความต่อไม่ได้" : "History is available, but replies are disabled")
+    : isAdminTyping
+      ? `${typingAdminName || "Admin nat"}${isTH ? " กำลังพิมพ์..." : " is typing..."}`
     : ownLastMessageRead
       ? (isTH ? "อ่านข้อความล่าสุดแล้ว" : "Latest message read")
       : unreadCount > 0
@@ -632,6 +677,16 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         )}
 
         {error && <div className="mb-2 text-xs text-red-500">{error}</div>}
+        {isAdminTyping && !isClosedForCustomer && (
+          <div className="mb-3 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">
+            <span>{typingAdminName || "Admin nat"}{isTH ? " กำลังพิมพ์" : " is typing"}</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
+            </span>
+          </div>
+        )}
         {isClosedForCustomer && (
           <div className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
             {isTH ? "เคสนี้ถูกปิดแล้ว คุณยังย้อนดูประวัติได้ แต่จะไม่สามารถส่ง แก้ไข หรือลบข้อความได้" : "This case is closed. You can still view chat history, but you cannot send, edit, or delete messages."}
@@ -641,7 +696,13 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         <div className="flex items-end gap-2">
           <Input
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setDraft(nextValue);
+              if (mode === "human" && !isClosedForCustomer) {
+                reportCustomerTyping(nextValue.trim().length > 0);
+              }
+            }}
             placeholder={isTH ? "พิมพ์ข้อความถึงเจ้าหน้าที่..." : "Type a message to support..."}
             className="h-12 rounded-2xl text-base sm:text-sm"
             disabled={isClosedForCustomer}
