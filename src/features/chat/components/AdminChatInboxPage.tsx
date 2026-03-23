@@ -132,7 +132,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "mine" | "archive">("all");
-  const [selectedInboxDate, setSelectedInboxDate] = useState(() => todayDateValue);
+  const [selectedInboxDate, setSelectedInboxDate] = useState("");
   const [matchingThreadIdsByDate, setMatchingThreadIdsByDate] = useState<number[] | null>(null);
   const [isInboxDateLoading, setIsInboxDateLoading] = useState(false);
   const [historyStart, setHistoryStart] = useState("");
@@ -140,6 +140,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
+  const dateFilterCacheRef = useRef<Record<string, number[]>>({});
   const shouldStickToBottomRef = useRef(true);
   const previousMessageCountRef = useRef(0);
   const locale = isTH ? "th-TH" : "en-US";
@@ -234,10 +235,20 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
     const loadThreadsForSelectedDate = async () => {
       if (!selectedInboxDate) {
         setMatchingThreadIdsByDate(threads.map((thread) => thread.id));
+        setIsInboxDateLoading(false);
         return;
       }
 
-      setIsInboxDateLoading(true);
+      const cacheKey = `${selectedInboxDate}:${threads
+        .map((thread) => `${thread.id}-${thread.last_message_at || thread.updated_at || thread.created_at || ""}`)
+        .join("|")}`;
+      const cachedThreadIds = dateFilterCacheRef.current[cacheKey];
+
+      if (cachedThreadIds) {
+        setMatchingThreadIdsByDate(cachedThreadIds);
+      }
+
+      setIsInboxDateLoading(!cachedThreadIds);
       const { startDate, endDate } = toDateTimeRange(selectedInboxDate);
 
       try {
@@ -257,7 +268,9 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
         );
 
         if (!cancelled) {
-          setMatchingThreadIdsByDate(results.filter((id): id is number => id !== null));
+          const nextMatchingIds = results.filter((id): id is number => id !== null);
+          dateFilterCacheRef.current[cacheKey] = nextMatchingIds;
+          setMatchingThreadIdsByDate(nextMatchingIds);
         }
       } finally {
         if (!cancelled) {
