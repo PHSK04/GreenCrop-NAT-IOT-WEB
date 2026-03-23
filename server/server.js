@@ -914,6 +914,28 @@ function normalizeChatPriority(value) {
     return allowed.has(normalized) ? normalized : 'normal';
 }
 
+function safeChatSenderName(sender) {
+    const senderRole = String(sender?.role || '').toLowerCase();
+    if (senderRole === 'admin') {
+        return 'Admin nat';
+    }
+    const baseName = String(sender?.name || sender?.email || '').trim();
+    return baseName || 'Customer';
+}
+
+function formatAuditTimestamp(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+function buildChatAuditDetail(date, text) {
+    return `${formatAuditTimestamp(date)} auto: ${text}`;
+}
+
 function mapChatThread(row) {
     if (!row) return null;
     return {
@@ -1025,7 +1047,7 @@ async function appendChatMessage({ threadId, sender, body, messageType = 'text',
         [
             threadId,
             sender.id,
-            sender.name || sender.email || 'Unknown',
+            safeChatSenderName(sender),
             senderRole,
             messageType,
             body || null,
@@ -1052,14 +1074,26 @@ async function appendChatMessage({ threadId, sender, body, messageType = 'text',
     return mapChatMessage(createdMessage);
 }
 
-async function loadChatThreadMessages(threadId, limit = 200) {
+async function loadChatThreadMessages(threadId, limit = 200, options = {}) {
     const safeLimit = Math.max(1, Math.min(500, Number(limit) || 200));
+    const where = ['thread_id = ?'];
+    const params = [threadId];
+
+    if (options.startDate) {
+        where.push('created_at >= ?');
+        params.push(options.startDate);
+    }
+    if (options.endDate) {
+        where.push('created_at <= ?');
+        params.push(options.endDate);
+    }
+
     const rows = await db.all(
         `SELECT TOP ${safeLimit} *
          FROM chat_messages
-         WHERE thread_id = ?
+         WHERE ${where.join(' AND ')}
          ORDER BY created_at ASC, id ASC`,
-        [threadId]
+        params
     );
     return rows.map(mapChatMessage);
 }
@@ -1132,7 +1166,19 @@ app.get('/api/chat/threads/:threadId/messages', async (req, res) => {
         const thread = await getChatThreadForRequest(threadId, req);
         if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
 
-        const messages = await loadChatThreadMessages(threadId, req.query.limit);
+        const startDate = req.query.startDate ? new Date(String(req.query.startDate)) : null;
+        const endDate = req.query.endDate ? new Date(String(req.query.endDate)) : null;
+
+        const messages = await loadChatThreadMessages(threadId, req.query.limit, {
+            startDate: startDate && !Number.isNaN(startDate.getTime()) ? startDate : null,
+            endDate: endDate && !Number.isNaN(endDate.getTime()) ? endDate : null,
+        });
+        if (startDate || endDate) {
+            const actorName = String(req.user?.role || '').toLowerCase() === 'admin' ? 'Admin nat' : (req.user?.name || 'Customer');
+            const rangeStart = startDate && !Number.isNaN(startDate.getTime()) ? startDate.toISOString().slice(0, 16).replace('T', ' ') : 'start';
+            const rangeEnd = endDate && !Number.isNaN(endDate.getTime()) ? endDate.toISOString().slice(0, 16).replace('T', ' ') : 'now';
+            await logAudit(actorName, 'CHAT_HISTORY_FILTER', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', buildChatAuditDetail(new Date(), `view history chat #${threadId} from ${rangeStart} to ${rangeEnd}`));
+        }
         res.json({ thread: mapChatThread(thread), messages });
     } catch (err) {
         res.status(500).json({ error: err.message || 'Failed to load chat messages' });
@@ -1145,6 +1191,10 @@ app.post('/api/chat/threads/:threadId/messages', async (req, res) => {
         if (!threadId) return res.status(400).json({ error: 'Invalid thread id' });
         const thread = await getChatThreadForRequest(threadId, req);
         if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
+        const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
+        if (!isAdmin && String(thread.status || '').toLowerCase() === 'closed') {
+            return res.status(403).json({ error: 'This case is closed and is now read-only' });
+        }
 
         const body = String(req.body?.body || '').trim();
         if (!body) return res.status(400).json({ error: 'Message body is required' });
@@ -1157,7 +1207,8 @@ app.post('/api/chat/threads/:threadId/messages', async (req, res) => {
             replyToMessageId: req.body?.reply_to_message_id || null,
         });
 
-        await logAudit(req.user?.name || 'Unknown', 'CHAT_SEND', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', `thread_id=${threadId}`);
+        const actorName = isAdmin ? 'Admin nat' : (req.user?.name || 'Customer');
+        await logAudit(actorName, 'CHAT_SEND', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', buildChatAuditDetail(new Date(), `send message chat #${threadId}`));
         res.json({ success: true, message });
     } catch (err) {
         res.status(500).json({ error: err.message || 'Failed to send chat message' });
@@ -1222,6 +1273,25 @@ app.post('/api/chat/threads/:threadId/meta', requireAdmin, async (req, res) => {
         );
 
         const updated = await db.get("SELECT * FROM chat_threads WHERE id = ?", [threadId]);
+        const changeLog = [];
+        if (status !== thread.status) {
+            changeLog.push(status === 'closed' ? `close case chat #${threadId} by Admin nat` : `set status ${status} for chat #${threadId} by Admin nat`);
+        }
+        if (Number(isPinned) !== Number(thread.is_pinned || 0)) {
+            changeLog.push(`${isPinned ? 'pin' : 'unpin'} chat #${threadId} by Admin nat`);
+        }
+        if (Number(isArchived) !== Number(thread.is_archived || 0)) {
+            changeLog.push(`${isArchived ? 'archive' : 'restore'} chat #${threadId} by Admin nat`);
+        }
+        if (String(assignedAdminId || '') !== String(thread.assigned_admin_id || '')) {
+            changeLog.push(`assign chat #${threadId} to ${assignedAdminName || 'unassigned'} by Admin nat`);
+        }
+        if (priority !== thread.priority) {
+            changeLog.push(`set priority ${priority} for chat #${threadId} by Admin nat`);
+        }
+        for (const detail of changeLog) {
+            await logAudit('Admin nat', 'CHAT_META', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', buildChatAuditDetail(now, detail));
+        }
         res.json({ success: true, thread: mapChatThread(updated) });
     } catch (err) {
         res.status(500).json({ error: err.message || 'Failed to update chat thread' });
@@ -1241,6 +1311,9 @@ app.put('/api/chat/messages/:messageId', async (req, res) => {
         if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
 
         const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
+        if (!isAdmin && String(thread.status || '').toLowerCase() === 'closed') {
+            return res.status(403).json({ error: 'This case is closed and is now read-only' });
+        }
         if (!isAdmin && String(message.sender_user_id) !== String(req.user?.id || '')) {
             return res.status(403).json({ error: 'Cannot edit this message' });
         }
@@ -1256,6 +1329,8 @@ app.put('/api/chat/messages/:messageId', async (req, res) => {
             );
         }
         const updated = await db.get("SELECT * FROM chat_messages WHERE id = ?", [messageId]);
+        const actorName = isAdmin ? 'Admin nat' : (req.user?.name || 'Customer');
+        await logAudit(actorName, 'CHAT_EDIT', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', buildChatAuditDetail(new Date(), `edit message #${messageId} in chat #${message.thread_id}`));
         res.json({ success: true, message: mapChatMessage(updated) });
     } catch (err) {
         res.status(500).json({ error: err.message || 'Failed to edit message' });
@@ -1272,6 +1347,9 @@ app.post('/api/chat/messages/:messageId/delete', async (req, res) => {
         if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
 
         const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
+        if (!isAdmin && String(thread.status || '').toLowerCase() === 'closed') {
+            return res.status(403).json({ error: 'This case is closed and is now read-only' });
+        }
         if (!isAdmin && String(message.sender_user_id) !== String(req.user?.id || '')) {
             return res.status(403).json({ error: 'Cannot delete this message' });
         }
@@ -1281,9 +1359,27 @@ app.post('/api/chat/messages/:messageId/delete', async (req, res) => {
             ['This message was deleted', new Date(), messageId]
         );
         const updated = await db.get("SELECT * FROM chat_messages WHERE id = ?", [messageId]);
+        const actorName = isAdmin ? 'Admin nat' : (req.user?.name || 'Customer');
+        await logAudit(actorName, 'CHAT_DELETE', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', buildChatAuditDetail(new Date(), `delete message #${messageId} in chat #${message.thread_id}`));
         res.json({ success: true, message: mapChatMessage(updated) });
     } catch (err) {
         res.status(500).json({ error: err.message || 'Failed to delete message' });
+    }
+});
+
+app.post('/api/chat/threads/:threadId/export-log', async (req, res) => {
+    try {
+        const threadId = parsePositiveInt(req.params.threadId, 0);
+        if (!threadId) return res.status(400).json({ error: 'Invalid thread id' });
+        const thread = await getChatThreadForRequest(threadId, req);
+        if (!thread) return res.status(404).json({ error: 'Chat thread not found' });
+
+        const format = String(req.body?.format || 'txt').toLowerCase();
+        const actorName = String(req.user?.role || '').toLowerCase() === 'admin' ? 'Admin nat' : (req.user?.name || 'Customer');
+        await logAudit(actorName, 'CHAT_EXPORT', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', buildChatAuditDetail(new Date(), `export transcript chat #${threadId} (${format})`));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to log export event' });
     }
 });
 
