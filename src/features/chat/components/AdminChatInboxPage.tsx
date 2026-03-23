@@ -85,6 +85,23 @@ const compareThreads = (left: ChatThread, right: ChatThread) => {
   return right.id - left.id;
 };
 
+const formatThreadPreview = (thread: ChatThread, isTH: boolean) => {
+  const preview = String(thread.last_message_preview || "").trim();
+  if (!preview) {
+    return isTH ? "ยังไม่มีข้อความ" : "No messages yet";
+  }
+
+  if (thread.last_message_sender_role === "admin") {
+    return `${isTH ? "คุณ" : "You"}: ${preview}`;
+  }
+
+  if (thread.last_message_sender_role === "user") {
+    return `${isTH ? "ลูกค้า" : "Customer"}: ${preview}`;
+  }
+
+  return preview;
+};
+
 const downloadBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -152,11 +169,14 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const [historyEnd, setHistoryEnd] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCustomerTyping, setIsCustomerTyping] = useState(false);
+  const [typingCustomerName, setTypingCustomerName] = useState("");
   const [error, setError] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
   const dateFilterCacheRef = useRef<Record<string, number[]>>({});
   const shouldStickToBottomRef = useRef(true);
   const previousMessageCountRef = useRef(0);
+  const typingTimeoutRef = useRef<number | null>(null);
   const locale = isTH ? "th-TH" : "en-US";
 
   const updateStickToBottom = () => {
@@ -266,6 +286,33 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
     }
   };
 
+  const loadTypingStatus = async (threadId: number) => {
+    try {
+      const typingState = await chatService.getTypingStatus(threadId);
+      setIsCustomerTyping(Boolean(typingState.user_typing));
+      setTypingCustomerName(String(typingState.user_name || selectedThread?.customer_name || "Customer"));
+    } catch {
+      // Ignore transient typing errors.
+    }
+  };
+
+  const reportAdminTyping = (isTyping: boolean) => {
+    if (!selectedThread) return;
+    chatService.setTypingStatus(selectedThread.id, isTyping).catch(() => {});
+    if (typingTimeoutRef.current) {
+      window.clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    if (isTyping) {
+      typingTimeoutRef.current = window.setTimeout(() => {
+        if (selectedThread) {
+          chatService.setTypingStatus(selectedThread.id, false).catch(() => {});
+        }
+        typingTimeoutRef.current = null;
+      }, 3000);
+    }
+  };
+
   useEffect(() => {
     loadThreads().catch(() => {});
     authService.getAdminDbUsers({ role: "admin", limit: 100 }).then(setAdmins).catch(() => {});
@@ -341,7 +388,10 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   useEffect(() => {
     const timer = window.setInterval(() => {
       loadThreads(true).catch(() => {});
-      if (selectedThreadId) loadMessages(selectedThreadId, true).catch(() => {});
+      if (selectedThreadId) {
+        loadMessages(selectedThreadId, true).catch(() => {});
+        loadTypingStatus(selectedThreadId).catch(() => {});
+      }
     }, POLL_MS);
     return () => window.clearInterval(timer);
   }, [selectedThreadId, query, filter, historyStart, historyEnd]);
@@ -349,7 +399,21 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   useEffect(() => {
     if (!selectedThreadId) return;
     loadMessages(selectedThreadId).catch(() => {});
+    loadTypingStatus(selectedThreadId).catch(() => {});
   }, [selectedThreadId, historyStart, historyEnd]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        window.clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedThreadId) return;
+    setIsCustomerTyping(false);
+  }, [selectedThreadId]);
 
   useEffect(() => {
     const hasNewMessages = messages.length > previousMessageCountRef.current;
@@ -373,6 +437,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
     setMessages((current) => [...current, created]);
     shouldStickToBottomRef.current = true;
     setDraft("");
+    reportAdminTyping(false);
     loadThreads(true).catch(() => {});
   };
 
@@ -543,7 +608,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                       {thread.admin_unread_count > 0 && <Badge>{thread.admin_unread_count}</Badge>}
                     </div>
                   </div>
-                  <div className="mt-2 line-clamp-2 text-sm text-muted-foreground">{thread.last_message_preview || (isTH ? "ยังไม่มีข้อความ" : "No messages yet")}</div>
+                  <div className="mt-2 line-clamp-2 text-sm text-muted-foreground">{formatThreadPreview(thread, isTH)}</div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
                     <Badge variant="outline">{thread.status}</Badge>
                     <Badge variant="outline">{thread.priority}</Badge>
@@ -561,7 +626,11 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <CardTitle>{selectedThread?.customer_name || (isTH ? "เลือกห้องแชท" : "Select a thread")}</CardTitle>
-                <div className="mt-1 text-sm text-muted-foreground">{selectedThread?.customer_email || (isTH ? "ดูประวัติและตอบกลับจากฝั่งแอดมิน" : "Review conversation history and reply from admin")}</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  {isCustomerTyping
+                    ? `${typingCustomerName || selectedThread?.customer_name || (isTH ? "ลูกค้า" : "Customer")}${isTH ? " กำลังพิมพ์..." : " is typing..."}`
+                    : selectedThread?.customer_email || (isTH ? "ดูประวัติและตอบกลับจากฝั่งแอดมิน" : "Review conversation history and reply from admin")}
+                </div>
               </div>
               {selectedThread && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -704,11 +773,25 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                   </div>
 
                   {error && <div className="text-xs text-red-500">{error}</div>}
+                  {isCustomerTyping && (
+                    <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">
+                      <span>{typingCustomerName || selectedThread.customer_name}{isTH ? " กำลังพิมพ์" : " is typing"}</span>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex items-end gap-2">
                     <Input
                       value={draft}
-                      onChange={(event) => setDraft(event.target.value)}
+                      onChange={(event) => {
+                        const nextValue = event.target.value;
+                        setDraft(nextValue);
+                        reportAdminTyping(nextValue.trim().length > 0);
+                      }}
                       placeholder={isTH ? "พิมพ์ข้อความตอบกลับ..." : "Type your reply..."}
                       className="h-12 rounded-2xl"
                       onKeyDown={(event) => {
