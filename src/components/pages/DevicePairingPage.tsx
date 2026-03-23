@@ -321,11 +321,21 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
                   <Camera className="h-4 w-4" />
                   สแกนด้วยกล้อง
                 </Button>
-                <Button size="sm" variant="outline" className="gap-2" onClick={handlePickFile}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-2 rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:hover:border-emerald-900 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300"
+                  onClick={handlePickFile}
+                >
                   <ImageIcon className="h-4 w-4" />
                   เลือกรูป QR
                 </Button>
-                <Button size="sm" variant="outline" className="gap-2" onClick={handlePickFile}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-2 rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:hover:border-emerald-900 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300"
+                  onClick={handlePickFile}
+                >
                   <FileUp className="h-4 w-4" />
                   เลือกไฟล์
                 </Button>
