@@ -5,7 +5,6 @@ import {
   Sun,
   Droplets,
   Activity,
-  MessageCircle,
   User,
   Users,
   LayoutDashboard,
@@ -46,6 +45,7 @@ import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { ModeToggle } from "./mode-toggle";
 import { useMachine } from "../contexts/MachineContext";
 import appLogoGreen from "@/assets/images/3_transparent_logo_green.png";
+import supportIcon from "@/assets/images/icon_support.png";
 import { emitActiveDeviceChanged } from "@/hooks/useActiveDeviceId";
 
 const mainNavItems = [
@@ -627,26 +627,21 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
               </div>
             )}
 
-            <div className="pointer-events-auto flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => setIsDashboardChatOpen((open) => !open)}
-                className="hidden rounded-[2rem] bg-white/96 px-8 py-6 text-[clamp(1.1rem,1.8vw,2rem)] font-semibold tracking-tight text-slate-800 shadow-[0_20px_50px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_55px_rgba(15,23,42,0.16)] sm:block dark:bg-slate-50"
-              >
-                Chat with us <span className="ml-2">👋</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsDashboardChatOpen((open) => !open)}
-                className="group flex h-20 w-20 items-center justify-center rounded-full bg-slate-700 text-white shadow-[0_22px_45px_rgba(15,23,42,0.24)] transition hover:-translate-y-0.5 hover:bg-slate-800 sm:h-24 sm:w-24"
-                aria-label={language === "TH" ? "เปิดแชตช่วยเหลือ" : "Open support chat"}
-              >
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 sm:h-12 sm:w-12">
-                  <MessageCircle className="h-6 w-6 transition group-hover:scale-105" />
-                </div>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsDashboardChatOpen((open) => !open)}
+              className="pointer-events-auto group flex h-20 w-20 items-center justify-center rounded-full bg-slate-700 text-white shadow-[0_22px_45px_rgba(15,23,42,0.24)] transition hover:-translate-y-0.5 hover:bg-slate-800 sm:h-24 sm:w-24"
+              aria-label={language === "TH" ? "เปิดแชตช่วยเหลือ" : "Open support chat"}
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 sm:h-12 sm:w-12">
+                <img
+                  src={supportIcon}
+                  alt="Support"
+                  className="h-6 w-6 object-contain transition group-hover:scale-105 sm:h-7 sm:w-7"
+                  draggable={false}
+                />
+              </div>
+            </button>
           </div>
         )}
       </div>
