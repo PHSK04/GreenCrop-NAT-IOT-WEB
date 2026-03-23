@@ -345,8 +345,12 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
                 {issueCategories.map((category) => (
                   <Button
                     key={category.id}
-                    variant={activeCategory === category.id ? "default" : "outline"}
-                    className="w-full justify-between rounded-xl"
+                    variant="ghost"
+                    className={
+                      activeCategory === category.id
+                        ? "w-full justify-between rounded-2xl border border-emerald-300 bg-gradient-to-r from-emerald-400 to-teal-400 px-5 py-6 text-base font-semibold text-white shadow-[0_14px_30px_rgba(45,212,191,0.24)] hover:from-emerald-400 hover:to-teal-400"
+                        : "w-full justify-between rounded-2xl border border-slate-200 bg-white px-5 py-6 text-base font-semibold text-slate-800 shadow-sm hover:border-emerald-200 hover:bg-emerald-50/70 hover:text-emerald-700 dark:border-slate-800 dark:bg-slate-950/80 dark:text-slate-100 dark:hover:border-emerald-900 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300"
+                    }
                     onClick={() => setActiveCategory(category.id)}
                   >
                     <span>{isTH ? category.label.TH : category.label.EN}</span>
