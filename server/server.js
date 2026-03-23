@@ -961,23 +961,39 @@ function mapChatMessage(row) {
 }
 
 async function ensureChatThreadForUser(user) {
+    const userId = user?.id;
+    if (!userId) {
+        throw new Error('User id is required for chat');
+    }
+
     const existing = await db.get(
         `SELECT TOP 1 *
          FROM chat_threads
          WHERE customer_user_id = ?
          ORDER BY created_at DESC`,
-        [user.id]
+        [userId]
     );
     if (existing) return mapChatThread(existing);
 
+    const dbUser = await db.get(
+        "SELECT id, name, email, phone FROM users WHERE id = ?",
+        [userId]
+    );
+
+    const customerName =
+        String(user?.name || dbUser?.name || user?.email || dbUser?.email || `User ${userId}`).trim();
+    const customerEmail =
+        String(user?.email || dbUser?.email || `user${userId}@local.chat`).trim().toLowerCase();
+    const customerPhone = user?.phone || dbUser?.phone || null;
+
     const now = new Date();
-    const subject = `Support for ${user.name}`;
+    const subject = `Support for ${customerName}`;
     const created = await db.run(
         `INSERT INTO chat_threads (
             customer_user_id, customer_name, customer_email, customer_phone, subject,
             status, priority, last_message_at, created_at, updated_at
          ) VALUES (?, ?, ?, ?, ?, 'open', 'normal', ?, ?, ?)`,
-        [user.id, user.name, user.email, user.phone || null, subject, now, now, now]
+        [userId, customerName, customerEmail, customerPhone, subject, now, now, now]
     );
 
     const thread = await db.get("SELECT * FROM chat_threads WHERE id = ?", [created.id]);
