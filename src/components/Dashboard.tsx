@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import {
+  ArrowRight,
   ClipboardList,
   Sun,
   Droplets,
   Activity,
+  MessageCircle,
   User,
   Users,
   LayoutDashboard,
@@ -18,6 +20,7 @@ import {
   PanelLeftOpen,
   Cpu,
   Headset,
+  X,
 } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
@@ -338,9 +341,11 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   const [tank3On, setTank3On] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isDesktopSidebarCompact, setIsDesktopSidebarCompact] = useState(false);
+  const [isDashboardChatOpen, setIsDashboardChatOpen] = useState(false);
   const [devices, setDevices] = useState<AdminDbDeviceRow[]>([]);
   const [activeDeviceId, setActiveDeviceId] = useState<string>("");
   const showDeviceSelector = devices.length > 1;
+  const showDashboardChatWidget = !isAdminUser && activePage === "Dashboard";
 
   // Use machine context for sidebar status
   const { isOn } = useMachine();
@@ -557,6 +562,93 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
         <div className="flex-1 overflow-auto">
           {renderContent()}
         </div>
+
+        {showDashboardChatWidget && (
+          <div className="pointer-events-none fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3 sm:bottom-8 sm:right-8">
+            {isDashboardChatOpen && (
+              <div className="pointer-events-auto w-[min(320px,calc(100vw-2.5rem))] overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/95 shadow-[0_24px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/95">
+                <div className="flex items-start justify-between border-b border-slate-200/80 px-5 py-4 dark:border-slate-800">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {language === "TH" ? "เริ่มคุยกับทีมซัพพอร์ต" : "Start a support chat"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      {language === "TH" ? "เลือกว่าต้องการไปดูคู่มือช่วยตอบ หรือส่งต่อเคส" : "Choose whether to open the help center or escalate a case."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsDashboardChatOpen(false)}
+                    className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 px-5 py-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivePage("Help Center");
+                      setIsDashboardChatOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {language === "TH" ? "เปิดศูนย์ช่วยเหลือ" : "Open Help Center"}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {language === "TH" ? "ดูวิธีตอบลูกค้าและขั้นตอนแก้ปัญหา" : "View troubleshooting steps and customer reply templates"}
+                      </p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-slate-400" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivePage("Help Center");
+                      setIsDashboardChatOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {language === "TH" ? "ส่งต่อเคสเร่งด่วน" : "Escalate an urgent case"}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {language === "TH" ? "เหมาะกับเครื่อง offline หรือ alert ระดับรุนแรง" : "For offline devices or critical alerts"}
+                      </p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-slate-400" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="pointer-events-auto flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setIsDashboardChatOpen((open) => !open)}
+                className="hidden rounded-[2rem] bg-white/96 px-8 py-6 text-[clamp(1.1rem,1.8vw,2rem)] font-semibold tracking-tight text-slate-800 shadow-[0_20px_50px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_55px_rgba(15,23,42,0.16)] sm:block dark:bg-slate-50"
+              >
+                Chat with us <span className="ml-2">👋</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsDashboardChatOpen((open) => !open)}
+                className="group flex h-20 w-20 items-center justify-center rounded-full bg-slate-700 text-white shadow-[0_22px_45px_rgba(15,23,42,0.24)] transition hover:-translate-y-0.5 hover:bg-slate-800 sm:h-24 sm:w-24"
+                aria-label={language === "TH" ? "เปิดแชตช่วยเหลือ" : "Open support chat"}
+              >
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 sm:h-12 sm:w-12">
+                  <MessageCircle className="h-6 w-6 transition group-hover:scale-105" />
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
