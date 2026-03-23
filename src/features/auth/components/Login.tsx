@@ -46,6 +46,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   });
 
   async function onSubmit(data: LoginFormValues) {
+    if (isLoading) return;
     setIsLoading(true);
     try {
       await login(data.email, data.password);
@@ -220,10 +221,11 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                                   : "text-slate-400"
                               }`}
                             />
-                            <Input
-                              placeholder="you@example.com"
-                              className="input-field h-12 rounded-xl border-slate-200 bg-slate-50 pl-10 text-[0.925rem] text-slate-900 placeholder:text-slate-300 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-600"
-                              autoComplete="off"
+                                <Input
+                                  placeholder="you@example.com"
+                                  className="input-field h-12 rounded-xl border-slate-200 bg-slate-50 pl-10 text-[0.925rem] text-slate-900 placeholder:text-slate-300 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-600"
+                                  disabled={isLoading}
+                                  autoComplete="off"
                               autoCorrect="off"
                               autoCapitalize="none"
                               spellCheck={false}
@@ -264,11 +266,12 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                                   : "text-slate-400"
                               }`}
                             />
-                            <Input
-                              type={showPassword ? "text" : "password"}
-                              placeholder="••••••••"
-                              className="input-field h-12 rounded-xl border-slate-200 bg-slate-50 pl-10 pr-11 text-[0.925rem] text-slate-900 placeholder:text-slate-300 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-600"
-                              autoComplete="off"
+                                <Input
+                                  type={showPassword ? "text" : "password"}
+                                  placeholder="••••••••"
+                                  className="input-field h-12 rounded-xl border-slate-200 bg-slate-50 pl-10 pr-11 text-[0.925rem] text-slate-900 placeholder:text-slate-300 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-600"
+                                  disabled={isLoading}
+                                  autoComplete="off"
                               autoCorrect="off"
                               autoCapitalize="none"
                               spellCheck={false}
@@ -279,6 +282,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                             <button
                               type="button"
                               onClick={() => setShowPassword((p) => !p)}
+                              disabled={isLoading}
                               className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-emerald-500"
                               aria-label={showPassword ? "Hide password" : "Show password"}
                             >

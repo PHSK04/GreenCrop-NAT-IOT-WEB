@@ -17,6 +17,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Cpu,
+  Headset,
 } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
@@ -31,6 +32,7 @@ import { MaintenancePage } from "./pages/MaintenancePage";
 import { MyProfilePage } from "./pages/MyProfilePage";
 import { TankLevelsPage } from "./pages/TankLevelsPage";
 import { DevicePairingPage } from "./pages/DevicePairingPage";
+import { SupportCenterPage } from "./pages/SupportCenterPage";
 import { AdminOverview } from "@/features/admin/pages/AdminOverview";
 import { UserManagementPage } from "@/features/admin/pages/UserManagementPage";
 import { AuditLogsPage } from "@/features/admin/pages/AuditLogsPage";
@@ -63,6 +65,7 @@ const analyticsItems = [
 
 const otherItems = [
   { icon: Wrench, label: "Maintenance" },
+  { icon: Headset, label: "Help Center" },
   { icon: User, label: "My Profile" },
 ];
 
@@ -85,6 +88,7 @@ const navTranslations = {
     "Machine Performance": "Machine Performance",
     "Wolffia Analytics": "Wolffia Analytics",
     "Maintenance": "Maintenance",
+    "Help Center": "Help Center",
     "My Profile": "My Profile",
     "Device Pairing": "Device Pairing",
     "Field Insights": "Field Insights",
@@ -111,6 +115,7 @@ const navTranslations = {
     "Machine Performance": "ประสิทธิภาพเครื่องจักร",
     "Wolffia Analytics": "วิเคราะห์ไข่น้ำ",
     "Maintenance": "การบำรุงรักษา",
+    "Help Center": "ศูนย์ช่วยเหลือ",
     "My Profile": "โปรไฟล์ของฉัน",
     "Device Pairing": "เชื่อมต่ออุปกรณ์",
     "Field Insights": "ข้อมูลเชิงลึกภาคสนาม",
@@ -437,6 +442,8 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
         return <WolffiaAnalyticsPage language={language} />;
       case "Maintenance":
         return <MaintenancePage language={language} />;
+      case "Help Center":
+        return <SupportCenterPage language={language} />;
       case "Tank Levels":
         return <TankLevelsPage tank2On={tank2On} setTank2On={setTank2On} tank3On={tank3On} setTank3On={setTank3On} language={language} />;
       case "My Profile":
