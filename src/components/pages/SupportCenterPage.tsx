@@ -5,14 +5,12 @@ import {
   CheckCircle2,
   Headset,
   LifeBuoy,
-  MessageCircle,
   Radio,
   Search,
   ShieldAlert,
   Smartphone,
   UserRoundX,
   WifiOff,
-  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -233,7 +231,6 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
   const isTH = language === "TH";
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<IssueCategory>("all");
-  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const filteredIssues = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -488,82 +485,6 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
         </section>
       </main>
 
-      <div className="pointer-events-none fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3 sm:bottom-8 sm:right-8">
-        {isChatOpen && (
-          <div className="pointer-events-auto w-[min(320px,calc(100vw-2.5rem))] overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/95 shadow-[0_24px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/95">
-            <div className="flex items-start justify-between border-b border-slate-200/80 px-5 py-4 dark:border-slate-800">
-              <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {isTH ? "เริ่มคุยกับทีมซัพพอร์ต" : "Start a support chat"}
-                </p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {isTH ? "เลือกแนวทางที่ต้องการให้เราช่วยต่อ" : "Choose how you want us to help next."}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsChatOpen(false)}
-                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3 px-5 py-4">
-              <button
-                type="button"
-                className="flex w-full items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800"
-              >
-                <div>
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                    {isTH ? "ส่งปัญหาเร่งด่วน" : "Report an urgent issue"}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {isTH ? "สำหรับเครื่อง offline หรือมี alert รุนแรง" : "For offline devices or critical alerts"}
-                  </p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-slate-400" />
-              </button>
-
-              <button
-                type="button"
-                className="flex w-full items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800"
-              >
-                <div>
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                    {isTH ? "ขอข้อความตอบลูกค้า" : "Get a reply template"}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {isTH ? "ใช้ข้อความพร้อมส่งให้ลูกค้าได้ทันที" : "Use a ready-made message for customers"}
-                  </p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-slate-400" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="pointer-events-auto flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => setIsChatOpen((open) => !open)}
-            className="hidden rounded-[1.6rem] bg-white/95 px-8 py-7 text-[clamp(1.1rem,1.6vw,2rem)] font-medium tracking-tight text-slate-800 shadow-[0_20px_45px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_55px_rgba(15,23,42,0.16)] sm:block dark:bg-slate-50"
-          >
-            {isTH ? "Chat with us" : "Chat with us"} <span className="ml-2">👋</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsChatOpen((open) => !open)}
-            className="group flex h-20 w-20 items-center justify-center rounded-full bg-slate-700 text-white shadow-[0_22px_45px_rgba(15,23,42,0.24)] transition hover:-translate-y-0.5 hover:bg-slate-800 sm:h-24 sm:w-24"
-            aria-label={isTH ? "เปิดแชตช่วยเหลือ" : "Open support chat"}
-          >
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 sm:h-12 sm:w-12">
-              <MessageCircle className="h-6 w-6 transition group-hover:scale-105" />
-            </div>
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
