@@ -211,14 +211,27 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
         endDate: historyEnd || undefined,
       });
       setMessages(data.messages);
+      setThreads((current) =>
+        current.map((thread) => {
+          if (thread.id !== threadId) return thread;
+          return {
+            ...thread,
+            ...data.thread,
+            admin_unread_count: 0,
+            last_message_preview:
+              data.messages[data.messages.length - 1]?.body ||
+              data.thread.last_message_preview ||
+              thread.last_message_preview,
+            last_message_at:
+              data.messages[data.messages.length - 1]?.created_at ||
+              data.thread.last_message_at ||
+              thread.last_message_at,
+          };
+        }),
+      );
       await chatService.markRead(threadId);
       if (!silently) {
         shouldStickToBottomRef.current = true;
-      }
-      if (!silently) {
-        setThreads((current) =>
-          current.map((thread) => (thread.id === threadId ? { ...thread, admin_unread_count: 0 } : thread)),
-        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load messages");
@@ -341,6 +354,19 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
     setThreads((current) => current.map((thread) => (thread.id === updated.id ? updated : thread)));
   };
 
+  const resetToAllThreads = () => {
+    setSelectedInboxDate("");
+    setFilter("all");
+    setSelectedThreadId(threads[0]?.id ?? null);
+  };
+
+  const selectedFilterLabel = useMemo(() => {
+    if (filter === "unread") return isTH ? "ยังไม่อ่าน" : "Unread";
+    if (filter === "mine") return isTH ? "ของฉัน" : "Mine";
+    if (filter === "archive") return "Archive";
+    return isTH ? "ทุกแชท" : "All chats";
+  }, [filter, isTH]);
+
   return (
     <div className="box-border flex h-full max-h-full min-h-0 flex-col overflow-hidden p-8">
       <div className="mb-6 shrink-0 flex items-end justify-between gap-4">
@@ -370,7 +396,11 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
               <Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-10" placeholder={isTH ? "ค้นหาจากชื่อ อีเมล หรือข้อความ" : "Search by customer, email, or message"} />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="space-y-2">
+              <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {isTH ? "วันของข้อความ" : "Message date"}
+              </div>
+              <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 className={selectedInboxDate === todayDateValue
@@ -385,9 +415,9 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                 className={!selectedInboxDate
                   ? "rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 px-5 text-white hover:from-emerald-400 hover:to-teal-400"
                   : "rounded-full border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-300 dark:hover:bg-emerald-950/30"}
-                onClick={() => setSelectedInboxDate("")}
+                onClick={resetToAllThreads}
               >
-                {isTH ? "ทั้งหมด" : "All dates"}
+                {isTH ? "ทุกวัน" : "All dates"}
               </Button>
               <input
                 type="date"
@@ -396,14 +426,19 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                 className="h-10 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
               />
             </div>
-
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">
-              {isTH ? "กำลังดูรายการของ:" : "Showing threads for:"} <span className="font-semibold">{selectedDateLabel}</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">
+              {isTH ? "กำลังดู:" : "Showing:"} <span className="font-semibold">{selectedDateLabel}</span> · <span className="font-semibold">{selectedFilterLabel}</span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {isTH ? "รายการแชท" : "Chat scope"}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
               {[
-                { id: "all", label: isTH ? "ทั้งหมด" : "All" },
+                { id: "all", label: isTH ? "ทุกแชท" : "All chats" },
                 { id: "unread", label: isTH ? "ยังไม่อ่าน" : "Unread" },
                 { id: "mine", label: isTH ? "ของฉัน" : "Mine" },
                 { id: "archive", label: isTH ? "Archive" : "Archive" },
@@ -414,18 +449,27 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                   className={filter === item.id
                     ? "rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 text-white shadow-[0_12px_24px_rgba(45,212,191,0.2)] hover:from-emerald-400 hover:to-teal-400"
                     : "rounded-full border border-emerald-200 bg-white text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-300 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/30"}
-                  onClick={() => setFilter(item.id as typeof filter)}
+                  onClick={() => {
+                    const nextFilter = item.id as typeof filter;
+                    if (nextFilter === "all") {
+                      resetToAllThreads();
+                      return;
+                    }
+                    setFilter(nextFilter);
+                    setSelectedThreadId(null);
+                  }}
                 >
                   {item.label}
                 </Button>
               ))}
+            </div>
             </div>
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
               {(isLoading || isInboxDateLoading) && <div className="text-sm text-muted-foreground">{isTH ? "กำลังโหลด..." : "Loading..."}</div>}
               {!isLoading && !isInboxDateLoading && filteredThreadsByDay.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                  {isTH ? "ยังไม่มีแชทในวันที่เลือก" : "No chat threads for the selected date"}
+                  {isTH ? `ไม่พบแชทสำหรับ ${selectedDateLabel} · ${selectedFilterLabel}` : `No chat threads for ${selectedDateLabel} · ${selectedFilterLabel}`}
                 </div>
               )}
               {filteredThreadsByDay.map((thread) => (
