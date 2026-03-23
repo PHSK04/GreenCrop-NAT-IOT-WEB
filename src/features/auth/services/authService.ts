@@ -133,11 +133,51 @@ const SESSION_KEY = 'smart_iot_session';
 const isGithubPagesRuntime =
   typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
 const REQUEST_TIMEOUT_MS = isGithubPagesRuntime ? 65000 : 12000;
+const TRANSIENT_RETRY_DELAY_MS = 700;
 
 type SessionPayload = {
   token?: string;
   user?: Partial<User> & { id?: string | number; role?: string; created_at?: number | string };
 } | null;
+
+const clearSession = () => {
+  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem('smart_iot_token');
+  localStorage.removeItem('auth_token');
+};
+
+const parseJwtPayload = (token: string): Record<string, any> | null => {
+  if (!token || token.split('.').length < 2) return null;
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const normalized = payload.padEnd(Math.ceil(payload.length / 4) * 4, '=');
+    return JSON.parse(atob(normalized));
+  } catch {
+    return null;
+  }
+};
+
+const isTokenExpired = (token: string): boolean => {
+  const payload = parseJwtPayload(token);
+  const exp = Number(payload?.exp);
+  if (!Number.isFinite(exp) || exp <= 0) return false;
+  return Date.now() >= exp * 1000;
+};
+
+const isTransientErrorMessage = (message: string): boolean => {
+  const normalized = String(message || '').toLowerCase();
+  return (
+    normalized.includes('cannot connect to server/db') ||
+    normalized.includes('timeout') ||
+    normalized.includes('network') ||
+    normalized.includes('failed to fetch') ||
+    normalized.includes('database is unavailable') ||
+    normalized.includes('temporarily unavailable') ||
+    normalized.includes('(503)')
+  );
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const normalizeUser = (raw: any): User | null => {
   if (!raw) return null;
@@ -181,8 +221,13 @@ const readSession = (): { token: string; user: User | null } => {
       localStorage.getItem('auth_token') ||
       '';
     const user = normalizeUser((parsed as any)?.user ?? parsed);
+    if (token && isTokenExpired(token)) {
+      clearSession();
+      return { token: '', user: null };
+    }
     return { token, user };
   } catch {
+    clearSession();
     const legacyToken =
       localStorage.getItem('smart_iot_token') ||
       localStorage.getItem('auth_token') ||
@@ -245,6 +290,26 @@ const fetchWithApiFallback = async (
   }
 };
 
+const withTransientRetry = async <T>(
+  operation: () => Promise<T>,
+  retries = 1,
+): Promise<T> => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error || '');
+      if (attempt >= retries || !isTransientErrorMessage(message)) {
+        throw error;
+      }
+      await sleep(TRANSIENT_RETRY_DELAY_MS);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Request failed');
+};
+
 const throwHttpError = async (response: Response, fallbackMessage: string): Promise<never> => {
   let serverMessage = '';
   try {
@@ -260,78 +325,82 @@ const throwHttpError = async (response: Response, fallbackMessage: string): Prom
 export const authService = {
   // Login via API (DB-backed)
   login: async (email: string, password: string): Promise<User> => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    return withTransientRetry(async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    try {
-      const response = await fetchWithApiFallback('/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-        signal: controller.signal
-      });
+      try {
+        const response = await fetchWithApiFallback('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+          signal: controller.signal
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Login failed');
-      }
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Login failed');
+        }
 
-      const data = await response.json();
-      const normalizedUser = normalizeUser(data);
-      if (!normalizedUser) {
-        throw new Error('Login response is missing user data');
+        const data = await response.json();
+        const normalizedUser = normalizeUser(data);
+        if (!normalizedUser) {
+          throw new Error('Login response is missing user data');
+        }
+        writeSession({ token: data?.token || '', user: normalizedUser });
+        return normalizedUser;
+      } catch (error: any) {
+        if (error?.name === 'AbortError') {
+          throw new Error('Cannot connect to server/DB (timeout)');
+        }
+        if (error?.message === 'Failed to fetch' || String(error?.message || '').includes('connect')) {
+          throw new Error('Cannot connect to server/DB');
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeoutId);
       }
-      writeSession({ token: data?.token || '', user: normalizedUser });
-      return normalizedUser;
-    } catch (error: any) {
-      if (error?.name === 'AbortError') {
-        throw new Error('Cannot connect to server/DB (timeout)');
-      }
-      if (error?.message === 'Failed to fetch' || String(error?.message || '').includes('connect')) {
-        throw new Error('Cannot connect to server/DB');
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    });
   },
 
   // Register via API (DB-backed)
   register: async (email: string, password: string, name: string): Promise<User> => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    return withTransientRetry(async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    try {
-      const response = await fetchWithApiFallback('/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
-        signal: controller.signal
-      });
+      try {
+        const response = await fetchWithApiFallback('/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, name }),
+          signal: controller.signal
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Registration failed');
-      }
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Registration failed');
+        }
 
-      const data = await response.json();
-      const normalizedUser = normalizeUser(data);
-      if (!normalizedUser) {
-        throw new Error('Registration response is missing user data');
+        const data = await response.json();
+        const normalizedUser = normalizeUser(data);
+        if (!normalizedUser) {
+          throw new Error('Registration response is missing user data');
+        }
+        writeSession({ token: data?.token || '', user: normalizedUser });
+        return normalizedUser;
+      } catch (error: any) {
+        if (error?.name === 'AbortError') {
+          throw new Error('Cannot connect to server/DB (timeout)');
+        }
+        if (error?.message === 'Failed to fetch' || String(error?.message || '').includes('connect')) {
+          throw new Error('Cannot connect to server/DB');
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeoutId);
       }
-      writeSession({ token: data?.token || '', user: normalizedUser });
-      return normalizedUser;
-    } catch (error: any) {
-      if (error?.name === 'AbortError') {
-        throw new Error('Cannot connect to server/DB (timeout)');
-      }
-      if (error?.message === 'Failed to fetch' || String(error?.message || '').includes('connect')) {
-        throw new Error('Cannot connect to server/DB');
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    });
   },
 
   logout: async () => {
@@ -347,12 +416,13 @@ export const authService = {
     } catch (e) {
         console.warn("Server logout failed, proceeding with local logout");
     } finally {
-        localStorage.removeItem(SESSION_KEY);
+        clearSession();
     }
   },
 
   getCurrentUser: (): User | null => {
-    return readSession().user;
+    const { user } = readSession();
+    return user;
   },
 
   getAllUsers: async (): Promise<User[]> => {
