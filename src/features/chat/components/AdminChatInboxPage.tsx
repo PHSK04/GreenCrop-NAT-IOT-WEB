@@ -72,6 +72,11 @@ const toDateTimeRange = (dateValue: string) => ({
   endDate: `${dateValue}T23:59`,
 });
 
+const isMessageOnSelectedDate = (value: string | null | undefined, dateValue: string) => {
+  if (!value || !dateValue) return false;
+  return toDateInputValue(new Date(value)) === dateValue;
+};
+
 const downloadBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -249,18 +254,17 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
       }
 
       setIsInboxDateLoading(!cachedThreadIds);
-      const { startDate, endDate } = toDateTimeRange(selectedInboxDate);
-
       try {
         const results = await Promise.all(
           threads.map(async (thread) => {
             try {
               const data = await chatService.getThreadMessages(thread.id, {
-                startDate,
-                endDate,
                 limit: 200,
               });
-              return data.messages.length > 0 ? thread.id : null;
+              const hasMessagesOnSelectedDate = data.messages.some((message) =>
+                isMessageOnSelectedDate(message.created_at, selectedInboxDate),
+              );
+              return hasMessagesOnSelectedDate ? thread.id : null;
             } catch {
               return null;
             }
