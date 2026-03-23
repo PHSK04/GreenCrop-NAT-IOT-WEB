@@ -17,6 +17,8 @@ export interface ChatThread {
   is_pinned: boolean;
   last_message_at?: string | null;
   last_message_preview?: string | null;
+  last_message_sender_role?: ChatSenderRole | null;
+  last_message_sender_name?: string | null;
   customer_unread_count: number;
   admin_unread_count: number;
   customer_last_read_at?: string | null;
@@ -45,6 +47,13 @@ export interface ChatMessage {
 export interface ChatUnreadSummary {
   unread_threads: number;
   unread_messages: number;
+}
+
+export interface ChatTypingStatus {
+  admin_typing: boolean;
+  admin_name?: string | null;
+  user_typing: boolean;
+  user_name?: string | null;
 }
 
 type ChatThreadListQuery = {
@@ -143,6 +152,22 @@ export const chatService = {
       headers: getAuthHeaders(),
     });
     await parseJson(response, "Failed to mark chat as read");
+  },
+
+  async getTypingStatus(threadId: number): Promise<ChatTypingStatus> {
+    const response = await fetch(buildApiUrl(`/chat/threads/${threadId}/typing`), {
+      headers: getAuthHeaders(),
+    });
+    return parseJson(response, "Failed to load typing state");
+  },
+
+  async setTypingStatus(threadId: number, isTyping: boolean): Promise<ChatTypingStatus> {
+    const response = await fetch(buildApiUrl(`/chat/threads/${threadId}/typing`), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ is_typing: isTyping }),
+    });
+    return parseJson(response, "Failed to update typing state");
   },
 
   async updateThreadMeta(
