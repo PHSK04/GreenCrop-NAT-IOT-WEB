@@ -255,7 +255,7 @@ function SidebarContent({
       )}
 
       {/* Navigation */}
-      <nav className={`flex-1 overflow-y-auto no-scrollbar scroll-smooth ${compact ? "p-2 space-y-4" : "p-4 space-y-7"}`}>
+      <nav className={`flex-1 min-h-0 overflow-y-hidden ${compact ? "p-2 space-y-4" : "p-4 space-y-7"}`}>
         {!isAdmin && (
           <>
             <div className="space-y-1">
@@ -464,9 +464,9 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   };
 
   return (
-    <div className="flex min-h-[100dvh] bg-background font-sans selection:bg-primary/30 text-foreground transition-colors duration-300">
+    <div className="flex h-[100dvh] overflow-hidden bg-background font-sans text-foreground transition-colors duration-300 selection:bg-primary/30">
       {/* Desktop Sidebar */}
-      <div className={`hidden lg:block min-h-[100dvh] z-20 relative border-r border-border/60 transition-[width] duration-300 ${isDesktopSidebarCompact ? "w-24" : "w-72"}`}>
+      <div className={`hidden lg:block h-full shrink-0 z-20 relative border-r border-border/60 transition-[width] duration-300 ${isDesktopSidebarCompact ? "w-24" : "w-72"}`}>
         <SidebarContent 
           activePage={activePage} 
           setActivePage={setActivePage} 
@@ -483,7 +483,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       </div>
 
       {/* Main Content */}
-      <div className="force-solid flex-1 flex flex-col overflow-hidden relative bg-background transition-colors duration-300">
+      <div className="force-solid relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background transition-colors duration-300">
          {/* Background Grid Pattern */}
          <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,rgba(15,23,42,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.05)_1px,transparent_1px)] bg-[size:24px_24px] dark:bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)]"></div>
          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_800px_at_50%_-30%,rgba(16,185,129,0.14),transparent)] dark:bg-[radial-gradient(circle_800px_at_50%_-30%,rgba(16,185,129,0.2),transparent)]"></div>
@@ -560,7 +560,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
           </Button>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
           {renderContent()}
         </div>
 
