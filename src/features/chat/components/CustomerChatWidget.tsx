@@ -38,6 +38,13 @@ type AssistantMessage = {
 
 const POLL_MS = 4000;
 
+const safeSenderLabel = (message: Pick<ChatMessage, "sender_name" | "sender_role">, isTH: boolean) => {
+  if (message.sender_role === "admin") {
+    return "Admin nat";
+  }
+  return message.sender_name || (isTH ? "ลูกค้า" : "Customer");
+};
+
 const assistantFlows = {
   offline: {
     title: "อุปกรณ์ไม่ออนไลน์",
@@ -120,7 +127,7 @@ async function exportTranscriptPdf(thread: ChatThread | null, messages: ChatMess
   writeLine(`Exported: ${new Date().toLocaleString()}`);
   writeLine("");
   messages.forEach((message) => {
-    writeLine(`[${formatTime(message.created_at)}] ${message.sender_name} (${message.sender_role})`, true);
+    writeLine(`[${formatTime(message.created_at)}] ${safeSenderLabel(message, true)} (${message.sender_role})`, true);
     const lines = String(message.body || "").split("\n");
     lines.forEach((line) => writeLine(line || " "));
     writeLine("");
@@ -137,7 +144,7 @@ function exportTranscriptTxt(thread: ChatThread | null, messages: ChatMessage[])
     `Exported: ${new Date().toLocaleString()}`,
     "",
     ...messages.flatMap((message) => [
-      `[${formatTime(message.created_at)}] ${message.sender_name} (${message.sender_role})`,
+      `[${formatTime(message.created_at)}] ${safeSenderLabel(message, true)} (${message.sender_role})`,
       String(message.body || ""),
       "",
     ]),
@@ -152,6 +159,8 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([createAssistantWelcome()]);
   const [thread, setThread] = useState<ChatThread | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [historyStart, setHistoryStart] = useState("");
+  const [historyEnd, setHistoryEnd] = useState("");
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
@@ -168,7 +177,15 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     try {
       const data = await chatService.getMyThread();
       setThread(data.thread);
-      setMessages(data.messages);
+      if (historyStart || historyEnd) {
+        const filtered = await chatService.getThreadMessages(data.thread.id, {
+          startDate: historyStart || undefined,
+          endDate: historyEnd || undefined,
+        });
+        setMessages(filtered.messages);
+      } else {
+        setMessages(data.messages);
+      }
       setError("");
       await chatService.markRead(data.thread.id);
     } catch (err) {
@@ -185,7 +202,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       loadChat(true).catch(() => {});
     }, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [isOpen, mode]);
+  }, [isOpen, mode, historyStart, historyEnd]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -288,6 +305,8 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     messages.length > 0 &&
     new Date(thread.admin_last_read_at).getTime() >= new Date(messages[messages.length - 1].created_at).getTime();
 
+  const isClosedForCustomer = mode === "human" && thread?.status === "closed";
+
   const assistantView = (
     <>
       <div className="flex-1 space-y-4 overflow-auto bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] px-4 py-4">
@@ -379,7 +398,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
             <div key={message.id} className={`flex ${isOwn ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
               <div className={`max-w-[85%] rounded-[1.5rem] px-4 py-3 shadow-sm ${isOwn ? "bg-emerald-600 text-white" : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"}`}>
                 <div className={`mb-1 text-[11px] ${isOwn ? "text-emerald-100" : "text-slate-500 dark:text-slate-400"}`}>
-                  {message.sender_name} · {formatTime(message.created_at)} {message.edited_at ? `· ${isTH ? "แก้ไขแล้ว" : "edited"}` : ""}
+                  {safeSenderLabel(message, isTH)} · {formatTime(message.created_at)} {message.edited_at ? `· ${isTH ? "แก้ไขแล้ว" : "edited"}` : ""}
                 </div>
                 <div className="whitespace-pre-wrap text-sm leading-6">{message.body}</div>
                 <div className={`mt-2 flex items-center justify-end gap-1 text-[11px] ${isOwn ? "text-emerald-100" : "text-slate-400"}`}>
@@ -404,6 +423,24 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       </div>
 
       <div className="border-t border-slate-200/80 bg-white/96 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/96">
+        <div className="mb-3 flex flex-wrap gap-2">
+          <input
+            type="datetime-local"
+            value={historyStart}
+            onChange={(event) => setHistoryStart(event.target.value)}
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+          />
+          <input
+            type="datetime-local"
+            value={historyEnd}
+            onChange={(event) => setHistoryEnd(event.target.value)}
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+          />
+          <Button variant="outline" onClick={() => { setHistoryStart(""); setHistoryEnd(""); }}>
+            {isTH ? "ล้างช่วงเวลา" : "Clear range"}
+          </Button>
+        </div>
+
         {replyTo && (
           <div className="mb-3 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             <div className="truncate">
@@ -416,6 +453,11 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         )}
 
         {error && <div className="mb-2 text-xs text-red-500">{error}</div>}
+        {isClosedForCustomer && (
+          <div className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+            {isTH ? "เคสนี้ถูกปิดแล้ว คุณยังย้อนดูประวัติได้ แต่จะไม่สามารถส่ง แก้ไข หรือลบข้อความได้" : "This case is closed. You can still view chat history, but you cannot send, edit, or delete messages."}
+          </div>
+        )}
 
         <div className="flex items-end gap-2">
           <Input
@@ -423,6 +465,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
             onChange={(event) => setDraft(event.target.value)}
             placeholder={isTH ? "พิมพ์ข้อความถึงเจ้าหน้าที่..." : "Type a message to support..."}
             className="h-12 rounded-2xl"
+            disabled={isClosedForCustomer}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
@@ -430,7 +473,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
               }
             }}
           />
-          <Button className="h-12 rounded-2xl px-4" onClick={() => submitMessage().catch(() => {})} disabled={isSending || !draft.trim()}>
+          <Button className="h-12 rounded-2xl px-4" onClick={() => submitMessage().catch(() => {})} disabled={isSending || !draft.trim() || isClosedForCustomer}>
             <Send className="mr-2 h-4 w-4" />
             {editingMessageId ? (isTH ? "อัปเดต" : "Update") : isTH ? "ส่ง" : "Send"}
           </Button>
