@@ -264,7 +264,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   };
 
   return (
-    <div className="box-border flex h-full min-h-0 flex-col overflow-hidden p-8">
+    <div className="box-border flex h-full max-h-full min-h-0 flex-col overflow-hidden p-8">
       <div className="mb-6 shrink-0 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">{isTH ? "ศูนย์แชทลูกค้า" : "Customer Chat Inbox"}</h1>
@@ -321,8 +321,8 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                   key={item.id}
                   variant="ghost"
                   className={filter === item.id
-                    ? "rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 text-white hover:from-emerald-400 hover:to-teal-400"
-                    : "rounded-full border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-300 dark:hover:bg-emerald-950/30"}
+                    ? "rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 text-white shadow-[0_12px_24px_rgba(45,212,191,0.2)] hover:from-emerald-400 hover:to-teal-400"
+                    : "rounded-full border border-emerald-200 bg-white text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-300 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/30"}
                   onClick={() => setFilter(item.id as typeof filter)}
                 >
                   {item.label}
