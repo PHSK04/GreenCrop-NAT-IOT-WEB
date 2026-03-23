@@ -45,7 +45,7 @@ export function ExportFiltersCard({
 }: ExportFiltersCardProps) {
   return (
     <Card
-      className="!rounded-[24px] overflow-hidden border border-border shadow-lg bg-card !opacity-100 mb-8"
+      className="!rounded-[32px] overflow-hidden border border-border shadow-lg bg-card !opacity-100 mb-8"
     >
       <CardHeader>
         <CardTitle className="text-foreground text-base">{title}</CardTitle>
