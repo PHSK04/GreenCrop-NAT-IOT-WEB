@@ -152,7 +152,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
       `}</style>
 
       {/* ── Left panel (Form) ── */}
-      <div className="flex min-h-screen flex-col lg:flex-row">
+      <div className="flex min-h-screen flex-col lg:flex-row-reverse">
         <div className="relative flex flex-1 flex-col justify-between px-6 py-8 sm:px-10 lg:max-w-[52%] lg:px-14 lg:py-10 xl:px-20">
 
           {/* Subtle background texture */}
