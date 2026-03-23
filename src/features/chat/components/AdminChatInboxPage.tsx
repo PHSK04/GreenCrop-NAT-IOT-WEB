@@ -67,6 +67,11 @@ const toDateInputValue = (value: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const toDateTimeRange = (dateValue: string) => ({
+  startDate: `${dateValue}T00:00`,
+  endDate: `${dateValue}T23:59`,
+});
+
 const downloadBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -127,6 +132,8 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const [draft, setDraft] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "mine" | "archive">("all");
   const [selectedInboxDate, setSelectedInboxDate] = useState(() => toDateInputValue(new Date()));
+  const [matchingThreadIdsByDate, setMatchingThreadIdsByDate] = useState<number[] | null>(null);
+  const [isInboxDateLoading, setIsInboxDateLoading] = useState(false);
   const [historyStart, setHistoryStart] = useState("");
   const [historyEnd, setHistoryEnd] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -151,12 +158,10 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
 
   const filteredThreadsByDay = useMemo(() => {
     if (!selectedInboxDate) return threads;
-    return threads.filter((thread) => {
-      const sourceDate = thread.last_message_at || thread.created_at;
-      if (!sourceDate) return false;
-      return toDateInputValue(new Date(sourceDate)) === selectedInboxDate;
-    });
-  }, [selectedInboxDate, threads]);
+    if (matchingThreadIdsByDate === null) return [];
+    const matchingIds = new Set(matchingThreadIdsByDate);
+    return threads.filter((thread) => matchingIds.has(thread.id));
+  }, [matchingThreadIdsByDate, selectedInboxDate, threads]);
 
   const selectedThread = useMemo(
     () => filteredThreadsByDay.find((thread) => thread.id === selectedThreadId) || null,
@@ -211,6 +216,51 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   useEffect(() => {
     loadThreads(true).catch(() => {});
   }, [query, filter]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadThreadsForSelectedDate = async () => {
+      if (!selectedInboxDate) {
+        setMatchingThreadIdsByDate(threads.map((thread) => thread.id));
+        return;
+      }
+
+      setIsInboxDateLoading(true);
+      const { startDate, endDate } = toDateTimeRange(selectedInboxDate);
+
+      try {
+        const results = await Promise.all(
+          threads.map(async (thread) => {
+            try {
+              const data = await chatService.getThreadMessages(thread.id, {
+                startDate,
+                endDate,
+                limit: 200,
+              });
+              return data.messages.length > 0 ? thread.id : null;
+            } catch {
+              return null;
+            }
+          }),
+        );
+
+        if (!cancelled) {
+          setMatchingThreadIdsByDate(results.filter((id): id is number => id !== null));
+        }
+      } finally {
+        if (!cancelled) {
+          setIsInboxDateLoading(false);
+        }
+      }
+    };
+
+    loadThreadsForSelectedDate().catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInboxDate, threads]);
 
   useEffect(() => {
     setSelectedThreadId((current) => {
@@ -331,8 +381,8 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
             </div>
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-              {isLoading && <div className="text-sm text-muted-foreground">{isTH ? "กำลังโหลด..." : "Loading..."}</div>}
-              {!isLoading && filteredThreadsByDay.length === 0 && (
+              {(isLoading || isInboxDateLoading) && <div className="text-sm text-muted-foreground">{isTH ? "กำลังโหลด..." : "Loading..."}</div>}
+              {!isLoading && !isInboxDateLoading && filteredThreadsByDay.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                   {isTH ? "ยังไม่มีแชทในวันที่เลือก" : "No chat threads for the selected date"}
                 </div>
