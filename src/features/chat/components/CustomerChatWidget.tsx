@@ -619,7 +619,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         })}
       </div>
 
-      <div className="border-t border-slate-200/80 bg-white/96 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4 sm:py-4 dark:border-slate-800 dark:bg-slate-950/96">
+      <div className="border-t border-slate-200/80 bg-white/96 px-3 py-3 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.25rem))] sm:px-4 sm:py-4 dark:border-slate-800 dark:bg-slate-950/96">
         {replyTo && (
           <div className="mb-3 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             <div className="truncate">
@@ -832,24 +832,26 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => setIsOpen((open) => !open)}
-        className="pointer-events-auto relative transition hover:-translate-y-0.5"
-        aria-label={isTH ? "เปิดแชทช่วยเหลือ" : "Open support chat"}
-      >
-        <img
-          src={supportIcon}
-          alt="Support"
-          className="h-16 w-16 rounded-full object-cover shadow-[0_18px_40px_rgba(15,23,42,0.2)] sm:h-24 sm:w-24"
-          draggable={false}
-        />
-        {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[11px] font-semibold text-white shadow-lg ring-2 ring-white dark:ring-slate-950">
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </span>
-        )}
-      </button>
+      {!isOpen && (
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="pointer-events-auto fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-40 relative transition hover:-translate-y-0.5 sm:static"
+          aria-label={isTH ? "เปิดแชทช่วยเหลือ" : "Open support chat"}
+        >
+          <img
+            src={supportIcon}
+            alt="Support"
+            className="h-14 w-14 rounded-full object-cover shadow-[0_18px_40px_rgba(15,23,42,0.2)] sm:h-24 sm:w-24"
+            draggable={false}
+          />
+          {unreadCount > 0 && (
+            <span className="absolute -right-1 -top-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[11px] font-semibold text-white shadow-lg ring-2 ring-white dark:ring-slate-950">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </button>
+      )}
     </div>
   );
 }
