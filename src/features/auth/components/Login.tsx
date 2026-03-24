@@ -10,9 +10,9 @@ import {
   Loader2,
   Lock,
   Mail,
-  MonitorCog,
   ShieldCheck,
-  Sprout,
+  Sparkles,
+  Waves,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -45,16 +45,16 @@ interface LoginProps {
   onLogin?: () => void;
 }
 
-const platformHighlights = [
-  "Centralized sensor and device monitoring",
-  "Role-based access for farm operators and admins",
-  "Operational dashboards built for real-time decisions",
+const signalCards = [
+  { label: "Water Flow", value: "Normal", tone: "text-emerald-300" },
+  { label: "Nutrient Mix", value: "Balanced", tone: "text-cyan-300" },
+  { label: "Active Devices", value: "12 Online", tone: "text-amber-300" },
 ];
 
-const trustMetrics = [
-  { value: "24/7", label: "System visibility" },
-  { value: "Live", label: "Device telemetry" },
-  { value: "Secure", label: "Access control" },
+const loginNotes = [
+  "Built for day-to-day operators and admin oversight",
+  "Live system status, history, and device management in one place",
+  "Consistent access across farm floor and back-office workflows",
 ];
 
 export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
@@ -82,283 +82,313 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#eef5ef] text-slate-900 dark:bg-[#07110d] dark:text-slate-100">
+    <div className="relative min-h-screen overflow-hidden bg-[#081411] text-slate-100">
       <style>{`
-        @keyframes authFadeUp {
-          from { opacity: 0; transform: translateY(18px); }
-          to { opacity: 1; transform: translateY(0); }
+        @keyframes panelEnter {
+          from { opacity: 0; transform: translateY(24px) scale(0.985); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        @keyframes authFloat {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
+        @keyframes softFloat {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-12px); }
         }
 
-        .auth-fade-up {
-          animation: authFadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+        @keyframes drift {
+          0%, 100% { transform: translate3d(0, 0, 0); }
+          50% { transform: translate3d(18px, -14px, 0); }
         }
 
-        .auth-float {
-          animation: authFloat 7s ease-in-out infinite;
+        .panel-enter {
+          animation: panelEnter 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .soft-float {
+          animation: softFloat 7s ease-in-out infinite;
+        }
+
+        .soft-drift {
+          animation: drift 14s ease-in-out infinite;
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .auth-fade-up, .auth-float {
+          .panel-enter, .soft-float, .soft-drift {
             animation: none !important;
           }
         }
       `}</style>
 
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(15,118,110,0.14),transparent_28%)]" />
-      <div className="absolute inset-y-0 left-0 hidden w-[46%] bg-[linear-gradient(180deg,rgba(6,78,59,0.98),rgba(3,47,36,0.98))] lg:block" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(16,185,129,0.24),transparent_25%),radial-gradient(circle_at_88%_22%,rgba(34,197,94,0.14),transparent_20%),radial-gradient(circle_at_70%_78%,rgba(14,165,233,0.14),transparent_24%),linear-gradient(160deg,#081411_0%,#0b1c17_45%,#0a1412_100%)]" />
+      <div className="soft-drift absolute -left-24 top-16 h-72 w-72 rounded-full bg-emerald-500/12 blur-3xl" />
+      <div className="soft-drift absolute bottom-0 right-0 h-80 w-80 rounded-full bg-cyan-500/10 blur-3xl" style={{ animationDelay: "-7s" }} />
+      <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.7) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.7) 1px, transparent 1px)", backgroundSize: "44px 44px" }} />
 
-      <div className="relative z-10 flex min-h-screen flex-col lg:flex-row">
-        <section className="relative hidden lg:flex lg:w-[46%] lg:flex-col lg:justify-between lg:overflow-hidden lg:px-10 lg:py-10 xl:px-14">
-          <div
-            className="absolute inset-0 opacity-20"
-            style={{ backgroundImage: `url(${loginBg})`, backgroundSize: "cover", backgroundPosition: "center" }}
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(2,44,34,0.2),rgba(16,185,129,0.08))]" />
-          <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)", backgroundSize: "34px 34px" }} />
+      <div className="relative z-10 min-h-screen px-4 py-4 sm:px-6 lg:px-8 lg:py-8">
+        <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1500px] flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.03] shadow-[0_32px_120px_rgba(0,0,0,0.45)] backdrop-blur-sm lg:min-h-[calc(100vh-4rem)] lg:flex-row lg:rounded-[2.5rem]">
+          <section className="relative flex min-h-[360px] flex-col justify-between overflow-hidden border-b border-white/10 px-5 py-5 sm:px-7 sm:py-7 lg:min-h-0 lg:w-[54%] lg:border-b-0 lg:border-r lg:px-10 lg:py-10 xl:px-14">
+            <div
+              className="absolute inset-0 opacity-20"
+              style={{ backgroundImage: `url(${loginBg})`, backgroundPosition: "center", backgroundSize: "cover" }}
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(3,26,20,0.85),rgba(4,40,31,0.55),rgba(7,18,15,0.95))]" />
 
-          <div className="auth-fade-up relative z-10 flex items-center justify-between" style={{ animationDelay: "40ms" }}>
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-white/12 p-2.5 ring-1 ring-white/20 backdrop-blur-sm">
-                <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-10 w-10 object-contain" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-100/90">
-                  GreenCrop NATIOT
-                </p>
-                <p className="text-sm text-emerald-50/70">Farm Operations Control Center</p>
-              </div>
-            </div>
-            <div className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-emerald-50/85 backdrop-blur-sm">
-              Production access
-            </div>
-          </div>
-
-          <div className="relative z-10 flex flex-1 items-center">
-            <div className="w-full max-w-xl">
-              <div className="auth-fade-up inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-50/85 backdrop-blur-sm" style={{ animationDelay: "120ms" }}>
-                <Sprout className="h-4 w-4" />
-                Smart farming platform
+            <header className="panel-enter relative z-10 flex items-start justify-between gap-4" style={{ animationDelay: "60ms" }}>
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl border border-white/10 bg-white/10 p-2.5 backdrop-blur-md">
+                  <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-10 w-10 object-contain" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-100/90">
+                    GreenCrop NATIOT
+                  </div>
+                  <div className="mt-1 text-sm text-slate-300/80">Operations Platform</div>
+                </div>
               </div>
 
-              <h1 className="auth-fade-up mt-6 max-w-lg text-5xl font-semibold leading-[1.05] tracking-tight text-white xl:text-6xl" style={{ animationDelay: "180ms" }}>
-                Run your farm systems from one clean control surface.
+              <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-100/90">
+                Live environment
+              </div>
+            </header>
+
+            <div className="relative z-10 py-10 lg:py-0">
+              <div className="panel-enter inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-200/90 backdrop-blur-md" style={{ animationDelay: "140ms" }}>
+                <Sparkles className="h-3.5 w-3.5 text-emerald-300" />
+                Designed for real operations
+              </div>
+
+              <h1 className="panel-enter mt-6 max-w-2xl text-4xl font-semibold leading-[1] tracking-[-0.04em] text-white sm:text-5xl xl:text-[4.5rem]" style={{ animationDelay: "220ms" }}>
+                Better control.
+                <br />
+                Less dashboard noise.
               </h1>
 
-              <p className="auth-fade-up mt-6 max-w-xl text-base leading-7 text-emerald-50/72 xl:text-lg" style={{ animationDelay: "240ms" }}>
-                Monitor equipment, review operations, and keep your team aligned with a calmer and more reliable admin experience.
+              <p className="panel-enter mt-6 max-w-xl text-base leading-7 text-slate-300 sm:text-lg" style={{ animationDelay: "300ms" }}>
+                A calmer login surface for a system that manages devices, crop workflows, and farm operations in real time.
               </p>
 
-              <div className="auth-fade-up mt-10 grid gap-3" style={{ animationDelay: "300ms" }}>
-                {platformHighlights.map((item) => (
+              <div className="panel-enter mt-8 grid gap-3 sm:grid-cols-3" style={{ animationDelay: "380ms" }}>
+                {signalCards.map((card) => (
                   <div
-                    key={item}
-                    className="flex items-start gap-3 rounded-2xl border border-white/12 bg-white/8 px-4 py-4 backdrop-blur-sm"
+                    key={card.label}
+                    className="rounded-[1.6rem] border border-white/10 bg-black/20 p-4 backdrop-blur-md"
                   >
-                    <div className="mt-0.5 rounded-full bg-emerald-300/18 p-1.5 text-emerald-100">
-                      <Leaf className="h-4 w-4" />
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                      {card.label}
                     </div>
-                    <p className="text-sm leading-6 text-emerald-50/88">{item}</p>
+                    <div className={`mt-3 text-xl font-semibold ${card.tone}`}>{card.value}</div>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
 
-          <div className="auth-fade-up relative z-10 grid grid-cols-3 gap-3" style={{ animationDelay: "360ms" }}>
-            {trustMetrics.map((metric) => (
-              <div
-                key={metric.label}
-                className="rounded-3xl border border-white/12 bg-white/10 px-4 py-5 backdrop-blur-sm"
-              >
-                <div className="text-2xl font-semibold text-white">{metric.value}</div>
-                <div className="mt-1 text-sm text-emerald-50/65">{metric.label}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="relative flex flex-1 items-center justify-center px-5 py-8 sm:px-8 lg:px-12 lg:py-10">
-          <div className="absolute right-5 top-5 sm:right-8 sm:top-8">
-            <ModeToggle />
-          </div>
-
-          <div className="w-full max-w-[560px]">
-            <div className="auth-fade-up rounded-[2rem] border border-white/70 bg-white/88 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-[#08130f]/82 dark:shadow-[0_28px_90px_rgba(0,0,0,0.45)] sm:p-8" style={{ animationDelay: "60ms" }}>
-              <div className="mb-8 flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    Secure sign in
-                  </div>
-                  <h2 className="text-3xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
-                    Welcome back
-                  </h2>
-                  <p className="mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-[15px]">
-                    Sign in to manage devices, crop operations, and your GreenCrop dashboard.
-                  </p>
+            <div className="panel-enter relative z-10 mt-8 grid gap-4 lg:mt-0 lg:grid-cols-[1.15fr_0.85fr]" style={{ animationDelay: "460ms" }}>
+              <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-md">
+                <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-200/85">
+                  <Waves className="h-4 w-4" />
+                  Why this feels better
                 </div>
-
-                <div className="hidden rounded-2xl border border-slate-200 bg-slate-50 p-3 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 sm:block">
-                  <MonitorCog className="h-5 w-5" />
+                <div className="space-y-3">
+                  {loginNotes.map((note) => (
+                    <div key={note} className="flex gap-3 text-sm leading-6 text-slate-200/90">
+                      <div className="mt-2 h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                      <p>{note}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="mb-6 rounded-3xl border border-emerald-100 bg-[linear-gradient(135deg,#f6fff9,#eefaf5)] p-4 dark:border-emerald-500/10 dark:bg-[linear-gradient(135deg,rgba(5,28,21,0.95),rgba(7,37,28,0.82))]">
-                <div className="flex items-center gap-4">
-                  <div className="auth-float hidden rounded-2xl bg-white/80 p-3 shadow-[0_16px_40px_rgba(16,185,129,0.14)] dark:bg-emerald-500/10 sm:block">
-                    <img src={machineHero} alt="GreenCrop device" className="h-16 w-16 object-contain" draggable={false} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
-                      Operations ready
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                      Access your production environment, review machine status, and continue from the latest session state.
+              <div className="relative min-h-[220px] overflow-hidden rounded-[1.75rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-4 backdrop-blur-md">
+                <div className="absolute inset-x-6 bottom-6 h-10 rounded-full bg-emerald-400/30 blur-2xl" />
+                <img
+                  src={machineHero}
+                  alt="GreenCrop machine"
+                  className="soft-float relative z-10 mx-auto h-full max-h-[240px] w-auto object-contain drop-shadow-[0_28px_60px_rgba(0,0,0,0.45)]"
+                  draggable={false}
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="relative flex flex-1 items-center justify-center px-4 py-5 sm:px-6 lg:px-8 lg:py-10 xl:px-10">
+            <div className="absolute right-5 top-5 z-20">
+              <ModeToggle />
+            </div>
+
+            <div className="panel-enter w-full max-w-[520px]" style={{ animationDelay: "180ms" }}>
+              <div className="rounded-[2rem] border border-white/10 bg-[#f7fbf6] p-5 text-slate-900 shadow-[0_24px_80px_rgba(0,0,0,0.28)] dark:bg-[#f7fbf6] sm:p-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      Secure sign in
+                    </div>
+                    <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-[2.5rem]">
+                      Welcome back
+                    </h2>
+                    <p className="mt-3 max-w-md text-sm leading-6 text-slate-500 sm:text-[15px]">
+                      Sign in to continue to your control center and review the latest farm activity.
                     </p>
                   </div>
+
+                  <div className="hidden rounded-2xl bg-slate-900 px-3 py-2 text-right text-white sm:block">
+                    <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-300">Status</div>
+                    <div className="mt-1 text-sm font-semibold">Operational</div>
+                  </div>
                 </div>
-              </div>
 
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" autoComplete="off">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem className="space-y-2">
-                        <FormLabel className="text-[13px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                          Email
-                        </FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Mail
-                              className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors ${
-                                focusedField === "email" ? "text-emerald-600" : "text-slate-400"
-                              }`}
-                            />
-                            <Input
-                              placeholder="you@example.com"
-                              className="h-14 rounded-2xl border-slate-200 bg-slate-50 pl-11 text-[15px] text-slate-900 placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:ring-4 focus-visible:ring-emerald-500/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500"
-                              disabled={isLoading}
-                              autoComplete="off"
-                              autoCorrect="off"
-                              autoCapitalize="none"
-                              spellCheck={false}
-                              onFocus={() => setFocusedField("email")}
-                              onBlur={() => setFocusedField(null)}
-                              {...field}
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="mt-6 rounded-[1.6rem] border border-emerald-100 bg-white p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-slate-950 px-4 py-3 text-white">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Access</div>
+                      <div className="mt-2 text-base font-semibold">Farm Core</div>
+                    </div>
+                    <div className="rounded-2xl bg-emerald-50 px-4 py-3">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-700">Telemetry</div>
+                      <div className="mt-2 text-base font-semibold text-slate-900">Streaming</div>
+                    </div>
+                    <div className="rounded-2xl bg-cyan-50 px-4 py-3">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-cyan-700">Security</div>
+                      <div className="mt-2 text-base font-semibold text-slate-900">Verified</div>
+                    </div>
+                  </div>
+                </div>
 
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem className="space-y-2">
-                        <div className="flex items-center justify-between gap-4">
-                          <FormLabel className="text-[13px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                            Password
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-4" autoComplete="off">
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem className="space-y-2">
+                          <FormLabel className="text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Email
                           </FormLabel>
-                          <button
-                            type="button"
-                            className="text-sm font-medium text-emerald-700 transition-colors hover:text-emerald-600 dark:text-emerald-300"
-                          >
-                            Forgot password?
-                          </button>
-                        </div>
-                        <FormControl>
-                          <div className="relative">
-                            <Lock
-                              className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors ${
-                                focusedField === "password" ? "text-emerald-600" : "text-slate-400"
-                              }`}
-                            />
-                            <Input
-                              type={showPassword ? "text" : "password"}
-                              placeholder="••••••••"
-                              className="h-14 rounded-2xl border-slate-200 bg-slate-50 pl-11 pr-12 text-[15px] text-slate-900 placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:ring-4 focus-visible:ring-emerald-500/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500"
-                              disabled={isLoading}
-                              autoComplete="off"
-                              autoCorrect="off"
-                              autoCapitalize="none"
-                              spellCheck={false}
-                              onFocus={() => setFocusedField("password")}
-                              onBlur={() => setFocusedField(null)}
-                              {...field}
-                            />
+                          <FormControl>
+                            <div className="relative">
+                              <Mail
+                                className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${
+                                  focusedField === "email" ? "text-emerald-700" : "text-slate-400"
+                                }`}
+                              />
+                              <Input
+                                placeholder="you@example.com"
+                                className="h-14 rounded-2xl border-slate-200 bg-white pl-11 text-[15px] text-slate-950 placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:ring-4 focus-visible:ring-emerald-500/10"
+                                disabled={isLoading}
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="none"
+                                spellCheck={false}
+                                onFocus={() => setFocusedField("email")}
+                                onBlur={() => setFocusedField(null)}
+                                {...field}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem className="space-y-2">
+                          <div className="flex items-center justify-between gap-4">
+                            <FormLabel className="text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Password
+                            </FormLabel>
                             <button
                               type="button"
-                              onClick={() => setShowPassword((prev) => !prev)}
-                              disabled={isLoading}
-                              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-emerald-600"
-                              aria-label={showPassword ? "Hide password" : "Show password"}
+                              className="text-sm font-medium text-emerald-700 transition-colors hover:text-emerald-600"
                             >
-                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              Forgot password?
                             </button>
                           </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <FormControl>
+                            <div className="relative">
+                              <Lock
+                                className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${
+                                  focusedField === "password" ? "text-emerald-700" : "text-slate-400"
+                                }`}
+                              />
+                              <Input
+                                type={showPassword ? "text" : "password"}
+                                placeholder="••••••••"
+                                className="h-14 rounded-2xl border-slate-200 bg-white pl-11 pr-12 text-[15px] text-slate-950 placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:ring-4 focus-visible:ring-emerald-500/10"
+                                disabled={isLoading}
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="none"
+                                spellCheck={false}
+                                onFocus={() => setFocusedField("password")}
+                                onBlur={() => setFocusedField(null)}
+                                {...field}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword((prev) => !prev)}
+                                disabled={isLoading}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-emerald-700"
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                              >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  <Button
-                    type="submit"
-                    disabled={isLoading}
-                    className="mt-2 h-14 w-full rounded-2xl bg-[linear-gradient(135deg,#047857,#10b981)] text-[15px] font-semibold text-white shadow-[0_16px_36px_rgba(16,185,129,0.28)] transition-all hover:translate-y-[-1px] hover:shadow-[0_20px_42px_rgba(16,185,129,0.34)]"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing in...
-                      </>
-                    ) : (
-                      <>
-                        Sign In
-                        <ArrowRight className="h-4 w-4" />
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </Form>
+                    <Button
+                      type="submit"
+                      disabled={isLoading}
+                      className="mt-2 h-14 w-full rounded-2xl bg-slate-950 text-[15px] font-semibold text-white shadow-[0_18px_40px_rgba(15,23,42,0.24)] transition-all hover:translate-y-[-1px] hover:bg-slate-900"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Signing in...
+                        </>
+                      ) : (
+                        <>
+                          Sign In
+                          <ArrowRight className="h-4 w-4" />
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </Form>
 
-              <div className="mt-7 rounded-3xl border border-slate-200/80 bg-slate-50/80 p-5 dark:border-white/10 dark:bg-white/5">
-                <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
+                <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-white p-5">
+                  <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
 
-                <div className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
-                  Don&apos;t have an account?{" "}
-                  <button
-                    type="button"
-                    onClick={onSwitchToRegister}
-                    className="font-semibold text-emerald-700 underline decoration-emerald-400/60 underline-offset-4 transition-colors hover:text-emerald-600 dark:text-emerald-300"
-                  >
-                    Create Account
-                  </button>
+                  <div className="mt-5 text-center text-sm text-slate-500">
+                    Don&apos;t have an account?{" "}
+                    <button
+                      type="button"
+                      onClick={onSwitchToRegister}
+                      className="font-semibold text-emerald-700 underline decoration-emerald-400/60 underline-offset-4 transition-colors hover:text-emerald-600"
+                    >
+                      Create Account
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="mt-6 flex flex-col gap-3 rounded-3xl border border-slate-200/80 bg-white/65 px-4 py-4 text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
-                  Protected access for GreenCrop platform users
-                </div>
-                <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
-                  Support: admin@greencropnatiot.com
+                <div className="mt-5 flex items-center justify-between gap-3 rounded-[1.5rem] bg-slate-950 px-4 py-3 text-sm text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-emerald-300" />
+                    Protected access for GreenCrop users
+                  </div>
+                  <div className="hidden text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 sm:block">
+                    admin@greencropnatiot.com
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </div>
   );
