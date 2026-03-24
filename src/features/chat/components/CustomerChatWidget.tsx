@@ -730,7 +730,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   return (
     <div className="pointer-events-none fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 sm:bottom-8 sm:right-8">
       {isOpen && (
-        <div className="pointer-events-auto fixed inset-x-0 bottom-0 top-0 flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-none border border-slate-200/80 bg-white/96 shadow-[0_30px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:absolute sm:bottom-0 sm:right-0 sm:top-auto sm:inset-x-auto sm:h-[min(78vh,720px)] sm:w-[min(440px,calc(100vw-1.5rem))] sm:rounded-[2rem] dark:border-slate-800 dark:bg-slate-950/96">
+        <div className="pointer-events-auto fixed inset-x-0 bottom-0 top-0 flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-none border border-slate-200/80 bg-white/96 shadow-[0_30px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:inset-x-auto sm:bottom-8 sm:right-8 sm:top-auto sm:h-[min(78vh,720px)] sm:w-[min(440px,calc(100vw-1.5rem))] sm:rounded-[2rem] dark:border-slate-800 dark:bg-slate-950/96">
           <div className="flex items-start justify-between border-b border-slate-200/80 px-3 py-3 sm:items-center sm:px-5 sm:py-4 dark:border-slate-800">
             <div className="min-w-0 flex items-start gap-3">
               <img src={supportIcon} alt="Support" className="h-10 w-10 rounded-full object-cover sm:h-11 sm:w-11" draggable={false} />
