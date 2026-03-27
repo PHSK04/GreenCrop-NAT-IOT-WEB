@@ -26,7 +26,6 @@ import {
 import { ModeToggle } from "@/components/mode-toggle";
 import { useAuth } from "../contexts/AuthContext";
 import appLogoGreen from "@/assets/images/3_transparent_logo_green.png";
-import machineHero from "@/assets/images/machine_hero.png";
 
 import { SocialAuth } from "./SocialAuth";
 
@@ -42,7 +41,7 @@ interface LoginProps {
   onLogin?: () => void;
 }
 
-const detailPills = ["Real-time monitoring", "Clean control center", "Protected access"];
+const detailPills = ["Real-time monitoring", "Protected access"];
 
 export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   const { login } = useAuth();
@@ -105,19 +104,18 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
         }
       `}</style>
 
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_8%_16%,rgba(16,185,129,0.10),transparent_20%),radial-gradient(circle_at_100%_0%,rgba(14,165,233,0.08),transparent_16%),linear-gradient(180deg,#fbfdfb_0%,#f4f8f4_52%,#edf4ef_100%)]" />
-      <div className="soft-drift absolute -left-24 top-20 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
-      <div className="soft-drift absolute -right-10 bottom-0 h-80 w-80 rounded-full bg-cyan-100/40 blur-3xl" style={{ animationDelay: "-7s" }} />
-      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(15,23,42,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.5) 1px, transparent 1px)", backgroundSize: "56px 56px" }} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_8%_16%,rgba(16,185,129,0.08),transparent_18%),linear-gradient(180deg,#fcfefc_0%,#f5f9f5_52%,#eef4f0_100%)]" />
+      <div className="soft-drift absolute -left-24 top-20 h-72 w-72 rounded-full bg-emerald-200/25 blur-3xl" />
+      <div className="absolute inset-0 opacity-[0.022]" style={{ backgroundImage: "linear-gradient(rgba(15,23,42,0.45) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.45) 1px, transparent 1px)", backgroundSize: "64px 64px" }} />
 
       <div className="relative z-10 min-h-screen px-4 py-4 sm:px-6 lg:px-8 lg:py-8">
-        <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1420px] flex-col overflow-hidden rounded-[2rem] border border-white/80 bg-white/70 shadow-[0_28px_90px_rgba(148,163,184,0.14)] backdrop-blur-xl lg:min-h-[calc(100vh-4rem)] lg:flex-row lg:rounded-[2.5rem]">
-          <section className="relative flex min-h-[360px] flex-col justify-between overflow-hidden border-b border-slate-200/60 px-5 py-5 sm:px-7 sm:py-7 lg:min-h-0 lg:w-[52%] lg:border-b-0 lg:border-r lg:px-12 lg:py-12 xl:px-16">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.9),rgba(255,255,255,0.55),transparent_72%)]" />
+        <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1320px] flex-col overflow-hidden rounded-[2rem] border border-white/85 bg-white/72 shadow-[0_24px_70px_rgba(148,163,184,0.12)] backdrop-blur-xl lg:min-h-[calc(100vh-4rem)] lg:flex-row lg:rounded-[2.5rem]">
+          <section className="relative flex min-h-[360px] flex-col justify-between overflow-hidden border-b border-slate-200/60 px-5 py-5 sm:px-7 sm:py-7 lg:min-h-0 lg:w-[50%] lg:border-b-0 lg:border-r lg:px-12 lg:py-12 xl:px-16">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.92),rgba(255,255,255,0.6),transparent_72%)]" />
 
             <header className="panel-enter relative z-10 flex items-start justify-between gap-4" style={{ animationDelay: "60ms" }}>
               <div className="flex items-center gap-3">
-                <div className="rounded-[1.8rem] border border-white/90 bg-white/95 p-3 shadow-[0_10px_30px_rgba(148,163,184,0.16)] backdrop-blur-md">
+                <div className="rounded-[1.8rem] border border-white/90 bg-white/95 p-3 shadow-[0_8px_24px_rgba(148,163,184,0.14)] backdrop-blur-md">
                   <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-10 w-10 object-contain" />
                 </div>
                 <div>
@@ -139,14 +137,14 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                 Clean access experience
               </div>
 
-              <h1 className="panel-enter mt-7 max-w-[10ch] text-5xl font-semibold leading-[0.9] tracking-[-0.06em] text-slate-950 sm:text-6xl xl:text-[5.6rem]" style={{ animationDelay: "220ms" }}>
-                Sign in with
+              <h1 className="panel-enter mt-7 max-w-[9ch] text-5xl font-semibold leading-[0.9] tracking-[-0.065em] text-slate-950 sm:text-6xl xl:text-[5.35rem]" style={{ animationDelay: "220ms" }}>
+                Sign in,
                 <br />
-                less noise.
+                stay focused.
               </h1>
 
-              <p className="panel-enter mt-6 max-w-xl text-base leading-8 text-slate-600 sm:text-xl" style={{ animationDelay: "300ms" }}>
-                A calmer sign-in surface for checking device health, farm activity, and system updates in one clear place.
+              <p className="panel-enter mt-6 max-w-lg text-base leading-8 text-slate-600 sm:text-xl" style={{ animationDelay: "300ms" }}>
+                Minimal access to your GreenCrop dashboard, with less clutter and a clearer starting point.
               </p>
 
               <div className="panel-enter mt-8 flex flex-wrap gap-3" style={{ animationDelay: "380ms" }}>
@@ -159,17 +157,8 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                   </div>
                 ))}
               </div>
-              <div className="panel-enter relative mt-10 flex min-h-[260px] items-center justify-center overflow-hidden rounded-[2rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(245,249,246,0.88))] shadow-[0_20px_50px_rgba(148,163,184,0.10)]" style={{ animationDelay: "460ms" }}>
-                <div className="absolute inset-x-16 bottom-8 h-10 rounded-full bg-emerald-200/80 blur-2xl" />
-                <div className="absolute right-6 top-6 rounded-full border border-slate-200 bg-white/95 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-                  GreenCrop unit
-                </div>
-                <img
-                  src={machineHero}
-                  alt="GreenCrop machine"
-                  className="soft-float relative z-10 h-full max-h-[310px] w-auto object-contain drop-shadow-[0_26px_45px_rgba(148,163,184,0.18)]"
-                  draggable={false}
-                />
+              <div className="panel-enter mt-12 max-w-md border-t border-slate-200/80 pt-8 text-sm leading-7 text-slate-500" style={{ animationDelay: "460ms" }}>
+                Secure sign-in for operators, admins, and teams managing daily farm workflows.
               </div>
             </div>
           </section>
@@ -179,9 +168,9 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
               <ModeToggle />
             </div>
 
-            <div className="panel-enter relative w-full max-w-[500px]" style={{ animationDelay: "180ms" }}>
-              <div className="absolute inset-0 scale-[0.97] rounded-[2.4rem] bg-emerald-200/35 blur-3xl" />
-              <div className="relative rounded-[2.4rem] border border-white/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,251,249,0.97))] p-5 text-slate-900 shadow-[0_24px_70px_rgba(148,163,184,0.18)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,251,249,0.97))] sm:p-8">
+            <div className="panel-enter relative w-full max-w-[480px]" style={{ animationDelay: "180ms" }}>
+              <div className="absolute inset-0 scale-[0.97] rounded-[2.4rem] bg-emerald-200/25 blur-3xl" />
+              <div className="relative rounded-[2.4rem] border border-white/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,252,250,0.98))] p-5 text-slate-900 shadow-[0_20px_56px_rgba(148,163,184,0.16)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,252,250,0.98))] sm:p-8">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/90 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">
