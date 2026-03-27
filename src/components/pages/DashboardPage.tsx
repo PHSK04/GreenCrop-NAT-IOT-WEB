@@ -39,7 +39,7 @@ const translations = {
     visualizerStatusTitle: "Live summary",
     currentPhase: "Current phase",
     activeDevice: "Active device",
-    viewDetail: "Open digital twin detail",
+    viewDetail: "Open Digital Twin",
     modeAuto: "Auto mode",
     modeManual: "Manual mode",
     currentStepIdle: "Awaiting command",
@@ -84,7 +84,7 @@ const translations = {
     visualizerStatusTitle: "สรุปสถานะสด",
     currentPhase: "ขั้นตอนปัจจุบัน",
     activeDevice: "อุปกรณ์ที่กำลังทำงาน",
-    viewDetail: "ดูหน้ารายละเอียดดิจิทัลทวิน",
+    viewDetail: "เปิดหน้า Digital Twin",
     modeAuto: "โหมดอัตโนมัติ",
     modeManual: "โหมดควบคุมเอง",
     currentStepIdle: "รอคำสั่งทำงาน",
@@ -264,10 +264,17 @@ export function DashboardPage({ language = "EN", onOpenDigitalTwinDetail }: Dash
           
           {/* Left Column: Visual Model */}
           <div className="lg:col-span-7 space-y-6">
-            <Card className="h-full min-h-[320px] overflow-hidden rounded-2xl border-border/70 bg-card/65 shadow-lg backdrop-blur-xl sm:min-h-[420px] lg:min-h-[500px]">
+            <Card className="h-full min-h-[320px] overflow-hidden rounded-2xl border-border/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.82))] shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:min-h-[420px] lg:min-h-[500px]">
               <CardHeader>
-                <CardTitle className="text-foreground">{t.visualizer}</CardTitle>
-                <CardDescription className="text-muted-foreground">{t.visualizerDesc}</CardDescription>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="text-foreground">{t.visualizer}</CardTitle>
+                    <CardDescription className="text-muted-foreground">{t.visualizerDesc}</CardDescription>
+                  </div>
+                  <Badge className="w-fit border-cyan-400/30 bg-cyan-500/10 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-cyan-700 dark:text-cyan-300">
+                    3D Live Twin
+                  </Badge>
+                </div>
               </CardHeader>
               <CardContent className="flex h-full items-center justify-center rounded-b-2xl bg-gradient-to-b from-transparent to-background/30 p-4 sm:p-6 lg:p-8">
                 <div className="relative w-full h-full flex items-center justify-center">
@@ -287,24 +294,6 @@ export function DashboardPage({ language = "EN", onOpenDigitalTwinDetail }: Dash
 
                    {/* Glow effect */}
                    {isOn && <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full transition-all duration-1000"></div>}
-
-                   <div className="pointer-events-none absolute left-[14%] top-[20%] z-10 hidden sm:block">
-                     <div className={`rounded-full border px-3 py-1.5 text-[11px] font-medium shadow-lg backdrop-blur-md transition-all ${isOn ? "border-cyan-400/40 bg-slate-950/70 text-cyan-100" : "border-border bg-background/85 text-muted-foreground"}`}>
-                       {t.controllerHub}
-                     </div>
-                   </div>
-
-                   <div className="pointer-events-none absolute bottom-[16%] left-[20%] z-10 hidden sm:block">
-                     <div className={`rounded-full border px-3 py-1.5 text-[11px] font-medium shadow-lg backdrop-blur-md transition-all ${isTankFlowActive ? "border-emerald-400/40 bg-slate-950/70 text-emerald-100" : "border-border bg-background/85 text-muted-foreground"}`}>
-                       {t.tankFeed}
-                     </div>
-                   </div>
-
-                   <div className="pointer-events-none absolute bottom-[30%] right-[13%] z-10 hidden sm:block">
-                     <div className={`rounded-full border px-3 py-1.5 text-[11px] font-medium shadow-lg backdrop-blur-md transition-all ${hasAnyPumpSignal ? "border-cyan-400/40 bg-slate-950/70 text-cyan-100" : "border-border bg-background/85 text-muted-foreground"}`}>
-                       {t.mainPump}
-                     </div>
-                   </div>
                   
                    <div className="h-full w-full">
                      <SmartFarmTwinScene
