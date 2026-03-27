@@ -33,6 +33,7 @@ import { MyProfilePage } from "./pages/MyProfilePage";
 import { TankLevelsPage } from "./pages/TankLevelsPage";
 import { DevicePairingPage } from "./pages/DevicePairingPage";
 import { SupportCenterPage } from "./pages/SupportCenterPage";
+import { DigitalTwinDetailPage } from "./pages/DigitalTwinDetailPage";
 import { AdminOverview } from "@/features/admin/pages/AdminOverview";
 import { UserManagementPage } from "@/features/admin/pages/UserManagementPage";
 import { AuditLogsPage } from "@/features/admin/pages/AuditLogsPage";
@@ -394,7 +395,23 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   const renderContent = () => {
     switch (activePage) {
       case "Dashboard":
-        return isAdminUser ? <AdminOverview language={language} /> : <DashboardPage language={language} />;
+        return isAdminUser ? (
+          <AdminOverview language={language} />
+        ) : (
+          <DashboardPage
+            language={language}
+            onOpenDigitalTwinDetail={() => setActivePage("Digital Twin Detail")}
+          />
+        );
+      case "Digital Twin Detail":
+        return isAdminUser ? (
+          <AdminOverview language={language} />
+        ) : (
+          <DigitalTwinDetailPage
+            language={language}
+            onBack={() => setActivePage("Dashboard")}
+          />
+        );
       case "Crop Reports":
         return <CropReportsPage language={language} />;
       case "Sensor Intelligence":
@@ -459,7 +476,12 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       case "Database Viewer":
         return isAdminUser ? <DatabaseViewerPage language={language} /> : <DashboardPage language={language} />;
       default:
-        return <DashboardPage language={language} />;
+        return (
+          <DashboardPage
+            language={language}
+            onOpenDigitalTwinDetail={() => setActivePage("Digital Twin Detail")}
+          />
+        );
     }
   };
 
