@@ -49,6 +49,7 @@ import { emitActiveDeviceChanged } from "@/hooks/useActiveDeviceId";
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
+  { icon: Cpu, label: "Digital Twin" },
   { icon: Droplets, label: "Tank Levels" }, 
   { icon: ClipboardList, label: "Crop Reports" },
   { icon: Zap, label: "Sensor Intelligence" },
@@ -81,6 +82,7 @@ const adminItems = [
 const navTranslations = {
   EN: {
     "Dashboard": "Dashboard",
+    "Digital Twin": "Digital Twin",
     "Tank Levels": "Tank Levels",
     "Crop Reports": "Crop Reports",
     "Sensor Intelligence": "Sensor Intelligence",
@@ -108,6 +110,7 @@ const navTranslations = {
   },
   TH: {
     "Dashboard": "แดชบอร์ด",
+    "Digital Twin": "ดิจิทัลทวิน",
     "Tank Levels": "ระดับถังเก็บน้ำ",
     "Crop Reports": "รายงานพืชผล",
     "Sensor Intelligence": "ระบบเซนเซอร์อัจฉริยะ",
@@ -400,9 +403,10 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
         ) : (
           <DashboardPage
             language={language}
-            onOpenDigitalTwinDetail={() => setActivePage("Digital Twin Detail")}
+            onOpenDigitalTwinDetail={() => setActivePage("Digital Twin")}
           />
         );
+      case "Digital Twin":
       case "Digital Twin Detail":
         return isAdminUser ? (
           <AdminOverview language={language} />
@@ -479,7 +483,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
         return (
           <DashboardPage
             language={language}
-            onOpenDigitalTwinDetail={() => setActivePage("Digital Twin Detail")}
+            onOpenDigitalTwinDetail={() => setActivePage("Digital Twin")}
           />
         );
     }
