@@ -46,9 +46,9 @@ interface LoginProps {
 }
 
 const signalCards = [
-  { label: "Water Flow", value: "Normal", tone: "text-emerald-200" },
-  { label: "Nutrient Mix", value: "Balanced", tone: "text-cyan-200" },
-  { label: "Active Devices", value: "12 Online", tone: "text-amber-200" },
+  { label: "Water Flow", value: "Normal", tone: "text-emerald-700" },
+  { label: "Nutrient Mix", value: "Balanced", tone: "text-cyan-700" },
+  { label: "Active Devices", value: "12 Online", tone: "text-amber-700" },
 ];
 
 const loginNotes = [
@@ -88,7 +88,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#081411] text-slate-100">
+    <div className="relative min-h-screen overflow-hidden bg-[#f4f8f3] text-slate-900">
       <style>{`
         @keyframes panelEnter {
           from { opacity: 0; transform: translateY(24px) scale(0.985); }
@@ -124,61 +124,61 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
         }
       `}</style>
 
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_12%,rgba(16,185,129,0.24),transparent_24%),radial-gradient(circle_at_86%_18%,rgba(56,189,248,0.16),transparent_18%),radial-gradient(circle_at_55%_100%,rgba(250,204,21,0.08),transparent_18%),linear-gradient(155deg,#07120f_0%,#0a1c18_42%,#091311_100%)]" />
-      <div className="soft-drift absolute -left-24 top-16 h-72 w-72 rounded-full bg-emerald-500/12 blur-3xl" />
-      <div className="soft-drift absolute bottom-0 right-0 h-80 w-80 rounded-full bg-cyan-500/10 blur-3xl" style={{ animationDelay: "-7s" }} />
-      <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.7) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.7) 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_12%,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_90%_18%,rgba(56,189,248,0.08),transparent_18%),linear-gradient(180deg,#f8fcf8_0%,#f3f8f5_52%,#eef5f1_100%)]" />
+      <div className="soft-drift absolute -left-24 top-16 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />
+      <div className="soft-drift absolute bottom-0 right-0 h-80 w-80 rounded-full bg-cyan-200/25 blur-3xl" style={{ animationDelay: "-7s" }} />
+      <div className="absolute inset-0 opacity-[0.035]" style={{ backgroundImage: "linear-gradient(rgba(15,23,42,0.7) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.7) 1px, transparent 1px)", backgroundSize: "52px 52px" }} />
 
       <div className="relative z-10 min-h-screen px-4 py-4 sm:px-6 lg:px-8 lg:py-8">
-        <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1500px] flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.03] shadow-[0_32px_120px_rgba(0,0,0,0.45)] backdrop-blur-sm lg:min-h-[calc(100vh-4rem)] lg:flex-row lg:rounded-[2.5rem]">
-          <section className="relative flex min-h-[360px] flex-col justify-between overflow-hidden border-b border-white/10 px-5 py-5 sm:px-7 sm:py-7 lg:min-h-0 lg:w-[56%] lg:border-b-0 lg:border-r lg:px-10 lg:py-10 xl:px-14">
+        <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1480px] flex-col overflow-hidden rounded-[2rem] border border-white/70 bg-white/65 shadow-[0_24px_90px_rgba(148,163,184,0.18)] backdrop-blur-xl lg:min-h-[calc(100vh-4rem)] lg:flex-row lg:rounded-[2.5rem]">
+          <section className="relative flex min-h-[360px] flex-col justify-between overflow-hidden border-b border-slate-200/70 px-5 py-5 sm:px-7 sm:py-7 lg:min-h-0 lg:w-[55%] lg:border-b-0 lg:border-r lg:px-10 lg:py-10 xl:px-14">
             <div
-              className="absolute inset-0 opacity-20"
+              className="absolute inset-0 opacity-[0.08]"
               style={{ backgroundImage: `url(${loginBg})`, backgroundPosition: "center", backgroundSize: "cover" }}
             />
-            <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(4,22,18,0.88),rgba(5,36,29,0.56),rgba(7,17,14,0.96))]" />
+            <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(248,252,249,0.92),rgba(240,247,242,0.88),rgba(236,244,239,0.96))]" />
 
             <header className="panel-enter relative z-10 flex items-start justify-between gap-4" style={{ animationDelay: "60ms" }}>
               <div className="flex items-center gap-3">
-                <div className="rounded-2xl border border-white/10 bg-white/10 p-2.5 backdrop-blur-md">
+                <div className="rounded-2xl border border-white/80 bg-white/90 p-2.5 shadow-sm backdrop-blur-md">
                   <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-10 w-10 object-contain" />
                 </div>
                 <div>
-                  <div className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-100/90">
+                  <div className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-800">
                     GreenCrop NATIOT
                   </div>
-                  <div className="mt-1 text-sm text-slate-300/80">Operations Platform</div>
+                  <div className="mt-1 text-sm text-slate-500">Operations Platform</div>
                 </div>
               </div>
 
-              <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-100/90">
+              <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
                 Live environment
               </div>
             </header>
 
             <div className="relative z-10 py-10 lg:py-0">
-              <div className="panel-enter inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-200/90 backdrop-blur-md" style={{ animationDelay: "140ms" }}>
-                <Sparkles className="h-3.5 w-3.5 text-emerald-300" />
-                Designed for real operations
+              <div className="panel-enter inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm backdrop-blur-md" style={{ animationDelay: "140ms" }}>
+                <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                Clean access experience
               </div>
 
-              <h1 className="panel-enter mt-6 max-w-2xl text-4xl font-semibold leading-[0.95] tracking-[-0.045em] text-white sm:text-5xl xl:text-[4.65rem]" style={{ animationDelay: "220ms" }}>
-                Keep the farm calm
+              <h1 className="panel-enter mt-6 max-w-2xl text-4xl font-semibold leading-[0.95] tracking-[-0.045em] text-slate-950 sm:text-5xl xl:text-[4.4rem]" style={{ animationDelay: "220ms" }}>
+                Calm, clear login
                 <br />
-                before the day gets busy.
+                for everyday operations.
               </h1>
 
-              <p className="panel-enter mt-6 max-w-xl text-base leading-7 text-slate-300 sm:text-lg" style={{ animationDelay: "300ms" }}>
-                Sign in to a control center built for daily monitoring, device response, and cleaner decisions across the operation floor.
+              <p className="panel-enter mt-6 max-w-xl text-base leading-7 text-slate-600 sm:text-lg" style={{ animationDelay: "300ms" }}>
+                A lighter, quieter sign-in surface for checking device health, farm activity, and system updates without visual noise.
               </p>
 
               <div className="panel-enter mt-8 grid gap-3 sm:grid-cols-3" style={{ animationDelay: "380ms" }}>
                 {signalCards.map((card) => (
                   <div
                     key={card.label}
-                    className="rounded-[1.6rem] border border-white/10 bg-white/[0.05] p-4 backdrop-blur-md"
+                    className="rounded-[1.5rem] border border-slate-200/80 bg-white/72 p-4 shadow-sm backdrop-blur-md"
                   >
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       {card.label}
                     </div>
                     <div className={`mt-3 text-xl font-semibold ${card.tone}`}>{card.value}</div>
@@ -188,15 +188,15 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
             </div>
 
             <div className="panel-enter relative z-10 mt-8 grid gap-4 lg:mt-0 lg:grid-cols-[1.1fr_0.9fr]" style={{ animationDelay: "460ms" }}>
-              <div className="rounded-[1.85rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-md">
-                <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-200/85">
-                  <Waves className="h-4 w-4" />
+              <div className="rounded-[1.85rem] border border-slate-200/80 bg-white/70 p-5 shadow-sm backdrop-blur-md">
+                <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                  <Waves className="h-4 w-4 text-emerald-600" />
                   Operator-friendly access
                 </div>
                 <div className="space-y-3">
                   {loginNotes.map((note) => (
-                    <div key={note} className="flex gap-3 text-sm leading-6 text-slate-200/90">
-                      <div className="mt-2 h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                    <div key={note} className="flex gap-3 text-sm leading-6 text-slate-600">
+                      <div className="mt-2 h-1.5 w-1.5 rounded-full bg-emerald-500" />
                       <p>{note}</p>
                     </div>
                   ))}
@@ -206,7 +206,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                   {trustHighlights.map((item) => (
                     <div
                       key={item}
-                      className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-200/80"
+                      className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600"
                     >
                       {item}
                     </div>
@@ -214,15 +214,15 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                 </div>
               </div>
 
-              <div className="relative min-h-[240px] overflow-hidden rounded-[1.85rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.02))] p-4 backdrop-blur-md">
-                <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85">
+              <div className="relative min-h-[240px] overflow-hidden rounded-[1.85rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.90),rgba(245,249,246,0.86))] p-4 shadow-sm backdrop-blur-md">
+                <div className="absolute left-4 top-4 rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
                   Device sync
                 </div>
-                <div className="absolute inset-x-6 bottom-6 h-10 rounded-full bg-emerald-400/30 blur-2xl" />
+                <div className="absolute inset-x-6 bottom-6 h-10 rounded-full bg-emerald-200/70 blur-2xl" />
                 <img
                   src={machineHero}
                   alt="GreenCrop machine"
-                  className="soft-float relative z-10 mx-auto h-full max-h-[250px] w-auto object-contain drop-shadow-[0_28px_60px_rgba(0,0,0,0.45)]"
+                  className="soft-float relative z-10 mx-auto h-full max-h-[250px] w-auto object-contain opacity-95 drop-shadow-[0_22px_40px_rgba(148,163,184,0.20)]"
                   draggable={false}
                 />
               </div>
@@ -235,8 +235,8 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
             </div>
 
             <div className="panel-enter relative w-full max-w-[540px]" style={{ animationDelay: "180ms" }}>
-              <div className="absolute inset-0 scale-[0.97] rounded-[2.2rem] bg-emerald-500/12 blur-3xl" />
-              <div className="relative rounded-[2.2rem] border border-white/60 bg-[linear-gradient(180deg,rgba(252,255,252,0.98),rgba(242,248,243,0.96))] p-5 text-slate-900 shadow-[0_28px_90px_rgba(0,0,0,0.30)] dark:bg-[linear-gradient(180deg,rgba(252,255,252,0.98),rgba(242,248,243,0.96))] sm:p-8">
+              <div className="absolute inset-0 scale-[0.97] rounded-[2.2rem] bg-emerald-200/40 blur-3xl" />
+              <div className="relative rounded-[2.2rem] border border-white/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,251,248,0.96))] p-5 text-slate-900 shadow-[0_24px_70px_rgba(148,163,184,0.18)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,251,248,0.96))] sm:p-8">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/90 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">
@@ -251,22 +251,22 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                     </p>
                   </div>
 
-                  <div className="hidden rounded-[1.35rem] border border-slate-200 bg-white/80 px-3 py-2 text-right text-slate-900 shadow-sm sm:block">
+                  <div className="hidden rounded-[1.35rem] border border-slate-200 bg-slate-50 px-3 py-2 text-right text-slate-900 shadow-sm sm:block">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-700">Status</div>
                     <div className="mt-1 text-sm font-semibold">Operational</div>
                   </div>
                 </div>
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-[1.4rem] border border-slate-200/80 bg-white/85 px-4 py-3 shadow-sm">
+                  <div className="rounded-[1.4rem] border border-slate-200/80 bg-slate-50 px-4 py-3 shadow-sm">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Access</div>
                     <div className="mt-2 text-base font-semibold text-slate-950">Farm Core</div>
                   </div>
-                  <div className="rounded-[1.4rem] border border-emerald-100 bg-emerald-50/90 px-4 py-3 shadow-sm">
+                  <div className="rounded-[1.4rem] border border-emerald-100 bg-emerald-50 px-4 py-3 shadow-sm">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-700">Telemetry</div>
                     <div className="mt-2 text-base font-semibold text-slate-900">Streaming</div>
                   </div>
-                  <div className="rounded-[1.4rem] border border-cyan-100 bg-cyan-50/90 px-4 py-3 shadow-sm">
+                  <div className="rounded-[1.4rem] border border-cyan-100 bg-cyan-50 px-4 py-3 shadow-sm">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-cyan-700">Security</div>
                     <div className="mt-2 text-base font-semibold text-slate-900">Verified</div>
                   </div>
@@ -274,7 +274,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
 
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="mt-7 space-y-4" autoComplete="off">
-                    <div className="rounded-[1.85rem] border border-white/80 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] sm:p-5">
+                    <div className="rounded-[1.85rem] border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
                       <div className="mb-4 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                         <Orbit className="h-3.5 w-3.5 text-emerald-700" />
                         Account credentials
@@ -298,7 +298,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                                   />
                                   <Input
                                     placeholder="you@example.com"
-                                    className="h-14 rounded-[1.25rem] border-slate-200/90 bg-white pl-11 text-[15px] text-slate-950 placeholder:text-slate-400 shadow-[0_1px_0_rgba(255,255,255,0.9)] focus-visible:border-emerald-400 focus-visible:ring-4 focus-visible:ring-emerald-500/10"
+                                    className="h-14 rounded-[1.25rem] border-slate-200 bg-slate-50 pl-11 text-[15px] text-slate-950 placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-emerald-500/10"
                                     disabled={isLoading}
                                     autoComplete="off"
                                     autoCorrect="off"
@@ -341,7 +341,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                                   <Input
                                     type={showPassword ? "text" : "password"}
                                     placeholder="••••••••"
-                                    className="h-14 rounded-[1.25rem] border-slate-200/90 bg-white pl-11 pr-12 text-[15px] text-slate-950 placeholder:text-slate-400 shadow-[0_1px_0_rgba(255,255,255,0.9)] focus-visible:border-emerald-400 focus-visible:ring-4 focus-visible:ring-emerald-500/10"
+                                    className="h-14 rounded-[1.25rem] border-slate-200 bg-slate-50 pl-11 pr-12 text-[15px] text-slate-950 placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-emerald-500/10"
                                     disabled={isLoading}
                                     autoComplete="off"
                                     autoCorrect="off"
@@ -372,7 +372,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                     <Button
                       type="submit"
                       disabled={isLoading}
-                      className="mt-2 h-14 w-full rounded-[1.45rem] bg-slate-950 text-[15px] font-semibold text-white shadow-[0_18px_40px_rgba(15,23,42,0.24)] transition-all hover:translate-y-[-1px] hover:bg-slate-900"
+                      className="mt-2 h-14 w-full rounded-[1.45rem] bg-emerald-600 text-[15px] font-semibold text-white shadow-[0_16px_30px_rgba(16,185,129,0.20)] transition-all hover:translate-y-[-1px] hover:bg-emerald-700"
                     >
                       {isLoading ? (
                         <>
@@ -389,7 +389,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                   </form>
                 </Form>
 
-                <div className="mt-6 rounded-[1.9rem] border border-white/80 bg-white/70 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                <div className="mt-6 rounded-[1.9rem] border border-slate-200/80 bg-white p-5 shadow-sm">
                   <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
 
                   <div className="mt-5 text-center text-sm text-slate-500">
@@ -404,9 +404,9 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                   </div>
                 </div>
 
-                <div className="mt-5 flex flex-col gap-3 rounded-[1.6rem] border border-slate-200/80 bg-slate-950 px-4 py-4 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-5 flex flex-col gap-3 rounded-[1.6rem] border border-slate-200/80 bg-slate-50 px-4 py-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-emerald-300" />
+                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
                     Protected access for GreenCrop users
                   </div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
