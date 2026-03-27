@@ -201,14 +201,22 @@ function Bucket({
 }
 
 function SmartFarmRig({ isOn, pumps, activeTank }: SmartFarmTwinSceneProps) {
+  const rigRef = useRef<THREE.Group>(null);
   const hasPump = pumps.some(Boolean);
   const activeBucket = activeTank ? Math.min(Math.max(activeTank, 1), 3) : null;
   const controllerActive = isOn && !hasPump && !activeBucket;
   const sensorActive = isOn && !hasPump;
   const pipeFlowActive = isOn && (hasPump || !!activeBucket);
 
+  useFrame(({ clock }) => {
+    if (!rigRef.current) return;
+    const t = clock.getElapsedTime();
+    rigRef.current.rotation.y = -0.55 + Math.sin(t * 0.32) * 0.06;
+    rigRef.current.position.y = -0.75 + Math.sin(t * 0.55) * 0.03;
+  });
+
   return (
-    <group position={[0, -0.75, 0]} rotation={[0.06, -0.55, 0]}>
+    <group ref={rigRef} position={[0, -0.75, 0]} rotation={[0.06, -0.55, 0]}>
       <mesh position={[0.4, -0.95, 0.12]} receiveShadow>
         <boxGeometry args={[5.8, 0.22, 4.4]} />
         <meshStandardMaterial color="#0f172a" metalness={0.5} roughness={0.3} />
@@ -293,7 +301,19 @@ function SmartFarmRig({ isOn, pumps, activeTank }: SmartFarmTwinSceneProps) {
 
 export function SmartFarmTwinScene(props: SmartFarmTwinSceneProps) {
   return (
-    <div className="h-full min-h-[320px] w-full overflow-hidden rounded-[1.8rem] bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.16),transparent_32%),linear-gradient(180deg,rgba(2,6,23,0.98),rgba(15,23,42,0.96))]">
+    <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-[1.8rem] border border-cyan-400/10 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.18),transparent_28%),radial-gradient(circle_at_20%_80%,rgba(16,185,129,0.12),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.98),rgba(15,23,42,0.96))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_30px_80px_rgba(2,132,199,0.18)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between p-4 sm:p-5">
+        <div className="rounded-full border border-cyan-400/25 bg-slate-950/55 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-100 backdrop-blur-xl">
+          3D Digital Twin
+        </div>
+        <div className="rounded-full border border-white/10 bg-slate-950/45 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.24em] text-slate-300 backdrop-blur-xl">
+          Drag to inspect
+        </div>
+      </div>
+
+      <div className="pointer-events-none absolute left-5 top-16 z-10 h-24 w-24 rounded-full bg-cyan-400/10 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-8 right-8 z-10 h-24 w-24 rounded-full bg-emerald-400/10 blur-3xl" />
+
       <Canvas shadows camera={{ position: [6.8, 4.2, 7.4], fov: 33 }}>
         <color attach="background" args={["#020617"]} />
         <fog attach="fog" args={["#020617", 8, 18]} />
@@ -312,6 +332,7 @@ export function SmartFarmTwinScene(props: SmartFarmTwinSceneProps) {
         <pointLight position={[-5, 3, 4]} intensity={8} color="#22d3ee" />
         <pointLight position={[3, 2, 5]} intensity={5} color="#34d399" />
         <Suspense fallback={null}>
+          <gridHelper args={[11, 18, "#134e4a", "#0f172a"]} position={[0, -1.73, 0]} />
           <SmartFarmRig {...props} />
           <ContactShadows
             position={[0, -1.78, 0]}
@@ -329,7 +350,7 @@ export function SmartFarmTwinScene(props: SmartFarmTwinSceneProps) {
           minPolarAngle={0.9}
           maxPolarAngle={1.45}
           autoRotate
-          autoRotateSpeed={0.7}
+          autoRotateSpeed={props.isOn ? 0.8 : 0.45}
         />
       </Canvas>
     </div>
