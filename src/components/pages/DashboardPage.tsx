@@ -1,6 +1,7 @@
 import { useMachine } from "../../contexts/MachineContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import { 
   Power, 
   Activity, 
@@ -12,7 +13,11 @@ import {
   Database,
   Cpu,
   TrendingUp,
-  Clock3
+  Clock3,
+  ArrowRight,
+  CircleDot,
+  Orbit,
+  Waves
 } from "lucide-react";
 import machineModel from "@/assets/images/machine_model.png";
 import { MetricsChart } from "../MetricsChart";
@@ -20,6 +25,7 @@ import { MetricsChart } from "../MetricsChart";
 
 interface DashboardPageProps {
   language?: string;
+  onOpenDigitalTwinDetail?: () => void;
 }
 
 const translations = {
@@ -30,6 +36,20 @@ const translations = {
     offline: "System Offline",
     visualizer: "System Visualizer",
     visualizerDesc: "Real-time digital twin representation",
+    visualizerStatusTitle: "Live summary",
+    currentPhase: "Current phase",
+    activeDevice: "Active device",
+    viewDetail: "Open digital twin detail",
+    modeAuto: "Auto mode",
+    modeManual: "Manual mode",
+    currentStepIdle: "Awaiting command",
+    currentStepAnalyze: "Analyzing soil moisture",
+    currentStepIrrigation: "Irrigation running",
+    currentStepStandby: "Standby monitoring",
+    controllerHub: "Controller Hub",
+    mainPump: "Main Pump",
+    tankFeed: "Tank Feed",
+    systemLoop: "System loop stable",
     masterControl: "Master Control",
     running: "Running",
     stopped: "Stopped",
@@ -61,6 +81,20 @@ const translations = {
     offline: "ระบบออฟไลน์",
     visualizer: "แบบจำลองระบบ",
     visualizerDesc: "แบบจำลองดิจิทัลทวินแบบเรียลไทม์",
+    visualizerStatusTitle: "สรุปสถานะสด",
+    currentPhase: "ขั้นตอนปัจจุบัน",
+    activeDevice: "อุปกรณ์ที่กำลังทำงาน",
+    viewDetail: "ดูหน้ารายละเอียดดิจิทัลทวิน",
+    modeAuto: "โหมดอัตโนมัติ",
+    modeManual: "โหมดควบคุมเอง",
+    currentStepIdle: "รอคำสั่งทำงาน",
+    currentStepAnalyze: "กำลังวิเคราะห์ค่าความชื้น",
+    currentStepIrrigation: "กำลังรดน้ำ",
+    currentStepStandby: "เฝ้าระวังระบบ",
+    controllerHub: "กล่องควบคุมหลัก",
+    mainPump: "ปั๊มน้ำหลัก",
+    tankFeed: "ระบบจ่ายน้ำถัง",
+    systemLoop: "วงจรระบบปกติ",
     masterControl: "การควบคุมหลัก",
     running: "กำลังทำงาน",
     stopped: "หยุดทำงาน",
@@ -87,7 +121,7 @@ const translations = {
   }
 };
 
-export function DashboardPage({ language = "EN" }: DashboardPageProps) {
+export function DashboardPage({ language = "EN", onOpenDigitalTwinDetail }: DashboardPageProps) {
   const t = translations[language as keyof typeof translations] || translations.EN;
   const { 
     isOn, 
@@ -102,6 +136,48 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
   } = useMachine();
 
   const hasAnyPumpSignal = pumps.some(Boolean);
+  const activePumpIndex = pumps.findIndex(Boolean);
+  const isTankFlowActive = isOn && !!activeTank;
+  const currentStep = !isOn
+    ? t.currentStepIdle
+    : hasAnyPumpSignal
+      ? t.currentStepIrrigation
+      : isTankFlowActive
+        ? t.currentStepAnalyze
+        : t.currentStepStandby;
+  const activeDeviceLabel = !isOn
+    ? t.modeManual
+    : hasAnyPumpSignal
+      ? `${t.mainPump}${activePumpIndex >= 0 ? ` P${activePumpIndex + 1}` : ""}`
+      : isTankFlowActive
+        ? t.tankFeed
+        : t.controllerHub;
+  const quickStats = [
+    {
+      label: "Water",
+      value: `${Math.min(100, Math.round(Math.max(flowRate, pressure * 18, activeTank ? activeTank * 24 : 22)))}%`,
+      icon: Droplets,
+      active: isOn,
+    },
+    {
+      label: "Pump",
+      value: isOn && hasAnyPumpSignal ? "ON" : "IDLE",
+      icon: Orbit,
+      active: isOn && hasAnyPumpSignal,
+    },
+    {
+      label: "Sensor",
+      value: isOn ? "ACTIVE" : "SLEEP",
+      icon: CircleDot,
+      active: isOn,
+    },
+    {
+      label: "Flow",
+      value: isOn ? "NORMAL" : "OFF",
+      icon: Waves,
+      active: isOn && flowRate > 0,
+    },
+  ];
 
   const formatUptime = (seconds: number) => {
     const hh = String(Math.floor(seconds / 3600)).padStart(2, "0");
@@ -195,8 +271,40 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
               </CardHeader>
               <CardContent className="flex h-full items-center justify-center rounded-b-2xl bg-gradient-to-b from-transparent to-background/30 p-4 sm:p-6 lg:p-8">
                 <div className="relative w-full h-full flex items-center justify-center">
+                   <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-end">
+                     <div className="flex max-w-[320px] flex-wrap justify-end gap-2">
+                       <Badge className={`border px-3 py-1 text-[10px] uppercase tracking-[0.18em] ${isOn ? "border-cyan-400/40 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300" : "border-border bg-background/80 text-muted-foreground"}`}>
+                         {isOn ? "LIVE" : "OFFLINE"}
+                       </Badge>
+                       <Badge className={`border px-3 py-1 text-[10px] uppercase tracking-[0.18em] ${isOn ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" : "border-border bg-background/80 text-muted-foreground"}`}>
+                         {isOn ? currentStep : t.currentStepIdle}
+                       </Badge>
+                       <Badge className="border border-border/80 bg-background/85 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                         {isOn ? t.modeAuto : t.modeManual}
+                       </Badge>
+                     </div>
+                   </div>
+
                    {/* Glow effect */}
                    {isOn && <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full transition-all duration-1000"></div>}
+
+                   <div className="pointer-events-none absolute left-[14%] top-[20%] z-10 hidden sm:block">
+                     <div className={`rounded-full border px-3 py-1.5 text-[11px] font-medium shadow-lg backdrop-blur-md transition-all ${isOn ? "border-cyan-400/40 bg-slate-950/70 text-cyan-100" : "border-border bg-background/85 text-muted-foreground"}`}>
+                       {t.controllerHub}
+                     </div>
+                   </div>
+
+                   <div className="pointer-events-none absolute bottom-[16%] left-[20%] z-10 hidden sm:block">
+                     <div className={`rounded-full border px-3 py-1.5 text-[11px] font-medium shadow-lg backdrop-blur-md transition-all ${isTankFlowActive ? "border-emerald-400/40 bg-slate-950/70 text-emerald-100" : "border-border bg-background/85 text-muted-foreground"}`}>
+                       {t.tankFeed}
+                     </div>
+                   </div>
+
+                   <div className="pointer-events-none absolute bottom-[30%] right-[13%] z-10 hidden sm:block">
+                     <div className={`rounded-full border px-3 py-1.5 text-[11px] font-medium shadow-lg backdrop-blur-md transition-all ${hasAnyPumpSignal ? "border-cyan-400/40 bg-slate-950/70 text-cyan-100" : "border-border bg-background/85 text-muted-foreground"}`}>
+                       {t.mainPump}
+                     </div>
+                   </div>
                   
                    <img 
                     src={machineModel} 
@@ -207,6 +315,63 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
                       transform: isOn ? 'scale(1.02)' : 'scale(1)'
                     }}
                    />
+
+                   <div className="absolute inset-x-0 bottom-0 z-20">
+                     <div className="rounded-[1.5rem] border border-border/70 bg-background/85 p-3 shadow-2xl backdrop-blur-xl sm:p-4">
+                       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                         <div className="space-y-2">
+                           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-600 dark:text-cyan-300">
+                             <span className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse"></span>
+                             {t.visualizerStatusTitle}
+                           </div>
+                           <div className="grid gap-3 sm:grid-cols-2">
+                             <div>
+                               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{t.currentPhase}</p>
+                               <p className="mt-1 text-sm font-semibold text-foreground sm:text-base">{currentStep}</p>
+                             </div>
+                             <div>
+                               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{t.activeDevice}</p>
+                               <p className="mt-1 text-sm font-semibold text-foreground sm:text-base">{activeDeviceLabel}</p>
+                             </div>
+                           </div>
+                         </div>
+
+                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                           {quickStats.map((stat) => (
+                             <div
+                               key={stat.label}
+                               className={`min-w-[80px] rounded-2xl border px-3 py-2.5 transition-all ${
+                                 stat.active
+                                   ? "border-cyan-400/30 bg-cyan-500/10 shadow-[0_0_24px_rgba(34,211,238,0.12)]"
+                                   : "border-border/70 bg-muted/30"
+                               }`}
+                             >
+                               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                                 <stat.icon className={`h-3.5 w-3.5 ${stat.active ? "text-cyan-500" : "text-muted-foreground"}`} />
+                                 {stat.label}
+                               </div>
+                               <div className="mt-2 text-sm font-semibold text-foreground">{stat.value}</div>
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+
+                       <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                         <p className="text-xs text-muted-foreground">
+                           {t.systemLoop}
+                         </p>
+                         <Button
+                           type="button"
+                           size="sm"
+                           onClick={onOpenDigitalTwinDetail}
+                           className="h-9 rounded-full bg-slate-950 px-4 text-white hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
+                         >
+                           {t.viewDetail}
+                           <ArrowRight className="ml-2 h-4 w-4" />
+                         </Button>
+                       </div>
+                     </div>
+                   </div>
                 </div>
               </CardContent>
             </Card>
