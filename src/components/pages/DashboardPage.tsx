@@ -19,8 +19,8 @@ import {
   Orbit,
   Waves
 } from "lucide-react";
-import machineModel from "@/assets/images/machine_model.png";
 import { MetricsChart } from "../MetricsChart";
+import { SmartFarmTwinScene } from "../SmartFarmTwinScene";
 
 
 interface DashboardPageProps {
@@ -306,15 +306,13 @@ export function DashboardPage({ language = "EN", onOpenDigitalTwinDetail }: Dash
                      </div>
                    </div>
                   
-                   <img 
-                    src={machineModel} 
-                    alt="Water System Model" 
-                    className="max-h-[260px] w-auto object-contain drop-shadow-2xl transition-all duration-700 sm:max-h-[380px] lg:max-h-[500px]"
-                    style={{ 
-                      filter: isOn ? 'brightness(1.1) contrast(1.05)' : 'grayscale(1)',
-                      transform: isOn ? 'scale(1.02)' : 'scale(1)'
-                    }}
-                   />
+                   <div className="h-full w-full">
+                     <SmartFarmTwinScene
+                       isOn={isOn}
+                       pumps={pumps}
+                       activeTank={activeTank}
+                     />
+                   </div>
 
                    <div className="absolute inset-x-0 bottom-0 z-20">
                      <div className="rounded-[1.5rem] border border-border/70 bg-background/85 p-3 shadow-2xl backdrop-blur-xl sm:p-4">
