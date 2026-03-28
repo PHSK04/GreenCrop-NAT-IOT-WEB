@@ -73,74 +73,34 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        @keyframes glowShift {
-          0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.9; }
-          50% { transform: translate3d(18px, -12px, 0) scale(1.08); opacity: 1; }
-        }
-
-        @keyframes grainDrift {
-          0% { transform: translate3d(0, 0, 0); }
-          100% { transform: translate3d(-18px, 14px, 0); }
-        }
-
-        @keyframes softFloat {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-12px); }
-        }
-
-        @keyframes drift {
-          0%, 100% { transform: translate3d(0, 0, 0); }
-          50% { transform: translate3d(18px, -14px, 0); }
-        }
-
         .panel-enter {
           animation: panelEnter 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
-        .soft-float {
-          animation: softFloat 7s ease-in-out infinite;
-        }
-
-        .soft-drift {
-          animation: drift 14s ease-in-out infinite;
-        }
-
-        .glow-shift {
-          animation: glowShift 12s ease-in-out infinite;
-        }
-
-        .grain-drift {
-          animation: grainDrift 18s linear infinite alternate;
-        }
-
         @media (prefers-reduced-motion: reduce) {
-          .panel-enter, .soft-float, .soft-drift, .glow-shift, .grain-drift {
+          .panel-enter {
             animation: none !important;
           }
         }
       `}</style>
 
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,#8c9390_0%,#757d7a_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(187,247,208,0.22),transparent_18%),radial-gradient(circle_at_84%_84%,rgba(110,231,183,0.18),transparent_20%),radial-gradient(circle_at_52%_38%,rgba(255,255,255,0.06),transparent_32%)]" />
-      <div className="glow-shift absolute left-[7%] top-[12%] h-[24rem] w-[24rem] rounded-full bg-emerald-300/18 blur-3xl" />
-      <div className="glow-shift absolute bottom-[8%] right-[6%] h-[20rem] w-[20rem] rounded-full bg-lime-200/12 blur-3xl" style={{ animationDelay: "-6s" }} />
-      <div className="absolute inset-0 opacity-[0.038]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.85) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.85) 1px, transparent 1px)", backgroundSize: "52px 52px" }} />
-      <div className="grain-drift absolute inset-0 opacity-[0.045] mix-blend-soft-light" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.9) 0.6px, transparent 0.6px)", backgroundSize: "18px 18px" }} />
-      <div className="absolute inset-x-0 top-0 h-40 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),transparent)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,#909691_0%,#7f8781_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_14%,rgba(220,252,231,0.16),transparent_20%),radial-gradient(circle_at_84%_86%,rgba(187,247,208,0.12),transparent_18%)]" />
+      <div className="absolute inset-0 opacity-[0.028]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.8) 1px, transparent 1px)", backgroundSize: "56px 56px" }} />
 
       <div className="relative z-10 min-h-screen px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-        <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-[1120px] flex-col overflow-hidden rounded-[2.2rem] border border-black/80 bg-[#040605] shadow-[0_40px_120px_rgba(0,0,0,0.46)] lg:min-h-[calc(100vh-5rem)]">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-[1120px] flex-col overflow-hidden rounded-[2.2rem] border border-black/75 bg-[#060807] shadow-[0_32px_90px_rgba(0,0,0,0.38)] lg:min-h-[calc(100vh-5rem)]">
+          <div className="flex items-center justify-between border-b border-white/8 px-4 py-3 sm:px-6">
             <div className="flex items-center gap-2">
               <span className="h-3 w-3 rounded-full bg-[#ff605c]" />
               <span className="h-3 w-3 rounded-full bg-[#ffbd44]" />
               <span className="h-3 w-3 rounded-full bg-[#00ca4e]" />
             </div>
-            <div className="hidden min-w-[260px] rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-center text-[11px] font-medium tracking-[0.18em] text-white/50 sm:block">
+            <div className="hidden min-w-[260px] rounded-full border border-white/8 bg-white/[0.04] px-4 py-2 text-center text-[11px] font-medium tracking-[0.18em] text-white/45 sm:block">
               https://dashboard.greencropnatiot.com/login
             </div>
             <div className="flex items-center gap-2">
-              <div className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200/90">
+              <div className="rounded-full border border-emerald-200/12 bg-emerald-300/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
                 Live
               </div>
               <ModeToggle />
@@ -148,22 +108,14 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
           </div>
 
           <section className="relative flex flex-1 items-center justify-center overflow-hidden px-4 py-8 sm:px-8 lg:px-16">
-            <div className="absolute left-[8%] top-[12%] h-72 w-72 rounded-full bg-emerald-400/18 blur-3xl" />
-            <div className="absolute left-[18%] top-[22%] h-52 w-52 rounded-full bg-lime-200/10 blur-3xl" />
-            <div className="absolute right-[10%] top-[16%] h-80 w-80 rounded-full bg-emerald-300/10 blur-3xl" />
-            <div className="absolute bottom-[10%] right-[12%] h-56 w-56 rounded-full bg-lime-300/8 blur-3xl" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(187,247,208,0.24),transparent_16%),radial-gradient(circle_at_36%_22%,rgba(74,222,128,0.18),transparent_24%),radial-gradient(circle_at_85%_22%,rgba(255,255,255,0.04),transparent_22%),linear-gradient(180deg,rgba(6,78,59,0.08),transparent_44%)]" />
-            <div className="absolute inset-y-0 left-0 w-[48%] bg-[linear-gradient(90deg,rgba(22,163,74,0.16),transparent)]" />
-            <div className="absolute inset-y-0 left-[12%] w-px bg-[linear-gradient(180deg,transparent,rgba(134,239,172,0.14),transparent)]" />
-            <div className="absolute inset-y-0 right-[14%] w-px bg-[linear-gradient(180deg,transparent,rgba(134,239,172,0.08),transparent)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_24%_20%,rgba(134,239,172,0.14),transparent_20%),linear-gradient(180deg,rgba(16,185,129,0.04),transparent_40%)]" />
+            <div className="absolute inset-y-0 left-0 w-[44%] bg-[linear-gradient(90deg,rgba(22,163,74,0.10),transparent)]" />
 
             <div className="panel-enter relative z-10 w-full max-w-[480px]" style={{ animationDelay: "160ms" }}>
-              <div className="absolute inset-0 scale-[0.98] rounded-[2rem] bg-emerald-300/16 blur-3xl" />
-              <div className="absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_top,rgba(134,239,172,0.06),transparent_32%)]" />
-              <div className="relative rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(3,8,6,0.90),rgba(4,10,7,0.96))] p-5 text-white shadow-[0_28px_80px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:p-8">
+              <div className="relative rounded-[2rem] border border-white/8 bg-[linear-gradient(180deg,rgba(7,10,9,0.94),rgba(7,10,9,0.98))] p-5 text-white shadow-[0_18px_48px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:p-8">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] p-3 shadow-[0_0_35px_rgba(74,222,128,0.15)]">
+                    <div className="rounded-[1.4rem] border border-white/8 bg-white/[0.04] p-3">
                       <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-9 w-9 object-contain" />
                     </div>
                     <div>
@@ -174,16 +126,16 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                     </div>
                   </div>
 
-                  <div className="hidden rounded-[1.2rem] border border-emerald-400/20 bg-[linear-gradient(180deg,rgba(34,197,94,0.16),rgba(34,197,94,0.08))] px-3 py-2 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:block">
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-200/70">Status</div>
+                  <div className="hidden rounded-[1.2rem] border border-white/8 bg-white/[0.04] px-3 py-2 text-right sm:block">
+                    <div className="text-[10px] uppercase tracking-[0.16em] text-white/42">Status</div>
                     <div className="mt-1 text-sm font-semibold text-white">Operational</div>
                   </div>
                 </div>
 
                 <div className="mt-8">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-[linear-gradient(180deg,rgba(134,239,172,0.12),rgba(74,222,128,0.08))] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-100/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                    <Sparkles className="h-3.5 w-3.5 text-lime-200" />
-                    Bright access layer
+                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200/12 bg-emerald-300/[0.06] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-100/85">
+                    <Sparkles className="h-3.5 w-3.5 text-emerald-200" />
+                    Access layer
                   </div>
                   <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-white sm:text-[2.85rem]">
                     Sign in to continue
@@ -213,7 +165,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                                 />
                                 <Input
                                   placeholder="you@example.com"
-                                  className="h-14 rounded-[1.2rem] border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.04))] pl-11 text-[15px] text-white placeholder:text-white/28 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] focus-visible:border-emerald-300 focus-visible:bg-white/[0.08] focus-visible:ring-4 focus-visible:ring-emerald-400/10"
+                                  className="h-14 rounded-[1.2rem] border-white/8 bg-white/[0.04] pl-11 text-[15px] text-white placeholder:text-white/28 focus-visible:border-emerald-300 focus-visible:bg-white/[0.06] focus-visible:ring-4 focus-visible:ring-emerald-400/8"
                                   disabled={isLoading}
                                   autoComplete="off"
                                   autoCorrect="off"
@@ -256,7 +208,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                                 <Input
                                   type={showPassword ? "text" : "password"}
                                   placeholder="••••••••"
-                                  className="h-14 rounded-[1.2rem] border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.04))] pl-11 pr-12 text-[15px] text-white placeholder:text-white/28 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] focus-visible:border-emerald-300 focus-visible:bg-white/[0.08] focus-visible:ring-4 focus-visible:ring-emerald-400/10"
+                                  className="h-14 rounded-[1.2rem] border-white/8 bg-white/[0.04] pl-11 pr-12 text-[15px] text-white placeholder:text-white/28 focus-visible:border-emerald-300 focus-visible:bg-white/[0.06] focus-visible:ring-4 focus-visible:ring-emerald-400/8"
                                   disabled={isLoading}
                                   autoComplete="off"
                                   autoCorrect="off"
@@ -286,7 +238,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                     <Button
                       type="submit"
                       disabled={isLoading}
-                      className="mt-2 h-14 w-full rounded-[1.25rem] bg-[linear-gradient(180deg,#d3ffe0,#72e08f)] text-[15px] font-semibold text-slate-950 shadow-[0_18px_36px_rgba(74,222,128,0.32)] transition-all hover:translate-y-[-1px] hover:shadow-[0_22px_44px_rgba(74,222,128,0.38)] hover:bg-[linear-gradient(180deg,#e0ffe8,#86e99f)]"
+                      className="mt-2 h-14 w-full rounded-[1.25rem] bg-[linear-gradient(180deg,#d7f7e0,#9ee0b1)] text-[15px] font-semibold text-slate-950 shadow-[0_12px_26px_rgba(110,231,183,0.18)] transition-all hover:translate-y-[-1px] hover:bg-[linear-gradient(180deg,#e2fae8,#afe8c0)]"
                     >
                       {isLoading ? (
                         <>
@@ -303,7 +255,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                   </form>
                 </Form>
 
-                <div className="mt-6 rounded-[1.6rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.035))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                <div className="mt-6 rounded-[1.6rem] border border-white/8 bg-white/[0.03] p-5">
                   <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
 
                   <div className="mt-5 text-center text-sm text-white/50">
@@ -318,7 +270,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                   </div>
                 </div>
 
-                <div className="mt-5 flex flex-col gap-3 rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.03))] px-4 py-4 text-sm text-white/58 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-5 flex flex-col gap-3 rounded-[1.4rem] border border-white/8 bg-white/[0.03] px-4 py-4 text-sm text-white/58 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-emerald-200" />
                     Protected access for GreenCrop users
