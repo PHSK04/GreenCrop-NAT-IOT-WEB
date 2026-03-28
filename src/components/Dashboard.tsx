@@ -33,7 +33,6 @@ import { MyProfilePage } from "./pages/MyProfilePage";
 import { TankLevelsPage } from "./pages/TankLevelsPage";
 import { DevicePairingPage } from "./pages/DevicePairingPage";
 import { SupportCenterPage } from "./pages/SupportCenterPage";
-import { DigitalTwinDetailPage } from "./pages/DigitalTwinDetailPage";
 import { AdminOverview } from "@/features/admin/pages/AdminOverview";
 import { UserManagementPage } from "@/features/admin/pages/UserManagementPage";
 import { AuditLogsPage } from "@/features/admin/pages/AuditLogsPage";
@@ -49,7 +48,6 @@ import { emitActiveDeviceChanged } from "@/hooks/useActiveDeviceId";
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
-  { icon: Cpu, label: "Digital Twin" },
   { icon: Droplets, label: "Tank Levels" }, 
   { icon: ClipboardList, label: "Crop Reports" },
   { icon: Zap, label: "Sensor Intelligence" },
@@ -82,7 +80,6 @@ const adminItems = [
 const navTranslations = {
   EN: {
     "Dashboard": "Dashboard",
-    "Digital Twin": "Digital Twin",
     "Tank Levels": "Tank Levels",
     "Crop Reports": "Crop Reports",
     "Sensor Intelligence": "Sensor Intelligence",
@@ -110,7 +107,6 @@ const navTranslations = {
   },
   TH: {
     "Dashboard": "แดชบอร์ด",
-    "Digital Twin": "ดิจิทัลทวิน",
     "Tank Levels": "ระดับถังเก็บน้ำ",
     "Crop Reports": "รายงานพืชผล",
     "Sensor Intelligence": "ระบบเซนเซอร์อัจฉริยะ",
@@ -398,24 +394,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   const renderContent = () => {
     switch (activePage) {
       case "Dashboard":
-        return isAdminUser ? (
-          <AdminOverview language={language} />
-        ) : (
-          <DashboardPage
-            language={language}
-            onOpenDigitalTwinDetail={() => setActivePage("Digital Twin")}
-          />
-        );
-      case "Digital Twin":
-      case "Digital Twin Detail":
-        return isAdminUser ? (
-          <AdminOverview language={language} />
-        ) : (
-          <DigitalTwinDetailPage
-            language={language}
-            onBack={() => setActivePage("Dashboard")}
-          />
-        );
+        return isAdminUser ? <AdminOverview language={language} /> : <DashboardPage language={language} />;
       case "Crop Reports":
         return <CropReportsPage language={language} />;
       case "Sensor Intelligence":
@@ -480,12 +459,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       case "Database Viewer":
         return isAdminUser ? <DatabaseViewerPage language={language} /> : <DashboardPage language={language} />;
       default:
-        return (
-          <DashboardPage
-            language={language}
-            onOpenDigitalTwinDetail={() => setActivePage("Digital Twin")}
-          />
-        );
+        return <DashboardPage language={language} />;
     }
   };
 
