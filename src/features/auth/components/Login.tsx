@@ -41,8 +41,6 @@ interface LoginProps {
   onLogin?: () => void;
 }
 
-const detailPills = ["Real-time monitoring", "Protected access"];
-
 export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -68,7 +66,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#f4f8f3] text-slate-900">
+    <div className="relative min-h-screen overflow-hidden bg-[#7f8784] text-white">
       <style>{`
         @keyframes panelEnter {
           from { opacity: 0; transform: translateY(24px) scale(0.985); }
@@ -104,91 +102,67 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
         }
       `}</style>
 
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_8%_16%,rgba(16,185,129,0.08),transparent_18%),linear-gradient(180deg,#fcfefc_0%,#f5f9f5_52%,#eef4f0_100%)]" />
-      <div className="soft-drift absolute -left-24 top-20 h-72 w-72 rounded-full bg-emerald-200/25 blur-3xl" />
-      <div className="absolute inset-0 opacity-[0.022]" style={{ backgroundImage: "linear-gradient(rgba(15,23,42,0.45) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.45) 1px, transparent 1px)", backgroundSize: "64px 64px" }} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(134,239,172,0.22),transparent_22%),radial-gradient(circle_at_82%_82%,rgba(74,222,128,0.18),transparent_20%),linear-gradient(180deg,#8b9390_0%,#767d7b_100%)]" />
+      <div className="absolute inset-0 opacity-[0.035]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.9) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.9) 1px, transparent 1px)", backgroundSize: "52px 52px" }} />
 
-      <div className="relative z-10 min-h-screen px-4 py-4 sm:px-6 lg:px-8 lg:py-8">
-        <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1320px] flex-col overflow-hidden rounded-[2rem] border border-white/85 bg-white/72 shadow-[0_24px_70px_rgba(148,163,184,0.12)] backdrop-blur-xl lg:min-h-[calc(100vh-4rem)] lg:flex-row lg:rounded-[2.5rem]">
-          <section className="relative flex min-h-[360px] flex-col justify-between overflow-hidden border-b border-slate-200/60 px-5 py-5 sm:px-7 sm:py-7 lg:min-h-0 lg:w-[50%] lg:border-b-0 lg:border-r lg:px-12 lg:py-12 xl:px-16">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.92),rgba(255,255,255,0.6),transparent_72%)]" />
-
-            <header className="panel-enter relative z-10 flex items-start justify-between gap-4" style={{ animationDelay: "60ms" }}>
-              <div className="flex items-center gap-3">
-                <div className="rounded-[1.8rem] border border-white/90 bg-white/95 p-3 shadow-[0_8px_24px_rgba(148,163,184,0.14)] backdrop-blur-md">
-                  <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-10 w-10 object-contain" />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-800">
-                    GreenCrop NATIOT
-                  </div>
-                  <div className="mt-1 text-sm text-slate-500">Operations Platform</div>
-                </div>
-              </div>
-
-              <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                Live environment
-              </div>
-            </header>
-
-            <div className="relative z-10 flex flex-1 flex-col justify-center py-12 lg:py-0">
-              <div className="panel-enter inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm backdrop-blur-md" style={{ animationDelay: "140ms" }}>
-                <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
-                Clean access experience
-              </div>
-
-              <h1 className="panel-enter mt-7 max-w-[9ch] text-5xl font-semibold leading-[0.9] tracking-[-0.065em] text-slate-950 sm:text-6xl xl:text-[5.35rem]" style={{ animationDelay: "220ms" }}>
-                Sign in,
-                <br />
-                stay focused.
-              </h1>
-
-              <p className="panel-enter mt-6 max-w-lg text-base leading-8 text-slate-600 sm:text-xl" style={{ animationDelay: "300ms" }}>
-                Minimal access to your GreenCrop dashboard, with less clutter and a clearer starting point.
-              </p>
-
-              <div className="panel-enter mt-8 flex flex-wrap gap-3" style={{ animationDelay: "380ms" }}>
-                {detailPills.map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600 shadow-sm"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
-              <div className="panel-enter mt-12 max-w-md border-t border-slate-200/80 pt-8 text-sm leading-7 text-slate-500" style={{ animationDelay: "460ms" }}>
-                Secure sign-in for operators, admins, and teams managing daily farm workflows.
-              </div>
+      <div className="relative z-10 min-h-screen px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+        <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-[1120px] flex-col overflow-hidden rounded-[2.1rem] border border-black/70 bg-[#050706] shadow-[0_35px_90px_rgba(0,0,0,0.45)] lg:min-h-[calc(100vh-5rem)]">
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-6">
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-[#ff605c]" />
+              <span className="h-3 w-3 rounded-full bg-[#ffbd44]" />
+              <span className="h-3 w-3 rounded-full bg-[#00ca4e]" />
             </div>
-          </section>
-
-          <section className="relative flex flex-1 items-center justify-center px-4 py-5 sm:px-6 lg:px-8 lg:py-10 xl:px-10">
-            <div className="absolute right-5 top-5 z-20">
+            <div className="hidden min-w-[260px] rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-center text-[11px] font-medium tracking-[0.18em] text-white/50 sm:block">
+              https://dashboard.greencropnatiot.com/login
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200/90">
+                Live
+              </div>
               <ModeToggle />
             </div>
+          </div>
 
-            <div className="panel-enter relative w-full max-w-[480px]" style={{ animationDelay: "180ms" }}>
-              <div className="absolute inset-0 scale-[0.97] rounded-[2.4rem] bg-emerald-200/25 blur-3xl" />
-              <div className="relative rounded-[2.4rem] border border-white/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,252,250,0.98))] p-5 text-slate-900 shadow-[0_20px_56px_rgba(148,163,184,0.16)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,252,250,0.98))] sm:p-8">
+          <section className="relative flex flex-1 items-center justify-center overflow-hidden px-4 py-8 sm:px-8 lg:px-16">
+            <div className="absolute left-[12%] top-[10%] h-64 w-64 rounded-full bg-emerald-400/20 blur-3xl" />
+            <div className="absolute right-[8%] top-[12%] h-72 w-72 rounded-full bg-lime-300/14 blur-3xl" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_14%,rgba(187,247,208,0.34),transparent_18%),radial-gradient(circle_at_48%_18%,rgba(74,222,128,0.24),transparent_22%),linear-gradient(180deg,rgba(6,78,59,0.08),transparent_40%)]" />
+            <div className="absolute inset-y-0 left-0 w-[42%] bg-[linear-gradient(90deg,rgba(34,197,94,0.18),transparent)]" />
+
+            <div className="panel-enter relative z-10 w-full max-w-[480px]" style={{ animationDelay: "160ms" }}>
+              <div className="absolute inset-0 scale-[0.97] rounded-[2rem] bg-emerald-300/18 blur-3xl" />
+              <div className="relative rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(3,8,6,0.92),rgba(4,10,7,0.96))] p-5 text-white shadow-[0_22px_65px_rgba(0,0,0,0.4)] backdrop-blur-2xl sm:p-8">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/90 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      Secure sign in
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-[1.4rem] border border-white/10 bg-white/[0.06] p-3 shadow-[0_0_35px_rgba(74,222,128,0.15)]">
+                      <img src={appLogoGreen} alt="GreenCropNAT logo" className="h-9 w-9 object-contain" />
                     </div>
-                    <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-[2.85rem]">
-                      Welcome back
-                    </h2>
-                    <p className="mt-3 max-w-md text-sm leading-7 text-slate-500 sm:text-[15px]">
-                      Use your account to continue to the GreenCrop operations dashboard.
-                    </p>
+                    <div>
+                      <div className="text-sm font-semibold uppercase tracking-[0.28em] text-emerald-100">
+                        GreenCrop NATIOT
+                      </div>
+                      <div className="mt-1 text-xs text-white/45">Operations Platform</div>
+                    </div>
                   </div>
 
-                  <div className="hidden rounded-[1.35rem] border border-slate-200 bg-slate-50 px-3 py-2 text-right text-slate-900 shadow-sm sm:block">
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-700">Status</div>
-                    <div className="mt-1 text-sm font-semibold">Operational</div>
+                  <div className="hidden rounded-[1.2rem] border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-right sm:block">
+                    <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-200/70">Status</div>
+                    <div className="mt-1 text-sm font-semibold text-white">Operational</div>
                   </div>
+                </div>
+
+                <div className="mt-8">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-100/90">
+                    <Sparkles className="h-3.5 w-3.5 text-lime-200" />
+                    Bright access layer
+                  </div>
+                  <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-white sm:text-[2.85rem]">
+                    Sign in to continue
+                  </h2>
+                  <p className="mt-3 max-w-md text-sm leading-7 text-white/60 sm:text-[15px]">
+                    Enter your GreenCrop account to access the live operations dashboard and machine controls.
+                  </p>
                 </div>
 
                 <Form {...form}>
@@ -199,19 +173,19 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                         name="email"
                         render={({ field }) => (
                           <FormItem className="space-y-2">
-                            <FormLabel className="text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            <FormLabel className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/55">
                               Email
                             </FormLabel>
                             <FormControl>
                               <div className="relative">
                                 <Mail
                                   className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${
-                                    focusedField === "email" ? "text-emerald-700" : "text-slate-400"
+                                    focusedField === "email" ? "text-emerald-200" : "text-white/30"
                                   }`}
                                 />
                                 <Input
                                   placeholder="you@example.com"
-                                  className="h-14 rounded-[1.35rem] border-slate-200 bg-slate-50 pl-11 text-[15px] text-slate-950 placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-emerald-500/10"
+                                  className="h-14 rounded-[1.2rem] border-white/10 bg-white/[0.06] pl-11 text-[15px] text-white placeholder:text-white/28 focus-visible:border-emerald-300 focus-visible:bg-white/[0.08] focus-visible:ring-4 focus-visible:ring-emerald-400/10"
                                   disabled={isLoading}
                                   autoComplete="off"
                                   autoCorrect="off"
@@ -234,12 +208,12 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                         render={({ field }) => (
                           <FormItem className="space-y-2">
                             <div className="flex items-center justify-between gap-4">
-                              <FormLabel className="text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              <FormLabel className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/55">
                                 Password
                               </FormLabel>
                               <button
                                 type="button"
-                                className="text-sm font-medium text-emerald-700 transition-colors hover:text-emerald-600"
+                                className="text-sm font-medium text-emerald-200 transition-colors hover:text-lime-200"
                               >
                                 Forgot password?
                               </button>
@@ -248,13 +222,13 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                               <div className="relative">
                                 <Lock
                                   className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${
-                                    focusedField === "password" ? "text-emerald-700" : "text-slate-400"
+                                    focusedField === "password" ? "text-emerald-200" : "text-white/30"
                                   }`}
                                 />
                                 <Input
                                   type={showPassword ? "text" : "password"}
                                   placeholder="••••••••"
-                                  className="h-14 rounded-[1.35rem] border-slate-200 bg-slate-50 pl-11 pr-12 text-[15px] text-slate-950 placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-emerald-500/10"
+                                  className="h-14 rounded-[1.2rem] border-white/10 bg-white/[0.06] pl-11 pr-12 text-[15px] text-white placeholder:text-white/28 focus-visible:border-emerald-300 focus-visible:bg-white/[0.08] focus-visible:ring-4 focus-visible:ring-emerald-400/10"
                                   disabled={isLoading}
                                   autoComplete="off"
                                   autoCorrect="off"
@@ -268,7 +242,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                                   type="button"
                                   onClick={() => setShowPassword((prev) => !prev)}
                                   disabled={isLoading}
-                                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-emerald-700"
+                                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/35 transition-colors hover:text-emerald-200"
                                   aria-label={showPassword ? "Hide password" : "Show password"}
                                 >
                                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -284,7 +258,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                     <Button
                       type="submit"
                       disabled={isLoading}
-                      className="mt-2 h-14 w-full rounded-[1.45rem] bg-emerald-600 text-[15px] font-semibold text-white shadow-[0_16px_30px_rgba(16,185,129,0.20)] transition-all hover:translate-y-[-1px] hover:bg-emerald-700"
+                      className="mt-2 h-14 w-full rounded-[1.25rem] bg-[linear-gradient(180deg,#b9ffcf,#58d479)] text-[15px] font-semibold text-slate-950 shadow-[0_18px_36px_rgba(74,222,128,0.28)] transition-all hover:translate-y-[-1px] hover:bg-[linear-gradient(180deg,#c8ffd8,#6ee787)]"
                     >
                       {isLoading ? (
                         <>
@@ -301,27 +275,27 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                   </form>
                 </Form>
 
-                <div className="mt-6 rounded-[1.9rem] border border-slate-200/80 bg-slate-50/90 p-5 shadow-sm">
+                <div className="mt-6 rounded-[1.6rem] border border-white/10 bg-white/[0.04] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                   <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
 
-                  <div className="mt-5 text-center text-sm text-slate-500">
+                  <div className="mt-5 text-center text-sm text-white/50">
                     Don&apos;t have an account?{" "}
                     <button
                       type="button"
                       onClick={onSwitchToRegister}
-                      className="font-semibold text-emerald-700 underline decoration-emerald-400/60 underline-offset-4 transition-colors hover:text-emerald-600"
+                      className="font-semibold text-emerald-200 underline decoration-emerald-300/50 underline-offset-4 transition-colors hover:text-lime-200"
                     >
                       Create Account
                     </button>
                   </div>
                 </div>
 
-                <div className="mt-5 flex flex-col gap-3 rounded-[1.6rem] border border-slate-200/80 bg-slate-50 px-4 py-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-5 flex flex-col gap-3 rounded-[1.4rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-sm text-white/58 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                    <ShieldCheck className="h-4 w-4 text-emerald-200" />
                     Protected access for GreenCrop users
                   </div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/32">
                     admin@greencropnatiot.com
                   </div>
                 </div>
