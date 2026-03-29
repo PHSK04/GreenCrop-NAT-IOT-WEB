@@ -232,7 +232,7 @@ export function SocialAuth({
 
     const socialButtonBase =
         "group relative h-14 w-full overflow-hidden rounded-2xl border transition-all duration-200 disabled:opacity-60 " +
-        "border-slate-200 bg-white text-slate-800 shadow-[0_10px_24px_rgba(15,23,42,0.10)] hover:border-emerald-300 hover:shadow-[0_14px_30px_rgba(15,23,42,0.14)] " +
+        "border-slate-200 bg-white text-slate-800 shadow-[0_8px_18px_rgba(15,23,42,0.07)] hover:border-emerald-300 hover:bg-emerald-50/50 hover:shadow-[0_12px_24px_rgba(15,23,42,0.10)] " +
         "dark:border-emerald-600/35 dark:bg-gradient-to-b dark:from-[#05211b] dark:to-[#031914] dark:text-emerald-50 " +
         "dark:shadow-[inset_0_1px_0_rgba(52,211,153,0.15),0_10px_30px_rgba(2,18,14,0.5)] dark:hover:border-emerald-400/60 dark:hover:shadow-[inset_0_1px_0_rgba(110,231,183,0.25),0_14px_36px_rgba(2,18,14,0.7)]";
 
@@ -241,10 +241,10 @@ export function SocialAuth({
             {showDivider ? (
                 <div className="relative">
                     <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-slate-300/80 dark:border-slate-700/80" />
+                        <span className="w-full border-t border-slate-200 dark:border-slate-700/80" />
                     </div>
                     <div className="relative flex justify-center text-xs font-semibold uppercase tracking-[0.12em]">
-                        <span className="bg-white/95 px-3 text-slate-500 dark:bg-slate-900/95 dark:text-slate-300">
+                        <span className="bg-slate-50 px-3 text-slate-400 dark:bg-slate-900/95 dark:text-slate-300">
                             Or {actionText} with
                         </span>
                     </div>
