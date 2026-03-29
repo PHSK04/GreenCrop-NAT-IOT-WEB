@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt');
-const db = require('./database_mssql');
+const db = require('./database_postgres');
 const jwt = require('jsonwebtoken');
 const https = require('https');
 const crypto = require('crypto');
@@ -90,6 +90,7 @@ app.get('/api/health', (req, res) => {
         service: 'smart-iot-api',
         host: HOST,
         port: PORT,
+        db: typeof db.getStatus === 'function' ? db.getStatus() : undefined,
         timestamp: new Date().toISOString()
     });
 });
@@ -1170,7 +1171,7 @@ app.get('/api/chat/threads', async (req, res) => {
 
         if (isAdmin) {
             where.push('t.is_archived = ?');
-            params.push(archived ? 1 : 0);
+            params.push(archived);
             if (mine) {
                 where.push('t.assigned_admin_id = ?');
                 params.push(req.user.id);
@@ -1357,8 +1358,8 @@ app.post('/api/chat/threads/:threadId/meta', requireAdmin, async (req, res) => {
 
         const status = req.body?.status ? normalizeChatStatus(req.body.status) : thread.status;
         const priority = req.body?.priority ? normalizeChatPriority(req.body.priority) : (thread.priority || 'normal');
-        const isArchived = req.body?.is_archived === undefined ? Number(thread.is_archived || 0) : (req.body.is_archived ? 1 : 0);
-        const isPinned = req.body?.is_pinned === undefined ? Number(thread.is_pinned || 0) : (req.body.is_pinned ? 1 : 0);
+        const isArchived = req.body?.is_archived === undefined ? Boolean(thread.is_archived) : Boolean(req.body.is_archived);
+        const isPinned = req.body?.is_pinned === undefined ? Boolean(thread.is_pinned) : Boolean(req.body.is_pinned);
         const assignedAdminId = req.body?.assigned_admin_id === undefined || req.body?.assigned_admin_id === null || req.body?.assigned_admin_id === ''
             ? null
             : Number(req.body.assigned_admin_id);
@@ -1383,10 +1384,10 @@ app.post('/api/chat/threads/:threadId/meta', requireAdmin, async (req, res) => {
         if (status !== thread.status) {
             changeLog.push(status === 'closed' ? `close case chat #${threadId} by Admin nat` : `set status ${status} for chat #${threadId} by Admin nat`);
         }
-        if (Number(isPinned) !== Number(thread.is_pinned || 0)) {
+        if (Boolean(isPinned) !== Boolean(thread.is_pinned)) {
             changeLog.push(`${isPinned ? 'pin' : 'unpin'} chat #${threadId} by Admin nat`);
         }
-        if (Number(isArchived) !== Number(thread.is_archived || 0)) {
+        if (Boolean(isArchived) !== Boolean(thread.is_archived)) {
             changeLog.push(`${isArchived ? 'archive' : 'restore'} chat #${threadId} by Admin nat`);
         }
         if (String(assignedAdminId || '') !== String(thread.assigned_admin_id || '')) {
@@ -1514,7 +1515,7 @@ app.get('/api/chat/unread-summary', async (req, res) => {
         const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
 
         if (isAdmin) {
-            const row = await db.get("SELECT COUNT(*) AS threads, COALESCE(SUM(admin_unread_count), 0) AS messages FROM chat_threads WHERE admin_unread_count > 0 AND is_archived = 0");
+            const row = await db.get("SELECT COUNT(*) AS threads, COALESCE(SUM(admin_unread_count), 0) AS messages FROM chat_threads WHERE admin_unread_count > 0 AND is_archived = false");
             return res.json({
                 unread_threads: Number(row?.threads || 0),
                 unread_messages: Number(row?.messages || 0),
@@ -1565,9 +1566,9 @@ app.post('/api/devices/primary', async (req, res) => {
         );
         if (!existing) return res.status(404).json({ error: 'Device not found for user' });
 
-        await db.run("UPDATE device_pairings SET is_primary = 0 WHERE user_id = ?", [userId]);
+        await db.run("UPDATE device_pairings SET is_primary = false WHERE user_id = ?", [userId]);
         await db.run(
-            "UPDATE device_pairings SET is_primary = 1, updated_at = ? WHERE user_id = ? AND device_id = ?",
+            "UPDATE device_pairings SET is_primary = true, updated_at = ? WHERE user_id = ? AND device_id = ?",
             [new Date(), userId, deviceId]
         );
 
@@ -1614,14 +1615,14 @@ app.post('/api/devices/pair', async (req, res) => {
 
         // Determine primary flag: if user has no devices, make this primary by default
         const existingPrimary = await db.get(
-            "SELECT TOP 1 id FROM device_pairings WHERE user_id = ? AND is_primary = 1",
+            "SELECT TOP 1 id FROM device_pairings WHERE user_id = ? AND is_primary = true",
             [userId]
         );
         const shouldBePrimary = requestPrimary || !existingPrimary;
 
         if (shouldBePrimary) {
             await db.run(
-                "UPDATE device_pairings SET is_primary = 0 WHERE user_id = ?",
+                "UPDATE device_pairings SET is_primary = false WHERE user_id = ?",
                 [userId]
             );
         }
@@ -1631,13 +1632,13 @@ app.post('/api/devices/pair', async (req, res) => {
                 `UPDATE device_pairings 
                  SET pairing_code = ?, status = 'paired', paired_at = ?, user_email = ?, device_name = ?, location = ?, is_primary = ?, updated_at = ?
                  WHERE id = ?`,
-                [pairingCode, new Date(), userEmail, deviceName, location, shouldBePrimary ? 1 : 0, new Date(), existing.id]
+                [pairingCode, new Date(), userEmail, deviceName, location, shouldBePrimary, new Date(), existing.id]
             );
         } else {
             await db.run(
                 `INSERT INTO device_pairings (user_id, user_email, device_id, device_name, location, pairing_code, status, paired_at, is_primary, updated_at)
                  VALUES (?, ?, ?, ?, ?, ?, 'paired', ?, ?, ?)`,
-                [userId, userEmail, deviceId, deviceName, location, pairingCode, new Date(), shouldBePrimary ? 1 : 0, new Date()]
+                [userId, userEmail, deviceId, deviceName, location, pairingCode, new Date(), shouldBePrimary, new Date()]
             );
         }
 
@@ -2403,7 +2404,7 @@ app.post('/api/sensor-data', async (req, res) => {
                 asNumber(ec_value, 0),
                 pumpsJson,
                 active_tank ?? null,
-                normalizedIsOn ? 1 : 0,
+                normalizedIsOn,
                 parsedIncomingUptime,
                 safeTimestamp
             ]

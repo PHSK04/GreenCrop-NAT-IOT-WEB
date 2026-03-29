@@ -3,12 +3,33 @@ const bcrypt = require('bcrypt');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+
+function getRequiredDbConfig() {
+    return {
+        DB_HOST: process.env.DB_HOST || '',
+        DB_PORT: process.env.DB_PORT || '',
+        DB_USER: process.env.DB_USER || '',
+        DB_PASSWORD: process.env.DB_PASSWORD || '',
+        DB_NAME: process.env.DB_NAME || '',
+    };
+}
+
+function getMissingDbEnvKeys() {
+    return Object.entries(getRequiredDbConfig())
+        .filter(([, value]) => !String(value || '').trim())
+        .map(([key]) => key);
+}
+
+let lastConnectionError = null;
+let lastConnectionAttemptAt = null;
+
 function buildConfig(dbUser) {
     return {
         user: dbUser,
-        password: process.env.DB_PASSWORD || 'Password123!',
-        server: process.env.DB_HOST || 'localhost',
-        database: process.env.DB_NAME || 'SmartIoTDB',
+        password: process.env.DB_PASSWORD || (isProduction ? '' : 'Password123!'),
+        server: process.env.DB_HOST || (isProduction ? '' : 'localhost'),
+        database: process.env.DB_NAME || (isProduction ? '' : 'SmartIoTDB'),
         options: {
             encrypt: true, // Required for Azure SQL
             trustServerCertificate: true // Keep true to simplify cert chain on hosted envs
@@ -53,8 +74,16 @@ async function resetPool() {
 async function connectToDatabase() {
     try {
         if (!pool) {
-            const dbUser = process.env.DB_USER || 'sa';
-            const dbHost = process.env.DB_HOST || 'localhost';
+            lastConnectionAttemptAt = new Date().toISOString();
+            const missingEnvKeys = getMissingDbEnvKeys();
+            if (isProduction && missingEnvKeys.length > 0) {
+                lastConnectionError = `Missing DB env vars: ${missingEnvKeys.join(', ')}`;
+                console.error(`❌ Database configuration error: ${lastConnectionError}`);
+                return null;
+            }
+
+            const dbUser = process.env.DB_USER || (isProduction ? '' : 'sa');
+            const dbHost = process.env.DB_HOST || (isProduction ? '' : 'localhost');
             const candidateUsers = [dbUser];
 
             // Azure SQL often requires user@servername login format.
@@ -70,9 +99,11 @@ async function connectToDatabase() {
                 try {
                     pool = await sql.connect(buildConfig(candidateUser));
                     console.log(`✅ Connected to MSSQL Database as ${candidateUser}`);
+                    lastConnectionError = null;
                     break;
                 } catch (err) {
                     lastErr = err;
+                    lastConnectionError = err?.message || String(err);
                     console.warn(`⚠️ DB connect failed for user ${candidateUser}: ${err.message}`);
                 }
             }
@@ -84,6 +115,7 @@ async function connectToDatabase() {
         }
         return pool;
     } catch (err) {
+        lastConnectionError = err?.message || String(err);
         console.error('❌ Database Connection Failed! Make sure SQL Server is running.', err);
         // Keep API process alive; routes using DB will fail per-request until connection works.
         return null;
@@ -415,6 +447,10 @@ async function initDb() {
 async function executeQuery(sqlText, params = []) {
     if (!pool) await connectToDatabase();
     if (!pool) {
+        const missingEnvKeys = getMissingDbEnvKeys();
+        if (isProduction && missingEnvKeys.length > 0) {
+            throw new Error(`Database is unavailable. Missing DB env vars: ${missingEnvKeys.join(', ')}`);
+        }
         throw new Error('Database is unavailable. Please verify DB host/network/firewall settings.');
     }
 

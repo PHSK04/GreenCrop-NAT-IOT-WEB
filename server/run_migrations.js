@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const db = require('./database_mssql');
+const db = require('./database_postgres');
 
 async function run() {
   const migrationsDir = path.join(__dirname, 'migrations');

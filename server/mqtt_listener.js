@@ -1,5 +1,5 @@
 const mqtt = require('mqtt');
-const db = require('./database_mssql');
+const db = require('./database_postgres');
 
 const MQTT_BROKER = 'mqtt://broker.hivemq.com:1883'; // Standard TCP Port for Node.js backend
 // Support both legacy topic and tenant-based topics
@@ -73,8 +73,8 @@ function startMqttListener() {
                 );
 
                 const is_on = hasIsOn
-                    ? ((payload.isOn !== undefined ? payload.isOn : payload.is_on) ? 1 : 0)
-                    : (latest?.is_on ?? 0);
+                    ? Boolean(payload.isOn !== undefined ? payload.isOn : payload.is_on)
+                    : Boolean(latest?.is_on ?? false);
                 const uptime_seconds = hasUptime
                     ? Number(payload.uptime_seconds ?? payload.uptimeSeconds ?? 0)
                     : Number(latest?.uptime_seconds ?? 0);
@@ -82,7 +82,7 @@ function startMqttListener() {
                 await db.run(
                     `INSERT INTO sensor_data 
                     (tenant_id, device_id, sensor_id, msg_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE())`,
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
                     [finalTenant, payloadDeviceId, payloadSensorId, msgId, pressure, flow_rate, ec_value, pumpsJson, raw, active_tank, is_on, Number.isFinite(uptime_seconds) ? uptime_seconds : 0]
                 );
                 console.log(`[DB] Saved sensor data for tenant=${finalTenant} device=${payloadDeviceId} msg_id=${msgId || 'none'}`);
