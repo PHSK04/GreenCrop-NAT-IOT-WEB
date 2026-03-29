@@ -140,6 +140,9 @@ async function initDb() {
             timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_tenant_device_sensor_ts
+        ON sensor_data(tenant_id, device_id, sensor_id, timestamp);
+
         CREATE UNIQUE INDEX IF NOT EXISTS uq_sensor_data_msg_id
         ON sensor_data(tenant_id, msg_id)
         WHERE msg_id IS NOT NULL;
@@ -241,6 +244,13 @@ async function initDb() {
         );
         console.log('✅ Default admin account created');
     }
+
+    await pool.query(`
+        UPDATE users
+        SET auth_provider = 'local'
+        WHERE auth_provider IS NULL
+          AND password IS NOT NULL
+    `);
 }
 
 const ready = initDb().catch((err) => {
