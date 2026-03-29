@@ -73,21 +73,55 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
+        @keyframes ambientFloat {
+          0% { transform: translate3d(0, 0, 0) scale(1); }
+          50% { transform: translate3d(0, -18px, 0) scale(1.03); }
+          100% { transform: translate3d(0, 0, 0) scale(1); }
+        }
+
+        @keyframes glowDrift {
+          0% { transform: translate3d(-2%, 0, 0) scale(1); opacity: 0.72; }
+          50% { transform: translate3d(2%, 2%, 0) scale(1.08); opacity: 1; }
+          100% { transform: translate3d(-2%, 0, 0) scale(1); opacity: 0.72; }
+        }
+
+        @keyframes gridPan {
+          0% { transform: translate3d(0, 0, 0); }
+          100% { transform: translate3d(-28px, -28px, 0); }
+        }
+
         .panel-enter {
           animation: panelEnter 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
+        .ambient-float {
+          animation: ambientFloat 14s ease-in-out infinite;
+        }
+
+        .glow-drift {
+          animation: glowDrift 16s ease-in-out infinite;
+        }
+
+        .grid-pan {
+          animation: gridPan 18s linear infinite;
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .panel-enter {
+          .panel-enter,
+          .ambient-float,
+          .glow-drift,
+          .grid-pan {
             animation: none !important;
           }
         }
       `}</style>
 
       <div className="absolute inset-0 bg-[linear-gradient(180deg,#fcfdf8_0%,#f1f4ea_52%,#eef2e8_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_18%,rgba(187,247,208,0.48),transparent_28%),radial-gradient(circle_at_82%_12%,rgba(253,224,71,0.14),transparent_20%),radial-gradient(circle_at_82%_86%,rgba(196,181,253,0.10),transparent_18%)]" />
+      <div className="ambient-float absolute inset-0 bg-[radial-gradient(circle_at_16%_18%,rgba(187,247,208,0.48),transparent_28%),radial-gradient(circle_at_82%_12%,rgba(253,224,71,0.14),transparent_20%),radial-gradient(circle_at_82%_86%,rgba(196,181,253,0.10),transparent_18%)]" />
+      <div className="glow-drift absolute -left-[10%] top-[8%] h-[28rem] w-[28rem] rounded-full bg-emerald-200/25 blur-3xl" />
+      <div className="glow-drift absolute bottom-[-8%] right-[-6%] h-[24rem] w-[24rem] rounded-full bg-lime-100/30 blur-3xl [animation-delay:-8s]" />
       <div
-        className="absolute inset-0 opacity-[0.035]"
+        className="grid-pan absolute inset-0 opacity-[0.035]"
         style={{
           backgroundImage:
             "linear-gradient(rgba(15,23,42,0.65) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.65) 1px, transparent 1px)",
