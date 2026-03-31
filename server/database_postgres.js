@@ -214,7 +214,7 @@ async function initDb() {
             closed_at TIMESTAMPTZ
         );
 
-        CREATE UNIQUE INDEX IF NOT EXISTS uq_chat_threads_customer_user_id ON chat_threads(customer_user_id);
+        CREATE INDEX IF NOT EXISTS ix_chat_threads_customer_user_id ON chat_threads(customer_user_id, last_message_at DESC);
         CREATE INDEX IF NOT EXISTS ix_chat_threads_status ON chat_threads(status, is_archived, last_message_at DESC);
         CREATE INDEX IF NOT EXISTS ix_chat_threads_assigned_admin_id ON chat_threads(assigned_admin_id, last_message_at DESC);
 
@@ -253,6 +253,12 @@ async function initDb() {
         SET auth_provider = 'local'
         WHERE auth_provider IS NULL
           AND password IS NOT NULL
+    `);
+
+    await pool.query(`
+        DROP INDEX IF EXISTS uq_chat_threads_customer_user_id;
+        CREATE INDEX IF NOT EXISTS ix_chat_threads_customer_user_id
+        ON chat_threads(customer_user_id, last_message_at DESC);
     `);
 }
 
