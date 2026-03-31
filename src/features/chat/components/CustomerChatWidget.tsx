@@ -248,18 +248,13 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const loadChat = async (silently = false) => {
     if (!silently) setIsLoading(true);
     try {
-      const data = await chatService.getMyThread();
+      const data = await chatService.getMyThread({
+        startDate: historyStart || undefined,
+        endDate: historyEnd || undefined,
+      });
       setThread(data.thread);
       setUnreadCount(data.thread.customer_unread_count || 0);
-      if (historyStart || historyEnd) {
-        const filtered = await chatService.getThreadMessages(data.thread.id, {
-          startDate: historyStart || undefined,
-          endDate: historyEnd || undefined,
-        });
-        setMessages(filtered.messages);
-      } else {
-        setMessages(data.messages);
-      }
+      setMessages(data.messages);
       const typingState = await chatService.getTypingStatus(data.thread.id).catch(() => null);
       if (typingState) {
         setIsAdminTyping(Boolean(typingState.admin_typing));
