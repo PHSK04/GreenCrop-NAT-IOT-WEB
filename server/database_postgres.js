@@ -52,17 +52,9 @@ function normalizeSql(sqlText) {
     sql = sql.replace(/GETDATE\(\)/gi, 'CURRENT_TIMESTAMP');
     sql = sql.replace(/DATEDIFF\s*\(\s*HOUR\s*,\s*([^,]+?)\s*,\s*CURRENT_TIMESTAMP\s*\)/gi, "EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - $1)) / 3600");
 
-    sql = sql.replace(/SELECT\s+TOP\s+(\d+)\s+/gi, 'SELECT ');
-    if (/SELECT\s+/i.test(sql) && /TOP\s+\d+/i.test(sqlText)) {
-        const match = sqlText.match(/SELECT\s+TOP\s+(\d+)\s+/i);
-        if (match) {
-            sql = `${sql} LIMIT ${match[1]}`;
-        }
-    }
-
     if (/OUTER APPLY/i.test(sql)) {
         sql = sql.replace(
-            /OUTER APPLY\s*\(\s*SELECT TOP 1 sender_role, sender_name\s*FROM chat_messages\s*WHERE thread_id = t\.id\s*ORDER BY created_at DESC, id DESC\s*\)\s*lm/gi,
+            /OUTER APPLY\s*\(\s*SELECT(?:\s+TOP\s+1)?\s+sender_role,\s*sender_name\s*FROM chat_messages\s*WHERE thread_id = t\.id\s*ORDER BY created_at DESC,\s*id DESC\s*\)\s*lm/gi,
             `LEFT JOIN LATERAL (
                 SELECT sender_role, sender_name
                 FROM chat_messages
@@ -71,6 +63,14 @@ function normalizeSql(sqlText) {
                 LIMIT 1
             ) lm ON true`
         );
+    }
+
+    sql = sql.replace(/SELECT\s+TOP\s+(\d+)\s+/gi, 'SELECT ');
+    if (/SELECT\s+/i.test(sql) && /TOP\s+\d+/i.test(sqlText)) {
+        const match = sqlText.match(/SELECT\s+TOP\s+(\d+)\s+/i);
+        if (match) {
+            sql = `${sql} LIMIT ${match[1]}`;
+        }
     }
 
     return sql;
