@@ -77,6 +77,12 @@ const isMessageOnSelectedDate = (value: string | null | undefined, dateValue: st
   return toDateInputValue(new Date(value)) === dateValue;
 };
 
+const threadHasActivityOnSelectedDate = (thread: ChatThread, dateValue: string) =>
+  isMessageOnSelectedDate(
+    thread.last_message_at || thread.updated_at || thread.created_at,
+    dateValue,
+  );
+
 const compareThreads = (left: ChatThread, right: ChatThread) => {
   if (left.is_pinned !== right.is_pinned) return Number(right.is_pinned) - Number(left.is_pinned);
   const leftTime = new Date(left.last_message_at || left.updated_at || left.created_at || 0).getTime();
@@ -346,8 +352,14 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
         const results = await Promise.all(
           threads.map(async (thread) => {
             try {
+              if (threadHasActivityOnSelectedDate(thread, selectedInboxDate)) {
+                return thread.id;
+              }
+
+              const dateRange = toDateTimeRange(selectedInboxDate);
               const data = await chatService.getThreadMessages(thread.id, {
-                limit: 200,
+                ...dateRange,
+                limit: 1,
               });
               const hasMessagesOnSelectedDate = data.messages.some((message) =>
                 isMessageOnSelectedDate(message.created_at, selectedInboxDate),
