@@ -73,9 +73,12 @@ export function Register({ onSwitchToLogin }: RegisterProps) {
                 })
             });
 
-            if (!regRes.ok) throw new Error("Registration failed");
+            if (!regRes.ok) {
+                const errorData = await regRes.json().catch(() => ({}));
+                throw new Error(errorData.error || "Registration failed");
+            }
 
-            const result = await regRes.json();
+            await regRes.json();
             
             toast.success("Account Created!", { 
                 description: "You have successfully registered." 
@@ -88,7 +91,11 @@ export function Register({ onSwitchToLogin }: RegisterProps) {
 
         } catch (error: any) {
              console.error(error);
-             toast.error("Registration Error", { description: error.message || "Failed to create account" });
+             const message =
+                error?.message === "Failed to fetch" || String(error?.message || "").includes("NetworkError")
+                    ? "Cannot connect to server. Please check that the backend is running and VITE_API_URL is correct."
+                    : error?.message || "Failed to create account";
+             toast.error("Registration Error", { description: message });
         } finally {
             setIsLoading(false);
         }
