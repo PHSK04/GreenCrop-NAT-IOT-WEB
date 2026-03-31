@@ -1,5 +1,5 @@
 const mqtt = require('mqtt');
-const db = require('./database_postgres');
+const db = require('./database');
 
 const MQTT_BROKER = 'mqtt://broker.hivemq.com:1883'; // Standard TCP Port for Node.js backend
 // Support both legacy topic and tenant-based topics

@@ -24,6 +24,15 @@ function getMissingDbEnvKeys() {
 let lastConnectionError = null;
 let lastConnectionAttemptAt = null;
 
+function getStatus() {
+    return {
+        driver: 'mssql',
+        connected: Boolean(pool) && !lastConnectionError,
+        lastConnectionError,
+        lastConnectionAttemptAt,
+    };
+}
+
 function buildConfig(dbUser) {
     return {
         user: dbUser,
@@ -558,4 +567,4 @@ async function setSessionContext(tenantId) {
     }
 }
 
-module.exports = Object.assign({}, db, { setSessionContext });
+module.exports = Object.assign({}, db, { setSessionContext, getStatus });
