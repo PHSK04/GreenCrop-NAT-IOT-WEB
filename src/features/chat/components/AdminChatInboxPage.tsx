@@ -204,6 +204,11 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
     const matchingIds = new Set(matchingThreadIdsByDate);
     return threads.filter((thread) => matchingIds.has(thread.id));
   }, [matchingThreadIdsByDate, selectedInboxDate, threads]);
+  const hiddenUnreadThreadCount = useMemo(() => {
+    if (!selectedInboxDate || matchingThreadIdsByDate === null) return 0;
+    const visibleIds = new Set(matchingThreadIdsByDate);
+    return threads.filter((thread) => thread.admin_unread_count > 0 && !visibleIds.has(thread.id)).length;
+  }, [matchingThreadIdsByDate, selectedInboxDate, threads]);
 
   const selectedThread = useMemo(
     () => filteredThreadsByDay.find((thread) => thread.id === selectedThreadId) || null,
@@ -601,6 +606,18 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
               {!isLoading && !isInboxDateLoading && filteredThreadsByDay.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                   {isTH ? `ไม่พบแชทสำหรับ ${selectedDateLabel} · ${selectedFilterLabel}` : `No chat threads for ${selectedDateLabel} · ${selectedFilterLabel}`}
+                  {hiddenUnreadThreadCount > 0 && (
+                    <div className="mt-4 space-y-3">
+                      <div className="text-xs text-amber-600 dark:text-amber-400">
+                        {isTH
+                          ? `มี ${hiddenUnreadThreadCount} แชทยังไม่อ่าน แต่ถูกซ่อนอยู่เพราะตัวกรองวันที่`
+                          : `${hiddenUnreadThreadCount} unread thread(s) are hidden by the selected date filter.`}
+                      </div>
+                      <Button type="button" variant="outline" className="rounded-full" onClick={resetToAllThreads}>
+                        {isTH ? "แสดงทุกวัน" : "Show all dates"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
               {filteredThreadsByDay.map((thread) => (
