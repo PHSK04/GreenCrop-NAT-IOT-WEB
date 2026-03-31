@@ -204,6 +204,11 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
     const matchingIds = new Set(matchingThreadIdsByDate);
     return threads.filter((thread) => matchingIds.has(thread.id));
   }, [matchingThreadIdsByDate, selectedInboxDate, threads]);
+  const shouldFallbackToAllThreads = useMemo(
+    () => Boolean(selectedInboxDate) && filteredThreadsByDay.length === 0 && threads.length > 0,
+    [filteredThreadsByDay.length, selectedInboxDate, threads.length],
+  );
+  const displayedThreads = shouldFallbackToAllThreads ? threads : filteredThreadsByDay;
   const hiddenUnreadThreadCount = useMemo(() => {
     if (!selectedInboxDate || matchingThreadIdsByDate === null) return 0;
     const visibleIds = new Set(matchingThreadIdsByDate);
@@ -211,8 +216,8 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   }, [matchingThreadIdsByDate, selectedInboxDate, threads]);
 
   const selectedThread = useMemo(
-    () => filteredThreadsByDay.find((thread) => thread.id === selectedThreadId) || null,
-    [filteredThreadsByDay, selectedThreadId],
+    () => displayedThreads.find((thread) => thread.id === selectedThreadId) || null,
+    [displayedThreads, selectedThreadId],
   );
   const selectedDateLabel = useMemo(() => {
     if (!selectedInboxDate) return isTH ? "ทุกวัน" : "All dates";
@@ -397,10 +402,10 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
 
   useEffect(() => {
     setSelectedThreadId((current) => {
-      if (current && filteredThreadsByDay.some((thread) => thread.id === current)) return current;
-      return filteredThreadsByDay[0]?.id ?? null;
+      if (current && displayedThreads.some((thread) => thread.id === current)) return current;
+      return displayedThreads[0]?.id ?? null;
     });
-  }, [filteredThreadsByDay]);
+  }, [displayedThreads]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -567,6 +572,13 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">
               {isTH ? "กำลังดู:" : "Showing:"} <span className="font-semibold">{selectedDateLabel}</span> · <span className="font-semibold">{selectedFilterLabel}</span>
             </div>
+            {shouldFallbackToAllThreads && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
+                {isTH
+                  ? "ไม่พบรายการตรงกับวันที่ที่เลือก จึงแสดงทุกแชทชั่วคราวเพื่อไม่ให้ข้อความหาย"
+                  : "No threads matched the selected date, so all threads are shown temporarily to avoid hiding messages."}
+              </div>
+            )}
 
             <div className="space-y-2">
               <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
@@ -603,7 +615,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
               {(isLoading || isInboxDateLoading) && <div className="text-sm text-muted-foreground">{isTH ? "กำลังโหลด..." : "Loading..."}</div>}
-              {!isLoading && !isInboxDateLoading && filteredThreadsByDay.length === 0 && (
+              {!isLoading && !isInboxDateLoading && displayedThreads.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                   {isTH ? `ไม่พบแชทสำหรับ ${selectedDateLabel} · ${selectedFilterLabel}` : `No chat threads for ${selectedDateLabel} · ${selectedFilterLabel}`}
                   {hiddenUnreadThreadCount > 0 && (
@@ -620,7 +632,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                   )}
                 </div>
               )}
-              {filteredThreadsByDay.map((thread) => (
+              {displayedThreads.map((thread) => (
                 <button
                   key={thread.id}
                   type="button"
