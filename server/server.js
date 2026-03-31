@@ -1041,14 +1041,54 @@ async function ensureChatThreadForUser(user) {
         throw new Error('User id is required for chat');
     }
 
-    const existing = await db.get(
-        `SELECT TOP 1 *
-         FROM chat_threads
-         WHERE customer_user_id = ?
-         ORDER BY created_at DESC`,
-        [userId]
-    );
-    if (existing) return mapChatThread(existing);
+    const normalizedEmail = normalizeEmail(user?.email || '');
+    const normalizedName = String(user?.name || '').trim();
+    const normalizedPhone = String(user?.phone || '').trim() || null;
+
+    const existing = normalizedEmail
+        ? await db.get(
+            `SELECT TOP 1 *
+             FROM chat_threads
+             WHERE customer_user_id = ?
+                OR LOWER(customer_email) = ?
+             ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
+            [userId, normalizedEmail]
+        )
+        : await db.get(
+            `SELECT TOP 1 *
+             FROM chat_threads
+             WHERE customer_user_id = ?
+             ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
+            [userId]
+        );
+
+    if (existing) {
+        const nextName = normalizedName || existing.customer_name;
+        const nextEmail = normalizedEmail || existing.customer_email;
+        const nextPhone = normalizedPhone || existing.customer_phone || null;
+        const shouldRefreshIdentity =
+            String(existing.customer_user_id) !== String(userId) ||
+            String(existing.customer_name || '') !== String(nextName || '') ||
+            String(existing.customer_email || '').toLowerCase() !== String(nextEmail || '').toLowerCase() ||
+            String(existing.customer_phone || '') !== String(nextPhone || '');
+
+        if (shouldRefreshIdentity) {
+            await db.run(
+                `UPDATE chat_threads
+                 SET customer_user_id = ?,
+                     customer_name = ?,
+                     customer_email = ?,
+                     customer_phone = ?,
+                     updated_at = ?
+                 WHERE id = ?`,
+                [userId, nextName, nextEmail, nextPhone, new Date(), existing.id]
+            );
+            const refreshed = await db.get("SELECT * FROM chat_threads WHERE id = ?", [existing.id]);
+            return mapChatThread(refreshed);
+        }
+
+        return mapChatThread(existing);
+    }
 
     const dbUser = await db.get(
         "SELECT id, name, email, phone FROM users WHERE id = ?",
@@ -1073,6 +1113,42 @@ async function ensureChatThreadForUser(user) {
 
     const thread = await db.get("SELECT * FROM chat_threads WHERE id = ?", [created.id]);
     return mapChatThread(thread);
+}
+
+async function loadRelatedThreadsForUser(user, primaryThread = null) {
+    const userId = user?.id;
+    const normalizedEmail = normalizeEmail(user?.email || primaryThread?.customer_email || '');
+
+    const rows = normalizedEmail
+        ? await db.all(
+            `SELECT *
+             FROM chat_threads
+             WHERE customer_user_id = ?
+                OR LOWER(customer_email) = ?
+             ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
+            [userId, normalizedEmail]
+        )
+        : await db.all(
+            `SELECT *
+             FROM chat_threads
+             WHERE customer_user_id = ?
+             ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
+            [userId]
+        );
+
+    const seen = new Set();
+    const uniqueRows = rows.filter((row) => {
+        const key = Number(row?.id || 0);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+
+    if (primaryThread && !seen.has(Number(primaryThread.id))) {
+        uniqueRows.unshift(primaryThread);
+    }
+
+    return uniqueRows;
 }
 
 async function getChatThreadForRequest(threadId, req) {
@@ -1127,8 +1203,8 @@ async function appendChatMessage({ threadId, sender, body, messageType = 'text',
     return mapChatMessage(createdMessage);
 }
 
-async function loadChatThreadMessages(threadId, limit = 200, options = {}) {
-    const safeLimit = Math.max(1, Math.min(500, Number(limit) || 200));
+async function loadChatThreadMessages(threadId, limit = 500, options = {}) {
+    const safeLimit = Math.max(1, Math.min(500, Number(limit) || 500));
     const where = ['thread_id = ?'];
     const params = [threadId];
 
@@ -1142,13 +1218,44 @@ async function loadChatThreadMessages(threadId, limit = 200, options = {}) {
     }
 
     const rows = await db.all(
-        `SELECT TOP ${safeLimit} *
+        `SELECT *
          FROM chat_messages
          WHERE ${where.join(' AND ')}
-         ORDER BY created_at ASC, id ASC`,
+         ORDER BY created_at DESC, id DESC
+         LIMIT ${safeLimit}`,
         params
     );
-    return rows.map(mapChatMessage);
+    return rows.reverse().map(mapChatMessage);
+}
+
+async function loadChatMessagesForThreadIds(threadIds, limit = 500, options = {}) {
+    const uniqueThreadIds = Array.from(new Set((threadIds || []).map((id) => Number(id)).filter((id) => id > 0)));
+    if (uniqueThreadIds.length === 0) return [];
+
+    const safeLimit = Math.max(1, Math.min(1000, Number(limit) || 500));
+    const placeholders = uniqueThreadIds.map(() => '?').join(', ');
+    const where = [`thread_id IN (${placeholders})`];
+    const params = [...uniqueThreadIds];
+
+    if (options.startDate) {
+        where.push('created_at >= ?');
+        params.push(options.startDate);
+    }
+    if (options.endDate) {
+        where.push('created_at <= ?');
+        params.push(options.endDate);
+    }
+
+    const rows = await db.all(
+        `SELECT *
+         FROM chat_messages
+         WHERE ${where.join(' AND ')}
+         ORDER BY created_at DESC, id DESC
+         LIMIT ${safeLimit}`,
+        params
+    );
+
+    return rows.reverse().map(mapChatMessage);
 }
 
 // --- Chat APIs ---
@@ -1156,7 +1263,17 @@ app.get('/api/chat/thread/me', async (req, res) => {
     try {
         if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
         const thread = await ensureChatThreadForUser(req.user);
-        const messages = await loadChatThreadMessages(thread.id, req.query.limit);
+        const startDate = req.query.startDate ? new Date(String(req.query.startDate)) : null;
+        const endDate = req.query.endDate ? new Date(String(req.query.endDate)) : null;
+        const relatedThreads = await loadRelatedThreadsForUser(req.user, thread);
+        const messages = await loadChatMessagesForThreadIds(
+            relatedThreads.map((item) => item.id),
+            req.query.limit,
+            {
+                startDate: startDate && !Number.isNaN(startDate.getTime()) ? startDate : null,
+                endDate: endDate && !Number.isNaN(endDate.getTime()) ? endDate : null,
+            }
+        );
         res.json({ thread, messages });
     } catch (err) {
         res.status(500).json({ error: err.message || 'Failed to load chat thread' });
