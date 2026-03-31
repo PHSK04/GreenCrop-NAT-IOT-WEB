@@ -365,7 +365,7 @@ async function initDb() {
                     updated_at DATETIME DEFAULT GETDATE(),
                     closed_at DATETIME NULL
                 );
-                CREATE UNIQUE INDEX uq_chat_threads_customer_user_id ON chat_threads(customer_user_id);
+                CREATE INDEX ix_chat_threads_customer_user_id ON chat_threads(customer_user_id, last_message_at);
                 CREATE INDEX ix_chat_threads_status ON chat_threads(status, is_archived, last_message_at);
                 CREATE INDEX ix_chat_threads_assigned_admin_id ON chat_threads(assigned_admin_id, last_message_at);
             END
@@ -404,6 +404,23 @@ async function initDb() {
                 IF COL_LENGTH('chat_threads', 'closed_at') IS NULL
                     ALTER TABLE chat_threads ADD closed_at DATETIME NULL;
             END
+        `);
+        await pool.request().query(`
+            IF EXISTS (
+                SELECT 1
+                FROM sys.indexes
+                WHERE name = 'uq_chat_threads_customer_user_id'
+                  AND object_id = OBJECT_ID('chat_threads')
+            )
+                DROP INDEX uq_chat_threads_customer_user_id ON chat_threads;
+
+            IF NOT EXISTS (
+                SELECT 1
+                FROM sys.indexes
+                WHERE name = 'ix_chat_threads_customer_user_id'
+                  AND object_id = OBJECT_ID('chat_threads')
+            )
+                CREATE INDEX ix_chat_threads_customer_user_id ON chat_threads(customer_user_id, last_message_at);
         `);
         console.log('✅ Chat threads table ready');
 
