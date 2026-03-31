@@ -1045,12 +1045,14 @@ async function ensureChatThreadForUser(user) {
     const normalizedName = String(user?.name || '').trim();
     const normalizedPhone = String(user?.phone || '').trim() || null;
 
-    const existing = normalizedEmail
+    const activeExisting = normalizedEmail
         ? await db.get(
             `SELECT TOP 1 *
              FROM chat_threads
-             WHERE customer_user_id = ?
-                OR LOWER(customer_email) = ?
+             WHERE (customer_user_id = ?
+                OR LOWER(customer_email) = ?)
+               AND status <> 'closed'
+               AND is_archived = false
              ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
             [userId, normalizedEmail]
         )
@@ -1058,19 +1060,21 @@ async function ensureChatThreadForUser(user) {
             `SELECT TOP 1 *
              FROM chat_threads
              WHERE customer_user_id = ?
+               AND status <> 'closed'
+               AND is_archived = false
              ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
             [userId]
         );
 
-    if (existing) {
-        const nextName = normalizedName || existing.customer_name;
-        const nextEmail = normalizedEmail || existing.customer_email;
-        const nextPhone = normalizedPhone || existing.customer_phone || null;
+    if (activeExisting) {
+        const nextName = normalizedName || activeExisting.customer_name;
+        const nextEmail = normalizedEmail || activeExisting.customer_email;
+        const nextPhone = normalizedPhone || activeExisting.customer_phone || null;
         const shouldRefreshIdentity =
-            String(existing.customer_user_id) !== String(userId) ||
-            String(existing.customer_name || '') !== String(nextName || '') ||
-            String(existing.customer_email || '').toLowerCase() !== String(nextEmail || '').toLowerCase() ||
-            String(existing.customer_phone || '') !== String(nextPhone || '');
+            String(activeExisting.customer_user_id) !== String(userId) ||
+            String(activeExisting.customer_name || '') !== String(nextName || '') ||
+            String(activeExisting.customer_email || '').toLowerCase() !== String(nextEmail || '').toLowerCase() ||
+            String(activeExisting.customer_phone || '') !== String(nextPhone || '');
 
         if (shouldRefreshIdentity) {
             await db.run(
@@ -1081,13 +1085,13 @@ async function ensureChatThreadForUser(user) {
                      customer_phone = ?,
                      updated_at = ?
                  WHERE id = ?`,
-                [userId, nextName, nextEmail, nextPhone, new Date(), existing.id]
+                [userId, nextName, nextEmail, nextPhone, new Date(), activeExisting.id]
             );
-            const refreshed = await db.get("SELECT * FROM chat_threads WHERE id = ?", [existing.id]);
+            const refreshed = await db.get("SELECT * FROM chat_threads WHERE id = ?", [activeExisting.id]);
             return mapChatThread(refreshed);
         }
 
-        return mapChatThread(existing);
+        return mapChatThread(activeExisting);
     }
 
     const dbUser = await db.get(
