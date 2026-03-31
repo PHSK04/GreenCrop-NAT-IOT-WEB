@@ -137,7 +137,14 @@ app.post('/api/register', async (req, res) => {
             logAudit(name, 'REGISTER', 'Web', 'SUCCESS', 'New user registered');
             res.json(newUser);
         } catch (sqlErr) {
-            if (sqlErr.message.includes("UNIQUE constraint failed")) {
+            const message = String(sqlErr?.message || '');
+            if (
+                message.includes("UNIQUE constraint failed") ||
+                sqlErr?.code === '23505' ||
+                sqlErr?.constraint === 'users_email_key' ||
+                message.includes('duplicate key value') ||
+                message.includes('users_email_key')
+            ) {
                 return res.status(400).json({ error: "Email already exists" });
             }
             throw sqlErr;
