@@ -27,6 +27,25 @@ function safeText(v: unknown) {
   return String(v);
 }
 
+function presentText(v: unknown) {
+  const text = String(v ?? "").trim();
+  if (!text) return "-";
+  const normalized = text.toLowerCase();
+  if (normalized === "unknown" || normalized === "unknown os" || normalized === "unknown device") {
+    return "-";
+  }
+  return text;
+}
+
+function formatBrowserOs(browser?: unknown, os?: unknown) {
+  const browserText = presentText(browser);
+  const osText = presentText(os);
+  if (browserText === "-" && osText === "-") return "-";
+  if (browserText === "-") return osText;
+  if (osText === "-") return browserText;
+  return `${browserText} / ${osText}`;
+}
+
 function formatDate(v: unknown) {
   if (!v) return "-";
   const d = new Date(String(v));
@@ -366,6 +385,30 @@ export function DatabaseViewerPage({ language = "TH" }: DatabaseViewerPageProps)
   const baseUserEvents = useMemo(() => {
     if (!selectedUserDetails) return [];
     const events: UserEvent[] = [];
+    const sessionsWithTime = selectedUserDetails.sessions
+      .map((s) => ({
+        raw: s,
+        loginMs: s.login_time ? new Date(String(s.login_time)).getTime() : Number.NaN,
+        logoutMs: s.logout_time ? new Date(String(s.logout_time)).getTime() : Number.NaN,
+      }))
+      .filter((entry) => Number.isFinite(entry.loginMs) || Number.isFinite(entry.logoutMs));
+
+    const findNearestSession = (timeMs: number, mode: "login" | "logout") => {
+      let best: (typeof sessionsWithTime)[number] | null = null;
+      let bestDiff = Number.POSITIVE_INFINITY;
+
+      sessionsWithTime.forEach((entry) => {
+        const candidateMs = mode === "logout" ? entry.logoutMs : entry.loginMs;
+        if (!Number.isFinite(candidateMs)) return;
+        const diff = Math.abs(candidateMs - timeMs);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          best = entry;
+        }
+      });
+
+      return bestDiff <= 5 * 60 * 1000 ? best?.raw ?? null : null;
+    };
 
     selectedUserDetails.sessions.forEach((s) => {
       const loginRaw = s.login_time ? new Date(String(s.login_time)) : null;
@@ -380,9 +423,9 @@ export function DatabaseViewerPage({ language = "TH" }: DatabaseViewerPageProps)
           type: "LOGIN",
           title: String(s.status || "").toLowerCase() === "failed" ? "Login failed" : "Login",
           detail: `User login ${String(s.status || "").toLowerCase() === "failed" ? "failed" : "success"}`,
-          device: safeText(s.device_name),
-          browser: `${safeText(s.browser)} / ${safeText(s.os)}`,
-          ip: safeText(s.ip_address),
+          device: presentText(s.device_name),
+          browser: formatBrowserOs(s.browser, s.os),
+          ip: presentText(s.ip_address),
         });
       }
 
@@ -398,9 +441,9 @@ export function DatabaseViewerPage({ language = "TH" }: DatabaseViewerPageProps)
           type: "LOGOUT",
           title: "Logout",
           detail: "User logged out",
-          device: safeText(s.device_name),
-          browser: `${safeText(s.browser)} / ${safeText(s.os)}`,
-          ip: safeText(s.ip_address),
+          device: presentText(s.device_name),
+          browser: formatBrowserOs(s.browser, s.os),
+          ip: presentText(s.ip_address),
         });
       }
     });
@@ -415,6 +458,11 @@ export function DatabaseViewerPage({ language = "TH" }: DatabaseViewerPageProps)
       if (actionUpper.includes("LOGIN")) derivedType = "LOGIN";
       if (actionUpper.includes("LOGOUT")) derivedType = "LOGOUT";
       if (actionUpper.includes("SENSOR")) derivedType = "SENSOR";
+      const matchedSession = derivedType === "LOGOUT"
+        ? findNearestSession(raw.getTime(), "logout")
+        : derivedType === "LOGIN"
+          ? findNearestSession(raw.getTime(), "login")
+          : null;
       events.push({
         key: `audit-${a.id}`,
         timeMs: raw.getTime(),
@@ -425,7 +473,9 @@ export function DatabaseViewerPage({ language = "TH" }: DatabaseViewerPageProps)
         type: derivedType,
         title: action,
         detail: safeText(a.details),
-        device: safeText(a.device),
+        device: presentText(matchedSession?.device_name || a.device),
+        browser: formatBrowserOs(matchedSession?.browser, matchedSession?.os),
+        ip: presentText(matchedSession?.ip_address),
       });
     });
 
