@@ -112,8 +112,8 @@ const parseJson = async <T>(response: Response, fallback: string): Promise<T> =>
 };
 
 export const chatService = {
-  async getMyThread(): Promise<{ thread: ChatThread; messages: ChatMessage[] }> {
-    const response = await fetch(buildApiUrl("/chat/thread/me"), {
+  async getMyThread(query?: ChatMessageQuery): Promise<{ thread: ChatThread; messages: ChatMessage[] }> {
+    const response = await fetch(buildApiUrl(`/chat/thread/me${toQueryString(query)}`), {
       headers: getAuthHeaders(),
     });
     return parseJson(response, "Failed to load chat");
