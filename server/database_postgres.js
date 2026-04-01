@@ -231,6 +231,9 @@ async function initDb() {
             reply_to_message_id INTEGER,
             edited_at TIMESTAMPTZ,
             deleted_at TIMESTAMPTZ,
+            deleted_for_user_at TIMESTAMPTZ,
+            deleted_for_admin_at TIMESTAMPTZ,
+            deleted_for_everyone_at TIMESTAMPTZ,
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -259,6 +262,15 @@ async function initDb() {
         DROP INDEX IF EXISTS uq_chat_threads_customer_user_id;
         CREATE INDEX IF NOT EXISTS ix_chat_threads_customer_user_id
         ON chat_threads(customer_user_id, last_message_at DESC);
+    `);
+
+    await pool.query(`
+        ALTER TABLE chat_messages
+        ADD COLUMN IF NOT EXISTS deleted_for_user_at TIMESTAMPTZ;
+        ALTER TABLE chat_messages
+        ADD COLUMN IF NOT EXISTS deleted_for_admin_at TIMESTAMPTZ;
+        ALTER TABLE chat_messages
+        ADD COLUMN IF NOT EXISTS deleted_for_everyone_at TIMESTAMPTZ;
     `);
 }
 
