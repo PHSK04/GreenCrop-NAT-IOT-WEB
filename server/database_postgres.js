@@ -259,7 +259,24 @@ async function initDb() {
     `);
 
     await pool.query(`
-        DROP INDEX IF EXISTS uq_chat_threads_customer_user_id;
+        ALTER TABLE chat_threads
+        DROP CONSTRAINT IF EXISTS uq_chat_threads_customer_user_id;
+
+        DO $$
+        DECLARE idx RECORD;
+        BEGIN
+            FOR idx IN
+                SELECT indexname
+                FROM pg_indexes
+                WHERE schemaname = ANY (current_schemas(false))
+                  AND tablename = 'chat_threads'
+                  AND indexdef ILIKE '%UNIQUE%'
+                  AND indexdef ILIKE '%customer_user_id%'
+            LOOP
+                EXECUTE format('DROP INDEX IF EXISTS %I', idx.indexname);
+            END LOOP;
+        END $$;
+
         CREATE INDEX IF NOT EXISTS ix_chat_threads_customer_user_id
         ON chat_threads(customer_user_id, last_message_at DESC);
     `);
