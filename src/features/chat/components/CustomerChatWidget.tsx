@@ -466,8 +466,18 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
   const removeMessage = async (messageId: number) => {
     if (!thread) return;
-    const updated = await chatService.deleteMessage(messageId);
-    setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+    const deleteForEveryone = window.confirm(
+      isTH
+        ? "กดตกลงเพื่อลบสำหรับทุกคน\nกดยกเลิกเพื่อลบเฉพาะฝั่งคุณ"
+        : "Press OK to delete for everyone.\nPress Cancel to delete only for you.",
+    );
+    const scope = deleteForEveryone ? "everyone" : "self";
+    const updated = await chatService.deleteMessage(messageId, scope);
+    setMessages((current) =>
+      scope === "self"
+        ? current.filter((message) => message.id !== messageId)
+        : current.map((message) => (message.id === updated.id ? updated : message)),
+    );
   };
 
   const updateCaseStatus = async (nextStatus: ChatThread["status"]) => {
@@ -634,21 +644,22 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                     <span className="max-w-full truncate">{safeSenderLabel(message, isTH)}</span>
                     <span className="opacity-70">{formatMessageTime(message.created_at, locale)}</span>
                     {message.edited_at ? <span className="opacity-70">{isTH ? "แก้ไขแล้ว" : "edited"}</span> : null}
+                    {message.deleted_for_everyone_at ? <span className="opacity-70">{isTH ? "ลบแล้ว" : "deleted"}</span> : null}
                   </div>
                   <div className="whitespace-pre-wrap break-words text-[15px] leading-6 sm:text-sm">{message.body}</div>
                   <div className={`mt-2 flex items-center justify-end gap-1.5 text-[11px] ${isOwn ? "text-emerald-100" : "text-slate-400"}`}>
                     {isOwn && (
                       <>
                         {isMessageReadByAdmin ? <span className="mr-1 opacity-90">{isTH ? "อ่านแล้ว" : "Read"}</span> : null}
-                        <button type="button" onClick={() => setReplyTo(message)} className="rounded-full p-1.5 hover:bg-white/10">
+                        {!message.deleted_for_everyone_at ? <button type="button" onClick={() => setReplyTo(message)} className="rounded-full p-1.5 hover:bg-white/10">
                           <Reply className="h-3.5 w-3.5" />
-                        </button>
-                        <button type="button" onClick={() => startEdit(message)} className="rounded-full p-1.5 hover:bg-white/10">
+                        </button> : null}
+                        {!message.deleted_for_everyone_at ? <button type="button" onClick={() => startEdit(message)} className="rounded-full p-1.5 hover:bg-white/10">
                           <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button type="button" onClick={() => removeMessage(message.id)} className="rounded-full p-1.5 hover:bg-white/10">
+                        </button> : null}
+                        {!message.deleted_for_everyone_at ? <button type="button" onClick={() => removeMessage(message.id)} className="rounded-full p-1.5 hover:bg-white/10">
                           <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        </button> : null}
                       </>
                     )}
                   </div>
