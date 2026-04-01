@@ -17,6 +17,14 @@ import {
 } from "lucide-react";
 import supportIcon from "@/assets/images/icon_support.png";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -203,6 +211,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const [isSending, setIsSending] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [messagePendingDelete, setMessagePendingDelete] = useState<ChatMessage | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isHistoryFilterOpen, setIsHistoryFilterOpen] = useState(false);
   const [isAdminTyping, setIsAdminTyping] = useState(false);
@@ -464,20 +473,15 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     setReplyTo(null);
   };
 
-  const removeMessage = async (messageId: number) => {
+  const removeMessage = async (messageId: number, scope: "self" | "everyone") => {
     if (!thread) return;
-    const deleteForEveryone = window.confirm(
-      isTH
-        ? "กดตกลงเพื่อลบสำหรับทุกคน\nกดยกเลิกเพื่อลบเฉพาะฝั่งคุณ"
-        : "Press OK to delete for everyone.\nPress Cancel to delete only for you.",
-    );
-    const scope = deleteForEveryone ? "everyone" : "self";
     const updated = await chatService.deleteMessage(messageId, scope);
     setMessages((current) =>
       scope === "self"
         ? current.filter((message) => message.id !== messageId)
         : current.map((message) => (message.id === updated.id ? updated : message)),
     );
+    setMessagePendingDelete(null);
   };
 
   const updateCaseStatus = async (nextStatus: ChatThread["status"]) => {
@@ -657,7 +661,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                         {!message.deleted_for_everyone_at ? <button type="button" onClick={() => startEdit(message)} className="rounded-full p-1.5 hover:bg-white/10">
                           <Pencil className="h-3.5 w-3.5" />
                         </button> : null}
-                        {!message.deleted_for_everyone_at ? <button type="button" onClick={() => removeMessage(message.id)} className="rounded-full p-1.5 hover:bg-white/10">
+                        {!message.deleted_for_everyone_at ? <button type="button" onClick={() => setMessagePendingDelete(message)} className="rounded-full p-1.5 hover:bg-white/10">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button> : null}
                       </>
@@ -898,6 +902,49 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
           {mode === "assistant" ? assistantView : humanView}
         </div>
       )}
+
+      <Dialog open={Boolean(messagePendingDelete)} onOpenChange={(open) => !open && setMessagePendingDelete(null)}>
+        <DialogContent className="border-slate-200 bg-white text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+          <DialogHeader>
+            <DialogTitle>{isTH ? "เลือกวิธีลบข้อความ" : "Choose how to delete this message"}</DialogTitle>
+            <DialogDescription>
+              {isTH
+                ? "คุณสามารถลบเฉพาะฝั่งตัวเอง หรือถอนข้อความสำหรับทุกคนได้เหมือนแชตทั่วไป"
+                : "You can remove the message only from your side or delete it for everyone."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
+            {messagePendingDelete?.body || (isTH ? "ไม่มีข้อความ" : "No message")}
+          </div>
+          <DialogFooter className="sm:justify-between">
+            <Button
+              type="button"
+              variant="ghost"
+              className="rounded-2xl"
+              onClick={() => setMessagePendingDelete(null)}
+            >
+              {isTH ? "ยกเลิก" : "Cancel"}
+            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-2xl"
+                onClick={() => messagePendingDelete && removeMessage(messagePendingDelete.id, "self").catch(() => {})}
+              >
+                {isTH ? "ลบเฉพาะฉัน" : "Delete for me"}
+              </Button>
+              <Button
+                type="button"
+                className="rounded-2xl bg-rose-600 hover:bg-rose-700"
+                onClick={() => messagePendingDelete && removeMessage(messagePendingDelete.id, "everyone").catch(() => {})}
+              >
+                {isTH ? "ลบสำหรับทุกคน" : "Delete for everyone"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {!isOpen && (
         <button
