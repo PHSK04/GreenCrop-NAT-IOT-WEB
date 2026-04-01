@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, FileText, MessageSquare, Pin, RefreshCw, Search, Send, ShieldAlert, UserCheck } from "lucide-react";
+import { Download, FileText, MessageSquare, Pin, RefreshCw, Search, Send, ShieldAlert, Trash2, UserCheck, UserRoundX } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -469,6 +469,21 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
     setThreads((current) => current.map((thread) => (thread.id === updated.id ? updated : thread)));
   };
 
+  const removeMessage = async (messageId: number) => {
+    const deleteForEveryone = window.confirm(
+      isTH
+        ? "กดตกลงเพื่อลบสำหรับทุกคน\nกดยกเลิกเพื่อลบเฉพาะฝั่งแอดมิน"
+        : "Press OK to delete for everyone.\nPress Cancel to delete only for admin.",
+    );
+    const scope = deleteForEveryone ? "everyone" : "self";
+    const updated = await chatService.deleteMessage(messageId, scope);
+    setMessages((current) =>
+      scope === "self"
+        ? current.filter((message) => message.id !== messageId)
+        : current.map((message) => (message.id === updated.id ? updated : message)),
+    );
+  };
+
   const resetToAllThreads = () => {
     setSelectedInboxDate("");
     setFilter("all");
@@ -790,8 +805,35 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                             <div className={`mb-1 flex items-center gap-2 text-[11px] ${isAdminMessage ? "text-emerald-100" : "text-slate-500 dark:text-slate-400"}`}>
                               <span>{safeSenderLabel(message, isTH)}</span>
                               <span className="opacity-70">{formatMessageTime(message.created_at, locale)}</span>
+                              {message.deleted_for_everyone_at ? (
+                                <span className="opacity-70">{isTH ? "ลบแล้ว" : "deleted"}</span>
+                              ) : null}
                             </div>
                             <div className="whitespace-pre-wrap text-sm leading-6">{message.body}</div>
+                            <div className={`mt-2 flex items-center justify-end gap-1.5 text-[11px] ${isAdminMessage ? "text-emerald-100" : "text-slate-400"}`}>
+                              {!message.deleted_for_everyone_at ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => chatService.deleteMessage(message.id, "self").then(() => {
+                                      setMessages((current) => current.filter((item) => item.id !== message.id));
+                                    }).catch(() => {})}
+                                    className={`rounded-full p-1.5 ${isAdminMessage ? "hover:bg-white/10" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+                                    title={isTH ? "ลบเฉพาะฝั่งแอดมิน" : "Delete for admin"}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeMessage(message.id).catch(() => {})}
+                                    className={`rounded-full p-1.5 ${isAdminMessage ? "hover:bg-white/10" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+                                    title={isTH ? "ลบสำหรับทุกคน" : "Delete for everyone"}
+                                  >
+                                    <UserRoundX className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       </div>
