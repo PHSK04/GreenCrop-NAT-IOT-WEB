@@ -80,17 +80,6 @@ const toDateTimeRange = (dateValue: string) => ({
   endDate: `${dateValue}T23:59`,
 });
 
-const isMessageOnSelectedDate = (value: string | null | undefined, dateValue: string) => {
-  if (!value || !dateValue) return false;
-  return toDateInputValue(new Date(value)) === dateValue;
-};
-
-const threadHasActivityOnSelectedDate = (thread: ChatThread, dateValue: string) =>
-  isMessageOnSelectedDate(
-    thread.last_message_at || thread.updated_at || thread.created_at,
-    dateValue,
-  );
-
 const compareThreads = (left: ChatThread, right: ChatThread) => {
   if (left.is_pinned !== right.is_pinned) return Number(right.is_pinned) - Number(left.is_pinned);
   const leftTime = new Date(left.last_message_at || left.updated_at || left.created_at || 0).getTime();
@@ -177,8 +166,6 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const [draft, setDraft] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "mine" | "archive">("all");
   const [selectedInboxDate, setSelectedInboxDate] = useState("");
-  const [matchingThreadIdsByDate, setMatchingThreadIdsByDate] = useState<number[] | null>(null);
-  const [isInboxDateLoading, setIsInboxDateLoading] = useState(false);
   const [historyStart, setHistoryStart] = useState("");
   const [historyEnd, setHistoryEnd] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -188,7 +175,6 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const [error, setError] = useState("");
   const [messagePendingDelete, setMessagePendingDelete] = useState<ChatMessage | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const dateFilterCacheRef = useRef<Record<string, number[]>>({});
   const shouldStickToBottomRef = useRef(true);
   const previousMessageCountRef = useRef(0);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -207,22 +193,8 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
     node.scrollTo({ top: node.scrollHeight, behavior });
   };
 
-  const filteredThreadsByDay = useMemo(() => {
-    if (!selectedInboxDate) return threads;
-    if (matchingThreadIdsByDate === null) return [];
-    const matchingIds = new Set(matchingThreadIdsByDate);
-    return threads.filter((thread) => matchingIds.has(thread.id));
-  }, [matchingThreadIdsByDate, selectedInboxDate, threads]);
-  const shouldFallbackToAllThreads = useMemo(
-    () => Boolean(selectedInboxDate) && filteredThreadsByDay.length === 0 && threads.length > 0,
-    [filteredThreadsByDay.length, selectedInboxDate, threads.length],
-  );
-  const displayedThreads = shouldFallbackToAllThreads ? threads : filteredThreadsByDay;
-  const hiddenUnreadThreadCount = useMemo(() => {
-    if (!selectedInboxDate || matchingThreadIdsByDate === null) return 0;
-    const visibleIds = new Set(matchingThreadIdsByDate);
-    return threads.filter((thread) => thread.admin_unread_count > 0 && !visibleIds.has(thread.id)).length;
-  }, [matchingThreadIdsByDate, selectedInboxDate, threads]);
+  const displayedThreads = threads;
+  const hiddenUnreadThreadCount = 0;
 
   const selectedThread = useMemo(
     () => displayedThreads.find((thread) => thread.id === selectedThreadId) || null,
@@ -242,6 +214,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const loadThreads = async (silently = false) => {
     if (!silently) setIsLoading(true);
     try {
+      const inboxDateRange = selectedInboxDate ? toDateTimeRange(selectedInboxDate) : {};
       const nextThreads = await (
         filter === "all"
           ? (() => {
@@ -249,10 +222,12 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                 chatService.listThreads({
                   q: query || undefined,
                   archived: false,
+                  ...inboxDateRange,
                 }),
                 chatService.listThreads({
                   q: query || undefined,
                   archived: true,
+                  ...inboxDateRange,
                 }),
               ]).then(([activeThreads, archivedThreads]) => {
                 const mergedThreads = [...activeThreads, ...archivedThreads];
@@ -265,6 +240,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
               mine: filter === "mine",
               unread: filter === "unread",
               archived: filter === "archive",
+              ...inboxDateRange,
             })
       );
       setThreads(nextThreads);
@@ -345,69 +321,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
 
   useEffect(() => {
     loadThreads(true).catch(() => {});
-  }, [query, filter]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadThreadsForSelectedDate = async () => {
-      if (!selectedInboxDate) {
-        setMatchingThreadIdsByDate(threads.map((thread) => thread.id));
-        setIsInboxDateLoading(false);
-        return;
-      }
-
-      const cacheKey = `${selectedInboxDate}:${threads
-        .map((thread) => `${thread.id}-${thread.last_message_at || thread.updated_at || thread.created_at || ""}`)
-        .join("|")}`;
-      const cachedThreadIds = dateFilterCacheRef.current[cacheKey];
-
-      if (cachedThreadIds) {
-        setMatchingThreadIdsByDate(cachedThreadIds);
-      }
-
-      setIsInboxDateLoading(!cachedThreadIds);
-      try {
-        const results = await Promise.all(
-          threads.map(async (thread) => {
-            try {
-              if (threadHasActivityOnSelectedDate(thread, selectedInboxDate)) {
-                return thread.id;
-              }
-
-              const dateRange = toDateTimeRange(selectedInboxDate);
-              const data = await chatService.getThreadMessages(thread.id, {
-                ...dateRange,
-                limit: 1,
-              });
-              const hasMessagesOnSelectedDate = data.messages.some((message) =>
-                isMessageOnSelectedDate(message.created_at, selectedInboxDate),
-              );
-              return hasMessagesOnSelectedDate ? thread.id : null;
-            } catch {
-              return null;
-            }
-          }),
-        );
-
-        if (!cancelled) {
-          const nextMatchingIds = results.filter((id): id is number => id !== null);
-          dateFilterCacheRef.current[cacheKey] = nextMatchingIds;
-          setMatchingThreadIdsByDate(nextMatchingIds);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsInboxDateLoading(false);
-        }
-      }
-    };
-
-    loadThreadsForSelectedDate().catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedInboxDate, threads]);
+  }, [query, filter, selectedInboxDate]);
 
   useEffect(() => {
     setSelectedThreadId((current) => {
@@ -591,14 +505,6 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">
               {isTH ? "กำลังดู:" : "Showing:"} <span className="font-semibold">{selectedDateLabel}</span> · <span className="font-semibold">{selectedFilterLabel}</span>
             </div>
-            {shouldFallbackToAllThreads && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
-                {isTH
-                  ? "ไม่พบรายการตรงกับวันที่ที่เลือก จึงแสดงทุกแชทชั่วคราวเพื่อไม่ให้ข้อความหาย"
-                  : "No threads matched the selected date, so all threads are shown temporarily to avoid hiding messages."}
-              </div>
-            )}
-
             <div className="space-y-2">
               <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                 {isTH ? "รายการแชท" : "Chat scope"}
@@ -633,8 +539,8 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
             </div>
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-              {(isLoading || isInboxDateLoading) && <div className="text-sm text-muted-foreground">{isTH ? "กำลังโหลด..." : "Loading..."}</div>}
-              {!isLoading && !isInboxDateLoading && displayedThreads.length === 0 && (
+              {isLoading && <div className="text-sm text-muted-foreground">{isTH ? "กำลังโหลด..." : "Loading..."}</div>}
+              {!isLoading && displayedThreads.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                   {isTH ? `ไม่พบแชทสำหรับ ${selectedDateLabel} · ${selectedFilterLabel}` : `No chat threads for ${selectedDateLabel} · ${selectedFilterLabel}`}
                   {hiddenUnreadThreadCount > 0 && (
@@ -670,9 +576,13 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                   </div>
                   <div className="mt-2 line-clamp-2 text-sm text-muted-foreground">{formatThreadPreview(thread, isTH)}</div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+                    <Badge variant="outline">#{thread.id}</Badge>
                     <Badge variant="outline">{thread.status}</Badge>
                     <Badge variant="outline">{thread.priority}</Badge>
                     {thread.assigned_admin_name && <Badge variant="outline">{thread.assigned_admin_name}</Badge>}
+                    <span className="text-muted-foreground">
+                      {isTH ? "เปิดเคส" : "Opened"} {formatTime(thread.created_at)}
+                    </span>
                     <span className="ml-auto text-muted-foreground">{formatTime(thread.last_message_at)}</span>
                   </div>
                 </button>
