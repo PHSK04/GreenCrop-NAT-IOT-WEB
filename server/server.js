@@ -1057,12 +1057,11 @@ async function ensureChatThreadForUser(user) {
         ? await db.get(
             `SELECT TOP 1 *
              FROM chat_threads
-             WHERE (customer_user_id = ?
-                OR LOWER(customer_email) = ?)
+             WHERE LOWER(customer_email) = ?
                AND status <> 'closed'
                AND is_archived = false
              ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
-            [userId, normalizedEmail]
+            [normalizedEmail]
         )
         : await db.get(
             `SELECT TOP 1 *
@@ -1135,18 +1134,46 @@ async function loadRelatedThreadsForUser(user, primaryThread = null) {
         ? await db.all(
             `SELECT *
              FROM chat_threads
-             WHERE customer_user_id = ?
-                OR LOWER(customer_email) = ?
+             WHERE LOWER(customer_email) = ?
              ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
-            [userId, normalizedEmail]
+            [normalizedEmail]
         )
         : await db.all(
             `SELECT *
-             FROM chat_threads
-             WHERE customer_user_id = ?
+            FROM chat_threads
+            WHERE customer_user_id = ?
              ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
             [userId]
         );
+
+    const seen = new Set();
+    const uniqueRows = rows.filter((row) => {
+        const key = Number(row?.id || 0);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+
+    if (primaryThread && !seen.has(Number(primaryThread.id))) {
+        uniqueRows.unshift(primaryThread);
+    }
+
+    return uniqueRows;
+}
+
+async function loadRelatedThreadsForAdmin(primaryThread = null) {
+    const normalizedEmail = normalizeEmail(primaryThread?.customer_email || '');
+    if (!normalizedEmail) {
+        return primaryThread ? [primaryThread] : [];
+    }
+
+    const rows = await db.all(
+        `SELECT *
+         FROM chat_threads
+         WHERE LOWER(customer_email) = ?
+         ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
+        [normalizedEmail]
+    );
 
     const seen = new Set();
     const uniqueRows = rows.filter((row) => {
@@ -1168,10 +1195,11 @@ async function getChatThreadForRequest(threadId, req) {
     if (!thread) return null;
     const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
     if (isAdmin) return thread;
-    if (String(thread.customer_user_id) !== String(req.user?.id || '')) {
-        return null;
+    const normalizedEmail = normalizeEmail(req.user?.email || '');
+    if (normalizedEmail) {
+        return normalizeEmail(thread.customer_email || '') === normalizedEmail ? thread : null;
     }
-    return thread;
+    return String(thread.customer_user_id) === String(req.user?.id || '') ? thread : null;
 }
 
 async function appendChatMessage({ threadId, sender, body, messageType = 'text', replyToMessageId = null, attachmentName = null, attachmentUrl = null }) {
@@ -1356,8 +1384,14 @@ app.get('/api/chat/threads', async (req, res) => {
                 params.push(`%${q}%`, `%${q}%`, `%${q}%`);
             }
         } else {
-            where.push('t.customer_user_id = ?');
-            params.push(req.user.id);
+            const normalizedEmail = normalizeEmail(req.user?.email || '');
+            if (normalizedEmail) {
+                where.push('LOWER(t.customer_email) = ?');
+                params.push(normalizedEmail);
+            } else {
+                where.push('t.customer_user_id = ?');
+                params.push(req.user.id);
+            }
         }
 
         const sql = `
@@ -1391,11 +1425,23 @@ app.get('/api/chat/threads/:threadId/messages', async (req, res) => {
 
         const startDate = req.query.startDate ? new Date(String(req.query.startDate)) : null;
         const endDate = req.query.endDate ? new Date(String(req.query.endDate)) : null;
-
-        const messages = await loadChatThreadMessages(threadId, getChatViewerRole(req), req.query.limit, {
-            startDate: startDate && !Number.isNaN(startDate.getTime()) ? startDate : null,
-            endDate: endDate && !Number.isNaN(endDate.getTime()) ? endDate : null,
-        });
+        const viewerRole = getChatViewerRole(req);
+        const includeRelated = viewerRole === 'admin' && String(req.query.includeRelated || '').toLowerCase() === 'true';
+        const relatedThreads = includeRelated ? await loadRelatedThreadsForAdmin(thread) : [thread];
+        const messages = includeRelated
+            ? await loadChatMessagesForThreadIds(
+                relatedThreads.map((item) => item.id),
+                viewerRole,
+                req.query.limit,
+                {
+                    startDate: startDate && !Number.isNaN(startDate.getTime()) ? startDate : null,
+                    endDate: endDate && !Number.isNaN(endDate.getTime()) ? endDate : null,
+                }
+            )
+            : await loadChatThreadMessages(threadId, viewerRole, req.query.limit, {
+                startDate: startDate && !Number.isNaN(startDate.getTime()) ? startDate : null,
+                endDate: endDate && !Number.isNaN(endDate.getTime()) ? endDate : null,
+            });
         if (startDate || endDate) {
             const actorName = String(req.user?.role || '').toLowerCase() === 'admin' ? 'Admin nat' : (req.user?.name || 'Customer');
             const rangeStart = startDate && !Number.isNaN(startDate.getTime()) ? startDate.toISOString().slice(0, 16).replace('T', ' ') : 'start';
