@@ -1314,6 +1314,8 @@ app.get('/api/chat/threads', async (req, res) => {
         const archived = String(req.query.archived || '').toLowerCase() === 'true';
         const q = String(req.query.q || '').trim();
         const status = req.query.status ? normalizeChatStatus(req.query.status) : '';
+        const startDate = normalizeDateTime(req.query.startDate);
+        const endDate = normalizeDateTime(req.query.endDate, true);
 
         const where = [];
         const params = [];
@@ -1331,6 +1333,23 @@ app.get('/api/chat/threads', async (req, res) => {
             if (status) {
                 where.push('t.status = ?');
                 params.push(status);
+            }
+            if (startDate || endDate) {
+                const dateWhere = [];
+                if (startDate) {
+                    dateWhere.push('m.created_at >= ?');
+                    params.push(startDate);
+                }
+                if (endDate) {
+                    dateWhere.push('m.created_at <= ?');
+                    params.push(endDate);
+                }
+                where.push(`EXISTS (
+                    SELECT 1
+                    FROM chat_messages m
+                    WHERE m.thread_id = t.id
+                      AND ${dateWhere.join(' AND ')}
+                )`);
             }
             if (q) {
                 where.push('(t.customer_name LIKE ? OR t.customer_email LIKE ? OR t.last_message_preview LIKE ?)');
