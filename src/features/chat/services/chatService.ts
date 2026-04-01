@@ -65,6 +65,8 @@ type ChatThreadListQuery = {
   archived?: boolean;
   q?: string;
   status?: ChatStatus;
+  startDate?: string;
+  endDate?: string;
 };
 
 type ChatMessageQuery = {
