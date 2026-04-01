@@ -459,6 +459,12 @@ async function initDb() {
                     ALTER TABLE chat_messages ADD edited_at DATETIME NULL;
                 IF COL_LENGTH('chat_messages', 'deleted_at') IS NULL
                     ALTER TABLE chat_messages ADD deleted_at DATETIME NULL;
+                IF COL_LENGTH('chat_messages', 'deleted_for_user_at') IS NULL
+                    ALTER TABLE chat_messages ADD deleted_for_user_at DATETIME NULL;
+                IF COL_LENGTH('chat_messages', 'deleted_for_admin_at') IS NULL
+                    ALTER TABLE chat_messages ADD deleted_for_admin_at DATETIME NULL;
+                IF COL_LENGTH('chat_messages', 'deleted_for_everyone_at') IS NULL
+                    ALTER TABLE chat_messages ADD deleted_for_everyone_at DATETIME NULL;
             END
         `);
         console.log('✅ Chat messages table ready');
