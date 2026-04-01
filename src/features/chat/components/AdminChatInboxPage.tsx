@@ -258,6 +258,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
       const data = await chatService.getThreadMessages(threadId, {
         startDate: historyStart || undefined,
         endDate: historyEnd || undefined,
+        includeRelated: true,
       });
       setMessages(data.messages);
       setThreads((current) =>
