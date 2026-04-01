@@ -41,6 +41,9 @@ export interface ChatMessage {
   reply_to_message_id?: number | null;
   edited_at?: string | null;
   deleted_at?: string | null;
+  deleted_for_user_at?: string | null;
+  deleted_for_admin_at?: string | null;
+  deleted_for_everyone_at?: string | null;
   created_at: string;
 }
 
@@ -193,10 +196,11 @@ export const chatService = {
     return data.message;
   },
 
-  async deleteMessage(messageId: number): Promise<ChatMessage> {
+  async deleteMessage(messageId: number, scope: "self" | "everyone" = "self"): Promise<ChatMessage> {
     const response = await fetch(buildApiUrl(`/chat/messages/${messageId}/delete`), {
       method: "POST",
       headers: getAuthHeaders(),
+      body: JSON.stringify({ scope }),
     });
     const data = await parseJson<{ message: ChatMessage }>(response, "Failed to delete message");
     return data.message;
