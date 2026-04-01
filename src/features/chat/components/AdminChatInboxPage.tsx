@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, FileText, MessageSquare, Pin, RefreshCw, Search, Send, ShieldAlert, Trash2, UserCheck, UserRoundX } from "lucide-react";
+import { Download, FileText, MessageSquare, Pin, RefreshCw, Search, Send, ShieldAlert, Trash2, UserCheck } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { chatService, ChatMessage, ChatThread } from "@/features/chat/services/chatService";
 import { authService, AdminDbUserRow } from "@/features/auth/services/authService";
@@ -178,6 +186,7 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
   const [isCustomerTyping, setIsCustomerTyping] = useState(false);
   const [typingCustomerName, setTypingCustomerName] = useState("");
   const [error, setError] = useState("");
+  const [messagePendingDelete, setMessagePendingDelete] = useState<ChatMessage | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const dateFilterCacheRef = useRef<Record<string, number[]>>({});
   const shouldStickToBottomRef = useRef(true);
@@ -469,19 +478,14 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
     setThreads((current) => current.map((thread) => (thread.id === updated.id ? updated : thread)));
   };
 
-  const removeMessage = async (messageId: number) => {
-    const deleteForEveryone = window.confirm(
-      isTH
-        ? "กดตกลงเพื่อลบสำหรับทุกคน\nกดยกเลิกเพื่อลบเฉพาะฝั่งแอดมิน"
-        : "Press OK to delete for everyone.\nPress Cancel to delete only for admin.",
-    );
-    const scope = deleteForEveryone ? "everyone" : "self";
+  const removeMessage = async (messageId: number, scope: "self" | "everyone") => {
     const updated = await chatService.deleteMessage(messageId, scope);
     setMessages((current) =>
       scope === "self"
         ? current.filter((message) => message.id !== messageId)
         : current.map((message) => (message.id === updated.id ? updated : message)),
     );
+    setMessagePendingDelete(null);
   };
 
   const resetToAllThreads = () => {
@@ -815,21 +819,11 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => chatService.deleteMessage(message.id, "self").then(() => {
-                                      setMessages((current) => current.filter((item) => item.id !== message.id));
-                                    }).catch(() => {})}
+                                    onClick={() => setMessagePendingDelete(message)}
                                     className={`rounded-full p-1.5 ${isAdminMessage ? "hover:bg-white/10" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`}
-                                    title={isTH ? "ลบเฉพาะฝั่งแอดมิน" : "Delete for admin"}
+                                    title={isTH ? "เลือกวิธีลบข้อความ" : "Choose delete options"}
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeMessage(message.id).catch(() => {})}
-                                    className={`rounded-full p-1.5 ${isAdminMessage ? "hover:bg-white/10" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`}
-                                    title={isTH ? "ลบสำหรับทุกคน" : "Delete for everyone"}
-                                  >
-                                    <UserRoundX className="h-3.5 w-3.5" />
                                   </button>
                                 </>
                               ) : null}
@@ -898,6 +892,49 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={Boolean(messagePendingDelete)} onOpenChange={(open) => !open && setMessagePendingDelete(null)}>
+        <DialogContent className="border-slate-200 bg-white text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+          <DialogHeader>
+            <DialogTitle>{isTH ? "เลือกวิธีลบข้อความ" : "Choose how to delete this message"}</DialogTitle>
+            <DialogDescription>
+              {isTH
+                ? "เลือกลบเฉพาะฝั่งแอดมิน หรือถอนข้อความออกจากทั้งสองฝั่งได้จากหน้าต่างนี้"
+                : "Choose whether to remove this message only for admins or for everyone."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
+            {messagePendingDelete?.body || (isTH ? "ไม่มีข้อความ" : "No message")}
+          </div>
+          <DialogFooter className="sm:justify-between">
+            <Button
+              type="button"
+              variant="ghost"
+              className="rounded-2xl"
+              onClick={() => setMessagePendingDelete(null)}
+            >
+              {isTH ? "ยกเลิก" : "Cancel"}
+            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-2xl"
+                onClick={() => messagePendingDelete && removeMessage(messagePendingDelete.id, "self").catch(() => {})}
+              >
+                {isTH ? "ลบเฉพาะฝั่งแอดมิน" : "Delete for admin"}
+              </Button>
+              <Button
+                type="button"
+                className="rounded-2xl bg-rose-600 hover:bg-rose-700"
+                onClick={() => messagePendingDelete && removeMessage(messagePendingDelete.id, "everyone").catch(() => {})}
+              >
+                {isTH ? "ลบสำหรับทุกคน" : "Delete for everyone"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
