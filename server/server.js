@@ -1018,6 +1018,7 @@ function mapChatThread(row) {
 
 function mapChatMessage(row) {
     if (!row) return null;
+    const isDeletedForEveryone = Boolean(row.deleted_for_everyone_at);
     return {
         id: row.id,
         thread_id: row.thread_id,
@@ -1025,14 +1026,21 @@ function mapChatMessage(row) {
         sender_name: row.sender_name,
         sender_role: row.sender_role,
         message_type: row.message_type,
-        body: row.body,
+        body: isDeletedForEveryone ? 'This message was deleted' : row.body,
         attachment_name: row.attachment_name,
         attachment_url: row.attachment_url,
         reply_to_message_id: row.reply_to_message_id,
         edited_at: row.edited_at,
         deleted_at: row.deleted_at,
+        deleted_for_user_at: row.deleted_for_user_at,
+        deleted_for_admin_at: row.deleted_for_admin_at,
+        deleted_for_everyone_at: row.deleted_for_everyone_at,
         created_at: row.created_at,
     };
+}
+
+function getChatViewerRole(req) {
+    return String(req?.user?.role || '').toLowerCase() === 'admin' ? 'admin' : 'user';
 }
 
 async function ensureChatThreadForUser(user) {
@@ -1207,7 +1215,7 @@ async function appendChatMessage({ threadId, sender, body, messageType = 'text',
     return mapChatMessage(createdMessage);
 }
 
-async function loadChatThreadMessages(threadId, limit = 500, options = {}) {
+async function loadChatThreadMessages(threadId, viewerRole, limit = 500, options = {}) {
     const safeLimit = Math.max(1, Math.min(500, Number(limit) || 500));
     const where = ['thread_id = ?'];
     const params = [threadId];
@@ -1221,6 +1229,12 @@ async function loadChatThreadMessages(threadId, limit = 500, options = {}) {
         params.push(options.endDate);
     }
 
+    if (viewerRole === 'admin') {
+        where.push('deleted_for_admin_at IS NULL OR deleted_for_everyone_at IS NOT NULL');
+    } else {
+        where.push('deleted_for_user_at IS NULL OR deleted_for_everyone_at IS NOT NULL');
+    }
+
     const rows = await db.all(
         `SELECT *
          FROM chat_messages
@@ -1232,7 +1246,7 @@ async function loadChatThreadMessages(threadId, limit = 500, options = {}) {
     return rows.reverse().map(mapChatMessage);
 }
 
-async function loadChatMessagesForThreadIds(threadIds, limit = 500, options = {}) {
+async function loadChatMessagesForThreadIds(threadIds, viewerRole, limit = 500, options = {}) {
     const uniqueThreadIds = Array.from(new Set((threadIds || []).map((id) => Number(id)).filter((id) => id > 0)));
     if (uniqueThreadIds.length === 0) return [];
 
@@ -1248,6 +1262,12 @@ async function loadChatMessagesForThreadIds(threadIds, limit = 500, options = {}
     if (options.endDate) {
         where.push('created_at <= ?');
         params.push(options.endDate);
+    }
+
+    if (viewerRole === 'admin') {
+        where.push('(deleted_for_admin_at IS NULL OR deleted_for_everyone_at IS NOT NULL)');
+    } else {
+        where.push('(deleted_for_user_at IS NULL OR deleted_for_everyone_at IS NOT NULL)');
     }
 
     const rows = await db.all(
@@ -1272,6 +1292,7 @@ app.get('/api/chat/thread/me', async (req, res) => {
         const relatedThreads = await loadRelatedThreadsForUser(req.user, thread);
         const messages = await loadChatMessagesForThreadIds(
             relatedThreads.map((item) => item.id),
+            getChatViewerRole(req),
             req.query.limit,
             {
                 startDate: startDate && !Number.isNaN(startDate.getTime()) ? startDate : null,
@@ -1352,7 +1373,7 @@ app.get('/api/chat/threads/:threadId/messages', async (req, res) => {
         const startDate = req.query.startDate ? new Date(String(req.query.startDate)) : null;
         const endDate = req.query.endDate ? new Date(String(req.query.endDate)) : null;
 
-        const messages = await loadChatThreadMessages(threadId, req.query.limit, {
+        const messages = await loadChatThreadMessages(threadId, getChatViewerRole(req), req.query.limit, {
             startDate: startDate && !Number.isNaN(startDate.getTime()) ? startDate : null,
             endDate: endDate && !Number.isNaN(endDate.getTime()) ? endDate : null,
         });
@@ -1571,6 +1592,12 @@ app.put('/api/chat/messages/:messageId', async (req, res) => {
         if (!isAdmin && String(message.sender_user_id) !== String(req.user?.id || '')) {
             return res.status(403).json({ error: 'Cannot edit this message' });
         }
+        if (message.deleted_for_everyone_at) {
+            return res.status(403).json({ error: 'Cannot edit a deleted message' });
+        }
+        if ((isAdmin && message.deleted_for_admin_at) || (!isAdmin && message.deleted_for_user_at)) {
+            return res.status(403).json({ error: 'Cannot edit a message deleted on this side' });
+        }
 
         await db.run(
             "UPDATE chat_messages SET body = ?, edited_at = ? WHERE id = ?",
@@ -1608,14 +1635,35 @@ app.post('/api/chat/messages/:messageId/delete', async (req, res) => {
             return res.status(403).json({ error: 'Cannot delete this message' });
         }
 
-        await db.run(
-            "UPDATE chat_messages SET body = ?, deleted_at = ? WHERE id = ?",
-            ['This message was deleted', new Date(), messageId]
-        );
+        const scope = String(req.body?.scope || 'self').toLowerCase();
+        const now = new Date();
+
+        if (scope === 'everyone') {
+            if (!isAdmin && String(message.sender_user_id) !== String(req.user?.id || '')) {
+                return res.status(403).json({ error: 'Only the sender can delete for everyone' });
+            }
+
+            await db.run(
+                "UPDATE chat_messages SET deleted_at = ?, deleted_for_everyone_at = ?, body = ? WHERE id = ?",
+                [now, now, 'This message was deleted', messageId]
+            );
+        } else {
+            const deleteColumn = isAdmin ? 'deleted_for_admin_at' : 'deleted_for_user_at';
+            await db.run(
+                `UPDATE chat_messages SET ${deleteColumn} = ?, deleted_at = COALESCE(deleted_at, ?) WHERE id = ?`,
+                [now, now, messageId]
+            );
+        }
         const updated = await db.get("SELECT * FROM chat_messages WHERE id = ?", [messageId]);
         const actorName = isAdmin ? 'Admin nat' : (req.user?.name || 'Customer');
-        await logAudit(actorName, 'CHAT_DELETE', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', buildChatAuditDetail(new Date(), `delete message #${messageId} in chat #${message.thread_id}`));
-        res.json({ success: true, message: mapChatMessage(updated) });
+        await logAudit(
+            actorName,
+            'CHAT_DELETE',
+            auditDeviceFromRequest(req, 'Web'),
+            'SUCCESS',
+            buildChatAuditDetail(now, `${scope === 'everyone' ? 'delete for everyone' : 'delete for self'} message #${messageId} in chat #${message.thread_id}`)
+        );
+        res.json({ success: true, message: mapChatMessage(updated), scope });
     } catch (err) {
         res.status(500).json({ error: err.message || 'Failed to delete message' });
     }
