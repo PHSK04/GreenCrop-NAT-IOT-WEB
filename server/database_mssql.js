@@ -408,6 +408,14 @@ async function initDb() {
         await pool.request().query(`
             IF EXISTS (
                 SELECT 1
+                FROM sys.key_constraints
+                WHERE name = 'uq_chat_threads_customer_user_id'
+                  AND parent_object_id = OBJECT_ID('chat_threads')
+            )
+                ALTER TABLE chat_threads DROP CONSTRAINT uq_chat_threads_customer_user_id;
+
+            IF EXISTS (
+                SELECT 1
                 FROM sys.indexes
                 WHERE name = 'uq_chat_threads_customer_user_id'
                   AND object_id = OBJECT_ID('chat_threads')
