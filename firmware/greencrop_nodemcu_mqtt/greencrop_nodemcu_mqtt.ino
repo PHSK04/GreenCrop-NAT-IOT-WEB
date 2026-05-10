@@ -18,11 +18,17 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-// 1. Wi-Fi config
+// ==================================================
+// 1. ตั้งค่า Wi-Fi
+//    แก้เฉพาะ 2 บรรทัดนี้ให้ตรงกับ Wi-Fi ที่บอร์ดจะใช้
+// ==================================================
 const char* WIFI_SSID = "   .......          ";
 const char* WIFI_PASSWORD = "      .........       ";
 
-// 2. MQTT config
+// ==================================================
+// 2. ตั้งค่า MQTT และข้อมูลประจำเครื่อง GreenCrop
+//    DEVICE_ID และ PAIRING_CODE คือค่าที่ต้องกรอกในหน้า Pair Device
+// ==================================================
 const char* MQTT_SERVER = "broker.hivemq.com";
 const int MQTT_PORT = 1883;
 const char* TOPIC_CONTROL = "smartfarm/control";
@@ -36,35 +42,49 @@ const char* DEFAULT_TENANT_ID = "public";
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 
-// 3. Input pins
-int pinWLS1 = D1;   // Water Level Sensor 1 (green light / unlock)
-int pinWLS2 = D6;   // Water Level Sensor 2 (red light / sound)
-int pinStart = D2;  // Start button (NO)
-int pinStop = D5;   // Stop button (NC)
+// ==================================================
+// 3. ขา Input จากโค้ดควบคุมเดิม
+// ==================================================
+int pinWLS1 = D1;   // Water Level Sensor 1: คุมไฟเขียว / ใช้ปลดล็อค
+int pinWLS2 = D6;   // Water Level Sensor 2: คุมไฟแดงและเสียง
+int pinStart = D2;  // ปุ่ม Start แบบ NO: กดแล้วอ่านได้ LOW
+int pinStop = D5;   // ปุ่ม Stop แบบ NC: กด/วงจรเปิดแล้วอ่านได้ HIGH
 
-// 4. Output pins
-int relayGreen = D7;   // Green light relay
-int relayYellow = D0;  // Yellow light / pump relay
-int relayRed = D3;     // Red light relay
-int pinISD = D8;       // ISD1820 P-L trigger pin
+// ==================================================
+// 4. ขา Output จากโค้ดควบคุมเดิม
+//    Relay เป็น Active-Low: LOW = ติด/ทำงาน, HIGH = ดับ/หยุด
+// ==================================================
+int relayGreen = D7;   // รีเลย์ไฟเขียว
+int relayYellow = D0;  // รีเลย์ไฟเหลือง / ปั๊ม
+int relayRed = D3;     // รีเลย์ไฟแดง
+int pinISD = D8;       // ขาสั่งเล่นเสียงโมดูล ISD1820 (P-L)
 
-// 5. Machine state
-int systemStatus = 0;   // 0 = pump stopped, 1 = pump running
-bool isLocked = false;  // false = normal, true = locked after Stop
+// ==================================================
+// 5. สถานะระบบควบคุมเครื่อง
+// ==================================================
+int systemStatus = 0;   // 0 = ปั๊มหยุด, 1 = ปั๊มเดิน
+bool isLocked = false;  // false = ปกติ, true = ระบบติดล็อคหลัง Stop
 
+// คำสั่งที่มาจากเว็บผ่าน MQTT จะถูกพักไว้ในตัวแปรนี้
 bool webStartCommand = false;
 bool webStopCommand = false;
+
+// สถานะการจับคู่กับบัญชีสมาชิกบนเว็บ
 bool isDevicePaired = false;
 String activeTenantId = DEFAULT_TENANT_ID;
 
+// ใช้คำนวณเวลาการทำงานของปั๊ม เพื่อส่งกลับเว็บ
 unsigned long startedAtMs = 0;
 unsigned long accumulatedUptimeSeconds = 0;
 unsigned long lastPublishMs = 0;
 
+// แปลง bool เป็นข้อความ true/false สำหรับประกอบ JSON
 const char* boolText(bool value) {
   return value ? "true" : "false";
 }
 
+// สร้าง topic แบบแยกตามสมาชิกและอุปกรณ์:
+// tenants/{tenantId}/devices/{deviceId}/control หรือ sensors
 String deviceTopic(const char* channel) {
   String topic = "tenants/";
   topic += activeTenantId;
@@ -75,6 +95,7 @@ String deviceTopic(const char* channel) {
   return topic;
 }
 
+// Topic สำหรับรับข้อความจากเว็บตอนกด Pair Device
 String pairingTopic() {
   String topic = "greencrop/devices/";
   topic += DEVICE_ID;
@@ -82,10 +103,13 @@ String pairingTopic() {
   return topic;
 }
 
+// ถ้ายังเป็น public จะใช้ topic กลางเพื่อทดสอบ
+// ถ้าจับคู่แล้วจะใช้ topic แยกตามสมาชิก
 bool useTenantTopic() {
   return activeTenantId.length() > 0 && activeTenantId != "public";
 }
 
+// อ่านค่า string ง่าย ๆ จาก JSON ที่เว็บส่งมา เช่น tenant_id
 String readJsonStringValue(String msg, const char* key) {
   String marker = "\"";
   marker += key;
@@ -98,6 +122,8 @@ String readJsonStringValue(String msg, const char* key) {
   return msg.substring(start, end);
 }
 
+// แสดง Device ID และ Pairing Code ใน Serial Monitor
+// เอาค่านี้ไปกรอกในหน้า Pair Device ของเว็บ
 void printPairingInfo() {
   Serial.println();
   Serial.println("=== GreenCrop Device Pairing ===");
@@ -116,6 +142,8 @@ void printPairingInfo() {
   Serial.println();
 }
 
+// รับข้อความจับคู่จากเว็บ
+// ถ้า pairing code ตรงกัน จะบันทึก tenant_id และตอบกลับเว็บว่า PAIRED
 void applyPairingMessage(String msg) {
   const bool statusPaired = msg.indexOf("PAIRED") >= 0 || msg.indexOf("\"paired\"") >= 0;
   const bool codeMatches = msg.indexOf(PAIRING_CODE) >= 0;
@@ -168,6 +196,7 @@ void applyPairingMessage(String msg) {
   Serial.println(statusTopic);
 }
 
+// Subscribe topic สำหรับรอรับข้อความ Pair Device จากเว็บ
 void subscribePairingTopics() {
   String topic = pairingTopic();
   mqttClient.subscribe(topic.c_str());
@@ -175,6 +204,7 @@ void subscribePairingTopics() {
   Serial.println(topic);
 }
 
+// ปิดไฟ/ปั๊ม/เสียงทั้งหมด
 void turnEverythingOff() {
   digitalWrite(relayGreen, HIGH);
   digitalWrite(relayYellow, HIGH);
@@ -182,6 +212,7 @@ void turnEverythingOff() {
   digitalWrite(pinISD, LOW);
 }
 
+// คำนวณเวลารวมที่ปั๊มทำงาน
 unsigned long currentUptimeSeconds() {
   if (systemStatus != 1 || startedAtMs == 0) {
     return accumulatedUptimeSeconds;
@@ -190,6 +221,8 @@ unsigned long currentUptimeSeconds() {
   return accumulatedUptimeSeconds + ((millis() - startedAtMs) / 1000);
 }
 
+// เริ่มปั๊มจากปุ่มจริงหรือคำสั่งเว็บ
+// ถ้าระบบล็อคอยู่ จะไม่ยอมเริ่ม
 void startPump() {
   if (isLocked || systemStatus == 1) {
     return;
@@ -199,6 +232,7 @@ void startPump() {
   startedAtMs = millis();
 }
 
+// หยุดปั๊ม และเลือกได้ว่าจะล็อคระบบหรือไม่
 void stopPump(bool lockSystem) {
   if (systemStatus == 1) {
     accumulatedUptimeSeconds = currentUptimeSeconds();
@@ -212,6 +246,7 @@ void stopPump(bool lockSystem) {
   }
 }
 
+// ต่อ Wi-Fi
 void setupWifi() {
   Serial.print("Connecting Wi-Fi: ");
   Serial.println(WIFI_SSID);
@@ -229,6 +264,7 @@ void setupWifi() {
   Serial.println(WiFi.localIP());
 }
 
+// Callback ของ MQTT: ทำงานทุกครั้งที่มีข้อความเข้ามาจากเว็บ
 void onMqttMessage(char* topic, byte* payload, unsigned int length) {
   String msg = "";
   for (unsigned int i = 0; i < length; i++) {
@@ -244,20 +280,24 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
     applyPairingMessage(msg);
   }
 
+  // เว็บกด Start: ให้ทำเหมือนกดปุ่ม Start จริง
   if (msg.indexOf("START") >= 0) {
     webStartCommand = true;
   }
 
+  // เว็บกด Stop: ให้หยุดและล็อคเหมือนปุ่ม Stop จริง
   if (msg.indexOf("STOP") >= 0) {
     webStopCommand = true;
   }
 
+  // เผื่อเว็บต้องการ reset เวลาทำงานปั๊ม
   if (msg.indexOf("RESET_UPTIME") >= 0) {
     accumulatedUptimeSeconds = 0;
     startedAtMs = systemStatus == 1 ? millis() : 0;
   }
 }
 
+// ต่อ MQTT Broker และ subscribe topic ที่ต้องฟัง
 void reconnectMqtt() {
   while (!mqttClient.connected()) {
     Serial.print("Connecting MQTT...");
@@ -287,6 +327,8 @@ void reconnectMqtt() {
   }
 }
 
+// ส่งสถานะบอร์ดกลับไปให้ backend/web ทุก 1 วินาที
+// backend จะบันทึกข้อมูลนี้ลง sensor_data
 void publishStatus(int stateWLS1, int stateWLS2, int stateStart, int stateStop) {
   String payload = "{";
   payload += "\"project\":\"";
@@ -350,59 +392,79 @@ void setup() {
   Serial.begin(115200);
   delay(100);
 
+  // ตั้งค่า input sensor และปุ่ม
   pinMode(pinWLS1, INPUT);
   pinMode(pinWLS2, INPUT);
 
   pinMode(pinStart, INPUT_PULLUP);
   pinMode(pinStop, INPUT_PULLUP);
 
+  // ตั้งค่า output relay และเสียง
   pinMode(relayGreen, OUTPUT);
   pinMode(relayYellow, OUTPUT);
   pinMode(relayRed, OUTPUT);
   pinMode(pinISD, OUTPUT);
 
+  // เริ่มต้นให้ทุกอย่างดับก่อน เพื่อความปลอดภัย
   turnEverythingOff();
+
+  // แสดงข้อมูลที่ต้องใช้กรอกหน้าเว็บ
   printPairingInfo();
 
   setupWifi();
 
+  // ตั้ง MQTT server และ callback รับข้อความ
   mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
   mqttClient.setCallback(onMqttMessage);
 }
 
 void loop() {
+  // รักษาการเชื่อมต่อ MQTT ให้ต่ออยู่ตลอด
   if (!mqttClient.connected()) {
     reconnectMqtt();
   }
   mqttClient.loop();
 
+  // อ่าน input ทุกตัว
   int stateWLS1 = digitalRead(pinWLS1);
   int stateWLS2 = digitalRead(pinWLS2);
   int stateStart = digitalRead(pinStart);
   int stateStop = digitalRead(pinStop);
 
-  // Stop button is NC. Pressed/open reads HIGH, then stop and lock.
+  // --------------------------------------------------
+  // A. Stop แบบ NC: ถ้ากดปุ่ม Stop หรือเว็บส่ง STOP
+  //    ให้หยุดทุกอย่างและเปิดโหมดล็อคทันที
+  // --------------------------------------------------
   if (stateStop == HIGH || webStopCommand) {
     stopPump(true);
     webStopCommand = false;
     turnEverythingOff();
   } else {
-    // Unlock when the lower water level sensor detects water again.
+    // --------------------------------------------------
+    // B. ปลดล็อคเมื่อ WLS1 ตรวจพบน้ำ
+    // --------------------------------------------------
     if (stateWLS1 == HIGH) {
       isLocked = false;
     }
 
+    // --------------------------------------------------
+    // C. โหมดติดล็อค: ไม่รับ Start และปิดปั๊ม/ไฟแดง/เสียง
+    // --------------------------------------------------
     if (isLocked) {
       digitalWrite(relayYellow, HIGH);
       digitalWrite(relayRed, HIGH);
       digitalWrite(pinISD, LOW);
       digitalWrite(relayGreen, HIGH);
     } else {
+      // --------------------------------------------------
+      // D. โหมดปกติ: รับ Start จากปุ่มจริงหรือจากเว็บ
+      // --------------------------------------------------
       if (stateStart == LOW || webStartCommand) {
         startPump();
       }
       webStartCommand = false;
 
+      // คุมไฟเหลือง/ปั๊ม และไฟเขียว
       if (systemStatus == 1) {
         digitalWrite(relayYellow, LOW);
         digitalWrite(relayGreen, HIGH);
@@ -416,6 +478,7 @@ void loop() {
         }
       }
 
+      // คุมไฟแดงและเสียงจาก WLS2
       if (stateWLS2 == HIGH) {
         digitalWrite(relayRed, LOW);
         digitalWrite(pinISD, HIGH);
@@ -426,6 +489,7 @@ void loop() {
     }
   }
 
+  // ส่งสถานะกลับเว็บทุก 1 วินาที
   if (millis() - lastPublishMs >= 1000) {
     lastPublishMs = millis();
     publishStatus(stateWLS1, stateWLS2, stateStart, stateStop);
