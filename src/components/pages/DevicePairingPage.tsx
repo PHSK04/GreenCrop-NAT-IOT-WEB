@@ -4,7 +4,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { Separator } from "../ui/separator";
-import { Cpu, QrCode, ShieldCheck, PlugZap, ArrowRight, Camera, Image as ImageIcon, FileUp, CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { Cpu, QrCode, ShieldCheck, PlugZap, ArrowRight, Camera, Image as ImageIcon, FileUp, CheckCircle2, Loader2, XCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { authService } from "@/features/auth/services/authService";
 import QRCode from "qrcode";
@@ -13,6 +13,35 @@ import { useRef } from "react";
 import mqtt from "mqtt";
 
 const MQTT_BROKER = "wss://broker.hivemq.com:8884/mqtt";
+
+const showPairingSosToast = (title: string, description?: string) => {
+  toast.custom((toastId) => (
+    <div className="pointer-events-auto w-[min(92vw,560px)] overflow-hidden rounded-2xl border-2 border-red-700 bg-red-600 text-white shadow-[0_28px_90px_rgba(127,29,29,0.45)]">
+      <div className="flex items-start gap-4 px-5 py-5">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/15 ring-2 ring-white/35">
+          <AlertTriangle className="h-7 w-7" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-bold uppercase tracking-[0.18em] text-red-100">SOS Alert</div>
+          <div className="mt-1 text-xl font-bold leading-7">{title}</div>
+          {description && (
+            <div className="mt-2 text-sm leading-6 text-red-50">{description}</div>
+          )}
+        </div>
+        <button
+          type="button"
+          className="rounded-full bg-white/15 px-3 py-1 text-sm font-semibold text-white hover:bg-white/25"
+          onClick={() => toast.dismiss(toastId)}
+        >
+          ปิด
+        </button>
+      </div>
+    </div>
+  ), {
+    duration: 9000,
+    position: "bottom-center",
+  });
+};
 
 const getSessionTenantId = () => {
   const raw = localStorage.getItem("smart_iot_session");
@@ -254,14 +283,19 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
       });
       const ackSent = await publishPairingAck(normalizedDeviceId, normalizedPairingCode);
       if (!ackSent) {
+        const alertTitle = t("บอร์ดหรืออุปกรณ์ยังไม่ได้ทำงาน", "Board or device is not running");
+        const alertDescription = t(
+          "ยังไม่บันทึกการจับคู่ กรุณาเปิด NodeMCU ตรวจ Wi‑Fi/MQTT แล้วลองอีกครั้ง",
+          "Pairing was not saved. Please power on the NodeMCU, check Wi‑Fi/MQTT, and try again",
+        );
         setConnectionState({
           status: "failed",
-          title: t("ยังไม่พบบอร์ด", "Board not detected"),
-          description: t("ยังไม่บันทึกการจับคู่ ตรวจว่า NodeMCU เปิดอยู่ ต่อ Wi‑Fi/MQTT สำเร็จ และใช้ Device ID กับ Pairing Code ตรงกัน", "Pairing was not saved. Check that the NodeMCU is powered on, connected to Wi‑Fi/MQTT, and uses the same Device ID and Pairing Code"),
+          title: alertTitle,
+          description: alertDescription,
           deviceId: normalizedDeviceId,
           pairingCode: normalizedPairingCode,
         });
-        toast.warning(t("ยังไม่พบบอร์ด จึงยังไม่บันทึกการจับคู่", "Board not detected, so pairing was not saved"));
+        showPairingSosToast(alertTitle, alertDescription);
         return;
       }
       await authService.pairDevice({
@@ -283,7 +317,16 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
         onPaired({ deviceId: normalizedDeviceId, pairingCode: normalizedPairingCode });
       }, 900);
     } catch (err: any) {
-      toast.error(err?.message || t("จับคู่อุปกรณ์ไม่สำเร็จ", "Device pairing failed"));
+      const alertTitle = t("จับคู่อุปกรณ์ไม่สำเร็จ", "Device pairing failed");
+      const alertDescription = err?.message || t("ระบบไม่สามารถบันทึกการจับคู่ได้ กรุณาตรวจสอบข้อมูลแล้วลองใหม่", "The system could not save the pairing. Please check the details and try again");
+      setConnectionState({
+        status: "failed",
+        title: alertTitle,
+        description: alertDescription,
+        deviceId: deviceId.trim().toUpperCase(),
+        pairingCode: pairingCode.trim(),
+      });
+      showPairingSosToast(alertTitle, alertDescription);
     } finally {
       setSubmitting(false);
     }
@@ -368,7 +411,7 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
                   connectionState.status === "connected"
                     ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                     : connectionState.status === "failed"
-                      ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                      ? "border-red-600/60 bg-red-600/15 text-red-700 shadow-[0_18px_60px_rgba(185,28,28,0.22)] dark:text-red-200"
                       : "border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
                 ].join(" ")}
               >
@@ -378,16 +421,6 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
                 <div className="space-y-1">
                   <div className="font-medium">{connectionState.title}</div>
                   <div className="text-xs opacity-90">{connectionState.description}</div>
-                  {connectionState.status === "failed" && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="mt-2 h-8 rounded-full border border-amber-500/30 px-3 text-xs text-inherit hover:bg-amber-500/10"
-                      onClick={() => onPaired({ deviceId: connectionState.deviceId, pairingCode: connectionState.pairingCode })}
-                    >
-                      {t("เข้าแดชบอร์ดต่อ", "Continue to dashboard")}
-                    </Button>
-                  )}
                 </div>
               </div>
             )}
