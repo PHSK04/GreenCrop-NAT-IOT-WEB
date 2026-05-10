@@ -404,18 +404,10 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     const currentUptime = getCurrentUptimeSeconds(isOn);
     setIsSendingControl(true);
     setLastLocalCommandAtMs(nowMs);
-    setIsOn(newState);
     setPendingIsOnAck(newState);
-    setIgnoreApiStateUntilMs(nowMs + 3000);
+    setIgnoreApiStateUntilMs(nowMs + 1000);
     zeroUptimeWhileRunningStreakRef.current = 0;
     lastApiUptimeRef.current = currentUptime;
-    if (newState) {
-      setUptimeSyncedAtMs(nowMs);
-    } else {
-      setUptimeBaseSeconds(currentUptime);
-      setUptimeSyncedAtMs(null);
-      setUptimeSeconds(currentUptime);
-    }
 
     if (client && mqttStatus === 'connected') {
       const { tenantId } = getSessionAuth();
@@ -428,10 +420,18 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       });
       const deviceControlTopic = getDeviceTopic(tenantId, activeDeviceId, 'control');
       client.publish(deviceControlTopic || TOPIC_CONTROL_LEGACY, payload);
+    } else {
+      setIsSendingControl(false);
+      setPendingIsOnAck(null);
+      toast.error('Command Failed', {
+        description: 'MQTT is not connected, so the board did not receive the command.',
+      });
+      return;
     }
 
     try {
-      await postMachineState(newState, currentUptime);
+      // The board is the source of truth. Do not write the desired power state here;
+      // wait for the firmware to publish the actual accepted state.
       await syncAfterCommand();
     } catch (apiErr) {
       console.error('Failed to sync machine state with API:', apiErr);
@@ -441,7 +441,9 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     }
 
     toast.success(newState ? 'Machine System Started' : 'Machine System Stopped', {
-      description: 'Command sent to system.',
+      description: newState
+        ? 'START command sent. The board will start only if it is not locked.'
+        : 'STOP command sent. The board will stop and enter lock mode.',
     });
   };
 
