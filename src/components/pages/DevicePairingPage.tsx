@@ -4,12 +4,97 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { Separator } from "../ui/separator";
-import { Cpu, QrCode, ShieldCheck, PlugZap, ArrowRight, Camera, Image as ImageIcon, FileUp } from "lucide-react";
+import { Cpu, QrCode, ShieldCheck, PlugZap, ArrowRight, Camera, Image as ImageIcon, FileUp, CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { authService } from "@/features/auth/services/authService";
 import QRCode from "qrcode";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { useRef } from "react";
+import mqtt from "mqtt";
+
+const MQTT_BROKER = "wss://broker.hivemq.com:8884/mqtt";
+
+const getSessionTenantId = () => {
+  const raw = localStorage.getItem("smart_iot_session");
+  if (!raw) return "";
+
+  try {
+    const parsed = JSON.parse(raw);
+    return String(parsed?.user?.id || parsed?.id || "");
+  } catch {
+    return "";
+  }
+};
+
+type PairingConnectionState =
+  | { status: "idle" }
+  | { status: "checking"; title: string; description: string }
+  | { status: "connected"; title: string; description: string; deviceId: string; pairingCode: string }
+  | { status: "failed"; title: string; description: string; deviceId: string; pairingCode: string };
+
+const publishPairingAck = (deviceId: string, pairingCode: string) => {
+  const tenantId = getSessionTenantId();
+  if (!tenantId) return Promise.resolve(false);
+
+  const topic = `greencrop/devices/${deviceId}/pairing`;
+  const statusTopic = `${topic}/status`;
+  const payload = JSON.stringify({
+    project: "GreenCrop NAT IoT",
+    status: "PAIRED",
+    tenant_id: tenantId,
+    device_id: deviceId,
+    pairing_code: pairingCode,
+    timestamp: Date.now(),
+  });
+
+  return new Promise<boolean>((resolve) => {
+    const client = mqtt.connect(MQTT_BROKER, {
+      clientId: `greencrop_pairing_${Math.random().toString(16).slice(2, 10)}`,
+      connectTimeout: 5000,
+    });
+    let finished = false;
+
+    const finish = (ok: boolean) => {
+      if (finished) return;
+      finished = true;
+      client.end(true);
+      resolve(ok);
+    };
+
+    const timeoutId = window.setTimeout(() => finish(false), 8000);
+
+    client.on("connect", () => {
+      client.subscribe(statusTopic, (subscribeErr) => {
+        if (subscribeErr) {
+          window.clearTimeout(timeoutId);
+          finish(false);
+          return;
+        }
+
+        client.publish(topic, payload, { qos: 0, retain: false }, (err) => {
+          if (err) {
+            window.clearTimeout(timeoutId);
+            finish(false);
+          }
+        });
+      });
+    });
+
+    client.on("message", (incomingTopic, message) => {
+      if (incomingTopic !== statusTopic) return;
+      const raw = message.toString();
+      if (raw.includes("PAIRED") && raw.includes(deviceId) && raw.includes(pairingCode)) {
+        window.clearTimeout(timeoutId);
+        finish(true);
+      }
+    });
+
+    client.on("error", () => {
+      window.clearTimeout(timeoutId);
+      finish(false);
+    });
+  });
+};
 
 type DevicePairingPageProps = {
   user?: { name?: string; email?: string };
@@ -27,6 +112,7 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
   const [location, setLocation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [connectionState, setConnectionState] = useState<PairingConnectionState>({ status: "idle" });
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
@@ -154,12 +240,18 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
   const handleSubmit = async () => {
     const nextError = validate();
     setError(nextError);
+    setConnectionState({ status: "idle" });
     if (nextError) return;
 
     try {
       setSubmitting(true);
       const normalizedDeviceId = deviceId.trim().toUpperCase();
       const normalizedPairingCode = pairingCode.trim();
+      setConnectionState({
+        status: "checking",
+        title: t("กำลังบันทึกและตรวจสอบบอร์ด", "Saving and checking board"),
+        description: t("ระบบกำลังผูกอุปกรณ์กับบัญชีและรอสัญญาณตอบกลับจากบอร์ด", "Pairing the device to your account and waiting for the board acknowledgement"),
+      });
       await authService.pairDevice({
         device_id: normalizedDeviceId,
         pairing_code: normalizedPairingCode,
@@ -167,8 +259,29 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
         location: location.trim() || undefined,
         is_primary: true,
       });
+      const ackSent = await publishPairingAck(normalizedDeviceId, normalizedPairingCode);
+      if (!ackSent) {
+        setConnectionState({
+          status: "failed",
+          title: t("จับคู่บัญชีแล้ว แต่ยังไม่พบบอร์ด", "Account paired, but board not detected"),
+          description: t("ตรวจว่า NodeMCU เปิดอยู่ ต่อ Wi‑Fi/MQTT สำเร็จ และใช้ Device ID กับ Pairing Code ตรงกัน", "Check that the NodeMCU is powered on, connected to Wi‑Fi/MQTT, and uses the same Device ID and Pairing Code"),
+          deviceId: normalizedDeviceId,
+          pairingCode: normalizedPairingCode,
+        });
+        toast.warning(t("จับคู่แล้ว แต่ยังส่งสัญญาณไปบอร์ดไม่ได้", "Device paired, but board acknowledgement was not sent"));
+        return;
+      }
+      setConnectionState({
+        status: "connected",
+        title: t("เชื่อมต่อบอร์ดสำเร็จ", "Board connected successfully"),
+        description: t("บอร์ดตอบกลับแล้ว ระบบพร้อมเข้าสู่แดชบอร์ด", "The board acknowledged the pairing and is ready for the dashboard"),
+        deviceId: normalizedDeviceId,
+        pairingCode: normalizedPairingCode,
+      });
       toast.success(t("จับคู่อุปกรณ์สำเร็จ", "Device paired successfully"));
-      onPaired({ deviceId: normalizedDeviceId, pairingCode: normalizedPairingCode });
+      window.setTimeout(() => {
+        onPaired({ deviceId: normalizedDeviceId, pairingCode: normalizedPairingCode });
+      }, 900);
     } catch (err: any) {
       toast.error(err?.message || t("จับคู่อุปกรณ์ไม่สำเร็จ", "Device pairing failed"));
     } finally {
@@ -245,6 +358,37 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
             {error && (
               <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
                 {error}
+              </div>
+            )}
+
+            {connectionState.status !== "idle" && (
+              <div
+                className={[
+                  "flex items-start gap-3 rounded-xl border px-4 py-3 text-sm",
+                  connectionState.status === "connected"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    : connectionState.status === "failed"
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                      : "border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
+                ].join(" ")}
+              >
+                {connectionState.status === "checking" && <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin" />}
+                {connectionState.status === "connected" && <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />}
+                {connectionState.status === "failed" && <XCircle className="mt-0.5 h-5 w-5 shrink-0" />}
+                <div className="space-y-1">
+                  <div className="font-medium">{connectionState.title}</div>
+                  <div className="text-xs opacity-90">{connectionState.description}</div>
+                  {connectionState.status === "failed" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="mt-2 h-8 rounded-full border border-amber-500/30 px-3 text-xs text-inherit hover:bg-amber-500/10"
+                      onClick={() => onPaired({ deviceId: connectionState.deviceId, pairingCode: connectionState.pairingCode })}
+                    >
+                      {t("เข้าแดชบอร์ดต่อ", "Continue to dashboard")}
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
 
