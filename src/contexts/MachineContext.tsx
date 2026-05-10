@@ -26,9 +26,28 @@ interface MachineContextType {
 const MachineContext = createContext<MachineContextType | undefined>(undefined);
 
 const MQTT_BROKER = 'wss://broker.hivemq.com:8884/mqtt';
-const TOPIC_SENSORS = 'smartfarm/sensors';
-const TOPIC_CONTROL = 'smartfarm/control';
+const TOPIC_SENSORS_LEGACY = 'smartfarm/sensors';
+const TOPIC_CONTROL_LEGACY = 'smartfarm/control';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+const safeTopicSegment = (value: string) =>
+  value.trim().replace(/[^A-Za-z0-9_-]/g, '');
+
+const getActiveDeviceId = () => {
+  if (typeof window === 'undefined') return '';
+  return window.localStorage.getItem('active_device_id') || '';
+};
+
+const getDeviceTopic = (
+  tenantId: string,
+  deviceId: string,
+  channel: 'control' | 'sensors',
+) => {
+  const safeTenant = safeTopicSegment(tenantId);
+  const safeDevice = safeTopicSegment(deviceId);
+  if (!safeTenant || !safeDevice) return '';
+  return `tenants/${safeTenant}/devices/${safeDevice}/${channel}`;
+};
 
 const getSessionAuth = () => {
   const raw = localStorage.getItem('smart_iot_session');
@@ -160,9 +179,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const activeDeviceId = typeof window !== 'undefined'
-        ? window.localStorage.getItem('active_device_id') || ''
-        : '';
+      const activeDeviceId = getActiveDeviceId();
       const deviceParam = activeDeviceId ? `&device_id=${encodeURIComponent(activeDeviceId)}` : '';
       const response = await fetch(`${API_BASE_URL}/sensor-data?tenant_id=${tenantId}${deviceParam}`, {
         headers: {
@@ -286,6 +303,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
+    const activeDeviceId = getActiveDeviceId();
     const response = await fetch(`${API_BASE_URL}/sensor-data?tenant_id=${tenantId}`, {
       method: 'POST',
       headers: {
@@ -301,6 +319,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         uptime_seconds: nextUptimeSeconds,
         timestamp: new Date().toISOString(),
         tenant_id: tenantId,
+        device_id: activeDeviceId || undefined,
         source: 'web-ui',
       }),
     });
@@ -322,7 +341,14 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
     mqttClient.on('connect', () => {
       setMqttStatus('connected');
-      mqttClient.subscribe(TOPIC_SENSORS);
+      mqttClient.subscribe(TOPIC_SENSORS_LEGACY);
+
+      const { tenantId } = getSessionAuth();
+      const activeDeviceId = getActiveDeviceId();
+      const deviceSensorsTopic = getDeviceTopic(tenantId, activeDeviceId, 'sensors');
+      if (deviceSensorsTopic) {
+        mqttClient.subscribe(deviceSensorsTopic);
+      }
     });
 
     mqttClient.on('error', (err) => {
@@ -392,8 +418,16 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     }
 
     if (client && mqttStatus === 'connected') {
-      const payload = JSON.stringify({ command: newState ? 'START' : 'STOP', timestamp: Date.now() });
-      client.publish(TOPIC_CONTROL, payload);
+      const { tenantId } = getSessionAuth();
+      const activeDeviceId = getActiveDeviceId();
+      const payload = JSON.stringify({
+        command: newState ? 'START' : 'STOP',
+        tenant_id: tenantId,
+        device_id: activeDeviceId || undefined,
+        timestamp: Date.now(),
+      });
+      const deviceControlTopic = getDeviceTopic(tenantId, activeDeviceId, 'control');
+      client.publish(deviceControlTopic || TOPIC_CONTROL_LEGACY, payload);
     }
 
     try {
