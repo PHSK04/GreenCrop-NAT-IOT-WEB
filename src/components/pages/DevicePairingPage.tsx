@@ -249,9 +249,21 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
       const normalizedPairingCode = pairingCode.trim();
       setConnectionState({
         status: "checking",
-        title: t("กำลังบันทึกและตรวจสอบบอร์ด", "Saving and checking board"),
-        description: t("ระบบกำลังผูกอุปกรณ์กับบัญชีและรอสัญญาณตอบกลับจากบอร์ด", "Pairing the device to your account and waiting for the board acknowledgement"),
+        title: t("กำลังตรวจสอบบอร์ด", "Checking board"),
+        description: t("ระบบกำลังส่งสัญญาณไปที่บอร์ดและรอการตอบกลับก่อนบันทึกการจับคู่", "Sending a signal to the board and waiting for acknowledgement before saving the pairing"),
       });
+      const ackSent = await publishPairingAck(normalizedDeviceId, normalizedPairingCode);
+      if (!ackSent) {
+        setConnectionState({
+          status: "failed",
+          title: t("ยังไม่พบบอร์ด", "Board not detected"),
+          description: t("ยังไม่บันทึกการจับคู่ ตรวจว่า NodeMCU เปิดอยู่ ต่อ Wi‑Fi/MQTT สำเร็จ และใช้ Device ID กับ Pairing Code ตรงกัน", "Pairing was not saved. Check that the NodeMCU is powered on, connected to Wi‑Fi/MQTT, and uses the same Device ID and Pairing Code"),
+          deviceId: normalizedDeviceId,
+          pairingCode: normalizedPairingCode,
+        });
+        toast.warning(t("ยังไม่พบบอร์ด จึงยังไม่บันทึกการจับคู่", "Board not detected, so pairing was not saved"));
+        return;
+      }
       await authService.pairDevice({
         device_id: normalizedDeviceId,
         pairing_code: normalizedPairingCode,
@@ -259,18 +271,6 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
         location: location.trim() || undefined,
         is_primary: true,
       });
-      const ackSent = await publishPairingAck(normalizedDeviceId, normalizedPairingCode);
-      if (!ackSent) {
-        setConnectionState({
-          status: "failed",
-          title: t("จับคู่บัญชีแล้ว แต่ยังไม่พบบอร์ด", "Account paired, but board not detected"),
-          description: t("ตรวจว่า NodeMCU เปิดอยู่ ต่อ Wi‑Fi/MQTT สำเร็จ และใช้ Device ID กับ Pairing Code ตรงกัน", "Check that the NodeMCU is powered on, connected to Wi‑Fi/MQTT, and uses the same Device ID and Pairing Code"),
-          deviceId: normalizedDeviceId,
-          pairingCode: normalizedPairingCode,
-        });
-        toast.warning(t("จับคู่แล้ว แต่ยังส่งสัญญาณไปบอร์ดไม่ได้", "Device paired, but board acknowledgement was not sent"));
-        return;
-      }
       setConnectionState({
         status: "connected",
         title: t("เชื่อมต่อบอร์ดสำเร็จ", "Board connected successfully"),
