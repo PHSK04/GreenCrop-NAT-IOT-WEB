@@ -1043,25 +1043,54 @@ function getChatViewerRole(req) {
     return String(req?.user?.role || '').toLowerCase() === 'admin' ? 'admin' : 'user';
 }
 
+function buildChatIdentityLookup({ userId, email }) {
+    const where = [];
+    const params = [];
+    const normalizedEmail = normalizeEmail(email || '');
+    const numericUserId = Number(userId);
+
+    if (Number.isFinite(numericUserId) && numericUserId > 0) {
+        where.push('customer_user_id = ?');
+        params.push(numericUserId);
+    }
+
+    if (normalizedEmail) {
+        where.push('LOWER(customer_email) = ?');
+        params.push(normalizedEmail);
+    }
+
+    return {
+        hasIdentity: where.length > 0,
+        whereSql: where.length > 1 ? `(${where.join(' OR ')})` : (where[0] || ''),
+        params,
+        normalizedEmail,
+        numericUserId,
+    };
+}
+
 async function ensureChatThreadForUser(user) {
     const userId = user?.id;
     if (!userId) {
         throw new Error('User id is required for chat');
     }
 
-    const normalizedEmail = normalizeEmail(user?.email || '');
+    const identity = buildChatIdentityLookup({
+        userId,
+        email: user?.email || '',
+    });
+    const normalizedEmail = identity.normalizedEmail;
     const normalizedName = String(user?.name || '').trim();
     const normalizedPhone = String(user?.phone || '').trim() || null;
 
-    const activeExisting = normalizedEmail
+    const activeExisting = identity.hasIdentity
         ? await db.get(
             `SELECT TOP 1 *
              FROM chat_threads
-             WHERE LOWER(customer_email) = ?
+             WHERE ${identity.whereSql}
                AND status <> 'closed'
                AND is_archived = false
              ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
-            [normalizedEmail]
+            identity.params
         )
         : await db.get(
             `SELECT TOP 1 *
@@ -1128,20 +1157,23 @@ async function ensureChatThreadForUser(user) {
 
 async function loadRelatedThreadsForUser(user, primaryThread = null) {
     const userId = user?.id;
-    const normalizedEmail = normalizeEmail(user?.email || primaryThread?.customer_email || '');
+    const identity = buildChatIdentityLookup({
+        userId,
+        email: user?.email || primaryThread?.customer_email || '',
+    });
 
-    const rows = normalizedEmail
+    const rows = identity.hasIdentity
         ? await db.all(
             `SELECT *
              FROM chat_threads
-             WHERE LOWER(customer_email) = ?
+             WHERE ${identity.whereSql}
              ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
-            [normalizedEmail]
+            identity.params
         )
         : await db.all(
             `SELECT *
-            FROM chat_threads
-            WHERE customer_user_id = ?
+             FROM chat_threads
+             WHERE customer_user_id = ?
              ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
             [userId]
         );
@@ -1162,17 +1194,20 @@ async function loadRelatedThreadsForUser(user, primaryThread = null) {
 }
 
 async function loadRelatedThreadsForAdmin(primaryThread = null) {
-    const normalizedEmail = normalizeEmail(primaryThread?.customer_email || '');
-    if (!normalizedEmail) {
+    const identity = buildChatIdentityLookup({
+        userId: primaryThread?.customer_user_id,
+        email: primaryThread?.customer_email || '',
+    });
+    if (!identity.hasIdentity) {
         return primaryThread ? [primaryThread] : [];
     }
 
     const rows = await db.all(
         `SELECT *
          FROM chat_threads
-         WHERE LOWER(customer_email) = ?
+         WHERE ${identity.whereSql}
          ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
-        [normalizedEmail]
+        identity.params
     );
 
     const seen = new Set();
@@ -1384,10 +1419,13 @@ app.get('/api/chat/threads', async (req, res) => {
                 params.push(`%${q}%`, `%${q}%`, `%${q}%`);
             }
         } else {
-            const normalizedEmail = normalizeEmail(req.user?.email || '');
-            if (normalizedEmail) {
-                where.push('LOWER(t.customer_email) = ?');
-                params.push(normalizedEmail);
+            const identity = buildChatIdentityLookup({
+                userId: req.user?.id,
+                email: req.user?.email || '',
+            });
+            if (identity.hasIdentity) {
+                where.push(identity.whereSql.replace(/customer_/g, 't.customer_'));
+                params.push(...identity.params);
             } else {
                 where.push('t.customer_user_id = ?');
                 params.push(req.user.id);
