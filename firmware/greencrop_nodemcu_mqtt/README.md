@@ -25,6 +25,39 @@ In VS Code:
 4. Edit Wi-Fi credentials in the `.ino` file.
 5. Upload to the NodeMCU.
 
+## Current control logic
+
+This firmware follows the latest two-system wiring:
+
+- `A0`: WLS1 analog, `analogRead(A0) > 300` means water detected.
+- `D1`: WLS2 digital.
+- `D2`: Start 1 button.
+- `D3`: Start 2 button.
+- `D4`: danger float switch.
+- `D5`: Stop NC button.
+- `D6`: pump 1 relay.
+- `D7`: green light 1.
+- `D0`: yellow light 1.
+- `D8`: green light 2.
+- `GPIO1/TX`: yellow light 2.
+- `GPIO3/RX`: red light + sound alarm.
+
+Commands from the web:
+
+- `START` or `START1`: starts system 1 if the board is not locked.
+- `START2`: starts system 2 if the board is not locked.
+- `STOP`: stops both systems and locks the board.
+
+Unlock condition:
+
+- The board unlocks only when WLS2 detects water.
+
+Important hardware note:
+
+- `D3`, `D4`, and `D8` are ESP8266 boot-sensitive pins.
+- `GPIO1/TX` and `GPIO3/RX` are also used by Serial Monitor and upload/debug.
+- If upload or boot fails, disconnect relays/switches from those pins during upload or move those signals to safer pins.
+
 ## MQTT topics
 
 - Web command topic: `smartfarm/control`
