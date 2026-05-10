@@ -1,0 +1,11 @@
+# Arduino CLI 项目本地配置
+# 自动生成，所有数据存储在项目目录中
+
+directories:
+  user: "/Users/phsk/Documents/GitHub/GreenCrop-NAT-IOT-WEB/.arduino-cli/user"
+  data: "/Users/phsk/Documents/GitHub/GreenCrop-NAT-IOT-WEB/.arduino-cli/data"
+  downloads: "/Users/phsk/.arduino-cli-shared/downloads"
+
+network:
+  connection_timeout: 600s
+
