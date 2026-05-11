@@ -37,6 +37,8 @@ const translations = {
     manualMode: "Manual Mode",
     uptime: "Uptime",
     pumpStatus: "Pump Status",
+    activePumps: "Active pumps",
+    noActivePumps: "No pump running",
     tankLevels: "Tank Levels & Flow",
     filling: "Filling Tank",
     idle: "Idle",
@@ -68,6 +70,8 @@ const translations = {
     manualMode: "โหมดควบคุมเอง",
     uptime: "เวลาทำงานต่อเนื่อง",
     pumpStatus: "สถานะปั๊ม",
+    activePumps: "ปั๊มที่ทำงาน",
+    noActivePumps: "ยังไม่มีปั๊มทำงาน",
     tankLevels: "ระดับน้ำและการไหล",
     filling: "กำลังเติมน้ำถัง",
     idle: "ว่าง",
@@ -103,6 +107,13 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
   } = useMachine();
 
   const hasAnyPumpSignal = pumps.some(Boolean);
+  const visiblePumpStates = pumps
+    .slice(0, 3)
+    .map((isActive, idx) => isActive || (isOn && !hasAnyPumpSignal && idx === 0));
+  const activePumpLabels = visiblePumpStates
+    .map((isActive, idx) => (isActive ? `P${idx + 1}` : null))
+    .filter(Boolean)
+    .join(", ");
 
   const formatUptime = (seconds: number) => {
     const hh = String(Math.floor(seconds / 3600)).padStart(2, "0");
@@ -266,9 +277,17 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
                 {/* Pump Status Grid */}
                 <div>
                   <h4 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">{t.pumpStatus}</h4>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/35 px-3 py-2">
+                    <span className="text-xs font-medium text-muted-foreground">{t.activePumps}</span>
+                    <Badge
+                      variant={activePumpLabels ? "default" : "secondary"}
+                      className={activePumpLabels ? "bg-blue-500 text-white hover:bg-blue-500" : "bg-background text-muted-foreground"}
+                    >
+                      {activePumpLabels || t.noActivePumps}
+                    </Badge>
+                  </div>
                   <div className="grid grid-cols-1 min-[450px]:grid-cols-3 gap-2">
-                    {pumps.slice(0, 3).map((isActive, idx) => {
-                      const active = isActive || (isOn && !hasAnyPumpSignal && idx === 0);
+                    {visiblePumpStates.map((active, idx) => {
                       return (
                       <button
                         key={idx}
