@@ -92,6 +92,7 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
   const { 
     isOn, 
     toggleMachine, 
+    togglePump,
     resetUptime,
     uptimeSeconds,
     pressure, 
@@ -262,15 +263,19 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
                     </div>
                 </div>
 
-                {/* 4 Pump Status Grid */}
+                {/* Pump Status Grid */}
                 <div>
                   <h4 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">{t.pumpStatus}</h4>
-                  <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-5 gap-2">
-                    {pumps.map((isActive, idx) => {
-                      const active = isOn && (isActive || (!hasAnyPumpSignal && idx === 0));
+                  <div className="grid grid-cols-1 min-[450px]:grid-cols-3 gap-2">
+                    {pumps.slice(0, 3).map((isActive, idx) => {
+                      const active = isActive || (isOn && !hasAnyPumpSignal && idx === 0);
                       return (
-                      <div key={idx} className={`
-                        flex flex-col items-center justify-center p-2 rounded-lg border transition-all duration-300 min-h-[80px]
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => togglePump(idx)}
+                        className={`
+                        flex min-h-[98px] flex-col items-center justify-center rounded-lg border p-2 transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-500/60
                         ${active 
                           ? "bg-blue-500/10 border-blue-500/40 shadow-[0_0_10px_rgba(59,130,246,0.1)]" 
                           : "bg-muted/50 border-border opacity-70"
@@ -280,7 +285,10 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
                          <Cpu className={`w-4 h-4 mb-1 ${active ? "text-blue-500 dark:text-blue-400" : "text-muted-foreground"}`} />
                          <span className="text-[9px] text-muted-foreground font-medium text-center leading-tight line-clamp-2 h-6 flex items-center">{t.pumpNames[idx]}</span>
                          <span className="text-[8px] text-muted-foreground font-mono mt-0.5">P{idx + 1}</span>
-                      </div>
+                         <span className={`mt-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${active ? "bg-blue-500 text-white" : "bg-background text-muted-foreground"}`}>
+                           {active ? "ON" : "OFF"}
+                         </span>
+                      </button>
                       );
                     })}
                   </div>
