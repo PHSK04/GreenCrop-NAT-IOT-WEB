@@ -12,7 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { useRef } from "react";
 import mqtt from "mqtt";
 
-const MQTT_BROKER = "wss://broker.hivemq.com:8884/mqtt";
+const MQTT_BROKER = "wss://862ddab18768410486982f71e1ac75bb.s1.eu.hivemq.cloud:8884/mqtt";
+const MQTT_USERNAME = "GreenCropnat";
+const MQTT_PASSWORD = "GreenCropnat123456";
+const MQTT_SENSOR_TOPIC = "smartfarm/sensors";
 
 const showPairingSosToast = (title: string, description?: string) => {
   toast.custom((toastId) => (
@@ -61,12 +64,48 @@ type PairingConnectionState =
   | { status: "connected"; title: string; description: string; deviceId: string; pairingCode: string }
   | { status: "failed"; title: string; description: string; deviceId: string; pairingCode: string };
 
+const parseMqttJson = (raw: string) => {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+};
+
+const matchesPairingAck = (
+  incomingTopic: string,
+  raw: string,
+  statusTopic: string,
+  deviceId: string,
+  pairingCode: string,
+) => {
+  const parsed = parseMqttJson(raw);
+  const status = String(parsed?.status || parsed?.pairing_status || "").toUpperCase();
+  const incomingDeviceId = String(parsed?.device_id || "").toUpperCase();
+  const incomingPairingCode = String(parsed?.pairing_code || "");
+
+  if (
+    incomingDeviceId === deviceId &&
+    incomingPairingCode === pairingCode &&
+    (status === "PAIRED" || status === "PAIRING_PAIRED")
+  ) {
+    return incomingTopic === statusTopic || incomingTopic === MQTT_SENSOR_TOPIC;
+  }
+
+  return incomingTopic === statusTopic &&
+    raw.includes("PAIRED") &&
+    raw.includes(deviceId) &&
+    raw.includes(pairingCode);
+};
+
 const publishPairingAck = (deviceId: string, pairingCode: string) => {
   const tenantId = getSessionTenantId();
   if (!tenantId) return Promise.resolve(false);
 
   const topic = `greencrop/devices/${deviceId}/pairing`;
   const statusTopic = `${topic}/status`;
+  const responseTopics = [statusTopic, MQTT_SENSOR_TOPIC];
   const payload = JSON.stringify({
     project: "GreenCrop NAT IoT",
     status: "PAIRED",
@@ -77,32 +116,36 @@ const publishPairingAck = (deviceId: string, pairingCode: string) => {
   });
 
   return new Promise<boolean>((resolve) => {
+    let timeoutId: number | undefined;
     const client = mqtt.connect(MQTT_BROKER, {
       clientId: `greencrop_pairing_${Math.random().toString(16).slice(2, 10)}`,
-      connectTimeout: 5000,
+      clean: true,
+      connectTimeout: 8000,
+      reconnectPeriod: 0,
+      username: MQTT_USERNAME,
+      password: MQTT_PASSWORD,
     });
     let finished = false;
 
     const finish = (ok: boolean) => {
       if (finished) return;
       finished = true;
+      if (timeoutId) window.clearTimeout(timeoutId);
       client.end(true);
       resolve(ok);
     };
 
-    const timeoutId = window.setTimeout(() => finish(false), 8000);
+    timeoutId = window.setTimeout(() => finish(false), 15000);
 
     client.on("connect", () => {
-      client.subscribe(statusTopic, (subscribeErr) => {
+      client.subscribe(responseTopics, { qos: 0 }, (subscribeErr) => {
         if (subscribeErr) {
-          window.clearTimeout(timeoutId);
           finish(false);
           return;
         }
 
         client.publish(topic, payload, { qos: 0, retain: false }, (err) => {
           if (err) {
-            window.clearTimeout(timeoutId);
             finish(false);
           }
         });
@@ -110,16 +153,13 @@ const publishPairingAck = (deviceId: string, pairingCode: string) => {
     });
 
     client.on("message", (incomingTopic, message) => {
-      if (incomingTopic !== statusTopic) return;
       const raw = message.toString();
-      if (raw.includes("PAIRED") && raw.includes(deviceId) && raw.includes(pairingCode)) {
-        window.clearTimeout(timeoutId);
+      if (matchesPairingAck(incomingTopic, raw, statusTopic, deviceId, pairingCode)) {
         finish(true);
       }
     });
 
     client.on("error", () => {
-      window.clearTimeout(timeoutId);
       finish(false);
     });
   });
