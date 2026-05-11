@@ -13,6 +13,7 @@ import mqtt from 'mqtt';
 interface MachineContextType {
   isOn: boolean;
   toggleMachine: () => void;
+  togglePump: (pumpIndex: number) => void;
   resetUptime: () => void;
   uptimeSeconds: number;
   pressure: number;
@@ -425,7 +426,10 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         timestamp: Date.now(),
       });
       const deviceControlTopic = getDeviceTopic(tenantId, activeDeviceId, 'control');
-      client.publish(deviceControlTopic || TOPIC_CONTROL_LEGACY, payload);
+      client.publish(TOPIC_CONTROL_LEGACY, payload);
+      if (deviceControlTopic) {
+        client.publish(deviceControlTopic, payload);
+      }
     } else {
       setIsSendingControl(false);
       setPendingIsOnAck(null);
@@ -453,11 +457,60 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const togglePump = async (pumpIndex: number) => {
+    if (isSendingControl) return;
+    if (pumpIndex < 0 || pumpIndex > 2) return;
+
+    if (!client || mqttStatus !== 'connected') {
+      toast.error('Command Failed', {
+        description: 'MQTT is not connected, so the board did not receive the pump command.',
+      });
+      return;
+    }
+
+    const { tenantId } = getSessionAuth();
+    const activeDeviceId = getActiveDeviceId();
+    const nextPumpState = !pumps[pumpIndex];
+    const pumpNumber = pumpIndex + 1;
+    const command = `PUMP${pumpNumber}_${nextPumpState ? 'ON' : 'OFF'}`;
+    const payload = JSON.stringify({
+      command,
+      pump: pumpNumber,
+      state: nextPumpState ? 'ON' : 'OFF',
+      tenant_id: tenantId,
+      device_id: activeDeviceId || undefined,
+      timestamp: Date.now(),
+    });
+    const deviceControlTopic = getDeviceTopic(tenantId, activeDeviceId, 'control');
+
+    setIsSendingControl(true);
+    setLastLocalCommandAtMs(Date.now());
+    setPumps((prev) => prev.map((active, index) => (index === pumpIndex ? nextPumpState : active)));
+    client.publish(TOPIC_CONTROL_LEGACY, payload);
+    if (deviceControlTopic) {
+      client.publish(deviceControlTopic, payload);
+    }
+
+    try {
+      await syncAfterCommand();
+    } catch (apiErr) {
+      console.error('Failed to sync pump state with API:', apiErr);
+      toast.error('Network Error', { description: 'Could not connect to API server.' });
+    } finally {
+      setIsSendingControl(false);
+    }
+
+    toast.success(`Pump ${pumpNumber} ${nextPumpState ? 'ON' : 'OFF'}`, {
+      description: `${command} command sent to the board.`,
+    });
+  };
+
   return (
     <MachineContext.Provider
       value={{
         isOn,
         toggleMachine,
+        togglePump,
         resetUptime,
         uptimeSeconds,
         pressure,
