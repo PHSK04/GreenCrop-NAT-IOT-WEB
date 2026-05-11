@@ -15,6 +15,11 @@
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 
+// Hardware config
+// false = ปุ่ม STOP เป็นปุ่มกดธรรมดา NO ใช้ INPUT_PULLUP (กดแล้วอ่าน LOW)
+// true  = ปุ่ม STOP เป็น NC ตามแมนวลเดิม (เปิดวงจรแล้วอ่าน HIGH)
+const bool STOP_BUTTON_IS_NC = false;
+
 // 1. Wi-Fi
 const char* WIFI_SSID     = "P.PHSK";
 const char* WIFI_PASSWORD = "Pphongsagon47.";
@@ -54,6 +59,7 @@ int  pump2Status = 0;      // สถานะปั๊ม 2 (0 = ดับ, 1 = 
 bool isLocked    = false;  // สถานะล็อคระบบ (Safety Interlock)
 bool webStartCommand = false;
 bool webStopCommand  = false;
+bool webPump2OffCommand = false;
 bool isDevicePaired  = false;
 String activeTenantId = DEFAULT_TENANT_ID;
 unsigned long pump2StartedAtMs              = 0;
@@ -199,7 +205,11 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
     webStartCommand = true;
   }
 
-  if (msg.indexOf("PUMP2_OFF") >= 0 || msg.indexOf("STOP") >= 0) {
+  if (msg.indexOf("PUMP2_OFF") >= 0) {
+    webPump2OffCommand = true;
+  }
+
+  if (msg.indexOf("STOP") >= 0) {
     webStopCommand = true;
   }
 
@@ -239,6 +249,7 @@ void publishStatus(
   int stateStart,
   int stateStop
 ) {
+  const bool stopPressed = STOP_BUTTON_IS_NC ? (stateStop == HIGH) : (stateStop == LOW);
   const bool pump1On = !isLocked && stateWLS2 != HIGH && stateWLS1 == HIGH;
   const bool greenOn = !isLocked && pump2Status == 0 && stateWLS2 == HIGH;
   const bool redOn = !isLocked && stateFloat == LOW;
@@ -253,7 +264,7 @@ void publishStatus(
   payload += "\"wls2\":";             payload += boolText(stateWLS2 == HIGH);       payload += ",";
   payload += "\"float_alarm\":";      payload += boolText(stateFloat == LOW);       payload += ",";
   payload += "\"start_button\":";     payload += boolText(stateStart == LOW);       payload += ",";
-  payload += "\"stop_button\":";      payload += boolText(stateStop == HIGH);       payload += ",";
+  payload += "\"stop_button\":";      payload += boolText(stopPressed);              payload += ",";
   payload += "\"locked\":";           payload += boolText(isLocked);                payload += ",";
   payload += "\"pump1_on\":";         payload += boolText(pump1On);                 payload += ",";
   payload += "\"pump2_on\":";         payload += boolText(pump2Status == 1);        payload += ",";
@@ -308,9 +319,10 @@ void loop() {
   int stateFloat = digitalRead(pinFloat);
   int stateStart = digitalRead(pinStart);
   int stateStop  = digitalRead(pinStop);
+  bool stopPressed = STOP_BUTTON_IS_NC ? (stateStop == HIGH) : (stateStop == LOW);
 
   // กด STOP แบบ NC หรือสั่ง STOP จาก MQTT -> ล็อคระบบ
-  if (stateStop == HIGH || webStopCommand) {
+  if (stopPressed || webStopCommand) {
     webStopCommand = false;
     stopAndLock();
   } else {
@@ -337,6 +349,11 @@ void loop() {
         startPump2();
       }
       webStartCommand = false;
+
+      if (webPump2OffCommand) {
+        stopPump2();
+      }
+      webPump2OffCommand = false;
 
       if (pump2Status == 1) {
         digitalWrite(relayPump2, LOW);

@@ -508,7 +508,10 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     const activeDeviceId = getActiveDeviceId();
     const nextPumpState = !pumps[pumpIndex];
     const pumpNumber = pumpIndex + 1;
-    const command = `PUMP${pumpNumber}_${nextPumpState ? 'ON' : 'OFF'}`;
+    const command =
+      pumpNumber === 2
+        ? (nextPumpState ? 'START' : 'STOP')
+        : `PUMP${pumpNumber}_${nextPumpState ? 'ON' : 'OFF'}`;
     const payload = JSON.stringify({
       command,
       pump: pumpNumber,

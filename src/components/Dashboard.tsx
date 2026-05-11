@@ -335,6 +335,8 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   const isAdminUser = String(user?.role || "").toLowerCase() === "admin";
   const [activePage, setActivePage] = useState(isAdminUser ? "Admin Panel" : "Dashboard");
   const [language, setLanguage] = useState("TH");
+  const [tank2On, setTank2On] = useState(false);
+  const [tank3On, setTank3On] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isDesktopSidebarCompact, setIsDesktopSidebarCompact] = useState(false);
   const [devices, setDevices] = useState<AdminDbDeviceRow[]>([]);
@@ -447,7 +449,15 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       case "Help Center":
         return <SupportCenterPage language={language} />;
       case "Tank Levels":
-        return <TankLevelsPage language={language} />;
+        return (
+          <TankLevelsPage
+            language={language}
+            tank2On={tank2On}
+            setTank2On={setTank2On}
+            tank3On={tank3On}
+            setTank3On={setTank3On}
+          />
+        );
       case "My Profile":
         return <MyProfilePage onLogout={onLogout} language={language} />;
 	      case "Admin Panel":
