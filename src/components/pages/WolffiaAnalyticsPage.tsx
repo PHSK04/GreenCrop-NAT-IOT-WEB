@@ -1,42 +1,22 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
-import { Input } from "../ui/input";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Sprout, TrendingUp, Scale, Calendar, ArrowUpRight, Droplets, Timer, Download, FileText } from "lucide-react";
+import { Sprout, TrendingUp, Scale, Droplets, Timer, Download, FileText } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
 import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
-import { rotateBy, seededInt, seededNumber } from "@/utils/deviceData";
-
-// Monthly Wolffia Stats: Yield vs Frequency
-const wolffiaStats = [
-  { month: "Jan", yield: 350, frequency: 8 },
-  { month: "Feb", yield: 395, frequency: 10 },
-  { month: "Mar", yield: 450, frequency: 12 },
-  { month: "Apr", yield: 500, frequency: 12 },
-  { month: "May", yield: 580, frequency: 14 },
-  { month: "Jun", yield: 670, frequency: 15 },
-];
-
-const pondMetrics = [
-  { metric: "Avg Harvest / Month", value: "11.8 times", trend: "+2" },
-  { metric: "Avg Yield / Harvest", value: "42.5 g", trend: "+5%" },
-  { metric: "Total Yield (YTD)", value: "2,945 g", trend: "+18%" },
-  { metric: "Cycle Duration", value: "2-3 Days", trend: "0" },
-];
-
-const recentHarvestLogs = [
-  { id: "#B-06-15-1", weight: "45.2 g", date: "Today, 6:00 AM", interval: "2 days" },
-  { id: "#B-06-13-1", weight: "44.8 g", date: "Jun 13", interval: "2 days" },
-  { id: "#B-06-11-1", weight: "43.5 g", date: "Jun 11", interval: "2 days" },
-  { id: "#B-06-09-1", weight: "46.1 g", date: "Jun 09", interval: "3 days" },
-  { id: "#B-06-06-1", weight: "42.9 g", date: "Jun 06", interval: "2 days" },
-];
+import {
+  CropYieldEntry,
+  getMonthlyYieldSummaries,
+  MonthlyYieldSummary,
+  readCropYieldEntries,
+  subscribeCropYieldEntries,
+} from "@/utils/cropYieldStore";
 
 type WolffiaAnalyticsPageProps = {
   language?: string;
@@ -45,10 +25,14 @@ type WolffiaAnalyticsPageProps = {
 export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPageProps) {
   const { deviceId, seed } = useDeviceSeed();
   const isTH = language === "TH";
+  const locale = isTH ? "th-TH" : "en-US";
+  const activeDeviceId = deviceId || "default";
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
+  const [entries, setEntries] = useState<CropYieldEntry[]>(() => readCropYieldEntries(activeDeviceId));
+  const [selectedMonth, setSelectedMonth] = useState<MonthlyYieldSummary | null>(null);
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([
     "monthly",
     "harvest",
@@ -61,57 +45,63 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
     { key: "metrics", label: isTH ? "ค่าชี้วัดบ่อ" : "Pond Metrics" },
   ];
 
+  useEffect(() => {
+    const refresh = () => setEntries(readCropYieldEntries(activeDeviceId));
+    refresh();
+    return subscribeCropYieldEntries(refresh);
+  }, [activeDeviceId, seed]);
+
+  const filteredEntries = useMemo(() => {
+    const start = exportStart ? new Date(exportStart) : null;
+    const end = exportEnd ? new Date(exportEnd) : null;
+    return entries.filter((entry) => {
+      const date = new Date(entry.date);
+      if (Number.isNaN(date.getTime())) return false;
+      if (start && date < start) return false;
+      if (end && date > end) return false;
+      return true;
+    });
+  }, [entries, exportEnd, exportStart]);
+
   const wolffiaStatsDevice = useMemo(
-    () =>
-      wolffiaStats.map((row, index) => ({
-        ...row,
-        yield: seededInt(row.yield, seed, index, 12, 300, 760),
-        frequency: seededInt(row.frequency, seed, index, 1, 6, 18),
-      })),
-    [seed],
+    () => getMonthlyYieldSummaries(filteredEntries, locale),
+    [filteredEntries, locale],
   );
 
-  const adjustMetricValue = (
-    value: string,
-    index: number,
-    step: number,
-    min: number,
-    max: number,
-    precision: number,
-  ) => {
-    const match = value.match(/-?\d+(\.\d+)?/);
-    if (!match) return value;
-    const base = Number(match[0]);
-    if (!Number.isFinite(base)) return value;
-    const adjusted = seededNumber(base, seed, index, step, min, max, precision);
-    const fixed =
-      precision === 0 ? `${Math.round(adjusted)}` : adjusted.toFixed(precision);
-    return value.replace(match[0], fixed);
-  };
+  const totalYield = filteredEntries.reduce((sum, entry) => sum + entry.yield, 0);
+  const avgHarvestPerMonth = wolffiaStatsDevice.length
+    ? filteredEntries.length / wolffiaStatsDevice.length
+    : 0;
+  const avgYieldPerHarvest = filteredEntries.length ? totalYield / filteredEntries.length : 0;
+  const latestEntries = useMemo(
+    () => [...filteredEntries].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8),
+    [filteredEntries],
+  );
 
   const pondMetricsDevice = useMemo(
-    () =>
-      pondMetrics.map((row, index) => {
-        let value = row.value;
-        if (row.metric.includes("Harvest / Month")) {
-          value = adjustMetricValue(row.value, index, 0.4, 8, 16, 1);
-        } else if (row.metric.includes("Yield / Harvest")) {
-          value = adjustMetricValue(row.value, index, 1.2, 30, 60, 1);
-        } else if (row.metric.includes("Total Yield")) {
-          value = adjustMetricValue(row.value, index, 60, 1800, 4200, 0);
-        }
-        return { ...row, value };
-      }),
-    [seed],
-  );
-
-  const recentHarvestLogsDevice = useMemo(
-    () =>
-      rotateBy(recentHarvestLogs, seed).map((row, index) => ({
-        ...row,
-        weight: `${seededNumber(44.8, seed, index, 0.6, 38.0, 52.0, 1)} g`,
-      })),
-    [seed],
+    () => [
+      {
+        metric: "Avg Harvest / Month",
+        value: `${avgHarvestPerMonth.toFixed(1)} ${isTH ? "ครั้ง" : "times"}`,
+        trend: filteredEntries.length ? `${wolffiaStatsDevice.length} ${isTH ? "เดือน" : "months"}` : "0",
+      },
+      {
+        metric: "Avg Yield / Harvest",
+        value: `${avgYieldPerHarvest.toFixed(1)} g`,
+        trend: filteredEntries.length ? `${filteredEntries.length} ${isTH ? "รายการ" : "entries"}` : "0",
+      },
+      {
+        metric: "Total Yield",
+        value: `${totalYield.toFixed(1)} g`,
+        trend: filteredEntries.length ? "+manual" : "0",
+      },
+      {
+        metric: "Recorded Months",
+        value: `${wolffiaStatsDevice.length}`,
+        trend: "0",
+      },
+    ],
+    [avgHarvestPerMonth, avgYieldPerHarvest, filteredEntries.length, isTH, totalYield, wolffiaStatsDevice.length],
   );
 
   const handleDownload = () => {
@@ -120,11 +110,11 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
         toast.error(isTH ? "ส่งออกล้มเหลว" : "Export Failed", { description: isTH ? "ไม่มีข้อมูลสำหรับส่งออก" : "No data to export." });
         return;
       }
-      const headers = Object.keys(wolffiaStatsDevice[0]).join(",");
       const csvContent =
-        headers +
-        "\n" +
-        wolffiaStatsDevice.map((row) => Object.values(row).join(",")).join("\n");
+        "month,total_yield_g,average_yield_g,harvest_count,avg_ph,avg_oxygen,avg_ec\n" +
+        wolffiaStatsDevice
+          .map((row) => `${row.monthLabel},${row.yield},${row.averageYield},${row.frequency},${row.avgPh},${row.avgOxygen},${row.avgEc}`)
+          .join("\n");
       downloadTextFile("wolffia_monthly_report.csv", csvContent, "text/csv;charset=utf-8");
       
       toast.success(isTH ? "ส่งออกสำเร็จ" : "Export Successful", {
@@ -149,18 +139,18 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
 
     if (selectedDataTypes.includes("monthly")) {
       lines.push(`${isTH ? "ส่วน" : "Section"}, ${isTH ? "สถิติรายเดือน" : "Monthly Stats"}`);
-      lines.push("month,yield,frequency");
+      lines.push("month,total_yield_g,average_yield_g,harvest_count,avg_ph,avg_oxygen,avg_ec");
       wolffiaStatsDevice.forEach((row) => {
-        lines.push(`${row.month},${row.yield},${row.frequency}`);
+        lines.push(`${row.monthLabel},${row.yield},${row.averageYield},${row.frequency},${row.avgPh},${row.avgOxygen},${row.avgEc}`);
       });
       lines.push("");
     }
 
     if (selectedDataTypes.includes("harvest")) {
       lines.push(`${isTH ? "ส่วน" : "Section"}, ${isTH ? "ประวัติเก็บเกี่ยว" : "Harvest History"}`);
-      lines.push("id,weight,date,interval");
-      recentHarvestLogsDevice.forEach((row) => {
-        lines.push(`${row.id},${row.weight},${row.date},${row.interval}`);
+      lines.push("date,yield_g,ph,oxygen,ec,note");
+      filteredEntries.forEach((row) => {
+        lines.push(`${row.date},${row.yield},${row.ph},${row.oxygen},${row.ec},${row.note || ""}`);
       });
       lines.push("");
     }
@@ -253,9 +243,9 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {wolffiaStatsDevice.map((row, i) => (
-                    <TableRow key={i} className="border-border hover:bg-muted/50">
-                      <TableCell className="text-foreground py-2">{row.month}</TableCell>
+                  {wolffiaStatsDevice.map((row) => (
+                    <TableRow key={row.key} className="border-border hover:bg-muted/50">
+                      <TableCell className="text-foreground py-2">{row.monthLabel}</TableCell>
                       <TableCell className="text-emerald-600 dark:text-emerald-400 font-medium text-right py-2">{row.yield}</TableCell>
                       <TableCell className="text-amber-600 dark:text-amber-400 text-right py-2">{row.frequency}</TableCell>
                     </TableRow>
@@ -264,7 +254,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
               </Table>
             </div>
             <p className="text-xs text-muted-foreground mt-3 text-center">
-              * This export includes total biomass yield and harvest counts for Jan-Jun.
+              {isTH ? "* ข้อมูลมาจากรายการที่กรอกในหน้ารายงานผลผลิต" : "* Data comes from manual entries in Crop Reports."}
             </p>
           </div>
 
@@ -313,7 +303,9 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
               {isTH ? "ผลผลิตเทียบความถี่การเก็บเกี่ยว" : "Yield vs. Harvest Frequency"}
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              {isTH ? "เปรียบเทียบผลผลิตรวม (กรัม) กับจำนวนครั้งที่เก็บเกี่ยว (ครั้ง/เดือน)" : "Comparing Total Biomass (g) with Harvest Count (times/month)"}
+              {isTH
+                ? "คำนวณจากผลผลิตที่กรอกเอง แยกตามเดือนและปี กดแท่งสีเขียวเพื่อดูรายวันที่บันทึก"
+                : "Calculated from manual entries by month and year. Click a green bar to inspect daily records."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -322,7 +314,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                 <ComposedChart data={wolffiaStatsDevice} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis 
-                    dataKey="month" 
+                    dataKey="monthLabel" 
                     stroke="hsl(var(--muted-foreground))"
                     fontSize={12}
                     tickLine={false}
@@ -356,11 +348,25 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                     cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar yAxisId="left" dataKey="yield" fill="#10b981" name={isTH ? "ผลผลิตชีวมวล (กรัม)" : "Biomass Yield (g)"} radius={[4, 4, 0, 0]} barSize={40} />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="yield"
+                    fill="#10b981"
+                    name={isTH ? "ผลผลิตชีวมวล (กรัม)" : "Biomass Yield (g)"}
+                    radius={[4, 4, 0, 0]}
+                    barSize={40}
+                    cursor="pointer"
+                    onClick={(data) => setSelectedMonth(data.payload as MonthlyYieldSummary)}
+                  />
                   <Line yAxisId="right" type="monotone" dataKey="frequency" stroke="#f59e0b" strokeWidth={3} name={isTH ? "จำนวนเก็บเกี่ยว (ครั้ง/เดือน)" : "Harvests (times/month)"} dot={{ r: 4, fill: "#f59e0b" }} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
+            {wolffiaStatsDevice.length === 0 && (
+              <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/30 p-4 text-center text-sm text-muted-foreground">
+                {isTH ? "ยังไม่มีข้อมูลผลผลิต กรุณากรอกที่หน้า รายงานผลผลิต" : "No harvest entries yet. Add data in Crop Reports."}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -385,10 +391,11 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                         {isTH
                           ? ({
                               "Avg Harvest / Month": "เก็บเกี่ยวเฉลี่ย/เดือน",
-                              "Avg Yield / Harvest": "ผลผลิตเฉลี่ย/ครั้ง",
-                              "Total Yield": "ผลผลิตรวม",
-                              "Cycle Duration": "ระยะเวลารอบการผลิต",
-                            } as Record<string, string>)[item.metric] || item.metric
+	                              "Avg Yield / Harvest": "ผลผลิตเฉลี่ย/ครั้ง",
+	                              "Total Yield": "ผลผลิตรวม",
+	                              "Recorded Months": "จำนวนเดือนที่มีข้อมูล",
+	                              "Cycle Duration": "ระยะเวลารอบการผลิต",
+	                            } as Record<string, string>)[item.metric] || item.metric
                           : item.metric}
                       </p>
                       <div className="flex items-end justify-between">
@@ -426,32 +433,117 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentHarvestLogsDevice.map((log, index) => (
-                    <TableRow key={index} className="border-border hover:bg-muted/50">
+                  {latestEntries.map((log) => (
+                    <TableRow key={log.id} className="border-border hover:bg-muted/50">
                       <TableCell>
                         <span className="text-sm font-medium text-foreground">
-                          {log.id}
+                          #{log.id.slice(0, 8)}
                         </span>
                         <div className="text-[10px] text-muted-foreground mt-0.5">
-                          {log.date}
+                          {new Date(log.date).toLocaleDateString(locale)}
                         </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="border-border text-amber-600 dark:text-amber-400 bg-amber-500/10">
-                          {log.interval}
+                          {log.note || (isTH ? "กรอกมือ" : "Manual")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{log.weight}</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{log.yield} g</span>
                       </TableCell>
                     </TableRow>
                   ))}
+                  {latestEntries.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
+                        {isTH ? "ยังไม่มีประวัติเก็บเกี่ยว" : "No harvest history yet."}
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
         </div>
       </main>
+
+      <Dialog open={!!selectedMonth} onOpenChange={() => setSelectedMonth(null)}>
+        <DialogContent className="bg-card border-border text-foreground sm:max-w-[720px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Sprout className="w-5 h-5 text-emerald-500" />
+              {selectedMonth
+                ? isTH
+                  ? `รายละเอียดผลผลิต ${selectedMonth.monthLabel}`
+                  : `Harvest details for ${selectedMonth.monthLabel}`
+                : ""}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {selectedMonth
+                ? isTH
+                  ? `ผลผลิตรวม ${selectedMonth.yield} กรัม, เฉลี่ย ${selectedMonth.averageYield} กรัม/ครั้ง, บันทึก ${selectedMonth.frequency} วัน`
+                  : `Total ${selectedMonth.yield} g, average ${selectedMonth.averageYield} g/harvest, ${selectedMonth.frequency} records`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedMonth && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">{isTH ? "ผลผลิตรวม" : "Total Yield"}</p>
+                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{selectedMonth.yield} g</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">{isTH ? "เฉลี่ย/ครั้ง" : "Average"}</p>
+                  <p className="text-xl font-bold text-foreground">{selectedMonth.averageYield} g</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">pH</p>
+                  <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{selectedMonth.avgPh}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">EC</p>
+                  <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">{selectedMonth.avgEc}</p>
+                </div>
+              </div>
+
+              <div className="max-h-[360px] overflow-auto rounded-lg border border-border">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow className="border-border">
+                      <TableHead>{isTH ? "วันที่" : "Date"}</TableHead>
+                      <TableHead className="text-right">{isTH ? "ผลผลิต" : "Yield"}</TableHead>
+                      <TableHead className="text-right">pH</TableHead>
+                      <TableHead className="text-right">{isTH ? "ออกซิเจน" : "Oxygen"}</TableHead>
+                      <TableHead className="text-right">EC</TableHead>
+                      <TableHead>{isTH ? "หมายเหตุ" : "Note"}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedMonth.entries.map((entry) => (
+                      <TableRow key={entry.id} className="border-border hover:bg-muted/50">
+                        <TableCell>{new Date(entry.date).toLocaleDateString(locale)}</TableCell>
+                        <TableCell className="text-right font-bold text-emerald-600 dark:text-emerald-400">{entry.yield} g</TableCell>
+                        <TableCell className="text-right">{entry.ph}</TableCell>
+                        <TableCell className="text-right">{entry.oxygen}</TableCell>
+                        <TableCell className="text-right">{entry.ec}</TableCell>
+                        <TableCell className="text-muted-foreground">{entry.note || "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedMonth(null)} className="border-border text-muted-foreground hover:bg-muted">
+              {isTH ? "ปิด" : "Close"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

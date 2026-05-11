@@ -44,7 +44,7 @@ import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { ModeToggle } from "./mode-toggle";
 import { useMachine } from "../contexts/MachineContext";
 import appLogoGreen from "@/assets/images/3_transparent_logo_green.png";
-import { emitActiveDeviceChanged } from "@/hooks/useActiveDeviceId";
+import { setActiveDeviceIdValue } from "@/hooks/useActiveDeviceId";
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
@@ -335,8 +335,6 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   const isAdminUser = String(user?.role || "").toLowerCase() === "admin";
   const [activePage, setActivePage] = useState(isAdminUser ? "Admin Panel" : "Dashboard");
   const [language, setLanguage] = useState("TH");
-  const [tank2On, setTank2On] = useState(false);
-  const [tank3On, setTank3On] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isDesktopSidebarCompact, setIsDesktopSidebarCompact] = useState(false);
   const [devices, setDevices] = useState<AdminDbDeviceRow[]>([]);
@@ -359,11 +357,8 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       const hasStored = stored ? rows.some((d) => d.device_id === stored) : false;
       const primary = rows.find((d) => d.is_primary)?.device_id;
       const next = (hasStored ? stored : null) || primary || rows[0]?.device_id || "";
-      setActiveDeviceId(next);
-      if (typeof window !== 'undefined') {
-        if (next) localStorage.setItem('active_device_id', next);
-        else localStorage.removeItem('active_device_id');
-      }
+	      setActiveDeviceId(next);
+	      setActiveDeviceIdValue(next);
     } catch {
       setDevices([]);
       setActiveDeviceId("");
@@ -376,11 +371,8 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   }, [user?.id]);
 
   const handleDeviceChange = async (deviceId: string) => {
-    setActiveDeviceId(deviceId);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('active_device_id', deviceId);
-    }
-    emitActiveDeviceChanged();
+	    setActiveDeviceId(deviceId);
+	    setActiveDeviceIdValue(deviceId);
     try {
       await authService.setPrimaryDevice(deviceId);
       setDevices((prev) =>
@@ -393,8 +385,17 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
 
   const renderContent = () => {
     switch (activePage) {
-      case "Dashboard":
-        return isAdminUser ? <AdminOverview language={language} /> : <DashboardPage language={language} />;
+	      case "Dashboard":
+	        return isAdminUser ? (
+	          <AdminOverview language={language} />
+	        ) : (
+	          <DashboardPage
+	            language={language}
+	            devices={devices}
+	            activeDeviceId={activeDeviceId}
+	            onDeviceChange={handleDeviceChange}
+	          />
+	        );
       case "Crop Reports":
         return <CropReportsPage language={language} />;
       case "Sensor Intelligence":
@@ -426,9 +427,8 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
               localStorage.setItem("device_pairing_completed", "true");
               localStorage.removeItem("device_pairing_skipped");
               localStorage.setItem("device_pairing_device_id", deviceId);
-              localStorage.setItem("active_device_id", deviceId);
-              setActiveDeviceId(deviceId);
-              emitActiveDeviceChanged();
+	              setActiveDeviceId(deviceId);
+	              setActiveDeviceIdValue(deviceId);
               authService.getMyDevices().then(setDevices).catch(() => {});
               setActivePage("Dashboard");
             }}
@@ -447,19 +447,19 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       case "Help Center":
         return <SupportCenterPage language={language} />;
       case "Tank Levels":
-        return <TankLevelsPage tank2On={tank2On} setTank2On={setTank2On} tank3On={tank3On} setTank3On={setTank3On} language={language} />;
+        return <TankLevelsPage language={language} />;
       case "My Profile":
         return <MyProfilePage onLogout={onLogout} language={language} />;
-      case "Admin Panel":
-        return isAdminUser ? <AdminOverview language={language} /> : <DashboardPage language={language} />;
-      case "User Management":
-        return isAdminUser ? <UserManagementPage language={language} /> : <DashboardPage language={language} />;
-      case "Audit Logs":
-        return isAdminUser ? <AuditLogsPage language={language} /> : <DashboardPage language={language} />;
-      case "Database Viewer":
-        return isAdminUser ? <DatabaseViewerPage language={language} /> : <DashboardPage language={language} />;
-      default:
-        return <DashboardPage language={language} />;
+	      case "Admin Panel":
+	        return isAdminUser ? <AdminOverview language={language} /> : <DashboardPage language={language} devices={devices} activeDeviceId={activeDeviceId} onDeviceChange={handleDeviceChange} />;
+	      case "User Management":
+	        return isAdminUser ? <UserManagementPage language={language} /> : <DashboardPage language={language} devices={devices} activeDeviceId={activeDeviceId} onDeviceChange={handleDeviceChange} />;
+	      case "Audit Logs":
+	        return isAdminUser ? <AuditLogsPage language={language} /> : <DashboardPage language={language} devices={devices} activeDeviceId={activeDeviceId} onDeviceChange={handleDeviceChange} />;
+	      case "Database Viewer":
+	        return isAdminUser ? <DatabaseViewerPage language={language} /> : <DashboardPage language={language} devices={devices} activeDeviceId={activeDeviceId} onDeviceChange={handleDeviceChange} />;
+	      default:
+	        return <DashboardPage language={language} devices={devices} activeDeviceId={activeDeviceId} onDeviceChange={handleDeviceChange} />;
     }
   };
 

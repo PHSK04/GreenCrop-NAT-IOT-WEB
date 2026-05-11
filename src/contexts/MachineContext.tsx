@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { toast } from 'sonner';
 import mqtt from 'mqtt';
+import { ACTIVE_DEVICE_EVENT_NAME } from '@/hooks/useActiveDeviceId';
 
 interface MachineContextType {
   isOn: boolean;
@@ -136,6 +137,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   const [client, setClient] = useState<mqtt.MqttClient | null>(null);
   const [mqttStatus, setMqttStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   const [isSendingControl, setIsSendingControl] = useState(false);
+  const [activeDeviceId, setActiveDeviceId] = useState(getActiveDeviceId);
 
   const uptimeBaseRef = useRef(0);
   const uptimeSyncedAtRef = useRef<number | null>(null);
@@ -337,8 +339,42 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  useEffect(() => {
-    const mqttClient = mqtt.connect(MQTT_BROKER, {
+	  useEffect(() => {
+	    const handleActiveDeviceChange = () => {
+	      const nextDeviceId = getActiveDeviceId();
+	      setActiveDeviceId(nextDeviceId);
+	      setIsOn(false);
+	      setUptimeBaseSeconds(0);
+	      setUptimeSyncedAtMs(null);
+	      setUptimeSeconds(0);
+	      setPumps([false, false, false, false, false]);
+	      setActiveTank(null);
+	      setEcValue(0);
+	      setPendingIsOnAck(null);
+	      setLastLocalCommandAtMs(null);
+	      lastApiUptimeRef.current = null;
+	    };
+
+	    window.addEventListener(ACTIVE_DEVICE_EVENT_NAME, handleActiveDeviceChange);
+	    window.addEventListener('storage', handleActiveDeviceChange);
+	    return () => {
+	      window.removeEventListener(ACTIVE_DEVICE_EVENT_NAME, handleActiveDeviceChange);
+	      window.removeEventListener('storage', handleActiveDeviceChange);
+	    };
+	  }, []);
+
+	  useEffect(() => {
+	    if (!client || mqttStatus !== 'connected') return;
+	    const { tenantId } = getSessionAuth();
+	    const deviceSensorsTopic = getDeviceTopic(tenantId, activeDeviceId, 'sensors');
+	    if (deviceSensorsTopic) {
+	      client.subscribe(deviceSensorsTopic);
+	    }
+	    fetchApiData();
+	  }, [activeDeviceId, client, fetchApiData, mqttStatus]);
+
+	  useEffect(() => {
+	    const mqttClient = mqtt.connect(MQTT_BROKER, {
       clientId: `smartfarm_web_${Math.random().toString(16).substr(2, 8)}`,
       clean: true,
       connectTimeout: 8000,

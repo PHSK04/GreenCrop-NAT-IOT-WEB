@@ -231,13 +231,12 @@ export function SocialAuth({
     };
 
     const socialButtonBase =
-        "group relative h-14 w-full overflow-hidden rounded-2xl border transition-all duration-200 disabled:opacity-60 " +
-        "border-slate-200 bg-white text-slate-800 shadow-[0_8px_18px_rgba(15,23,42,0.07)] hover:border-emerald-300 hover:bg-emerald-50/50 hover:shadow-[0_12px_24px_rgba(15,23,42,0.10)] " +
-        "dark:border-emerald-600/35 dark:bg-gradient-to-b dark:from-[#05211b] dark:to-[#031914] dark:text-emerald-50 " +
-        "dark:shadow-[inset_0_1px_0_rgba(52,211,153,0.15),0_10px_30px_rgba(2,18,14,0.5)] dark:hover:border-emerald-400/60 dark:hover:shadow-[inset_0_1px_0_rgba(110,231,183,0.25),0_14px_36px_rgba(2,18,14,0.7)]";
+        "group relative h-12 w-full overflow-hidden rounded-[1.1rem] border transition-all duration-200 disabled:opacity-60 " +
+        "border-slate-200 bg-white/90 text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.05)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)] " +
+        "dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-emerald-500/40 dark:hover:bg-slate-900";
 
     return (
-        <div className="pt-2 text-center space-y-4">
+        <div className="space-y-4 pt-2 text-center">
             {showDivider ? (
                 <div className="relative">
                     <div className="absolute inset-0 flex items-center">
@@ -259,9 +258,9 @@ export function SocialAuth({
                     className={socialButtonBase}
                     disabled={!!isLoading}
                 >
-                    <div className="absolute inset-0 bg-emerald-400/0 transition-colors duration-300 group-hover:bg-emerald-500/5 dark:group-hover:bg-emerald-300/5" />
+                    <div className="absolute inset-0 bg-transparent transition-colors duration-300 group-hover:bg-slate-900/[0.02] dark:group-hover:bg-white/[0.03]" />
                     <GoogleIcon />
-                    <span className="ml-3 text-[1.05rem] font-semibold tracking-tight">Google</span>
+                    <span className="ml-3 text-sm font-semibold tracking-tight">Google</span>
                 </Button>
                 
                 <Button 
@@ -271,9 +270,9 @@ export function SocialAuth({
                     className={socialButtonBase}
                     disabled={!!isLoading}
                 >
-                     <div className="absolute inset-0 bg-emerald-400/0 transition-colors duration-300 group-hover:bg-emerald-500/5 dark:group-hover:bg-emerald-300/5" />
+                     <div className="absolute inset-0 bg-transparent transition-colors duration-300 group-hover:bg-slate-900/[0.02] dark:group-hover:bg-white/[0.03]" />
                     <MicrosoftIcon />
-                    <span className="ml-3 text-[1.05rem] font-semibold tracking-tight">Microsoft</span>
+                    <span className="ml-3 text-sm font-semibold tracking-tight">Microsoft</span>
                 </Button>
 
                 <Button 
@@ -283,9 +282,9 @@ export function SocialAuth({
                     className={socialButtonBase}
                     disabled={!!isLoading}
                 >
-                     <div className="absolute inset-0 bg-emerald-400/0 transition-colors duration-300 group-hover:bg-emerald-500/5 dark:group-hover:bg-emerald-300/5" />
+                     <div className="absolute inset-0 bg-transparent transition-colors duration-300 group-hover:bg-slate-900/[0.02] dark:group-hover:bg-white/[0.03]" />
                     <LineIcon />
-                    <span className="ml-3 text-[1.05rem] font-semibold tracking-tight">LINE</span>
+                    <span className="ml-3 text-sm font-semibold tracking-tight">LINE</span>
                 </Button>
 
                 <Button 
@@ -295,9 +294,9 @@ export function SocialAuth({
                     className={socialButtonBase}
                     disabled={!!isLoading}
                 >
-                     <div className="absolute inset-0 bg-emerald-400/0 transition-colors duration-300 group-hover:bg-emerald-500/5 dark:group-hover:bg-emerald-300/5" />
+                     <div className="absolute inset-0 bg-transparent transition-colors duration-300 group-hover:bg-slate-900/[0.02] dark:group-hover:bg-white/[0.03]" />
                     <FacebookIcon />
-                    <span className="ml-3 text-[1.05rem] font-semibold tracking-tight">Facebook</span>
+                    <span className="ml-3 text-sm font-semibold tracking-tight">Facebook</span>
                 </Button>
             </div>
         </div>

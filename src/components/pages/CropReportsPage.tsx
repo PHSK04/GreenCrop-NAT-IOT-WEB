@@ -1,68 +1,22 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
-import { Download, Eye, Calendar, Filter, FileText, Share2, Sprout, Droplets, Zap, Wind } from "lucide-react";
+import { Download, Eye, Calendar, Filter, FileText, Share2, Sprout, Droplets, Zap, Wind, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
-import { seededInt, seededNumber } from "@/utils/deviceData";
-
-const reportData = [
-  {
-    date: "2025-01-24",
-    yield: 145,
-    ph: 7.2,
-    oxygen: 6.8,
-    ec: 1.8,
-  },
-  {
-    date: "2025-01-23",
-    yield: 132,
-    ph: 7.1,
-    oxygen: 6.6,
-    ec: 1.7,
-  },
-  {
-    date: "2025-01-22",
-    yield: 156,
-    ph: 6.9,
-    oxygen: 6.4,
-    ec: 1.9,
-  },
-  {
-    date: "2025-01-21",
-    yield: 128,
-    ph: 7.4,
-    oxygen: 7.1,
-    ec: 1.6,
-  },
-  {
-    date: "2025-01-20",
-    yield: 142,
-    ph: 7.0,
-    oxygen: 6.9,
-    ec: 1.7,
-  },
-  {
-    date: "2025-01-19",
-    yield: 138,
-    ph: 7.2,
-    oxygen: 6.7,
-    ec: 1.8,
-  },
-  {
-    date: "2025-01-18",
-    yield: 125,
-    ph: 6.8,
-    oxygen: 6.5,
-    ec: 1.9,
-  },
-];
+import {
+  addCropYieldEntry,
+  CropYieldEntry,
+  deleteCropYieldEntry,
+  readCropYieldEntries,
+  subscribeCropYieldEntries,
+} from "@/utils/cropYieldStore";
 
 type CropReportsPageProps = {
   language?: string;
@@ -71,21 +25,27 @@ type CropReportsPageProps = {
 export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   const { deviceId, seed } = useDeviceSeed();
   const isTH = language === "TH";
+  const activeDeviceId = deviceId || "default";
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
-  const [selectedReport, setSelectedReport] = useState<typeof reportData[0] | null>(null);
+  const [selectedReport, setSelectedReport] = useState<CropYieldEntry | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedFields, setSelectedFields] = useState<string[]>(["yield", "ph", "oxygen", "ec"]);
+  const [deviceReportData, setDeviceReportData] = useState<CropYieldEntry[]>(() => readCropYieldEntries(activeDeviceId));
+  const [form, setForm] = useState({
+    date: new Date().toISOString().slice(0, 10),
+    yield: "",
+    ph: "7.0",
+    oxygen: "6.5",
+    ec: "1.8",
+    note: "",
+  });
 
-  const deviceReportData = useMemo(() => {
-    return reportData.map((row, index) => ({
-      ...row,
-      yield: seededInt(row.yield, seed, index, 3, 90, 210),
-      ph: seededNumber(row.ph, seed, index, 0.05, 6.4, 7.8, 2),
-      oxygen: seededNumber(row.oxygen, seed, index, 0.08, 5.5, 8.6, 2),
-      ec: seededNumber(row.ec, seed, index, 0.05, 1.1, 2.4, 2),
-    }));
-  }, [seed]);
+  useEffect(() => {
+    const refresh = () => setDeviceReportData(readCropYieldEntries(activeDeviceId));
+    refresh();
+    return subscribeCropYieldEntries(refresh);
+  }, [activeDeviceId, seed]);
 
   const reportSummary = useMemo(() => {
     const days = deviceReportData.length;
@@ -125,6 +85,44 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
       return base;
     });
   }, [filteredReportData, selectedFields]);
+
+  const handleSaveManualEntry = () => {
+    const yieldValue = Number(form.yield);
+    const phValue = Number(form.ph);
+    const oxygenValue = Number(form.oxygen);
+    const ecValue = Number(form.ec);
+
+    if (!form.date || !Number.isFinite(yieldValue) || yieldValue <= 0) {
+      toast.error(isTH ? "กรอกข้อมูลไม่ครบ" : "Missing data", {
+        description: isTH ? "กรุณากรอกวันที่และผลผลิตเป็นตัวเลขมากกว่า 0" : "Please enter a date and yield greater than 0.",
+      });
+      return;
+    }
+
+    addCropYieldEntry({
+      deviceId: activeDeviceId,
+      date: form.date,
+      yield: yieldValue,
+      ph: Number.isFinite(phValue) ? phValue : 7,
+      oxygen: Number.isFinite(oxygenValue) ? oxygenValue : 0,
+      ec: Number.isFinite(ecValue) ? ecValue : 0,
+      note: form.note,
+    });
+
+    setForm((prev) => ({
+      ...prev,
+      yield: "",
+      note: "",
+    }));
+    toast.success(isTH ? "บันทึกผลผลิตแล้ว" : "Harvest saved", {
+      description: isTH ? "ข้อมูลนี้จะถูกนำไปเฉลี่ยใน Wolffia Pond Analytics" : "This entry will be reflected in Wolffia Pond Analytics.",
+    });
+  };
+
+  const handleDeleteEntry = (entryId: string) => {
+    deleteCropYieldEntry(entryId);
+    toast.success(isTH ? "ลบรายการแล้ว" : "Entry deleted");
+  };
 
   const handleDownload = async (data: any[], filename: string, format: "csv" | "pdf") => {
     try {
@@ -182,6 +180,57 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
 
       <main className="page-solid-cards flex-1 overflow-auto p-8">
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 motion-reduce:animate-none">
+          <Card className="mb-6 rounded-xl border border-border shadow-lg !bg-card !opacity-100">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-foreground">
+                <Plus className="h-5 w-5 text-emerald-500" />
+                {isTH ? "กรอกผลผลิตด้วยตนเอง" : "Manual Harvest Entry"}
+              </CardTitle>
+              <CardDescription className="text-muted-foreground">
+                {isTH
+                  ? "ข้อมูลที่บันทึกจะถูกใช้คำนวณค่าเฉลี่ยรายเดือนและรายปีในหน้า Wolffia Pond Analytics"
+                  : "Saved entries are used for monthly and yearly averages in Wolffia Pond Analytics."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "วันที่เก็บ" : "Date"}</p>
+                  <Input type="date" value={form.date} onChange={(event) => setForm((prev) => ({ ...prev, date: event.target.value }))} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "ผลผลิต (กรัม)" : "Yield (g)"}</p>
+                  <Input type="number" min="0" step="0.1" value={form.yield} onChange={(event) => setForm((prev) => ({ ...prev, yield: event.target.value }))} placeholder="120" />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">pH</p>
+                  <Input type="number" step="0.1" value={form.ph} onChange={(event) => setForm((prev) => ({ ...prev, ph: event.target.value }))} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "ออกซิเจน" : "Oxygen"}</p>
+                  <Input type="number" step="0.1" value={form.oxygen} onChange={(event) => setForm((prev) => ({ ...prev, oxygen: event.target.value }))} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">EC</p>
+                  <Input type="number" step="0.1" value={form.ec} onChange={(event) => setForm((prev) => ({ ...prev, ec: event.target.value }))} />
+                </div>
+                <div className="flex items-end">
+                  <Button className="w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700" onClick={handleSaveManualEntry}>
+                    <Plus className="h-4 w-4" />
+                    {isTH ? "บันทึก" : "Save"}
+                  </Button>
+                </div>
+              </div>
+              <div className="mt-3">
+                <Input
+                  value={form.note}
+                  onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
+                  placeholder={isTH ? "หมายเหตุ เช่น รอบเช้า / บ่อ A / คุณภาพดี" : "Note, e.g. morning batch / pond A / good quality"}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           <ExportFiltersCard
             startDate={startDate}
             endDate={endDate}
@@ -261,7 +310,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               <TableBody>
                 {deviceReportData.map((row) => (
                   <TableRow 
-                    key={row.date}
+                    key={row.id}
                     className="border-border hover:bg-muted/50 transition-colors group"
                   >
                     <TableCell className="font-medium text-muted-foreground">
@@ -301,18 +350,36 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
-                        onClick={() => setSelectedReport(row)}
-                      >
-                        <Eye className="w-4 h-4" />
-                        {isTH ? "ดู" : "View"}
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+                          onClick={() => setSelectedReport(row)}
+                        >
+                          <Eye className="w-4 h-4" />
+                          {isTH ? "ดู" : "View"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 border-red-500/30 bg-transparent text-red-600 hover:bg-red-500/10"
+                          onClick={() => handleDeleteEntry(row.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          {isTH ? "ลบ" : "Delete"}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
+                {deviceReportData.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                      {isTH ? "ยังไม่มีข้อมูล กรุณากรอกผลผลิตด้านบน" : "No entries yet. Add a harvest entry above."}
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>

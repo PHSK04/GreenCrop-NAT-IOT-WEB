@@ -4,22 +4,23 @@ import { Badge } from "../ui/badge";
 import { 
   Power, 
   Activity, 
-  Droplets, 
-  Gauge, 
   Wind, 
   Beaker, 
   Zap, 
   Database,
   Cpu,
-  TrendingUp,
   Clock3
 } from "lucide-react";
 import machineModel from "@/assets/images/machine_model.png";
 import { MetricsChart } from "../MetricsChart";
+import type { AdminDbDeviceRow } from "@/features/auth/services/authService";
 
 
 interface DashboardPageProps {
   language?: string;
+  devices?: AdminDbDeviceRow[];
+  activeDeviceId?: string;
+  onDeviceChange?: (deviceId: string) => void;
 }
 
 const translations = {
@@ -39,6 +40,11 @@ const translations = {
     pumpStatus: "Pump Status",
     activePumps: "Active pumps",
     noActivePumps: "No pump running",
+    activeDevice: "Active Device",
+    changeDevice: "Change device",
+    noDevice: "No paired device selected",
+    deviceId: "Device ID",
+    location: "Location",
     tankLevels: "Tank Levels & Flow",
     filling: "Filling Tank",
     idle: "Idle",
@@ -50,9 +56,7 @@ const translations = {
     metrics: {
       ph: { title: "pH Balance", desc: "Acidity Level" },
       do: { title: "Dissolved Oxygen", desc: "Oxygen Saturation" },
-      ec: { title: "Conductivity (EC)", desc: "Nutrient Concentration" },
-      pressure: { title: "Pressure", desc: "System Pressure" },
-      flow: { title: "Flow Rate", desc: "Water Movement" }
+      ec: { title: "Conductivity (EC)", desc: "Nutrient Concentration" }
     },
     pumpNames: ["Water Pump", "Water Pump", "Solid pump", "Water Pump", "Air Pump"]
   },
@@ -72,6 +76,11 @@ const translations = {
     pumpStatus: "สถานะปั๊ม",
     activePumps: "ปั๊มที่ทำงาน",
     noActivePumps: "ยังไม่มีปั๊มทำงาน",
+    activeDevice: "อุปกรณ์ที่กำลังใช้งาน",
+    changeDevice: "เปลี่ยนอุปกรณ์",
+    noDevice: "ยังไม่ได้เลือกอุปกรณ์ที่จับคู่",
+    deviceId: "Device ID",
+    location: "ตำแหน่ง",
     tankLevels: "ระดับน้ำและการไหล",
     filling: "กำลังเติมน้ำถัง",
     idle: "ว่าง",
@@ -83,15 +92,18 @@ const translations = {
     metrics: {
       ph: { title: "ค่าความเป็นกรดด่าง (pH)", desc: "ระดับความเป็นกรด" },
       do: { title: "ออกซิเจนในน้ำ (DO)", desc: "ความอิ่มตัวของออกซิเจน" },
-      ec: { title: "ค่าการนำไฟฟ้า (EC)", desc: "ความเข้มข้นของสารอาหาร" },
-      pressure: { title: "แรงดันน้ำ", desc: "แรงดันในระบบ" },
-      flow: { title: "อัตราการไหล", desc: "การเคลื่อนที่ของน้ำ" }
+      ec: { title: "ค่าการนำไฟฟ้า (EC)", desc: "ความเข้มข้นของสารอาหาร" }
     },
     pumpNames: ["น้ำ", "ปั้มน้ำ", "ปั้มฉีดสารละลาย", "น้ำ", "ปั้มลม"]
   }
 };
 
-export function DashboardPage({ language = "EN" }: DashboardPageProps) {
+export function DashboardPage({
+  language = "EN",
+  devices = [],
+  activeDeviceId = "",
+  onDeviceChange,
+}: DashboardPageProps) {
   const t = translations[language as keyof typeof translations] || translations.EN;
   const { 
     isOn, 
@@ -99,8 +111,6 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
     togglePump,
     resetUptime,
     uptimeSeconds,
-    pressure, 
-    flowRate, 
     pumps, 
     activeTank, 
     ecValue 
@@ -114,6 +124,9 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
     .map((isActive, idx) => (isActive ? `P${idx + 1}` : null))
     .filter(Boolean)
     .join(", ");
+  const activeDevice = devices.find((device) => device.device_id === activeDeviceId);
+  const activeDeviceName = activeDevice?.device_name || activeDeviceId || t.noDevice;
+  const activeDeviceLocation = activeDevice?.location || "-";
 
   const formatUptime = (seconds: number) => {
     const hh = String(Math.floor(seconds / 3600)).padStart(2, "0");
@@ -159,7 +172,54 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
       </header>
 
       <main className="relative z-10 flex-1 overflow-auto p-4 md:p-8">
-        <div className="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:grid-cols-3">
+        <Card className="mb-6 rounded-2xl border-emerald-500/20 bg-card/75 shadow-sm backdrop-blur-sm">
+          <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                {t.activeDevice}
+              </p>
+              <h2 className="mt-1 text-lg font-bold text-foreground">
+                {activeDeviceName}
+              </h2>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
+                  {t.deviceId}: {activeDeviceId || "-"}
+                </Badge>
+                <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
+                  {t.location}: {activeDeviceLocation}
+                </Badge>
+                {activeDevice?.is_primary && (
+                  <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                    Primary
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="w-full md:w-72">
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                {t.changeDevice}
+              </label>
+              <select
+                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground disabled:opacity-60"
+                value={activeDeviceId}
+                onChange={(event) => onDeviceChange?.(event.target.value)}
+                disabled={!devices.length}
+              >
+                {devices.length === 0 ? (
+                  <option value="">{t.noDevice}</option>
+                ) : (
+                  devices.map((device) => (
+                    <option key={String(device.id)} value={device.device_id}>
+                      {device.device_name || device.device_id} ({device.device_id})
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="mb-6 grid grid-cols-1 gap-4 md:mb-8">
           <Card className="rounded-2xl border-border/60 bg-card/70 shadow-sm backdrop-blur-sm">
             <CardContent className="flex items-center justify-between p-4">
               <div>
@@ -168,28 +228,6 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
               </div>
               <div className="rounded-xl bg-primary/15 p-2 text-primary">
                 <Clock3 className="h-5 w-5" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="rounded-2xl border-border/60 bg-card/70 shadow-sm backdrop-blur-sm">
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t.metrics.pressure.title}</p>
-                <p className="mt-1 text-xl font-semibold text-foreground">{pressure.toFixed(1)} <span className="text-xs text-muted-foreground">BAR</span></p>
-              </div>
-              <div className="rounded-xl bg-cyan-500/15 p-2 text-cyan-600 dark:text-cyan-400">
-                <Gauge className="h-5 w-5" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="rounded-2xl border-border/60 bg-card/70 shadow-sm backdrop-blur-sm">
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t.metrics.flow.title}</p>
-                <p className="mt-1 text-xl font-semibold text-foreground">{flowRate.toFixed(1)} <span className="text-xs text-muted-foreground">L/min</span></p>
-              </div>
-              <div className="rounded-xl bg-emerald-500/15 p-2 text-emerald-600 dark:text-emerald-400">
-                <TrendingUp className="h-5 w-5" />
               </div>
             </CardContent>
           </Card>
@@ -376,7 +414,7 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
         </div>
         
         {/* Water Quality & Analytics Metrics */}
-        <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:gap-6">
+        <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
           {[
             {
               title: t.metrics.ph.title,
@@ -408,26 +446,6 @@ export function DashboardPage({ language = "EN" }: DashboardPageProps) {
               bgColor: "bg-yellow-500/10",
               detail: "Current capability to conduct electrical current."
             },
-             {
-              title: t.metrics.pressure.title,
-              value: pressure.toFixed(1),
-              unit: "BAR",
-              status: "Stable",
-              desc: t.metrics.pressure.desc,
-              icon: Gauge,
-              color: "text-purple-600 dark:text-purple-400",
-              bgColor: "bg-purple-500/10",
-            },
-            {
-              title: t.metrics.flow.title,
-              value: flowRate.toFixed(1),
-              unit: "L/min",
-              status: "Active",
-              desc: t.metrics.flow.desc,
-              icon: Droplets,
-              color: "text-green-600 dark:text-green-400",
-              bgColor: "bg-green-500/10",
-            }
           ].map((metric) => (
             <Card key={metric.title} className="rounded-2xl border-border/70 bg-card/65 shadow-md backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
               <CardHeader className="pb-2 p-4">

@@ -1,29 +1,39 @@
 import { useEffect, useMemo, useState } from "react";
 
-const STORAGE_KEY = "active_device_id";
-const EVENT_NAME = "active-device-changed";
+export const ACTIVE_DEVICE_STORAGE_KEY = "active_device_id";
+export const ACTIVE_DEVICE_EVENT_NAME = "active-device-changed";
 
 export function emitActiveDeviceChanged() {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(EVENT_NAME));
+  window.dispatchEvent(new Event(ACTIVE_DEVICE_EVENT_NAME));
+}
+
+export function setActiveDeviceIdValue(deviceId: string) {
+  if (typeof window === "undefined") return;
+  if (deviceId) {
+    window.localStorage.setItem(ACTIVE_DEVICE_STORAGE_KEY, deviceId);
+  } else {
+    window.localStorage.removeItem(ACTIVE_DEVICE_STORAGE_KEY);
+  }
+  emitActiveDeviceChanged();
 }
 
 export function useActiveDeviceId() {
   const [deviceId, setDeviceId] = useState(() => {
     if (typeof window === "undefined") return "";
-    return window.localStorage.getItem(STORAGE_KEY) || "";
+    return window.localStorage.getItem(ACTIVE_DEVICE_STORAGE_KEY) || "";
   });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const update = () => {
-      setDeviceId(window.localStorage.getItem(STORAGE_KEY) || "");
+      setDeviceId(window.localStorage.getItem(ACTIVE_DEVICE_STORAGE_KEY) || "");
     };
     window.addEventListener("storage", update);
-    window.addEventListener(EVENT_NAME, update as EventListener);
+    window.addEventListener(ACTIVE_DEVICE_EVENT_NAME, update as EventListener);
     return () => {
       window.removeEventListener("storage", update);
-      window.removeEventListener(EVENT_NAME, update as EventListener);
+      window.removeEventListener(ACTIVE_DEVICE_EVENT_NAME, update as EventListener);
     };
   }, []);
 
