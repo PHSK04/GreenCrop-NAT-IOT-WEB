@@ -27,26 +27,23 @@ In VS Code:
 
 ## Current control logic
 
-This firmware follows the latest two-system wiring:
+This firmware follows the latest wiring:
 
-- `A0`: WLS1 analog, `analogRead(A0) > 300` means water detected.
-- `D1`: WLS2 digital.
-- `D2`: Start 1 button.
-- `D3`: Start 2 button.
-- `D4`: danger float switch.
+- `D1`: WLS1 lower water level sensor.
+- `D6`: WLS2 upper water level sensor.
+- `GPIO3/RX`: float switch input.
+- `D2`: Start button.
 - `D5`: Stop NC button.
-- `D6`: pump 1 relay.
-- `D7`: green light 1.
-- `D0`: yellow light 1.
-- `D8`: green light 2.
-- `GPIO1/TX`: yellow light 2.
-- `GPIO3/RX`: red light + sound alarm.
+- `D4`: pump 1 relay.
+- `D0`: pump 2 relay + yellow light.
+- `D7`: green light.
+- `D3`: red light.
+- `D8`: ISD1820 sound trigger.
 
 Commands from the web:
 
-- `START` or `START1`: starts system 1 if the board is not locked.
-- `START2`: starts system 2 if the board is not locked.
-- `STOP`: stops both systems and locks the board.
+- `START`: starts pump 2 if the board is not locked.
+- `STOP`: stops all outputs and locks the board.
 
 Unlock condition:
 
@@ -54,9 +51,9 @@ Unlock condition:
 
 Important hardware note:
 
+- `GPIO3/RX` is used as the float switch input, so this firmware does not use `Serial.begin()` or Serial Monitor.
 - `D3`, `D4`, and `D8` are ESP8266 boot-sensitive pins.
-- `GPIO1/TX` and `GPIO3/RX` are also used by Serial Monitor and upload/debug.
-- If upload or boot fails, disconnect relays/switches from those pins during upload or move those signals to safer pins.
+- If upload or boot fails, disconnect relays/switches from boot-sensitive pins during upload or move those signals to safer pins.
 
 ## MQTT topics
 
@@ -72,7 +69,8 @@ const char* DEVICE_ID = "GREENCROP01";
 const char* PAIRING_CODE = "123456";
 ```
 
-The board prints these values in Serial Monitor at `115200`.
+Because `GPIO3/RX` is used by the float switch, the board does not print these values in Serial Monitor.
+Use the constants in the `.ino` file when pairing from the web.
 
 After a successful web pairing, the web app publishes a pairing acknowledgement to:
 
@@ -80,13 +78,12 @@ After a successful web pairing, the web app publishes a pairing acknowledgement 
 greencrop/devices/<device_id>/pairing
 ```
 
-The board then prints:
+The board then replies on:
 
 ```text
-GreenCrop Pairing Complete
-Status: PAIRED
+greencrop/devices/<device_id>/pairing/status
 ```
 
 ## Serial Monitor
 
-Use baud rate `115200`.
+Do not use Serial Monitor with this wiring because `GPIO3/RX` is used by the float switch.
