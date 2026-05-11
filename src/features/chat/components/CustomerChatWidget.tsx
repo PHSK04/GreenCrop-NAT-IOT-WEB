@@ -136,6 +136,13 @@ const isSameCalendarDay = (left?: string | null, right?: string | null) => {
   );
 };
 
+const compareThreads = (left: ChatThread, right: ChatThread) => {
+  const leftTime = new Date(left.last_message_at || left.updated_at || left.created_at || 0).getTime();
+  const rightTime = new Date(right.last_message_at || right.updated_at || right.created_at || 0).getTime();
+  if (leftTime !== rightTime) return rightTime - leftTime;
+  return right.id - left.id;
+};
+
 const downloadBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -201,6 +208,8 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<AssistantMode>("assistant");
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([createAssistantWelcome()]);
+  const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
   const [thread, setThread] = useState<ChatThread | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [historyStart, setHistoryStart] = useState("");
@@ -225,9 +234,13 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const previousAssistantMessageCountRef = useRef(assistantMessages.length);
   const typingTimeoutRef = useRef<number | null>(null);
 
-  const draftKey = useMemo(() => `chat_draft_${thread?.id || "pending"}`, [thread?.id]);
+  const draftKey = useMemo(() => `chat_draft_${selectedThreadId || thread?.id || "pending"}`, [selectedThreadId, thread?.id]);
   const humanListRef = listRef;
   const locale = isTH ? "th-TH" : "en-US";
+  const selectedThread = useMemo(
+    () => threads.find((item) => item.id === selectedThreadId) || thread,
+    [selectedThreadId, thread, threads],
+  );
 
   const updateStickToBottom = () => {
     const node = humanListRef.current;
@@ -254,6 +267,17 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     });
   };
 
+  const loadThreads = async () => {
+    const rows = await chatService.listThreads();
+    const orderedRows = [...rows].sort(compareThreads);
+    setThreads(orderedRows);
+    setSelectedThreadId((current) => {
+      if (current && orderedRows.some((item) => item.id === current)) return current;
+      return orderedRows[0]?.id ?? null;
+    });
+    return orderedRows;
+  };
+
   const loadChat = async (silently = false) => {
     if (!silently) setIsLoading(true);
     try {
@@ -264,6 +288,13 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       setThread(data.thread);
       setUnreadCount(data.thread.customer_unread_count || 0);
       setMessages(data.messages);
+      setThreads((current) => {
+        const next = current.some((item) => item.id === data.thread.id)
+          ? current.map((item) => (item.id === data.thread.id ? data.thread : item))
+          : [data.thread, ...current];
+        return [...next].sort(compareThreads);
+      });
+      setSelectedThreadId(data.thread.id);
       const typingState = await chatService.getTypingStatus(data.thread.id).catch(() => null);
       if (typingState) {
         setIsAdminTyping(Boolean(typingState.admin_typing));
@@ -282,16 +313,46 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     }
   };
 
+  const loadSelectedThreadMessages = async (threadId: number, silently = false) => {
+    if (!silently) setIsLoading(true);
+    try {
+      const data = await chatService.getThreadMessages(threadId, {
+        startDate: historyStart || undefined,
+        endDate: historyEnd || undefined,
+      });
+      setThread(data.thread);
+      setMessages(data.messages);
+      setThreads((current) => {
+        const next = current.some((item) => item.id === data.thread.id)
+          ? current.map((item) => (item.id === data.thread.id ? data.thread : item))
+          : [data.thread, ...current];
+        return [...next].sort(compareThreads);
+      });
+      const typingState = await chatService.getTypingStatus(data.thread.id).catch(() => null);
+      if (typingState) {
+        setIsAdminTyping(Boolean(typingState.admin_typing));
+        setTypingAdminName(String(typingState.admin_name || data.thread.assigned_admin_name || "Admin nat"));
+      }
+      setError("");
+      await chatService.markRead(data.thread.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load chat");
+    } finally {
+      if (!silently) setIsLoading(false);
+    }
+  };
+
   const reportCustomerTyping = (isTyping: boolean) => {
-    if (!thread || mode !== "human") return;
-    chatService.setTypingStatus(thread.id, isTyping).catch(() => {});
+    const activeThread = selectedThread || thread;
+    if (!activeThread || mode !== "human") return;
+    chatService.setTypingStatus(activeThread.id, isTyping).catch(() => {});
     if (typingTimeoutRef.current) {
       window.clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
     }
     if (isTyping) {
       typingTimeoutRef.current = window.setTimeout(() => {
-        chatService.setTypingStatus(thread.id, false).catch(() => {});
+        chatService.setTypingStatus(activeThread.id, false).catch(() => {});
         typingTimeoutRef.current = null;
       }, 3000);
     }
@@ -299,9 +360,18 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
   const refreshThreadState = async () => {
     try {
-      const data = await chatService.getMyThread();
+      const nextThreads = await loadThreads();
+      const targetThreadId = selectedThreadId || nextThreads[0]?.id;
+      const data = targetThreadId
+        ? await chatService.getThreadMessages(targetThreadId)
+        : await chatService.getMyThread();
+
       setThread(data.thread);
-      setUnreadCount(data.thread.customer_unread_count || 0);
+      setUnreadCount(
+        nextThreads.reduce((sum, item) => sum + Number(item.customer_unread_count || 0), 0) ||
+        data.thread.customer_unread_count ||
+        0,
+      );
 
       const latestAdminMessage = [...data.messages].reverse().find((message) => message.sender_role === "admin");
       if (!latestAdminMessage) return;
@@ -329,12 +399,22 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
   useEffect(() => {
     if (!isOpen || mode !== "human") return;
-    loadChat().catch(() => {});
+    loadThreads()
+      .then((items) => {
+        if (items.length === 0) return loadChat();
+        return undefined;
+      })
+      .catch(() => {
+        loadChat().catch(() => {});
+      });
     const timer = window.setInterval(() => {
-      loadChat(true).catch(() => {});
+      loadThreads().catch(() => {});
+      if (selectedThreadId) {
+        loadSelectedThreadMessages(selectedThreadId, true).catch(() => {});
+      }
     }, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [isOpen, mode, historyStart, historyEnd]);
+  }, [isOpen, mode, historyStart, historyEnd, selectedThreadId]);
 
   useEffect(() => {
     return () => {
@@ -350,10 +430,10 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       window.clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
     }
-    if (thread) {
-      chatService.setTypingStatus(thread.id, false).catch(() => {});
+    if (selectedThread || thread) {
+      chatService.setTypingStatus((selectedThread || thread)!.id, false).catch(() => {});
     }
-  }, [isOpen, mode, thread]);
+  }, [isOpen, mode, selectedThread, thread]);
 
   useEffect(() => {
     refreshThreadState().catch(() => {});
@@ -373,6 +453,11 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     if (!thread) return;
     localStorage.setItem(draftKey, draft);
   }, [draft, draftKey, thread]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== "human" || !selectedThreadId) return;
+    loadSelectedThreadMessages(selectedThreadId).catch(() => {});
+  }, [historyEnd, historyStart, isOpen, mode, selectedThreadId]);
 
   useEffect(() => {
     if (!isOpen || mode !== "human") return;
@@ -408,7 +493,12 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
   const openHumanChat = async () => {
     setMode("human");
-    await loadChat();
+    const items = await loadThreads().catch(() => []);
+    if (items.length === 0) {
+      await loadChat();
+      return;
+    }
+    setSelectedThreadId((current) => current ?? items[0]?.id ?? null);
   };
 
   const handleAssistantAction = async (actionKey: string) => {
@@ -444,7 +534,8 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
   const submitMessage = async () => {
     const body = draft.trim();
-    if (!thread || !body) return;
+    const activeThread = selectedThread || thread;
+    if (!activeThread || !body) return;
     setIsSending(true);
     try {
       if (editingMessageId) {
@@ -452,8 +543,19 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
         setEditingMessageId(null);
       } else {
-        const created = await chatService.sendMessage(thread.id, body, replyTo?.id || null);
+        const created = await chatService.sendMessage(activeThread.id, body, replyTo?.id || null);
         setMessages((current) => [...current, created]);
+        setThreads((current) => current.map((item) => (
+          item.id === activeThread.id
+            ? {
+                ...item,
+                last_message_at: created.created_at,
+                last_message_preview: created.body,
+                last_message_sender_role: created.sender_role,
+                last_message_sender_name: created.sender_name,
+              }
+            : item
+        )).sort(compareThreads));
       }
       shouldStickToBottomRef.current = true;
       setDraft("");
@@ -474,7 +576,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   };
 
   const removeMessage = async (messageId: number, scope: "self" | "everyone") => {
-    if (!thread) return;
+    if (!selectedThread && !thread) return;
     const updated = await chatService.deleteMessage(messageId, scope);
     setMessages((current) =>
       scope === "self"
@@ -485,11 +587,13 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   };
 
   const updateCaseStatus = async (nextStatus: ChatThread["status"]) => {
-    if (!thread) return;
+    const activeThread = selectedThread || thread;
+    if (!activeThread) return;
     setIsSending(true);
     try {
-      const updated = await chatService.updateThreadMeta(thread.id, { status: nextStatus });
+      const updated = await chatService.updateThreadMeta(activeThread.id, { status: nextStatus });
       setThread(updated);
+      setThreads((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       setUnreadCount(updated.customer_unread_count || 0);
       toast.success(nextStatus === "closed"
         ? (isTH ? "ปิดเคสแล้ว" : "Case closed")
@@ -502,27 +606,27 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   };
 
   const ownLastMessageRead =
-    thread?.admin_last_read_at &&
+    (selectedThread || thread)?.admin_last_read_at &&
     messages.length > 0 &&
-    new Date(thread.admin_last_read_at).getTime() >= new Date(messages[messages.length - 1].created_at).getTime();
+    new Date(String((selectedThread || thread)?.admin_last_read_at)).getTime() >= new Date(messages[messages.length - 1].created_at).getTime();
 
-  const isClosedForCustomer = mode === "human" && thread?.status === "closed";
+  const isClosedForCustomer = mode === "human" && (selectedThread || thread)?.status === "closed";
   const hasHistoryFilter = Boolean(historyStart || historyEnd);
-  const assignedAdminName = thread?.assigned_admin_name?.trim();
+  const assignedAdminName = (selectedThread || thread)?.assigned_admin_name?.trim();
   const statusToneClass =
-    thread?.status === "closed"
+    (selectedThread || thread)?.status === "closed"
       ? "bg-slate-400"
       : assignedAdminName
         ? "bg-emerald-500"
         : "bg-amber-500";
-  const humanHeaderStatus = thread?.status === "closed"
+  const humanHeaderStatus = (selectedThread || thread)?.status === "closed"
     ? (isTH ? "ปิดเคสแล้ว" : "Case closed")
     : assignedAdminName
       ? `${assignedAdminName}${isTH ? " กำลังดูแลเคส" : " is handling this case"}`
-      : thread?.status === "waiting"
+      : (selectedThread || thread)?.status === "waiting"
         ? (isTH ? "รอเจ้าหน้าที่รับเคส" : "Waiting for support")
         : (isTH ? "มีเจ้าหน้าที่ดูแล" : "Support available");
-  const humanHeaderMeta = thread?.status === "closed"
+  const humanHeaderMeta = (selectedThread || thread)?.status === "closed"
     ? (isTH ? "ดูประวัติได้ แต่ส่งข้อความต่อไม่ได้" : "History is available, but replies are disabled")
     : isAdminTyping
       ? `${typingAdminName || "Admin nat"}${isTH ? " กำลังพิมพ์..." : " is typing..."}`
@@ -628,8 +732,8 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
           const isOwn = message.sender_role === "user";
           const isMessageReadByAdmin = Boolean(
             isOwn &&
-            thread?.admin_last_read_at &&
-            new Date(thread.admin_last_read_at).getTime() >= new Date(message.created_at).getTime(),
+            (selectedThread || thread)?.admin_last_read_at &&
+            new Date(String((selectedThread || thread)?.admin_last_read_at)).getTime() >= new Date(message.created_at).getTime(),
           );
           const previousMessage = index > 0 ? messages[index - 1] : null;
           const shouldShowDayDivider = !previousMessage || !isSameCalendarDay(previousMessage.created_at, message.created_at);
@@ -791,6 +895,45 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                         </SheetDescription>
                       </SheetHeader>
                       <div className="grid gap-3 px-4 pb-4">
+                        <div className="grid gap-2">
+                          <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                            {isTH ? "เคสที่เคยส่ง" : "Your chat cases"}
+                          </div>
+                          {threads.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed border-slate-200 px-3 py-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                              {isTH ? "ยังไม่มีเคสในระบบ" : "No chat cases yet"}
+                            </div>
+                          ) : (
+                            <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                              {threads.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedThreadId(item.id);
+                                    setIsHistoryFilterOpen(false);
+                                  }}
+                                  className={`w-full rounded-2xl border px-3 py-2 text-left transition ${
+                                    selectedThreadId === item.id
+                                      ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                      : "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/60 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/20"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-sm font-medium">#{item.id}</span>
+                                    <span className="text-[11px] opacity-75">{item.status}</span>
+                                  </div>
+                                  <div className="mt-1 line-clamp-2 text-xs opacity-80">
+                                    {item.last_message_preview || (isTH ? "ยังไม่มีข้อความ" : "No messages yet")}
+                                  </div>
+                                  <div className="mt-1 text-[11px] opacity-70">
+                                    {formatTime(item.last_message_at || item.created_at)}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         {hasHistoryFilter && (
                           <Badge variant="outline" className="w-fit border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300">
                             {isTH ? "กำลังกรอง" : "Filtered"}
@@ -838,7 +981,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => exportTranscriptTxt(thread, messages)}
+                    onClick={() => exportTranscriptTxt(selectedThread || thread, messages)}
                     title={isTH ? "ดาวน์โหลดเป็นไฟล์ข้อความ" : "Download as text"}
                     aria-label={isTH ? "ดาวน์โหลดเป็นไฟล์ข้อความ" : "Download as text"}
                   >
@@ -847,13 +990,13 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => exportTranscriptPdf(thread, messages)}
+                    onClick={() => exportTranscriptPdf(selectedThread || thread, messages)}
                     title={isTH ? "ดาวน์โหลดเป็น PDF" : "Download as PDF"}
                     aria-label={isTH ? "ดาวน์โหลดเป็น PDF" : "Download as PDF"}
                   >
                     <Download className="h-4 w-4" />
                   </Button>
-                  {thread?.status === "closed" ? (
+                  {(selectedThread || thread)?.status === "closed" ? (
                     <Button
                       size="icon"
                       variant="ghost"
