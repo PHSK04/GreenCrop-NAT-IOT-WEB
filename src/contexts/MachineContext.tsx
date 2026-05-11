@@ -25,7 +25,9 @@ interface MachineContextType {
 
 const MachineContext = createContext<MachineContextType | undefined>(undefined);
 
-const MQTT_BROKER = 'wss://broker.hivemq.com:8884/mqtt';
+const MQTT_BROKER = 'wss://862ddab18768410486982f71e1ac75bb.s1.eu.hivemq.cloud:8884/mqtt';
+const MQTT_USERNAME = 'GreenCropnat';
+const MQTT_PASSWORD = 'GreenCropnat123456';
 const TOPIC_SENSORS_LEGACY = 'smartfarm/sensors';
 const TOPIC_CONTROL_LEGACY = 'smartfarm/control';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -337,6 +339,10 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const mqttClient = mqtt.connect(MQTT_BROKER, {
       clientId: `smartfarm_web_${Math.random().toString(16).substr(2, 8)}`,
+      clean: true,
+      connectTimeout: 8000,
+      username: MQTT_USERNAME,
+      password: MQTT_PASSWORD,
     });
 
     mqttClient.on('connect', () => {
