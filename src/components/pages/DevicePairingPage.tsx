@@ -85,9 +85,13 @@ const matchesPairingAck = (
   const incomingDeviceId = String(parsed?.device_id || "").toUpperCase();
   const incomingPairingCode = String(parsed?.pairing_code || "");
 
+  if (incomingTopic === MQTT_SENSOR_TOPIC && incomingDeviceId === deviceId) {
+    return true;
+  }
+
   if (
     incomingDeviceId === deviceId &&
-    incomingPairingCode === pairingCode &&
+    (!incomingPairingCode || incomingPairingCode === pairingCode) &&
     (status === "PAIRED" || status === "PAIRING_PAIRED")
   ) {
     return incomingTopic === statusTopic || incomingTopic === MQTT_SENSOR_TOPIC;
@@ -116,6 +120,7 @@ const publishPairingAck = (deviceId: string, pairingCode: string) => {
   });
 
   return new Promise<boolean>((resolve) => {
+    // eslint-disable-next-line prefer-const
     let timeoutId: number | undefined;
     const client = mqtt.connect(MQTT_BROKER, {
       clientId: `greencrop_pairing_${Math.random().toString(16).slice(2, 10)}`,
@@ -149,6 +154,12 @@ const publishPairingAck = (deviceId: string, pairingCode: string) => {
             finish(false);
           }
         });
+
+        window.setTimeout(() => {
+          if (!finished) {
+            client.publish(topic, payload, { qos: 0, retain: false });
+          }
+        }, 1000);
       });
     });
 
