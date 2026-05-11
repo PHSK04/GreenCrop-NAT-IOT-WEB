@@ -58,7 +58,7 @@ int pinStop  = D5;  // ปุ่ม Stop แบบ NC
 // ==================================================
 int relayPump1 = D4;  // ปั๊ม 1
 int relayPump2 = D0;  // ปั๊ม 2 + ไฟเหลือง
-int relayGreen = D7;  // ไฟเขียว
+int relayPump3 = D7;  // ปั๊ม 3
 int relayRed   = D3;  // ไฟแดง
 int pinISD     = D8;  // เสียง ISD1820 P-L
 
@@ -70,6 +70,9 @@ bool isLocked    = false;  // Safety interlock
 
 bool webStartCommand = false;
 bool webStopCommand  = false;
+bool pump1ManualOverride = false;
+bool pump1ManualStatus   = false;
+bool pump3Status         = false;
 
 bool   isDevicePaired = false;
 String activeTenantId = DEFAULT_TENANT_ID;
@@ -131,7 +134,7 @@ unsigned long currentUptimeSeconds() {
 void turnOffAll() {
   digitalWrite(relayPump1, HIGH);
   digitalWrite(relayPump2, HIGH);
-  digitalWrite(relayGreen, HIGH);
+  digitalWrite(relayPump3, HIGH);
   digitalWrite(relayRed,   HIGH);
   digitalWrite(pinISD,     LOW);
 }
@@ -142,6 +145,14 @@ void startPump2() {
   pump2StartedAtMs = millis();
 }
 
+void stopPump2WithoutLock() {
+  if (pump2Status == 1) {
+    accumulatedPump2UptimeSeconds = currentUptimeSeconds();
+  }
+  pump2Status      = 0;
+  pump2StartedAtMs = 0;
+}
+
 void stopAndLock() {
   if (pump2Status == 1) {
     accumulatedPump2UptimeSeconds = currentUptimeSeconds();
@@ -149,6 +160,9 @@ void stopAndLock() {
   pump2Status      = 0;
   pump2StartedAtMs = 0;
   isLocked         = true;
+  pump1ManualOverride = false;
+  pump1ManualStatus = false;
+  pump3Status = false;
   turnOffAll();
 }
 
@@ -208,6 +222,38 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
     msg += (char)payload[i];
   }
 
+  if (msg.indexOf("PUMP1_ON") >= 0) {
+    pump1ManualOverride = true;
+    pump1ManualStatus = true;
+  }
+
+  if (msg.indexOf("PUMP1_OFF") >= 0) {
+    pump1ManualOverride = true;
+    pump1ManualStatus = false;
+  }
+
+  if (msg.indexOf("PUMP1_AUTO") >= 0) {
+    pump1ManualOverride = false;
+  }
+
+  if (msg.indexOf("PUMP2_ON") >= 0) {
+    startPump2();
+  }
+
+  if (msg.indexOf("PUMP2_OFF") >= 0) {
+    stopPump2WithoutLock();
+  }
+
+  if (msg.indexOf("PUMP3_ON") >= 0) {
+    if (!isLocked) {
+      pump3Status = true;
+    }
+  }
+
+  if (msg.indexOf("PUMP3_OFF") >= 0) {
+    pump3Status = false;
+  }
+
   if (String(topic) == pairingTopic()) {
     applyPairingMessage(msg);
   }
@@ -262,7 +308,9 @@ void publishStatus(
   int stateStart,
   int stateStop
 ) {
-  const bool pump1On = !isLocked && stateWLS1 == HIGH && stateWLS2 != HIGH;
+  const bool pump1AutoOn = stateWLS1 == HIGH && stateWLS2 != HIGH;
+  const bool pump1On = !isLocked && (pump1ManualOverride ? pump1ManualStatus : pump1AutoOn);
+  const bool pump3On = !isLocked && pump3Status;
   const bool alarmOn = !isLocked && stateFloat == LOW;
 
   String payload = "{";
@@ -283,13 +331,16 @@ void publishStatus(
   payload += "\"locked\":";          payload += boolText(isLocked);                 payload += ",";
   payload += "\"pump1_on\":";        payload += boolText(pump1On);                  payload += ",";
   payload += "\"pump2_on\":";        payload += boolText(pump2Status == 1);         payload += ",";
+  payload += "\"pump3_on\":";        payload += boolText(pump3On);                  payload += ",";
   payload += "\"alarm_on\":";        payload += boolText(alarmOn);                  payload += ",";
-  payload += "\"is_on\":";           payload += boolText(pump1On || pump2Status == 1); payload += ",";
+  payload += "\"is_on\":";           payload += boolText(pump1On || pump2Status == 1 || pump3On); payload += ",";
   payload += "\"uptime_seconds\":";  payload += String(currentUptimeSeconds());     payload += ",";
   payload += "\"pumps\":[";
   payload += pump1On          ? "1" : "0"; payload += ",";
   payload += pump2Status == 1 ? "1" : "0";
-  payload += ",0,0,0]}";
+  payload += ",";
+  payload += pump3On ? "1" : "0";
+  payload += ",0,0]}";
 
   mqttClient.publish(TOPIC_SENSORS, payload.c_str());
 
@@ -313,7 +364,7 @@ void setup() {
 
   pinMode(relayPump1, OUTPUT);
   pinMode(relayPump2, OUTPUT);
-  pinMode(relayGreen, OUTPUT);
+  pinMode(relayPump3, OUTPUT);
   pinMode(relayRed,   OUTPUT);
   pinMode(pinISD,     OUTPUT);
 
@@ -364,7 +415,9 @@ void loop() {
       // --------------------------------------------------
       // 3. ปั๊ม 1 อัตโนมัติ
       // --------------------------------------------------
-      if (stateWLS2 == HIGH) {
+      if (pump1ManualOverride) {
+        digitalWrite(relayPump1, pump1ManualStatus ? LOW : HIGH);
+      } else if (stateWLS2 == HIGH) {
         digitalWrite(relayPump1, HIGH);
       } else if (stateWLS1 == HIGH) {
         digitalWrite(relayPump1, LOW);
@@ -382,15 +435,11 @@ void loop() {
 
       if (pump2Status == 1) {
         digitalWrite(relayPump2, LOW);
-        digitalWrite(relayGreen, HIGH);
       } else {
         digitalWrite(relayPump2, HIGH);
-        if (stateWLS2 == HIGH) {
-          digitalWrite(relayGreen, LOW);
-        } else {
-          digitalWrite(relayGreen, HIGH);
-        }
       }
+
+      digitalWrite(relayPump3, pump3Status ? LOW : HIGH);
 
       // --------------------------------------------------
       // 5. ลูกลอยระดับอันตราย -> ไฟแดง + เสียง
