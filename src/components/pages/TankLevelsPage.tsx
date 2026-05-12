@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Progress } from "../ui/progress";
@@ -221,33 +221,47 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
       <main className="flex-1 overflow-auto p-8 ">
         
         {/* Metric Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-           <Card className="rounded-xl border border-border bg-card/50 p-4 flex items-center gap-4">
-              <div className="p-3 rounded-full bg-blue-500/10 text-blue-500 dark:text-blue-400"><Droplets className="w-6 h-6" /></div>
+        <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_1.85fr] gap-6 mb-8">
+           <Card className="rounded-xl border border-border bg-card/50 p-5 flex items-center gap-4">
+              <div className="p-3 rounded-full bg-blue-500/10 text-blue-500 dark:text-blue-400">
+                 <Droplets className="w-6 h-6" />
+              </div>
               <div>
                  <p className="text-sm text-muted-foreground">Total Reserve</p>
-                 <p className="text-2xl font-bold text-foreground">{totalVolume.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">L</span></p>
+                 <p className="text-3xl font-bold text-foreground">
+                    {totalVolume.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">L</span>
+                 </p>
               </div>
            </Card>
-           <Card className="rounded-xl border border-border bg-card/50 p-4 flex items-center gap-4">
-              <div className="p-3 rounded-full bg-cyan-500/10 text-cyan-500 dark:text-cyan-400"><Waves className="w-6 h-6" /></div>
-              <div>
-                 <p className="text-sm text-muted-foreground">Net Flow In</p>
-                 <p className="text-2xl font-bold text-foreground">{flowRateLive} <span className="text-sm font-normal text-muted-foreground">L/min</span></p>
-              </div>
-           </Card>
-           <Card className="rounded-xl border border-border bg-card/50 p-4 flex items-center gap-4">
-              <div className="p-3 rounded-full bg-purple-500/10 text-purple-500 dark:text-purple-400"><Gauge className="w-6 h-6" /></div>
-              <div>
-                 <p className="text-sm text-muted-foreground">Sys Pressure</p>
-                 <p className="text-2xl font-bold text-foreground">{pressureLive} <span className="text-sm font-normal text-muted-foreground">PSI</span></p>
-              </div>
-           </Card>
-           <Card className="rounded-xl border border-border bg-card/50 p-4 flex items-center gap-4">
-              <div className="p-3 rounded-full bg-amber-500/10 text-amber-500 dark:text-amber-400"><AlertCircle className="w-6 h-6" /></div>
-              <div>
-                 <p className="text-sm text-muted-foreground">Alerts</p>
-                 <p className="text-2xl font-bold text-foreground">{activeAlerts} <span className="text-sm font-normal text-muted-foreground">Active</span></p>
+           <Card className="rounded-xl border border-border bg-card/50 p-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                 <div className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-4 py-3">
+                    <div className="p-2 rounded-full bg-cyan-500/10 text-cyan-500 dark:text-cyan-400">
+                       <Waves className="w-5 h-5" />
+                    </div>
+                    <div>
+                       <p className="text-sm text-muted-foreground">Net Flow In</p>
+                       <p className="text-2xl font-bold text-foreground">{flowRateLive} <span className="text-sm font-normal text-muted-foreground">L/min</span></p>
+                    </div>
+                 </div>
+                 <div className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-4 py-3">
+                    <div className="p-2 rounded-full bg-purple-500/10 text-purple-500 dark:text-purple-400">
+                       <Gauge className="w-5 h-5" />
+                    </div>
+                    <div>
+                       <p className="text-sm text-muted-foreground">Sys Pressure</p>
+                       <p className="text-2xl font-bold text-foreground">{pressureLive} <span className="text-sm font-normal text-muted-foreground">PSI</span></p>
+                    </div>
+                 </div>
+                 <div className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-4 py-3">
+                    <div className="p-2 rounded-full bg-amber-500/10 text-amber-500 dark:text-amber-400">
+                       <AlertCircle className="w-5 h-5" />
+                    </div>
+                    <div>
+                       <p className="text-sm text-muted-foreground">Alerts</p>
+                       <p className="text-2xl font-bold text-foreground">{activeAlerts} <span className="text-sm font-normal text-muted-foreground">Active</span></p>
+                    </div>
+                 </div>
               </div>
            </Card>
         </div>
@@ -283,51 +297,39 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                 </div>
               </CardHeader>
               
-              <CardContent className="relative z-10 space-y-6">
-                {/* Status Indicators */}
-                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div>
-                        <span className="text-sm font-medium text-muted-foreground">{t.systemStatus}: <span className="text-amber-600 dark:text-amber-400">{t.resting}</span></span>
-                    </div>
-                    <Badge variant="secondary" className="bg-secondary text-secondary-foreground">{t.autoMode}</Badge>
+              <CardContent className="relative z-10 space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                   <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                      <p className="text-xs text-muted-foreground mb-1">{t.systemStatus}</p>
+                      <div className="flex items-center gap-2">
+                         <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div>
+                         <span className="text-sm font-semibold text-foreground">{t.resting}</span>
+                      </div>
+                   </div>
+                   <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                      <p className="text-xs text-muted-foreground mb-1">{t.waterLevel}</p>
+                      <p className="text-lg font-semibold text-foreground">{tank1WaterCm} <span className="text-xs text-muted-foreground">cm</span></p>
+                   </div>
                 </div>
 
-                {/* Resting Timer Progress */}
                 <div className="space-y-2">
                    <div className="flex justify-between items-end">
                       <span className="text-xs text-muted-foreground">{t.restingProgress}</span>
                       <span className="text-sm font-bold text-muted-foreground">18h 45m / 20h</span>
                    </div>
                    <Progress value={93.75} className="h-2 bg-secondary" indicatorClassName="bg-amber-500" />
-                   
-                   {/* TIME REMAINING DISPLAY */}
-                   <div className="flex items-center justify-between bg-card p-2 rounded border border-border mt-2">
-                      <span className="text-xs text-muted-foreground">{t.timeRemaining}:</span>
-                      <span className="text-sm font-bold text-amber-600 dark:text-amber-400 animate-pulse">1 hr 15 mins</span>
+                   <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
+                      <span className="text-xs text-muted-foreground">{t.timeRemaining}</span>
+                      <span className="text-sm font-bold text-amber-600 dark:text-amber-400">1 hr 15 mins</span>
                    </div>
                 </div>
 
-                {/* Metrics Grid */}
-                <div className="grid grid-cols-1 gap-4">
-                   <div className="p-3 rounded-lg bg-muted/50 border border-border">
-                      <div className="flex items-center gap-2 mb-1">
-                         <Waves className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
-                         <span className="text-xs text-muted-foreground">{t.waterLevel}</span>
-                      </div>
-                      <div className="text-lg font-semibold text-foreground">{tank1WaterCm} <span className="text-xs text-muted-foreground">cm</span></div>
+                <div className="rounded-lg border border-dashed border-border bg-background/60 px-3 py-2">
+                   <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground">Feed routing</span>
+                      <Badge variant="secondary" className="bg-secondary text-secondary-foreground">{t.autoMode}</Badge>
                    </div>
-                </div>
-
-                {/* Controls */}
-                <div className="pt-2">
-                   <Button 
-                     variant="ghost"
-                     className="w-full gap-2 text-muted-foreground border border-border cursor-not-allowed hover:bg-transparent"
-                   >
-                      <RefreshCw className="w-4 h-4" />
-                      Waiting for Timer...
-                   </Button>
+                   <p className="mt-2 text-sm text-foreground">Source tank is stabilizing before transfer to Preparation Tank (2).</p>
                 </div>
               </CardContent>
             </Card>
@@ -376,7 +378,18 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                  </div>
 
                 {/* Detailed Sensors Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
+                    <div className="p-2 rounded bg-muted/40 border border-border">
+                        <p className="text-xs text-muted-foreground">Tank 1 Status</p>
+                        <p className="text-sm font-bold text-foreground">{t.resting}</p>
+                        <p className="text-[10px] text-amber-600/80 dark:text-amber-400/80">Source under monitoring</p>
+                    </div>
+
+                    <div className="p-2 rounded bg-muted/40 border border-border">
+                        <p className="text-xs text-muted-foreground">Tank 1 Water Level</p>
+                        <p className="text-lg font-bold text-foreground">{tank1WaterCm} <span className="text-xs font-normal">cm</span></p>
+                    </div>
+
                     <div className="p-2 rounded bg-muted/40 border border-border">
                         <p className="text-xs text-muted-foreground">pH Level</p>
                         <p className="text-lg font-bold text-red-600 dark:text-red-400">{tank2Ph}</p>
@@ -387,6 +400,41 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                         <p className="text-xs text-muted-foreground">EC</p>
                         <p className="text-lg font-bold text-foreground">{tank2Ec} <span className="text-xs font-normal">mS/cm</span></p>
                     </div>
+
+                    <div className="p-2 rounded bg-muted/40 border border-border">
+                        <p className="text-xs text-muted-foreground">Tank 1 Time Remaining</p>
+                        <p className="text-sm font-bold text-amber-600 dark:text-amber-400">1 hr 15 mins</p>
+                        <p className="text-[10px] text-muted-foreground">Before release to mix stage</p>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-background/60 p-4 space-y-3">
+                   <div className="flex items-center justify-between gap-3">
+                      <div>
+                         <p className="text-sm font-semibold text-foreground">Raw Water Feed Snapshot</p>
+                         <p className="text-xs text-muted-foreground">Tank 1 context moved here for the preparation workflow</p>
+                      </div>
+                      <Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+                         {t.tank1}
+                      </Badge>
+                   </div>
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="rounded-lg border border-border bg-muted/40 p-3">
+                         <p className="text-xs text-muted-foreground">{t.restingProgress}</p>
+                         <Progress value={93.75} className="mt-2 h-2 bg-secondary" indicatorClassName="bg-amber-500" />
+                         <p className="mt-2 text-sm font-semibold text-foreground">18h 45m / 20h</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-muted/40 p-3">
+                         <p className="text-xs text-muted-foreground">Live Transfer Readiness</p>
+                         <p className="mt-1 text-lg font-bold text-foreground">{flowRateLive} <span className="text-xs font-normal text-muted-foreground">L/min incoming</span></p>
+                         <p className="text-[10px] text-muted-foreground">System pressure {pressureLive} PSI</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-muted/40 p-3">
+                         <p className="text-xs text-muted-foreground">Exception Watch</p>
+                         <p className="mt-1 text-lg font-bold text-foreground">{activeAlerts}</p>
+                         <p className="text-[10px] text-muted-foreground">Active alerts affecting transfer</p>
+                      </div>
+                   </div>
                 </div>
 
                 {/* Analysis & Recommendation Engine */}
