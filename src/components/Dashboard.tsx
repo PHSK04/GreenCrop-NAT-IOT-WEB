@@ -50,7 +50,7 @@ const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
   { icon: Droplets, label: "Tank Levels" }, 
   { icon: ClipboardList, label: "Crop Reports" },
-  { icon: Zap, label: "Sensor Intelligence" },
+  { icon: Zap, label: "Device Monitor" },
   { icon: Settings, label: "Farm Settings" },
   { icon: Cpu, label: "Device Pairing" },
 ];
