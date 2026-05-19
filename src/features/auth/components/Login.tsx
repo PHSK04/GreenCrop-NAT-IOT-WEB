@@ -4,15 +4,21 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowRight,
-  Cpu,
+  BarChart3,
+  Droplets,
   Eye,
   EyeOff,
   Leaf,
   Loader2,
   Lock,
   Mail,
-  Radio,
+  Play,
   ShieldCheck,
+  ShoppingBasket,
+  Sprout,
+  Sun,
+  Thermometer,
+  Wifi,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,24 +49,40 @@ interface LoginProps {
   onLogin?: () => void;
 }
 
-const platformSignals = [
+const navItems = ["หน้าแรก", "เกี่ยวกับเรา", "เทคโนโลยี", "การเลี้ยง", "สินค้า", "บทความ", "ติดต่อเรา"];
+
+const floatingMetrics = [
+  { icon: Droplets, label: "pH", value: "6.5", position: "left-[3%] top-[22%]" },
+  { icon: Sprout, label: "DO", value: "6.2 mg/L", position: "left-[-2%] bottom-[18%]" },
+  { icon: Thermometer, label: "อุณหภูมิ", value: "25.8°C", position: "right-[1%] top-[30%]" },
+  { icon: Sun, label: "แสง", value: "220", position: "right-[-2%] bottom-[12%]" },
+];
+
+const featureItems = [
   {
-    icon: Radio,
-    label: "Sensor Network",
-    value: "Always Connected",
-    detail: "Realtime device telemetry and environmental monitoring",
+    icon: Wifi,
+    title: "ควบคุมอัจฉริยะ",
+    detail: "ติดตามคุณภาพน้ำแบบเรียลไทม์ผ่าน IoT",
   },
   {
-    icon: Cpu,
-    label: "Operations Core",
-    value: "Centralized Control",
-    detail: "Manage irrigation, tanks, crops, and machine status in one place",
+    icon: BarChart3,
+    title: "เพิ่มประสิทธิภาพผลผลิต",
+    detail: "วิเคราะห์ข้อมูล pH, EC, DO และอุณหภูมิ",
   },
   {
     icon: ShieldCheck,
-    label: "Security Layer",
-    value: "Protected Access",
-    detail: "Verified sign-in for operators, admins, and farm stakeholders",
+    title: "ปลอดภัย ไร้สารตกค้าง",
+    detail: "ควบคุมสภาพแวดล้อมให้เหมาะกับไข่ผำ",
+  },
+  {
+    icon: Leaf,
+    title: "ยั่งยืน เป็นมิตรต่อสิ่งแวดล้อม",
+    detail: "ใช้น้ำน้อย ลดของเสีย และดูแลง่าย",
+  },
+  {
+    icon: ShoppingBasket,
+    title: "จัดการผลผลิต",
+    detail: "บันทึกและส่งออกรายงานรายวันได้ทันที",
   },
 ];
 
@@ -89,296 +111,259 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#f4f7f1] text-slate-900">
-      <style>{`
-        @keyframes softFloat {
-          0% { transform: translate3d(0, 0, 0); }
-          50% { transform: translate3d(0, -14px, 0); }
-          100% { transform: translate3d(0, 0, 0); }
-        }
-
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(18px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        .soft-float {
-          animation: softFloat 14s ease-in-out infinite;
-        }
-
-        .fade-up {
-          animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .soft-float,
-          .fade-up {
-            animation: none !important;
-          }
-        }
-      `}</style>
-
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,#fbfcf8_0%,#f0f5ee_58%,#edf2ea_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(167,243,208,0.22),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(187,247,208,0.16),transparent_28%)]" />
+    <div className="relative min-h-screen overflow-hidden bg-[#f8faf6] text-slate-900">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_36%,rgba(159,190,137,0.22),transparent_30%),radial-gradient(circle_at_18%_8%,rgba(255,255,255,0.95),transparent_28%)]" />
       <div
-        className="absolute inset-0 opacity-[0.045]"
+        className="absolute inset-0 opacity-[0.035]"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(15,23,42,0.9) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.9) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
+            "linear-gradient(rgba(21,58,35,0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(21,58,35,0.8) 1px, transparent 1px)",
+          backgroundSize: "56px 56px",
         }}
       />
-      <div className="soft-float absolute left-[-8%] top-[10%] h-72 w-72 rounded-full bg-emerald-200/20 blur-3xl" />
-      <div className="soft-float absolute bottom-[-8%] right-[-6%] h-80 w-80 rounded-full bg-lime-100/30 blur-3xl [animation-delay:-7s]" />
 
-      <div className="relative z-10 min-h-screen px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-        <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-[1240px] overflow-hidden rounded-[2rem] border border-white/70 bg-white/82 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur-xl lg:min-h-[calc(100vh-4rem)]">
-          <section className="relative hidden w-[54%] overflow-hidden border-r border-slate-200/70 lg:flex">
-            <div className="absolute inset-0 bg-[linear-gradient(160deg,rgba(15,23,42,0.96)_0%,rgba(20,43,35,0.94)_52%,rgba(33,77,57,0.88)_100%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(110,231,183,0.18),transparent_20%),radial-gradient(circle_at_80%_24%,rgba(255,255,255,0.08),transparent_20%),radial-gradient(circle_at_70%_78%,rgba(134,239,172,0.16),transparent_22%)]" />
-            <div
-              className="absolute inset-0 opacity-[0.08]"
-              style={{
-                backgroundImage:
-                  "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
-                backgroundSize: "52px 52px",
-              }}
-            />
-
-            <div className="relative z-10 flex w-full flex-col justify-between p-8 xl:p-10">
-              <div className="flex items-center justify-between">
-                <div className="inline-flex items-center gap-3 rounded-full border border-white/12 bg-white/6 px-4 py-2 backdrop-blur">
-                  <div className="rounded-full bg-white/10 p-2">
-                    <img src={appLogoGreen} alt="GreenCrop NATIOT logo" className="h-8 w-8 object-contain" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-200/90">
-                      GreenCrop NATIOT
-                    </div>
-                    <div className="text-sm text-slate-300">Smart Farm Control Platform</div>
-                  </div>
-                </div>
-
-                <div className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
-                  Secure Access
-                </div>
-              </div>
-
-              <div className="fade-up max-w-2xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-200">
-                  <Leaf className="h-3.5 w-3.5 text-emerald-300" />
-                  Professional IoT Operations
-                </div>
-                <h1 className="mt-6 max-w-xl font-['Montserrat'] text-5xl font-semibold leading-[1.05] tracking-[-0.05em] text-white xl:text-6xl">
-                  Formal access to your modern farm command center.
-                </h1>
-                <p className="mt-6 max-w-xl text-base leading-8 text-slate-300">
-                  Monitor crop systems, tank levels, machine performance, and live telemetry through a clean
-                  and secure interface built for day-to-day operations.
-                </p>
-              </div>
-
-              <div className="grid gap-4 xl:grid-cols-3">
-                {platformSignals.map(({ icon: Icon, label, value, detail }, index) => (
-                  <div
-                    key={label}
-                    className="fade-up rounded-[1.6rem] border border-white/10 bg-white/8 p-5 backdrop-blur-sm"
-                    style={{ animationDelay: `${160 + index * 110}ms` }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="rounded-2xl bg-emerald-400/12 p-3">
-                        <Icon className="h-5 w-5 text-emerald-200" />
-                      </div>
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.55)]" />
-                    </div>
-                    <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                      {label}
-                    </div>
-                    <div className="mt-2 text-lg font-semibold text-white">{value}</div>
-                    <p className="mt-3 text-sm leading-6 text-slate-300">{detail}</p>
-                  </div>
-                ))}
-              </div>
+      <header className="relative z-20 mx-auto flex w-full max-w-[1440px] items-center justify-between px-6 py-6 lg:px-10">
+        <button type="button" className="flex items-center gap-4 text-left" onClick={onSwitchToRegister}>
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white shadow-sm ring-1 ring-emerald-100">
+            <img src={appLogoGreen} alt="GreenCrop NATIOT logo" className="h-8 w-8 object-contain" />
+          </div>
+          <div>
+            <div className="font-['Montserrat'] text-3xl font-semibold leading-none tracking-[-0.04em] text-[#244f2f]">
+              ไข่ผำ
             </div>
-          </section>
+            <div className="mt-1 text-xs font-medium text-slate-500">เทคโนโลยีเพื่อการเลี้ยงที่ยั่งยืน</div>
+          </div>
+        </button>
 
-          <section className="relative flex w-full flex-1 items-center justify-center px-4 py-8 sm:px-6 lg:w-[46%] lg:px-10 xl:px-12">
-            <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
-              <ModeToggle />
-            </div>
+        <nav className="hidden items-center gap-9 text-sm font-medium text-slate-600 lg:flex">
+          {navItems.map((item, index) => (
+            <span key={item} className={index === 0 ? "relative text-[#244f2f]" : ""}>
+              {item}
+              {index === 0 && <span className="absolute -bottom-5 left-0 h-0.5 w-full rounded-full bg-[#2e6b3d]" />}
+            </span>
+          ))}
+        </nav>
 
-            <div className="fade-up relative z-10 w-full max-w-[460px]">
-              <div className="rounded-[1.9rem] border border-slate-200/90 bg-white/92 p-5 shadow-[0_20px_55px_rgba(15,23,42,0.08)] backdrop-blur sm:p-8">
-                <div className="lg:hidden">
-                  <div className="inline-flex items-center gap-3 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2">
-                    <img src={appLogoGreen} alt="GreenCrop NATIOT logo" className="h-8 w-8 object-contain" />
-                    <div className="text-left">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">
-                        GreenCrop NATIOT
-                      </div>
-                      <div className="text-xs text-slate-500">Smart Farm Control Platform</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 sm:mt-0">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                    Operator Login
-                  </div>
-                  <h2 className="mt-5 font-['Montserrat'] text-3xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-[2.55rem]">
-                    Sign in
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-slate-500 sm:text-[15px]">
-                    Use your GreenCrop account to enter the operational dashboard and manage your IoT farm
-                    environment securely.
-                  </p>
-                </div>
-
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="mt-8 space-y-4" autoComplete="off">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem className="space-y-2">
-                          <FormLabel className="text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                            Email
-                          </FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Mail
-                                className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${
-                                  focusedField === "email" ? "text-emerald-700" : "text-slate-400"
-                                }`}
-                              />
-                              <Input
-                                placeholder="you@example.com"
-                                className="h-14 rounded-[1.15rem] border-slate-200 bg-slate-50/80 pl-11 text-[15px] text-slate-900 placeholder:text-slate-400 focus-visible:border-emerald-500 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-emerald-100"
-                                disabled={isLoading}
-                                autoComplete="off"
-                                autoCorrect="off"
-                                autoCapitalize="none"
-                                spellCheck={false}
-                                onFocus={() => setFocusedField("email")}
-                                onBlur={() => setFocusedField(null)}
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem className="space-y-2">
-                          <div className="flex items-center justify-between gap-4">
-                            <FormLabel className="text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                              Password
-                            </FormLabel>
-                            <button
-                              type="button"
-                              className="text-sm font-medium text-slate-500 transition-colors hover:text-emerald-800"
-                            >
-                              Forgot password?
-                            </button>
-                          </div>
-                          <FormControl>
-                            <div className="relative">
-                              <Lock
-                                className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${
-                                  focusedField === "password" ? "text-emerald-700" : "text-slate-400"
-                                }`}
-                              />
-                              <Input
-                                type={showPassword ? "text" : "password"}
-                                placeholder="••••••••"
-                                className="h-14 rounded-[1.15rem] border-slate-200 bg-slate-50/80 pl-11 pr-12 text-[15px] text-slate-900 placeholder:text-slate-400 focus-visible:border-emerald-500 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-emerald-100"
-                                disabled={isLoading}
-                                autoComplete="off"
-                                autoCorrect="off"
-                                autoCapitalize="none"
-                                spellCheck={false}
-                                onFocus={() => setFocusedField("password")}
-                                onBlur={() => setFocusedField(null)}
-                                {...field}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowPassword((prev) => !prev)}
-                                disabled={isLoading}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-emerald-700"
-                                aria-label={showPassword ? "Hide password" : "Show password"}
-                              >
-                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </button>
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <Button
-                      type="submit"
-                      disabled={isLoading}
-                      className="mt-2 h-14 w-full rounded-[1.2rem] bg-[linear-gradient(180deg,#1e4535,#173527)] text-[15px] font-semibold text-white shadow-[0_14px_30px_rgba(23,53,39,0.18)] transition-all hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,#255240,#1b3d2e)]"
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Signing in...
-                        </>
-                      ) : (
-                        <>
-                          Sign In
-                          <ArrowRight className="h-4 w-4" />
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                </Form>
-
-                <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50/85 p-5">
-                  <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
-
-                  <div className="mt-5 text-center text-sm text-slate-500">
-                    Don&apos;t have an account?{" "}
-                    <button
-                      type="button"
-                      onClick={onSwitchToRegister}
-                      className="font-semibold text-emerald-700 underline decoration-emerald-300 underline-offset-4 transition-colors hover:text-emerald-900"
-                    >
-                      Create Account
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
-                    <div className="flex items-center gap-2 font-medium text-slate-700">
-                      <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                      Protected access
-                    </div>
-                    <p className="mt-2 text-xs leading-6 text-slate-500">
-                      Trusted entry point for operators and administrators.
-                    </p>
-                  </div>
-
-                  <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
-                    <div className="font-medium text-slate-700">Support Contact</div>
-                    <p className="mt-2 text-xs leading-6 text-slate-500">admin@greencropnatiot.com</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+        <div className="flex items-center gap-3">
+          <ModeToggle />
+          <Button
+            type="button"
+            onClick={() => document.getElementById("login-panel")?.scrollIntoView({ behavior: "smooth" })}
+            className="hidden rounded-full bg-[#2e6b3d] px-6 py-6 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(46,107,61,0.22)] hover:bg-[#255b34] sm:inline-flex"
+          >
+            <BarChart3 className="mr-2 h-4 w-4" />
+            ระบบจัดการฟาร์ม
+          </Button>
         </div>
-      </div>
+      </header>
+
+      <main className="relative z-10 mx-auto grid min-h-[calc(100vh-116px)] w-full max-w-[1440px] grid-cols-1 items-center gap-10 px-6 pb-10 pt-4 lg:grid-cols-[0.88fr_1.12fr] lg:px-10">
+        <section className="max-w-[560px]">
+          <h1 className="font-['Montserrat'] text-[5.5rem] font-semibold leading-[0.95] tracking-[-0.08em] text-[#1f4d2c] sm:text-[7rem]">
+            ไข่ผำ
+          </h1>
+          <p className="mt-8 text-3xl font-medium leading-[1.35] text-slate-600">
+            อาหารธรรมชาติคุณภาพสูง
+            <br />
+            ด้วยเทคโนโลยี
+            <span className="text-[#2e6b3d]">การเลี้ยงอัจฉริยะ</span>
+          </p>
+          <div className="mt-10 h-0.5 w-20 rounded-full bg-[#80a94b]" />
+          <p className="mt-8 max-w-lg text-lg leading-9 text-slate-500">
+            ควบคุมคุณภาพน้ำ อุณหภูมิ แสง และผลผลิตอย่างแม่นยำ เพื่อการเพาะเลี้ยงไข่ผำที่สม่ำเสมอและยั่งยืน
+          </p>
+
+          <div className="mt-10 flex flex-wrap items-center gap-5">
+            <Button
+              type="button"
+              onClick={() => document.getElementById("login-panel")?.scrollIntoView({ behavior: "smooth" })}
+              className="h-14 rounded-full bg-[#2e6b3d] px-8 text-base font-semibold text-white shadow-[0_18px_38px_rgba(46,107,61,0.22)] hover:bg-[#255b34]"
+            >
+              เข้าสู่ระบบจัดการ
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-14 rounded-full border-[#b8c9b6] bg-white/80 px-6 text-base font-semibold text-[#2e6b3d] hover:bg-white"
+            >
+              <Play className="mr-2 h-4 w-4" />
+              ดูวิดีโอแนะนำ
+            </Button>
+          </div>
+        </section>
+
+        <section className="relative min-h-[660px]">
+          <div className="absolute left-[10%] top-[9%] h-[540px] w-[540px] rounded-full border border-emerald-900/5 bg-white/35 shadow-[inset_0_0_0_12px_rgba(255,255,255,0.55)]" />
+          <div className="absolute left-[2%] top-[4%] h-[620px] w-[620px] rounded-full border border-dashed border-emerald-900/12" />
+          <div className="absolute left-[16%] top-[16%] h-[430px] w-[430px] rounded-full bg-[radial-gradient(circle_at_42%_35%,#d7f19f_0_2px,#7daa22_3px_5px,#4f7618_6px_7px,transparent_8px)] bg-[length:18px_18px] shadow-[0_24px_80px_rgba(53,91,37,0.24),inset_0_0_0_16px_rgba(255,255,255,0.8),inset_0_0_0_24px_rgba(169,191,153,0.35)] ring-1 ring-emerald-900/10" />
+          <div className="absolute left-[13%] top-[13%] h-[470px] w-[470px] rounded-full border-[12px] border-white/80 shadow-[0_18px_60px_rgba(47,78,53,0.12)]" />
+
+          {floatingMetrics.map(({ icon: Icon, label, value, position }) => (
+            <div
+              key={label}
+              className={`absolute ${position} rounded-3xl border border-white/80 bg-white/82 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl`}
+            >
+              <Icon className="h-9 w-9 text-[#2e6b3d]" />
+              <div className="mt-4 text-sm font-semibold text-slate-600">{label}</div>
+              <div className="mt-1 text-2xl font-semibold text-[#244f2f]">{value}</div>
+              <div className="mt-4 h-3 w-24 rounded-full bg-[linear-gradient(135deg,transparent_0_18%,#90b45b_18%_24%,transparent_24%_42%,#90b45b_42%_48%,transparent_48%_66%,#90b45b_66%_72%,transparent_72%)] opacity-70" />
+            </div>
+          ))}
+
+          <div
+            id="login-panel"
+            className="absolute bottom-0 right-0 w-full max-w-[430px] rounded-[2rem] border border-emerald-900/10 bg-white/90 p-6 shadow-[0_28px_80px_rgba(36,79,47,0.14)] backdrop-blur-xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2e6b3d]">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Operator Login
+                </div>
+                <h2 className="mt-4 font-['Montserrat'] text-3xl font-semibold tracking-[-0.04em] text-slate-900">
+                  เข้าสู่ระบบ
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-500">สำหรับจัดการบ่อไข่ผำ เซนเซอร์ และรายงานผลผลิต</p>
+              </div>
+            </div>
+
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-4" autoComplete="off">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Email
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Mail
+                            className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${
+                              focusedField === "email" ? "text-[#2e6b3d]" : "text-slate-400"
+                            }`}
+                          />
+                          <Input
+                            placeholder="you@example.com"
+                            className="h-12 rounded-2xl border-slate-200 bg-slate-50/80 pl-11 text-[15px] text-slate-900 placeholder:text-slate-400 focus-visible:border-emerald-500 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-emerald-100"
+                            disabled={isLoading}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="none"
+                            spellCheck={false}
+                            onFocus={() => setFocusedField("email")}
+                            onBlur={() => setFocusedField(null)}
+                            {...field}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <div className="flex items-center justify-between gap-4">
+                        <FormLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Password
+                        </FormLabel>
+                        <button type="button" className="text-xs font-medium text-slate-500 hover:text-[#2e6b3d]">
+                          Forgot password?
+                        </button>
+                      </div>
+                      <FormControl>
+                        <div className="relative">
+                          <Lock
+                            className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${
+                              focusedField === "password" ? "text-[#2e6b3d]" : "text-slate-400"
+                            }`}
+                          />
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="••••••••"
+                            className="h-12 rounded-2xl border-slate-200 bg-slate-50/80 pl-11 pr-12 text-[15px] text-slate-900 placeholder:text-slate-400 focus-visible:border-emerald-500 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-emerald-100"
+                            disabled={isLoading}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="none"
+                            spellCheck={false}
+                            onFocus={() => setFocusedField("password")}
+                            onBlur={() => setFocusedField(null)}
+                            {...field}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((prev) => !prev)}
+                            disabled={isLoading}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-[#2e6b3d]"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="h-12 w-full rounded-2xl bg-[#244f2f] text-[15px] font-semibold text-white shadow-[0_14px_30px_rgba(36,79,47,0.18)] hover:bg-[#1c4026]"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      กำลังเข้าสู่ระบบ...
+                    </>
+                  ) : (
+                    <>
+                      เข้าสู่ระบบ
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </form>
+            </Form>
+
+            <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
+              <div className="mt-4 text-center text-sm text-slate-500">
+                ยังไม่มีบัญชี?{" "}
+                <button
+                  type="button"
+                  onClick={onSwitchToRegister}
+                  className="font-semibold text-[#2e6b3d] underline decoration-emerald-300 underline-offset-4 hover:text-[#1f4d2c]"
+                >
+                  สร้างบัญชี
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <section className="relative z-10 mx-auto mb-8 grid w-[calc(100%-3rem)] max-w-[1320px] grid-cols-1 rounded-[2rem] border border-white bg-white/82 px-6 py-6 shadow-[0_18px_60px_rgba(15,23,42,0.06)] backdrop-blur-xl sm:grid-cols-2 lg:grid-cols-5">
+        {featureItems.map(({ icon: Icon, title, detail }, index) => (
+          <div
+            key={title}
+            className={`flex flex-col items-center px-5 py-4 text-center ${
+              index > 0 ? "lg:border-l lg:border-slate-200" : ""
+            }`}
+          >
+            <Icon className="h-10 w-10 text-[#2e6b3d]" />
+            <h3 className="mt-4 text-base font-semibold text-[#244f2f]">{title}</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-500">{detail}</p>
+          </div>
+        ))}
+      </section>
     </div>
   );
 }
