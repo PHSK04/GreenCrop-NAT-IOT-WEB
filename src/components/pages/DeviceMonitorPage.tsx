@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Activity, AlertTriangle, CheckCircle2, Download, Gauge, Search, Thermometer, Waves, Wifi } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Clock3, Download, Gauge, Search, Thermometer, Waves, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
@@ -38,6 +38,17 @@ const statusClass = (status: LiveDeviceRow["status"]) => {
   if (status === "Alarm") return "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400";
   if (status === "Active") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
   return "border-border bg-muted text-muted-foreground";
+};
+
+const formatCompactTime = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value || "-";
+  return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+};
+
+const boolText = (value: boolean, isTH: boolean) => {
+  if (value) return isTH ? "ทำงาน/พบสัญญาณ" : "ON / Detected";
+  return isTH ? "หยุด/ไม่พบสัญญาณ" : "OFF / Not detected";
 };
 
 export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
@@ -186,6 +197,71 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
     const q = searchQuery.toLowerCase().trim();
     return !q || item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q);
   });
+
+  const processCards = useMemo(
+    () => [
+      {
+        label: isTH ? "MQTT" : "MQTT",
+        value: mqttStatus === "connected" ? (isTH ? "เชื่อมต่อ" : "Connected") : (isTH ? "ยังไม่เชื่อมต่อ" : "Disconnected"),
+        tone: mqttStatus === "connected" ? "ok" : "danger",
+      },
+      {
+        label: isTH ? "WLS1 ระดับล่าง" : "WLS1 Lower",
+        value: boolText(wls1, isTH),
+        tone: wls1 ? "ok" : "idle",
+      },
+      {
+        label: isTH ? "WLS2 ระดับบน" : "WLS2 Upper",
+        value: wls2 ? (isTH ? "น้ำเต็มระดับ" : "Target reached") : (isTH ? "ยังไม่เต็ม" : "Not full"),
+        tone: wls2 ? "ok" : "idle",
+      },
+      {
+        label: isTH ? "ลูกลอยถัง 2" : "Tank 2 Float",
+        value: floatAlarm ? (isTH ? "แจ้งเตือน" : "Alarm") : (isTH ? "ปกติ" : "Normal"),
+        tone: floatAlarm ? "danger" : "ok",
+      },
+      {
+        label: isTH ? "ล็อคฉุกเฉิน" : "Emergency Lock",
+        value: locked ? (isTH ? "ล็อคอยู่" : "Locked") : (isTH ? "พร้อมทำงาน" : "Ready"),
+        tone: locked ? "danger" : "ok",
+      },
+      {
+        label: isTH ? "pH ผ่านเงื่อนไข" : "pH Condition",
+        value: phOk ? (isTH ? "ผ่าน 6.5-7.5" : "OK 6.5-7.5") : (isTH ? "ไม่ผ่าน" : "Out of range"),
+        tone: phOk ? "ok" : "danger",
+      },
+      {
+        label: isTH ? "ปั๊ม 1 ออโต้" : "Pump 1 Auto",
+        value: pump1On ? (isTH ? "กำลังเดิน" : "Running") : (isTH ? "หยุด" : "Stopped"),
+        tone: pump1On ? "ok" : "idle",
+      },
+      {
+        label: isTH ? "ปั๊ม 2 กดมือ/เว็บ" : "Pump 2 Manual/Web",
+        value: pump2On ? (isTH ? "กำลังเดิน" : "Running") : (isTH ? "หยุด" : "Stopped"),
+        tone: pump2On ? "ok" : "idle",
+      },
+      {
+        label: isTH ? "ไฟเขียว" : "Green Lamp",
+        value: greenOn ? (isTH ? "ติด" : "ON") : (isTH ? "ดับ" : "OFF"),
+        tone: greenOn ? "ok" : "idle",
+      },
+      {
+        label: isTH ? "ไฟแดง/เสียง" : "Red Lamp / Sound",
+        value: redOn ? (isTH ? "แจ้งเตือน" : "Alarm") : (isTH ? "ปกติ" : "Normal"),
+        tone: redOn ? "danger" : "ok",
+      },
+    ],
+    [floatAlarm, greenOn, isTH, locked, mqttStatus, phOk, pump1On, pump2On, redOn, wls1, wls2],
+  );
+
+  const recentHistory = telemetryHistory.slice(0, 30);
+  const trendHistory = telemetryHistory.slice(0, 12).reverse();
+
+  const cardToneClass = (tone: string) => {
+    if (tone === "danger") return "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400";
+    if (tone === "ok") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    return "border-border bg-muted/40 text-muted-foreground";
+  };
 
   const buildExportPayload = () => {
     const lines: string[] = [];
@@ -406,6 +482,144 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 </TableBody>
               </Table>
             </div>
+          </CardContent>
+        </Card>
+
+        <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_1.35fr]">
+          <Card className="rounded-lg border border-border bg-card/60 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                {isTH ? "สถานะขาจริงและรีเลย์" : "Live Pin & Relay Status"}
+              </CardTitle>
+              <CardDescription>
+                {isTH ? "ดูง่ายว่าแต่ละขา/อุปกรณ์กำลัง ON, OFF หรือแจ้งเตือน" : "Quick view of every input, output, and alarm state"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {processCards.map((item) => (
+                  <div key={item.label} className={`rounded-xl border p-3 ${cardToneClass(item.tone)}`}>
+                    <p className="text-xs font-medium opacity-80">{item.label}</p>
+                    <p className="mt-1 text-sm font-semibold">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg border border-border bg-card/60 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-emerald-500" />
+                {isTH ? "แนวโน้มค่าล่าสุด" : "Latest Value Trend"}
+              </CardTitle>
+              <CardDescription>
+                {isTH ? "กราฟย่อจากข้อมูล MQTT ล่าสุด ใช้ดูว่าค่าวิ่งอยู่ตลอดไหม" : "Mini trend from recent MQTT telemetry"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {trendHistory.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                  {isTH ? "ยังไม่มีประวัติจาก MQTT" : "No MQTT history yet"}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {[
+                    { key: "ph", label: isTH ? "pH" : "pH", color: "bg-emerald-500", getValue: (row: typeof trendHistory[number]) => row.phValue, max: 14 },
+                    { key: "ec", label: isTH ? "EC" : "EC", color: "bg-sky-500", getValue: (row: typeof trendHistory[number]) => row.ecValue, max: 5 },
+                    { key: "temp", label: isTH ? "Temp" : "Temp", color: "bg-amber-500", getValue: (row: typeof trendHistory[number]) => row.tempValue, max: 50 },
+                  ].map((metric) => (
+                    <div key={metric.key}>
+                      <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{metric.label}</span>
+                        <span>{formatCompactTime(trendHistory[trendHistory.length - 1]?.timestamp || "")}</span>
+                      </div>
+                      <div className="flex h-20 items-end gap-2 rounded-xl border border-border bg-muted/30 p-3">
+                        {trendHistory.map((row) => {
+                          const value = metric.getValue(row);
+                          const height = Math.max(8, Math.min(100, (value / metric.max) * 100));
+                          return (
+                            <div key={`${metric.key}-${row.timestamp}`} className="flex min-w-4 flex-1 flex-col items-center justify-end gap-1">
+                              <div
+                                className={`w-full rounded-t-md ${metric.color}`}
+                                style={{ height: `${height}%` }}
+                                title={`${metric.label}: ${value.toFixed(2)} (${formatCompactTime(row.timestamp)})`}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="mt-6 rounded-lg border border-border bg-card/60 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock3 className="h-5 w-5 text-emerald-500" />
+              {isTH ? "ประวัติข้อมูลที่รันต่อเนื่อง" : "Continuous Telemetry Log"}
+            </CardTitle>
+            <CardDescription>
+              {isTH ? `แสดงล่าสุด ${recentHistory.length} รายการจาก MQTT และบันทึกในเครื่องอัตโนมัติ` : `Showing the latest ${recentHistory.length} MQTT records saved locally`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentHistory.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-8 text-center">
+                <p className="font-medium text-foreground">{isTH ? "รอข้อมูลจาก ESP32" : "Waiting for ESP32 telemetry"}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {isTH ? "เมื่อบอร์ดส่ง MQTT เข้ามา ตารางนี้จะเพิ่มข้อมูลอัตโนมัติ" : "Rows will appear automatically when MQTT messages arrive."}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{isTH ? "เวลา" : "Time"}</TableHead>
+                      <TableHead>pH</TableHead>
+                      <TableHead>EC</TableHead>
+                      <TableHead>{isTH ? "อุณหภูมิ" : "Temp"}</TableHead>
+                      <TableHead>WLS1</TableHead>
+                      <TableHead>WLS2</TableHead>
+                      <TableHead>{isTH ? "ลูกลอย" : "Float"}</TableHead>
+                      <TableHead>{isTH ? "ล็อค" : "Lock"}</TableHead>
+                      <TableHead>{isTH ? "ปั๊ม 1" : "Pump 1"}</TableHead>
+                      <TableHead>{isTH ? "ปั๊ม 2" : "Pump 2"}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentHistory.map((row) => (
+                      <TableRow key={`${row.timestamp}-${row.phValue}-${row.ecValue}`}>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{formatCompactTime(row.timestamp)}</TableCell>
+                        <TableCell className="font-mono">{row.phValue.toFixed(2)}</TableCell>
+                        <TableCell className="font-mono">{row.ecValue.toFixed(2)}</TableCell>
+                        <TableCell className="font-mono">{row.tempValue.toFixed(1)} °C</TableCell>
+                        <TableCell>{row.wls1 ? "ON" : "OFF"}</TableCell>
+                        <TableCell>{row.wls2 ? "ON" : "OFF"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={row.floatAlarm ? statusClass("Alarm") : statusClass("Active")}>
+                            {row.floatAlarm ? (isTH ? "เตือน" : "Alarm") : (isTH ? "ปกติ" : "OK")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={row.locked ? statusClass("Alarm") : statusClass("Active")}>
+                            {row.locked ? (isTH ? "ล็อค" : "Locked") : (isTH ? "พร้อม" : "Ready")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{row.pump1On ? "ON" : "OFF"}</TableCell>
+                        <TableCell>{row.pump2On ? "ON" : "OFF"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
