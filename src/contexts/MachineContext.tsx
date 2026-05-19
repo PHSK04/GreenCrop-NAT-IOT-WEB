@@ -66,7 +66,7 @@ const MQTT_PASSWORD = 'GreenCropnat123456';
 const TOPIC_SENSORS_LEGACY = 'smartfarm/sensors';
 const TOPIC_CONTROL_LEGACY = 'smartfarm/control';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
-const HISTORY_LIMIT = 200;
+const HISTORY_LIMIT = 2000;
 
 const getTelemetryHistoryKey = (deviceId: string) =>
   `greencrop.telemetry.history.${safeTopicSegment(deviceId || 'default')}`;

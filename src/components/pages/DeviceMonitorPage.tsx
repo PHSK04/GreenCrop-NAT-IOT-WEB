@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Activity, AlertTriangle, CheckCircle2, Clock3, Download, Gauge, Search, Thermometer, Waves, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
@@ -46,6 +46,26 @@ const formatCompactTime = (value: string) => {
   return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 };
 
+const formatDateKey = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatDateLabel = (value: string, isTH: boolean) => {
+  if (!value) return "-";
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString(isTH ? "th-TH" : "en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
+
 const boolText = (value: boolean, isTH: boolean) => {
   if (value) return isTH ? "ทำงาน/พบสัญญาณ" : "ON / Detected";
   return isTH ? "หยุด/ไม่พบสัญญาณ" : "OFF / Not detected";
@@ -78,6 +98,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>(["Sensor", "Actuator", "System"]);
+  const [historyDateMode, setHistoryDateMode] = useState<"latest" | "all" | string>("latest");
 
   const lastUpdate = formatTimestamp(lastTelemetryAt);
 
@@ -254,7 +275,34 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
     [floatAlarm, greenOn, isTH, locked, mqttStatus, phOk, pump1On, pump2On, redOn, wls1, wls2],
   );
 
-  const recentHistory = telemetryHistory.slice(0, 30);
+  const historyDates = useMemo(() => {
+    const dates = telemetryHistory.map((row) => formatDateKey(row.timestamp)).filter(Boolean);
+    return Array.from(new Set(dates));
+  }, [telemetryHistory]);
+
+  const activeHistoryDate = historyDateMode === "latest" ? historyDates[0] || "" : historyDateMode;
+  const historyForSelectedDate = useMemo(() => {
+    if (activeHistoryDate === "all") return telemetryHistory;
+    if (!activeHistoryDate) return [];
+    return telemetryHistory.filter((row) => formatDateKey(row.timestamp) === activeHistoryDate);
+  }, [activeHistoryDate, telemetryHistory]);
+
+  const groupedHistory = useMemo(() => {
+    const groups: { date: string; rows: typeof telemetryHistory }[] = [];
+    historyForSelectedDate.forEach((row) => {
+      const date = formatDateKey(row.timestamp);
+      const lastGroup = groups[groups.length - 1];
+      if (!lastGroup || lastGroup.date !== date) {
+        groups.push({ date, rows: [row] });
+      } else {
+        lastGroup.rows.push(row);
+      }
+    });
+    return groups;
+  }, [historyForSelectedDate]);
+
+  const oldestHistoryAt = historyForSelectedDate[historyForSelectedDate.length - 1]?.timestamp || "";
+  const newestHistoryAt = historyForSelectedDate[0]?.timestamp || "";
   const trendHistory = telemetryHistory.slice(0, 12).reverse();
 
   const cardToneClass = (tone: string) => {
@@ -560,16 +608,64 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
 
         <Card className="mt-6 rounded-lg border border-border bg-card/60 shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock3 className="h-5 w-5 text-emerald-500" />
-              {isTH ? "ประวัติข้อมูลที่รันต่อเนื่อง" : "Continuous Telemetry Log"}
-            </CardTitle>
-            <CardDescription>
-              {isTH ? `แสดงล่าสุด ${recentHistory.length} รายการจาก MQTT และบันทึกในเครื่องอัตโนมัติ` : `Showing the latest ${recentHistory.length} MQTT records saved locally`}
-            </CardDescription>
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock3 className="h-5 w-5 text-emerald-500" />
+                  {isTH ? "ประวัติข้อมูลที่รันต่อเนื่อง" : "Continuous Telemetry Log"}
+                </CardTitle>
+                <CardDescription>
+                  {isTH
+                    ? `เลือกดูตามวันและเลื่อนดูข้อมูลเก่าได้ ตอนนี้พบ ${historyForSelectedDate.length} รายการ`
+                    : `Filter by day and scroll older records. Showing ${historyForSelectedDate.length} records.`}
+                </CardDescription>
+              </div>
+
+              <div className="flex flex-col gap-2 rounded-xl border border-border bg-background/70 p-3 sm:flex-row sm:items-center">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={historyDateMode === "latest" ? "default" : "outline"}
+                  onClick={() => setHistoryDateMode("latest")}
+                >
+                  {isTH ? "วันล่าสุด" : "Latest Day"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={historyDateMode === "all" ? "default" : "outline"}
+                  onClick={() => setHistoryDateMode("all")}
+                >
+                  {isTH ? "ทุกวัน" : "All Days"}
+                </Button>
+                <Input
+                  type="date"
+                  value={activeHistoryDate === "all" ? "" : activeHistoryDate}
+                  onChange={(event) => setHistoryDateMode(event.target.value || "latest")}
+                  className="h-9 w-full sm:w-40"
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            {recentHistory.length === 0 ? (
+            <div className="mb-4 grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-border bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">{isTH ? "รอบข้อมูล" : "Data Cycle"}</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
+                  {activeHistoryDate === "all" ? (isTH ? "ทุกวัน" : "All days") : formatDateLabel(activeHistoryDate, isTH)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">{isTH ? "ข้อมูลใหม่สุด" : "Newest Record"}</p>
+                <p className="mt-1 font-mono text-sm font-semibold text-foreground">{newestHistoryAt ? formatTimestamp(newestHistoryAt) : "-"}</p>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">{isTH ? "ข้อมูลเก่าสุดที่เก็บไว้" : "Oldest Saved Record"}</p>
+                <p className="mt-1 font-mono text-sm font-semibold text-foreground">{oldestHistoryAt ? formatTimestamp(oldestHistoryAt) : "-"}</p>
+              </div>
+            </div>
+
+            {historyForSelectedDate.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border p-8 text-center">
                 <p className="font-medium text-foreground">{isTH ? "รอข้อมูลจาก ESP32" : "Waiting for ESP32 telemetry"}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -577,44 +673,53 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="max-h-[620px] overflow-auto rounded-xl border border-border">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-20 bg-emerald-600 text-white shadow-sm">
                     <TableRow>
-                      <TableHead>{isTH ? "เวลา" : "Time"}</TableHead>
-                      <TableHead>pH</TableHead>
-                      <TableHead>EC</TableHead>
-                      <TableHead>{isTH ? "อุณหภูมิ" : "Temp"}</TableHead>
-                      <TableHead>WLS1</TableHead>
-                      <TableHead>WLS2</TableHead>
-                      <TableHead>{isTH ? "ลูกลอย" : "Float"}</TableHead>
-                      <TableHead>{isTH ? "ล็อค" : "Lock"}</TableHead>
-                      <TableHead>{isTH ? "ปั๊ม 1" : "Pump 1"}</TableHead>
-                      <TableHead>{isTH ? "ปั๊ม 2" : "Pump 2"}</TableHead>
+                      <TableHead className="min-w-36 text-white">{isTH ? "เวลา" : "Time"}</TableHead>
+                      <TableHead className="min-w-24 text-white">pH</TableHead>
+                      <TableHead className="min-w-24 text-white">EC</TableHead>
+                      <TableHead className="min-w-28 text-white">{isTH ? "อุณหภูมิ" : "Temp"}</TableHead>
+                      <TableHead className="min-w-24 text-white">WLS1</TableHead>
+                      <TableHead className="min-w-24 text-white">WLS2</TableHead>
+                      <TableHead className="min-w-28 text-white">{isTH ? "ลูกลอย" : "Float"}</TableHead>
+                      <TableHead className="min-w-28 text-white">{isTH ? "ล็อค" : "Lock"}</TableHead>
+                      <TableHead className="min-w-28 text-white">{isTH ? "ปั๊ม 1" : "Pump 1"}</TableHead>
+                      <TableHead className="min-w-28 text-white">{isTH ? "ปั๊ม 2" : "Pump 2"}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {recentHistory.map((row) => (
-                      <TableRow key={`${row.timestamp}-${row.phValue}-${row.ecValue}`}>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{formatCompactTime(row.timestamp)}</TableCell>
-                        <TableCell className="font-mono">{row.phValue.toFixed(2)}</TableCell>
-                        <TableCell className="font-mono">{row.ecValue.toFixed(2)}</TableCell>
-                        <TableCell className="font-mono">{row.tempValue.toFixed(1)} °C</TableCell>
-                        <TableCell>{row.wls1 ? "ON" : "OFF"}</TableCell>
-                        <TableCell>{row.wls2 ? "ON" : "OFF"}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={row.floatAlarm ? statusClass("Alarm") : statusClass("Active")}>
-                            {row.floatAlarm ? (isTH ? "เตือน" : "Alarm") : (isTH ? "ปกติ" : "OK")}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={row.locked ? statusClass("Alarm") : statusClass("Active")}>
-                            {row.locked ? (isTH ? "ล็อค" : "Locked") : (isTH ? "พร้อม" : "Ready")}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{row.pump1On ? "ON" : "OFF"}</TableCell>
-                        <TableCell>{row.pump2On ? "ON" : "OFF"}</TableCell>
-                      </TableRow>
+                    {groupedHistory.map((group) => (
+                      <Fragment key={group.date}>
+                        <TableRow key={`day-${group.date}`} className="bg-emerald-50/80 hover:bg-emerald-50/80 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/30">
+                          <TableCell colSpan={10} className="font-semibold text-emerald-700 dark:text-emerald-300">
+                            {isTH ? "รอบวันที่" : "Daily Cycle"} {formatDateLabel(group.date, isTH)} · {group.rows.length} {isTH ? "รายการ" : "records"}
+                          </TableCell>
+                        </TableRow>
+                        {group.rows.map((row) => (
+                          <TableRow key={`${row.timestamp}-${row.phValue}-${row.ecValue}`}>
+                            <TableCell className="font-mono text-xs text-muted-foreground">{formatCompactTime(row.timestamp)}</TableCell>
+                            <TableCell className="font-mono">{row.phValue.toFixed(2)}</TableCell>
+                            <TableCell className="font-mono">{row.ecValue.toFixed(2)}</TableCell>
+                            <TableCell className="font-mono">{row.tempValue.toFixed(1)} °C</TableCell>
+                            <TableCell>{row.wls1 ? "ON" : "OFF"}</TableCell>
+                            <TableCell>{row.wls2 ? "ON" : "OFF"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={row.floatAlarm ? statusClass("Alarm") : statusClass("Active")}>
+                                {row.floatAlarm ? (isTH ? "เตือน" : "Alarm") : (isTH ? "ปกติ" : "OK")}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={row.locked ? statusClass("Alarm") : statusClass("Active")}>
+                                {row.locked ? (isTH ? "ล็อค" : "Locked") : (isTH ? "พร้อม" : "Ready")}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{row.pump1On ? "ON" : "OFF"}</TableCell>
+                            <TableCell>{row.pump2On ? "ON" : "OFF"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </Fragment>
                     ))}
                   </TableBody>
                 </Table>
