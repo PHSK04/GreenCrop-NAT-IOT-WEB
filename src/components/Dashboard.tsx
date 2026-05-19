@@ -50,7 +50,8 @@ const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
   { icon: Droplets, label: "Tank Levels" }, 
   { icon: ClipboardList, label: "Crop Reports" },
-  { icon: Zap, label: "Device Monitor" },
+  { icon: Zap, label: "Sensor Intelligence" },
+  { icon: Activity, label: "Device Monitor" },
   { icon: Settings, label: "Farm Settings" },
   { icon: Cpu, label: "Device Pairing" },
 ];
@@ -110,7 +111,7 @@ const navTranslations = {
     "Tank Levels": "ระดับถังเก็บน้ำ",
     "Crop Reports": "รายงานพืชผล",
     "Sensor Intelligence": "ระบบเซนเซอร์อัจฉริยะ",
-    "Device Monitor": "ตรวจสอบอุปกรณ์",
+    "Device Monitor": "มอนิเตอร์ละเอียด",
     "Farm Settings": "ตั้งค่าฟาร์ม",
     "Weather Data": "ข้อมูลสภาพอากาศ",
     "Machine Performance": "ประสิทธิภาพเครื่องจักร",
@@ -401,6 +402,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       case "Crop Reports":
         return <CropReportsPage language={language} />;
       case "Sensor Intelligence":
+        return <WeatherDataPage language={language} />;
       case "Device Monitor":
         return <DeviceMonitorPage language={language} />;
       case "Farm Settings":
