@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
+import { MinimalDatePicker } from "../ui/minimal-date-picker";
 import {
   addCropYieldEntry,
   CropYieldEntry,
@@ -196,7 +197,12 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
                 <div>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "วันที่เก็บ" : "Date"}</p>
-                  <Input type="date" value={form.date} onChange={(event) => setForm((prev) => ({ ...prev, date: event.target.value }))} />
+                  <MinimalDatePicker
+                    value={form.date}
+                    onChange={(value) => setForm((prev) => ({ ...prev, date: value }))}
+                    ariaLabel={isTH ? "เลือกวันที่เก็บ" : "Select harvest date"}
+                    locale={isTH ? "TH" : "EN"}
+                  />
                 </div>
                 <div>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "ผลผลิต (กรัม)" : "Yield (g)"}</p>

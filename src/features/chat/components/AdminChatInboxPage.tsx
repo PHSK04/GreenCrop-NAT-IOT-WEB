@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MinimalDatePicker } from "@/components/ui/minimal-date-picker";
 import { chatService, ChatMessage, ChatThread } from "@/features/chat/services/chatService";
 import { authService, AdminDbUserRow } from "@/features/auth/services/authService";
 
@@ -494,11 +495,12 @@ export function AdminChatInboxPage({ language = "TH" }: AdminChatInboxPageProps)
               >
                 {isTH ? "ทุกวัน" : "All dates"}
               </Button>
-              <input
-                type="date"
+              <MinimalDatePicker
                 value={selectedInboxDate}
-                onChange={(event) => setSelectedInboxDate(event.target.value)}
-                className="h-10 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
+                onChange={setSelectedInboxDate}
+                ariaLabel={isTH ? "เลือกวันของข้อความ" : "Select message date"}
+                locale={isTH ? "TH" : "EN"}
+                className="min-w-48 flex-1"
               />
             </div>
             </div>

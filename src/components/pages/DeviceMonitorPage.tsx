@@ -10,6 +10,7 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
+import { MinimalDatePicker } from "../ui/minimal-date-picker";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 
 type DeviceMonitorPageProps = {
@@ -638,11 +639,12 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 >
                   {isTH ? "ทุกวัน" : "All Days"}
                 </Button>
-                <Input
-                  type="date"
+                <MinimalDatePicker
                   value={activeHistoryDate === "all" ? "" : activeHistoryDate}
-                  onChange={(event) => setHistoryDateMode(event.target.value || "latest")}
-                  className="h-9 w-full sm:w-40"
+                  onChange={(value) => setHistoryDateMode(value || "latest")}
+                  ariaLabel={isTH ? "เลือกวันที่ประวัติ" : "Select history date"}
+                  locale={isTH ? "TH" : "EN"}
+                  className="w-full sm:w-44"
                 />
               </div>
             </div>

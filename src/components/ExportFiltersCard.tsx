@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { MinimalDatePicker } from "@/components/ui/minimal-date-picker";
 import { Download, FileText } from "lucide-react";
 
 type ExportFilterOption = {
@@ -55,20 +55,18 @@ export function ExportFiltersCard({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground">{startDateLabel}</label>
-            <Input
-              type="date"
+            <MinimalDatePicker
               aria-label="Export start date"
               value={startDate}
-              onChange={(e) => onStartDateChange(e.target.value)}
+              onChange={onStartDateChange}
             />
           </div>
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground">{endDateLabel}</label>
-            <Input
-              type="date"
+            <MinimalDatePicker
               aria-label="Export end date"
               value={endDate}
-              onChange={(e) => onEndDateChange(e.target.value)}
+              onChange={onEndDateChange}
             />
           </div>
         </div>
