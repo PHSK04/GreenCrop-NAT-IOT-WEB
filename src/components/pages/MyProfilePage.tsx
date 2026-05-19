@@ -4,14 +4,16 @@ import {
     MapPin,
     Mail,
     Sprout,
-    Tractor,
+    Droplets,
     Award,
     Calendar,
     Leaf,
     Save,
     X,
     LogOut,
-    Edit3
+    Edit3,
+    Waves,
+    Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,13 +33,18 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
     const { user, updateProfile } = useAuth();
     const API_URL = import.meta.env.VITE_API_URL || "/api";
     const [isEditing, setIsEditing] = useState(false);
+    const defaultRole = user?.role === 'admin' ? "System Administrator" : isTH ? "ผู้ดูแลบ่อไข่ผำ" : "Wolffia Pond Operator";
+    const defaultLocation = isTH ? "ระบบเพาะเลี้ยงไข่ผำ GreenCrop NAT" : "GreenCrop NAT Wolffia Cultivation System";
+    const defaultBio = isTH
+        ? "ดูแลระบบเพาะเลี้ยงไข่ผำแบบ IoT ติดตามคุณภาพน้ำ ระดับถัง ปั๊ม และข้อมูลผลผลิตรายวัน เพื่อให้บ่ออยู่ในสภาพเหมาะสมต่อการเจริญเติบโต"
+        : "Managing an IoT-enabled Wolffia cultivation system with live water quality, tank level, pump status, and daily harvest monitoring.";
     
     const [profile, setProfile] = useState({
         name: user?.name || "Guest User",
-        role: user?.title || (user?.role === 'admin' ? "System Administrator" : "Farm Owner"),
-        location: user?.location || "Green Valley, Chiang Mai",
+        role: user?.title || defaultRole,
+        location: user?.location || defaultLocation,
         email: user?.email || "guest@example.com",
-        bio: user?.bio || "Welcome to my Smart Farm! Connect with me to learn more about sustainable agriculture.",
+        bio: user?.bio || defaultBio,
         avatar: user?.avatar || ""
     });
 
@@ -47,10 +54,10 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
             // 1. Set initial state from Context (fast)
             setProfile({
                 name: user.name,
-                role: user.title || (user.role === 'admin' ? "System Administrator" : "Farm Owner"),
-                location: user.location || "",
+                role: user.title || defaultRole,
+                location: user.location || defaultLocation,
                 email: user.email,
-                bio: user.bio || "",
+                bio: user.bio || defaultBio,
                 avatar: user.avatar || ""
             });
 
@@ -82,9 +89,9 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
                             setProfile(prev => ({
                                 ...prev,
                                 name: currentUser.name || prev.name,
-                                role: currentUser.title || currentUser.role, // Use title if available
-                                location: currentUser.location || prev.location,
-                                bio: currentUser.bio || prev.bio,
+                                role: currentUser.title || prev.role,
+                                location: currentUser.location || defaultLocation,
+                                bio: currentUser.bio || defaultBio,
                                 avatar: currentUser.avatar || prev.avatar
                             }));
                         }
@@ -284,13 +291,13 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
 
                         <div className="mt-8 flex flex-wrap gap-3">
                             <Badge variant="secondary" className="px-4 py-1.5 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/20 text-sm font-medium rounded-full">
-                                <Sprout className="w-4 h-4 mr-1.5" /> {isTH ? "รับรองออร์แกนิก" : "Organic Certified"}
+                                <Sprout className="w-4 h-4 mr-1.5" /> {isTH ? "เพาะเลี้ยงไข่ผำ" : "Wolffia Cultivation"}
                             </Badge>
                             <Badge variant="secondary" className="px-4 py-1.5 bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 border border-blue-200 dark:border-blue-500/20 text-sm font-medium rounded-full">
-                                <Tractor className="w-4 h-4 mr-1.5" /> {isTH ? "ผู้ใช้เทคโนโลยีอัจฉริยะ" : "Smart Tech User"}
+                                <Droplets className="w-4 h-4 mr-1.5" /> {isTH ? "ควบคุมคุณภาพน้ำ" : "Water Quality Control"}
                             </Badge>
                             <Badge variant="secondary" className="px-4 py-1.5 bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20 border border-amber-200 dark:border-amber-500/20 text-sm font-medium rounded-full">
-                                <Award className="w-4 h-4 mr-1.5" /> {isTH ? "ผู้ผลิตยอดเยี่ยม 2025" : "Top Producer 2025"}
+                                <Award className="w-4 h-4 mr-1.5" /> {isTH ? "ติดตามผลผลิต 2025" : "Harvest Tracking 2025"}
                             </Badge>
                         </div>
                     </CardContent>
@@ -325,24 +332,24 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
                                 <Separator className="bg-border" />
                                 <div className="grid grid-cols-2 gap-8">
                                     <div className="p-4 rounded-2xl bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
-                                        <h4 className="font-semibold text-muted-foreground text-sm uppercase tracking-wider mb-2">Total Area</h4>
+                                        <h4 className="font-semibold text-muted-foreground text-sm uppercase tracking-wider mb-2">{isTH ? "พื้นที่บ่อเลี้ยง" : "Cultivation Area"}</h4>
                                         <div className="flex items-baseline gap-2">
-                                            <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">150</p>
-                                            <span className="text-lg font-medium text-foreground">Rai</span>
+                                            <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">4</p>
+                                            <span className="text-lg font-medium text-foreground">{isTH ? "บ่อ" : "ponds"}</span>
                                         </div>
                                         <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                                             <span className="block w-2 h-2 rounded-full bg-emerald-500"></span>
-                                            Expandable to 200
+                                            {isTH ? "บ่อเพาะเลี้ยงพร้อมเก็บข้อมูล" : "Connected cultivation ponds"}
                                         </p>
                                     </div>
                                     <div className="p-4 rounded-2xl bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
-                                        <h4 className="font-semibold text-muted-foreground text-sm uppercase tracking-wider mb-2">Primary Crop</h4>
+                                        <h4 className="font-semibold text-muted-foreground text-sm uppercase tracking-wider mb-2">{isTH ? "พืชน้ำหลัก" : "Primary Aquatic Crop"}</h4>
                                         <div className="flex items-baseline gap-2">
-                                            <span className="text-2xl font-bold text-amber-500 dark:text-amber-400 truncate">Jasmine Rice</span>
+                                            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 truncate">{isTH ? "ไข่ผำ" : "Wolffia"}</span>
                                         </div>
                                         <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                            <span className="block w-2 h-2 rounded-full bg-amber-500"></span>
-                                            Harvest: Nov 2025
+                                            <span className="block w-2 h-2 rounded-full bg-emerald-500"></span>
+                                            {isTH ? "บันทึกผลผลิตรายวัน" : "Daily harvest logging"}
                                         </p>
                                     </div>
                                 </div>
@@ -353,37 +360,41 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
                             <CardHeader>
                                 <CardTitle className="text-xl text-foreground flex items-center gap-3">
                                     <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                                        <Tractor className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                        <Droplets className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                     </div>
-                                    Farm Equipment
+                                    {isTH ? "อุปกรณ์ระบบบ่อไข่ผำ" : "Wolffia System Equipment"}
                                 </CardTitle>
-                                <CardDescription className="text-muted-foreground pl-12">Status of connected machinery</CardDescription>
+                                <CardDescription className="text-muted-foreground pl-12">
+                                    {isTH ? "สถานะอุปกรณ์น้ำ ปั๊ม และเซนเซอร์ที่เชื่อมต่อ" : "Connected water, pump, and sensor equipment status"}
+                                </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/60 transition-colors rounded-2xl border border-border/50 group">
                                         <div className="flex items-center gap-4">
                                             <div className="p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-300">
-                                                <Tractor className="w-6 h-6" />
+                                                <Waves className="w-6 h-6" />
                                             </div>
                                             <div>
-                                                <p className="font-semibold text-foreground text-lg">Kubota Tractor L5018</p>
-                                                <p className="text-sm text-muted-foreground">ID: TR-001 • <span className="text-emerald-500">Last used 2h ago</span></p>
+                                                <p className="font-semibold text-foreground text-lg">{isTH ? "ชุดปั๊มหมุนเวียนน้ำบ่อไข่ผำ" : "Wolffia Pond Circulation Pump"}</p>
+                                                <p className="text-sm text-muted-foreground">ID: PUMP-01 • <span className="text-emerald-500">{isTH ? "ทำงานปกติ" : "Running normally"}</span></p>
                                             </div>
                                         </div>
-                                        <Badge className="bg-emerald-500 dark:bg-emerald-600 text-white px-3 py-1 shadow-md shadow-emerald-500/20">Active</Badge>
+                                        <Badge className="bg-emerald-500 dark:bg-emerald-600 text-white px-3 py-1 shadow-md shadow-emerald-500/20">{isTH ? "ทำงาน" : "Active"}</Badge>
                                     </div>
                                     <div className="flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/60 transition-colors rounded-2xl border border-border/50 group">
                                         <div className="flex items-center gap-4">
                                             <div className="p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm text-amber-500 dark:text-amber-400 group-hover:scale-110 transition-transform duration-300">
-                                                <Tractor className="w-6 h-6" />
+                                                <Activity className="w-6 h-6" />
                                             </div>
                                             <div>
-                                                <p className="font-semibold text-foreground text-lg">Drone Sprayer DJI T30</p>
-                                                <p className="text-sm text-muted-foreground">ID: DR-005 • <span className="text-amber-500">Battery at 15%</span></p>
+                                                <p className="font-semibold text-foreground text-lg">{isTH ? "โมดูลควบคุม ESP32 / MQTT" : "ESP32 / MQTT Control Module"}</p>
+                                                <p className="text-sm text-muted-foreground">ID: MCU-ESP32 • <span className="text-amber-500">{isTH ? "รอข้อมูลรอบถัดไป" : "Waiting for next telemetry"}</span></p>
                                             </div>
                                         </div>
-                                        <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400 px-3 py-1">Charging</Badge>
+                                        <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400 px-3 py-1">
+                                            {isTH ? "รอข้อมูล" : "Waiting"}
+                                        </Badge>
                                     </div>
                                 </div>
                             </CardContent>
@@ -397,7 +408,9 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
                             <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-400/20 rounded-full blur-3xl"></div>
                             
                             <CardHeader className="text-center pb-2 relative z-10">
-                                <CardTitle className="text-lg text-emerald-800 dark:text-emerald-300 font-semibold uppercase tracking-wide">Efficiency Score</CardTitle>
+                                <CardTitle className="text-lg text-emerald-800 dark:text-emerald-300 font-semibold uppercase tracking-wide">
+                                    {isTH ? "คะแนนสภาพบ่อ" : "Pond Health Score"}
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="text-center relative z-10 pb-10">
                                 <div className="relative inline-flex items-center justify-center w-40 h-40 mb-6 shrink-0 aspect-square">
@@ -432,8 +445,8 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
                                     </div>
                                 </div>
                                 <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300 px-4 leading-relaxed">
-                                    Your farm is operating at <br/>
-                                    <span className="font-bold text-emerald-600 dark:text-emerald-400">Peak Performance</span>!
+                                    {isTH ? "สภาพน้ำของบ่อไข่ผำอยู่ใน" : "Wolffia pond water is in"} <br/>
+                                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{isTH ? "ช่วงเหมาะสม" : "Optimal Range"}</span>
                                 </p>
                             </CardContent>
                         </Card>
@@ -441,16 +454,16 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
                         <Card className="rounded-[2rem] shadow-lg border-border bg-card">
                             <CardHeader>
                                 <CardTitle className="text-lg text-foreground flex items-center justify-between">
-                                    Sensor Network
-                                    <Badge variant="outline" className="font-normal text-xs">Live</Badge>
+                                    {isTH ? "เครือข่ายเซนเซอร์บ่อ" : "Pond Sensor Network"}
+                                    <Badge variant="outline" className="font-normal text-xs">{isTH ? "สด" : "Live"}</Badge>
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-6">
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-center text-sm">
-                                            <span className="text-muted-foreground font-medium">Moisture Sensors</span>
-                                            <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded text-xs">24 / 24</span>
+                                            <span className="text-muted-foreground font-medium">pH Sensors</span>
+                                            <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded text-xs">4 / 4</span>
                                         </div>
                                         <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
                                             <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600 w-full rounded-full shadow-[0_0_10px_rgba(59,130,246,0.3)]" />
@@ -459,8 +472,8 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
 
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-center text-sm">
-                                            <span className="text-muted-foreground font-medium">Temp/Humidity</span>
-                                            <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded text-xs">12 / 12</span>
+                                            <span className="text-muted-foreground font-medium">{isTH ? "อุณหภูมิ / DO" : "Temp / DO"}</span>
+                                            <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded text-xs">4 / 4</span>
                                         </div>
                                         <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
                                             <div className="h-full bg-gradient-to-r from-orange-400 to-amber-500 w-full rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
@@ -469,8 +482,8 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
 
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-center text-sm">
-                                            <span className="text-muted-foreground font-medium">Cameras</span>
-                                            <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded text-xs">8 / 10</span>
+                                            <span className="text-muted-foreground font-medium">EC Sensors</span>
+                                            <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded text-xs">3 / 4</span>
                                         </div>
                                         <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
                                             <div className="h-full bg-gradient-to-r from-red-400 to-red-500 w-[80%] rounded-full shadow-[0_0_10px_rgba(239,68,68,0.3)]" />
@@ -478,7 +491,9 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
                                     </div>
                                     
                                     <div className="pt-2 text-center">
-                                         <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-primary w-full">View Network Diagnostics</Button>
+                                         <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-primary w-full">
+                                            {isTH ? "ดูสถานะเซนเซอร์ทั้งหมด" : "View Sensor Diagnostics"}
+                                         </Button>
                                     </div>
                                 </div>
                             </CardContent>
