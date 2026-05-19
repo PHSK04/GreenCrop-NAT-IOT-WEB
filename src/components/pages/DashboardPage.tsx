@@ -1,20 +1,22 @@
+import { useMemo } from "react";
 import { useMachine } from "../../contexts/MachineContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { 
-  Power, 
-  Activity, 
-  Wind, 
-  Beaker, 
-  Zap, 
-  Database,
-  Cpu,
-  Clock3
+import { Button } from "../ui/button";
+import {
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  Droplets,
+  Gauge,
+  Power,
+  Radio,
+  Siren,
+  Thermometer,
+  Waves,
 } from "lucide-react";
-import machineModel from "@/assets/images/machine_model.png";
-import { MetricsChart } from "../MetricsChart";
 import type { AdminDbDeviceRow } from "@/features/auth/services/authService";
-
 
 interface DashboardPageProps {
   language?: string;
@@ -25,77 +27,113 @@ interface DashboardPageProps {
 
 const translations = {
   EN: {
-    title: "GreenCropNAT Dashboard",
-    subtitle: "Real-time machine control and analytics",
-    online: "System Online",
-    offline: "System Offline",
-    visualizer: "System Visualizer",
-    visualizerDesc: "Real-time digital twin representation",
-    masterControl: "Master Control",
-    running: "Running",
-    stopped: "Stopped",
-    autoSeq: "Automatic Sequence",
-    manualMode: "Manual Mode",
-    uptime: "Uptime",
-    pumpStatus: "Pump Status",
-    activePumps: "Active pumps",
-    noActivePumps: "No pump running",
+    title: "GreenCrop Remote Panel",
+    subtitle: "Web = remote button, board = main controller",
     activeDevice: "Active Device",
     changeDevice: "Change device",
     noDevice: "No paired device selected",
     deviceId: "Device ID",
     location: "Location",
-    tankLevels: "Tank Levels & Flow",
-    filling: "Filling Tank",
-    idle: "Idle",
-    sensorNetwork: "Sensor Network",
-    sensorsOk: "All sensors communicating",
-    standby: "Standby Mode",
-    statusOnline: "ONLINE",
-    statusSleep: "SLEEP",
-    metrics: {
-      ph: { title: "pH Balance", desc: "Acidity Level" },
-      do: { title: "Dissolved Oxygen", desc: "Oxygen Saturation" },
-      ec: { title: "Conductivity (EC)", desc: "Nutrient Concentration" }
+    online: "MQTT Connected",
+    offline: "MQTT Disconnected",
+    lastUpdate: "Last telemetry",
+    manualControl: "Manual Remote Control",
+    manualDesc: "Commands must behave like pressing the real buttons on the machine.",
+    startPump2: "Start Pump 2",
+    stopPump2: "Stop Pump 2",
+    emergencyStop: "Emergency Stop",
+    resetUptime: "Reset Uptime",
+    machineLocked: "Locked by emergency stop",
+    machineReady: "Ready for manual command",
+    machineWaiting: "Waiting for water level / process logic",
+    telemetry: "Live Telemetry",
+    telemetryDesc: "Values coming from the ESP32 through MQTT.",
+    history: "Auto Saved History",
+    historyDesc: "Latest snapshots saved automatically in the browser.",
+    noHistory: "No telemetry saved yet",
+    uptime: "Pump 2 Uptime",
+    states: {
+      wls1: "WLS1 Lower",
+      wls2: "WLS2 Upper",
+      floatAlarm: "Float Alarm",
+      locked: "Locked",
+      pump1: "Pump 1",
+      pump2: "Pump 2",
+      green: "Green Lamp",
+      red: "Red Lamp",
+      phOk: "pH Ready",
     },
-    pumpNames: ["Water Pump", "Water Pump", "Solid pump", "Water Pump", "Air Pump"]
+    values: {
+      ph: "pH",
+      ec: "EC",
+      temp: "Temperature",
+    },
+    on: "ON",
+    off: "OFF",
+    normal: "Normal",
+    alarm: "Alarm",
   },
   TH: {
-    title: "แดชบอร์ด GreenCropNAT",
-    subtitle: "การควบคุมเครื่องจักรและวิเคราะห์ผลแบบเรียลไทม์",
-    online: "ระบบออนไลน์",
-    offline: "ระบบออฟไลน์",
-    visualizer: "แบบจำลองระบบ",
-    visualizerDesc: "แบบจำลองดิจิทัลทวินแบบเรียลไทม์",
-    masterControl: "การควบคุมหลัก",
-    running: "กำลังทำงาน",
-    stopped: "หยุดทำงาน",
-    autoSeq: "ลำดับอัตโนมัติ",
-    manualMode: "โหมดควบคุมเอง",
-    uptime: "เวลาทำงานต่อเนื่อง",
-    pumpStatus: "สถานะปั๊ม",
-    activePumps: "ปั๊มที่ทำงาน",
-    noActivePumps: "ยังไม่มีปั๊มทำงาน",
+    title: "แผงรีโมต GreenCrop",
+    subtitle: "เว็บ = ปุ่มรีโมต, ตัวเครื่อง = สมองหลัก",
     activeDevice: "อุปกรณ์ที่กำลังใช้งาน",
     changeDevice: "เปลี่ยนอุปกรณ์",
     noDevice: "ยังไม่ได้เลือกอุปกรณ์ที่จับคู่",
     deviceId: "Device ID",
     location: "ตำแหน่ง",
-    tankLevels: "ระดับน้ำและการไหล",
-    filling: "กำลังเติมน้ำถัง",
-    idle: "ว่าง",
-    sensorNetwork: "เครือข่ายเซนเซอร์",
-    sensorsOk: "เซนเซอร์ทั้งหมดสื่อสารปกติ",
-    standby: "โหมดสแตนด์บาย",
-    statusOnline: "ออนไลน์",
-    statusSleep: "สถานะหลับ",
-    metrics: {
-      ph: { title: "ค่าความเป็นกรดด่าง (pH)", desc: "ระดับความเป็นกรด" },
-      do: { title: "ออกซิเจนในน้ำ (DO)", desc: "ความอิ่มตัวของออกซิเจน" },
-      ec: { title: "ค่าการนำไฟฟ้า (EC)", desc: "ความเข้มข้นของสารอาหาร" }
+    online: "MQTT เชื่อมต่อแล้ว",
+    offline: "MQTT ยังไม่เชื่อมต่อ",
+    lastUpdate: "อัปเดตล่าสุด",
+    manualControl: "ปุ่มรีโมตควบคุม",
+    manualDesc: "การกดจากหน้าเว็บต้องทำงานเหมือนกดปุ่มจริงที่หน้าเครื่อง",
+    startPump2: "เริ่มปั๊ม 2",
+    stopPump2: "หยุดปั๊ม 2",
+    emergencyStop: "หยุดฉุกเฉิน",
+    resetUptime: "รีเซ็ตเวลา",
+    machineLocked: "ระบบล็อคจากปุ่มฉุกเฉิน",
+    machineReady: "พร้อมรับคำสั่งแบบกดมือ",
+    machineWaiting: "กำลังรอเงื่อนไขระดับน้ำ/ลอจิกระบบ",
+    telemetry: "ค่าที่วัดได้จริง",
+    telemetryDesc: "ค่าที่บอร์ด ESP32 ส่งกลับมาผ่าน MQTT",
+    history: "ประวัติที่บันทึกอัตโนมัติ",
+    historyDesc: "บันทึก snapshot ล่าสุดอัตโนมัติในเบราว์เซอร์",
+    noHistory: "ยังไม่มีข้อมูลที่บันทึกไว้",
+    uptime: "เวลาทำงานปั๊ม 2",
+    states: {
+      wls1: "WLS1 ล่าง",
+      wls2: "WLS2 บน",
+      floatAlarm: "ลูกลอยเตือน",
+      locked: "ล็อคระบบ",
+      pump1: "ปั๊ม 1",
+      pump2: "ปั๊ม 2",
+      green: "ไฟเขียว",
+      red: "ไฟแดง",
+      phOk: "pH พร้อมทำงาน",
     },
-    pumpNames: ["น้ำ", "ปั้มน้ำ", "ปั้มฉีดสารละลาย", "น้ำ", "ปั้มลม"]
-  }
+    values: {
+      ph: "ค่า pH",
+      ec: "ค่า EC",
+      temp: "อุณหภูมิ",
+    },
+    on: "ทำงาน",
+    off: "หยุด",
+    normal: "ปกติ",
+    alarm: "เตือน",
+  },
+};
+
+const formatUptime = (seconds: number) => {
+  const hh = String(Math.floor(seconds / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0");
+  const ss = String(seconds % 60).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+};
+
+const formatTimestamp = (value: string | null) => {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
 };
 
 export function DashboardPage({
@@ -105,69 +143,83 @@ export function DashboardPage({
   onDeviceChange,
 }: DashboardPageProps) {
   const t = translations[language as keyof typeof translations] || translations.EN;
-  const { 
-    isOn, 
-    toggleMachine, 
-    togglePump,
+  const {
+    sendStartCommand,
+    sendEmergencyStop,
+    stopPump2FromWeb,
     resetUptime,
     uptimeSeconds,
-    pumps, 
-    activeTank, 
-    ecValue 
+    ecValue,
+    phValue,
+    tempValue,
+    locked,
+    wls1,
+    wls2,
+    floatAlarm,
+    pump1On,
+    pump2On,
+    greenOn,
+    redOn,
+    phOk,
+    lastTelemetryAt,
+    telemetryHistory,
+    mqttStatus,
   } = useMachine();
 
-  const hasAnyPumpSignal = pumps.some(Boolean);
-  const visiblePumpStates = pumps
-    .slice(0, 3)
-    .map((isActive, idx) => isActive || (isOn && !hasAnyPumpSignal && idx === 0));
-  const activePumpLabels = visiblePumpStates
-    .map((isActive, idx) => (isActive ? `P${idx + 1}` : null))
-    .filter(Boolean)
-    .join(", ");
   const activeDevice = devices.find((device) => device.device_id === activeDeviceId);
   const activeDeviceName = activeDevice?.device_name || activeDeviceId || t.noDevice;
   const activeDeviceLocation = activeDevice?.location || "-";
 
-  const formatUptime = (seconds: number) => {
-    const hh = String(Math.floor(seconds / 3600)).padStart(2, "0");
-    const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0");
-    const ss = String(seconds % 60).padStart(2, "0");
-    return hh + ":" + mm + ":" + ss;
-  };
+  const statusTone = locked
+    ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
+    : wls2
+      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+      : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300";
+
+  const machineSummary = locked
+    ? t.machineLocked
+    : wls2
+      ? t.machineReady
+      : t.machineWaiting;
+
+  const stateCards = useMemo(
+    () => [
+      { label: t.states.wls1, active: wls1 },
+      { label: t.states.wls2, active: wls2 },
+      { label: t.states.floatAlarm, active: floatAlarm, alarm: true },
+      { label: t.states.locked, active: locked, alarm: true },
+      { label: t.states.pump1, active: pump1On },
+      { label: t.states.pump2, active: pump2On },
+      { label: t.states.green, active: greenOn },
+      { label: t.states.red, active: redOn, alarm: true },
+      { label: t.states.phOk, active: phOk },
+    ],
+    [floatAlarm, greenOn, locked, phOk, pump1On, pump2On, redOn, t.states.floatAlarm, t.states.green, t.states.locked, t.states.phOk, t.states.pump1, t.states.pump2, t.states.red, t.states.wls1, t.states.wls2, wls1, wls2],
+  );
+
+  const latestHistory = telemetryHistory.slice(0, 6);
 
   return (
     <>
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-border/60 bg-card/75 px-4 py-4 backdrop-blur-xl md:px-8 md:py-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
+      <header className="sticky top-0 z-10 border-b border-border/60 bg-card/80 px-4 py-4 backdrop-blur-xl md:px-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="flex items-center gap-3 text-lg font-bold tracking-tight text-foreground sm:text-xl md:text-2xl">
-              <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary/15 text-primary sm:h-9 sm:w-9">
-                <Activity className="h-5 w-5" />
+            <h1 className="flex items-center gap-3 text-xl font-bold text-foreground md:text-2xl">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                <Radio className="h-5 w-5" />
               </span>
               {t.title}
             </h1>
-            <p className="mt-1 text-xs font-medium text-muted-foreground md:text-sm">{t.subtitle}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
           </div>
-          <Badge 
-            variant={isOn ? "default" : "secondary"}
-            className={`self-end border px-4 py-1.5 font-mono text-xs sm:self-auto ${isOn ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20" : "border-border bg-muted text-muted-foreground"}`}
-          >
-            {isOn ? (
-              <span className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                </span>
-                {t.online.toUpperCase()}
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-muted-foreground"></span>
-                {t.offline.toUpperCase()}
-              </span>
-            )}
-          </Badge>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline" className={mqttStatus === "connected" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"}>
+              {mqttStatus === "connected" ? t.online : t.offline}
+            </Badge>
+            <Badge variant="outline" className={statusTone}>
+              {machineSummary}
+            </Badge>
+          </div>
         </div>
       </header>
 
@@ -178,9 +230,7 @@ export function DashboardPage({
               <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                 {t.activeDevice}
               </p>
-              <h2 className="mt-1 text-lg font-bold text-foreground">
-                {activeDeviceName}
-              </h2>
+              <h2 className="mt-1 text-lg font-bold text-foreground">{activeDeviceName}</h2>
               <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                 <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
                   {t.deviceId}: {activeDeviceId || "-"}
@@ -188,11 +238,9 @@ export function DashboardPage({
                 <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
                   {t.location}: {activeDeviceLocation}
                 </Badge>
-                {activeDevice?.is_primary && (
-                  <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
-                    Primary
-                  </Badge>
-                )}
+                <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
+                  {t.lastUpdate}: {formatTimestamp(lastTelemetryAt)}
+                </Badge>
               </div>
             </div>
             <div className="w-full md:w-72">
@@ -219,267 +267,181 @@ export function DashboardPage({
           </CardContent>
         </Card>
 
-        <div className="mb-6 grid grid-cols-1 gap-4 md:mb-8">
-          <Card className="rounded-2xl border-border/60 bg-card/70 shadow-sm backdrop-blur-sm">
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t.uptime}</p>
-                <p className="mt-1 font-mono text-xl font-semibold text-foreground">{formatUptime(uptimeSeconds)}</p>
-              </div>
-              <div className="rounded-xl bg-primary/15 p-2 text-primary">
-                <Clock3 className="h-5 w-5" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Machine Control Section (Hero) */}
-        <div className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-8">
-          
-          {/* Left Column: Visual Model */}
-          <div className="lg:col-span-7 space-y-6">
-            <Card className="h-full min-h-[320px] overflow-hidden rounded-2xl border-border/70 bg-card/65 shadow-lg backdrop-blur-xl sm:min-h-[420px] lg:min-h-[500px]">
+        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-6">
+            <Card className="rounded-2xl border-border/70 bg-card/80 shadow-xl">
               <CardHeader>
-                <CardTitle className="text-foreground">{t.visualizer}</CardTitle>
-                <CardDescription className="text-muted-foreground">{t.visualizerDesc}</CardDescription>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <Power className="h-5 w-5" />
+                  {t.manualControl}
+                </CardTitle>
+                <CardDescription>{t.manualDesc}</CardDescription>
               </CardHeader>
-              <CardContent className="flex h-full items-center justify-center rounded-b-2xl bg-gradient-to-b from-transparent to-background/30 p-4 sm:p-6 lg:p-8">
-                <div className="relative w-full h-full flex items-center justify-center">
-                   {/* Glow effect */}
-                   {isOn && <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full transition-all duration-1000"></div>}
-                  
-                   <img 
-                    src={machineModel} 
-                    alt="Water System Model" 
-                    className="max-h-[260px] w-auto object-contain drop-shadow-2xl transition-all duration-700 sm:max-h-[380px] lg:max-h-[500px]"
-                    style={{ 
-                      filter: isOn ? 'brightness(1.1) contrast(1.05)' : 'grayscale(1)',
-                      transform: isOn ? 'scale(1.02)' : 'scale(1)'
-                    }}
-                   />
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Button onClick={sendStartCommand} className="h-14 justify-start rounded-xl bg-emerald-600 text-white hover:bg-emerald-700">
+                    <Power className="mr-2 h-4 w-4" />
+                    {t.startPump2}
+                  </Button>
+                  <Button onClick={stopPump2FromWeb} variant="outline" className="h-14 justify-start rounded-xl border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300">
+                    <Waves className="mr-2 h-4 w-4" />
+                    {t.stopPump2}
+                  </Button>
+                  <Button onClick={sendEmergencyStop} variant="destructive" className="h-14 justify-start rounded-xl">
+                    <Siren className="mr-2 h-4 w-4" />
+                    {t.emergencyStop}
+                  </Button>
+                  <Button onClick={resetUptime} variant="outline" className="h-14 justify-start rounded-xl">
+                    <Clock3 className="mr-2 h-4 w-4" />
+                    {t.resetUptime}
+                  </Button>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-muted/30 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{t.uptime}</p>
+                      <p className="mt-1 font-mono text-2xl font-semibold text-foreground">{formatUptime(uptimeSeconds)}</p>
+                    </div>
+                    <Badge variant="outline" className={statusTone}>
+                      {machineSummary}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl border-border/70 bg-card/75 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <Activity className="h-5 w-5" />
+                  {t.telemetry}
+                </CardTitle>
+                <CardDescription>{t.telemetryDesc}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-border bg-background/70 p-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Gauge className="h-4 w-4" />
+                      {t.values.ph}
+                    </div>
+                    <p className="mt-2 text-3xl font-bold text-foreground">{phValue.toFixed(2)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-background/70 p-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Droplets className="h-4 w-4" />
+                      {t.values.ec}
+                    </div>
+                    <p className="mt-2 text-3xl font-bold text-foreground">{ecValue.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">mS/cm</p>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-background/70 p-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Thermometer className="h-4 w-4" />
+                      {t.values.temp}
+                    </div>
+                    <p className="mt-2 text-3xl font-bold text-foreground">{tempValue.toFixed(1)}</p>
+                    <p className="text-xs text-muted-foreground">°C</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {stateCards.map((item) => (
+                    <div
+                      key={item.label}
+                      className={`rounded-xl border p-3 ${
+                        item.active
+                          ? item.alarm
+                            ? "border-red-500/30 bg-red-500/10"
+                            : "border-emerald-500/30 bg-emerald-500/10"
+                          : "border-border bg-background/70"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-medium text-foreground">{item.label}</span>
+                        <Badge variant="outline" className={item.active ? (item.alarm ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400") : "border-border bg-muted text-muted-foreground"}>
+                          {item.active ? (item.alarm ? t.alarm : t.on) : t.off}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Right Column: Controls & Pumps */}
-          <div className="lg:col-span-5 space-y-6">
-            
-            {/* Master Control */}
-            <Card className="rounded-2xl border-border/70 bg-card/80 shadow-xl backdrop-blur-md">
-              <CardHeader className="pb-2">
+          <div className="space-y-6">
+            <Card className="rounded-2xl border-border/70 bg-card/75 shadow-lg">
+              <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
-                  <Power className="w-5 h-5" />
-                  {t.masterControl}
+                  <CheckCircle2 className="h-5 w-5" />
+                  {t.history}
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex flex-col gap-4 rounded-xl border border-border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
-                   <div className="flex items-center gap-4">
-                     <button
-                       type="button"
-                       onClick={toggleMachine}
-                       className={`
-                         cursor-pointer w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all duration-300
-                         ${isOn 
-                           ? "bg-primary/20 border-primary text-primary shadow-[0_0_15px_rgba(16,185,129,0.3)]" 
-                           : "bg-muted border-border text-muted-foreground hover:border-muted-foreground/50"
-                         }
-                       `}
-                     >
-                       <Power className={`w-8 h-8 ${isOn ? "scale-110" : "scale-100"}`} />
-                     </button>
-                      <div>
-                        <h3 className="text-lg font-medium text-foreground">
-                          {isOn ? t.running : t.stopped}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          {isOn ? t.autoSeq : t.manualMode}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="space-y-1 text-left sm:text-right">
-                      <p className="text-xs text-muted-foreground">{t.uptime}</p>
-                      <p className="font-mono text-primary">{formatUptime(uptimeSeconds)}</p>
-                      <button
-                        type="button"
-                        onClick={resetUptime}
-                        className="mt-1 inline-flex h-9 w-full items-center justify-center gap-1 rounded-md border border-red-400/30 bg-red-600 px-3 text-[11px] font-bold text-white transition-colors hover:bg-red-500 sm:w-28"
-                      >
-                        <span>↺</span>
-                        {language === "TH" ? "รีเซ็ตเวลา" : "RESET"}
-                      </button>
-                    </div>
-                </div>
-
-                {/* Pump Status Grid */}
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">{t.pumpStatus}</h4>
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/35 px-3 py-2">
-                    <span className="text-xs font-medium text-muted-foreground">{t.activePumps}</span>
-                    <Badge
-                      variant={activePumpLabels ? "default" : "secondary"}
-                      className={activePumpLabels ? "bg-blue-500 text-white hover:bg-blue-500" : "bg-background text-muted-foreground"}
-                    >
-                      {activePumpLabels || t.noActivePumps}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-1 min-[450px]:grid-cols-3 gap-2">
-                    {visiblePumpStates.map((active, idx) => {
-                      return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => togglePump(idx)}
-                        className={`
-                        flex min-h-[98px] flex-col items-center justify-center rounded-lg border p-2 transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-500/60
-                        ${active 
-                          ? "bg-blue-500/10 border-blue-500/40 shadow-[0_0_10px_rgba(59,130,246,0.1)]" 
-                          : "bg-muted/50 border-border opacity-70"
-                        }
-                      `}>
-                         <div className={`w-1.5 h-1.5 rounded-full mb-1.5 ${active ? "bg-blue-500 animate-pulse" : "bg-muted-foreground"}`}></div>
-                         <Cpu className={`w-4 h-4 mb-1 ${active ? "text-blue-500 dark:text-blue-400" : "text-muted-foreground"}`} />
-                         <span className="text-[9px] text-muted-foreground font-medium text-center leading-tight line-clamp-2 h-6 flex items-center">{t.pumpNames[idx]}</span>
-                         <span className="text-[8px] text-muted-foreground font-mono mt-0.5">P{idx + 1}</span>
-                         <span className={`mt-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${active ? "bg-blue-500 text-white" : "bg-background text-muted-foreground"}`}>
-                           {active ? "ON" : "OFF"}
-                         </span>
-                      </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Tank Status Visualizer */}
-            <Card className="rounded-2xl border-border/70 bg-card/55 shadow-lg">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-                  <span>{t.tankLevels}</span>
-                  <Badge variant="outline" className="border-border text-muted-foreground text-[10px]">
-                    {isOn && activeTank ? `${t.filling} ${activeTank}` : t.idle}
-                  </Badge>
-                </CardTitle>
+                <CardDescription>{t.historyDesc}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-2 pt-2">
-                  {[1, 2, 3].map((tankId) => {
-                    const isFilled = isOn && !!activeTank && activeTank >= tankId;
-                    const isCurrent = isOn && activeTank === tankId;
-                    return (
-                      <div key={tankId} className="flex flex-col items-center gap-2 group w-full">
-                        <div className={`
-                          relative w-full h-20 sm:h-24 rounded-lg border-2 flex items-end justify-center overflow-hidden transition-all duration-500
-                          ${isCurrent ? "border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)]" : "border-border bg-muted/30"}
-                        `}>
-                          {/* Water Level Animation */}
-                          <div className={`
-                            absolute bottom-0 left-0 right-0 bg-cyan-500/20 transition-all duration-1000
-                            ${(isFilled || isCurrent) ? (isCurrent ? "h-3/4 animate-pulse" : "h-full") : "h-1/4"}
-                          `}></div>
-                          
-                          <Database className={`relative z-10 w-5 h-5 sm:w-6 sm:h-6 mb-6 sm:mb-8 transition-colors ${(isFilled || isCurrent) ? "text-cyan-600 dark:text-cyan-200" : "text-muted-foreground"}`} />
-                          <span className="absolute bottom-1 sm:bottom-2 text-[10px] sm:text-xs font-bold text-muted-foreground">T{tankId}</span>
+                {latestHistory.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-background/60 p-6 text-center text-sm text-muted-foreground">
+                    {t.noHistory}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {latestHistory.map((entry) => (
+                      <div key={`${entry.timestamp}-${entry.deviceId}`} className="rounded-xl border border-border bg-background/70 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">{formatTimestamp(entry.timestamp)}</span>
+                          <Badge variant="outline" className={entry.locked ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"}>
+                            {entry.locked ? t.alarm : t.normal}
+                          </Badge>
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">{t.values.ph}</p>
+                            <p className="font-semibold text-foreground">{entry.phValue.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">{t.values.ec}</p>
+                            <p className="font-semibold text-foreground">{entry.ecValue.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">{t.values.temp}</p>
+                            <p className="font-semibold text-foreground">{entry.tempValue.toFixed(1)}°C</p>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                          <span>WLS1: {entry.wls1 ? t.on : t.off}</span>
+                          <span>WLS2: {entry.wls2 ? t.on : t.off}</span>
+                          <span>P1: {entry.pump1On ? t.on : t.off}</span>
+                          <span>P2: {entry.pump2On ? t.on : t.off}</span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Sensor Health Status */}
-            <Card className="rounded-2xl border-border/70 bg-card/55 shadow-lg">
-               <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${isOn ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"}`}>
-                       <Cpu className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-foreground">{t.sensorNetwork}</h4>
-                      <p className="text-xs text-muted-foreground">{isOn ? t.sensorsOk : t.standby}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                     <span className={`text-xs font-bold px-2 py-1 rounded bg-muted border border-border ${isOn ? "text-emerald-500" : "text-muted-foreground"}`}>
-                       {isOn ? t.statusOnline : t.statusSleep}
-                     </span>
-                  </div>
-               </CardContent>
+            <Card className="rounded-2xl border-border/70 bg-card/75 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <AlertTriangle className="h-5 w-5" />
+                  Manual Logic
+                </CardTitle>
+                <CardDescription>
+                  {language === "TH"
+                    ? "หน้าเว็บเป็นรีโมต ส่วนบอร์ดเป็นตัวตัดสินการทำงานจริงตาม WLS, pH, Float, และ Stop NC"
+                    : "The web page acts as a remote. The board remains the source of truth for WLS, pH, float, and Stop NC logic."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>{language === "TH" ? "กด เริ่มปั๊ม 2 = เหมือนกด Start ที่หน้าเครื่อง" : "Start Pump 2 = same as pressing the physical Start button."}</p>
+                <p>{language === "TH" ? "กด หยุดฉุกเฉิน = เหมือนกด Stop ที่หน้าเครื่อง และระบบต้องล็อค" : "Emergency Stop = same as the physical Stop button and should lock the system."}</p>
+                <p>{language === "TH" ? "ถ้า WLS2 ยังไม่ถึงหรือระบบยังล็อคอยู่ หน้าเว็บจะแสดงสถานะตามที่บอร์ดตอบกลับ" : "If WLS2 has not reached the target or the system remains locked, the board reply stays authoritative."}</p>
+              </CardContent>
             </Card>
-
           </div>
         </div>
-        
-        {/* Water Quality & Analytics Metrics */}
-        <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
-          {[
-            {
-              title: t.metrics.ph.title,
-              value: "7.2",
-              status: "Optimal", 
-              desc: t.metrics.ph.desc,
-              icon: Beaker,
-              color: "text-blue-500 dark:text-blue-400",
-              bgColor: "bg-blue-500/10",
-            },
-            {
-              title: t.metrics.do.title,
-              value: "6.8",
-              unit: "mg/L", 
-              status: "Good",
-              desc: t.metrics.do.desc,
-              icon: Wind,
-              color: "text-cyan-600 dark:text-cyan-400",
-              bgColor: "bg-cyan-500/10",
-            },
-            {
-              title: t.metrics.ec.title,
-              value: isOn ? ecValue.toFixed(1) : "0.0",
-              unit: "mS/cm",
-              status: "Normal",
-              desc: t.metrics.ec.desc,
-              icon: Zap,
-              color: "text-yellow-600 dark:text-yellow-400", 
-              bgColor: "bg-yellow-500/10",
-              detail: "Current capability to conduct electrical current."
-            },
-          ].map((metric) => (
-            <Card key={metric.title} className="rounded-2xl border-border/70 bg-card/65 shadow-md backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-              <CardHeader className="pb-2 p-4">
-                <div className="flex justify-between items-start">
-                  <div className={`p-2 rounded-lg ${metric.bgColor}`}>
-                    <metric.icon className={`w-5 h-5 ${metric.color}`} />
-                  </div>
-                  {metric.status && (
-                    <Badge variant="outline" className="bg-muted/50 border-border text-muted-foreground text-[10px] uppercase tracking-wider">
-                      {metric.status}
-                    </Badge>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-2xl font-bold text-foreground">{metric.value}</span>
-                  {metric.unit && <span className="text-xs text-muted-foreground font-medium">{metric.unit}</span>}
-                </div>
-                <h3 className="text-sm font-semibold text-foreground">{metric.title}</h3>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  {metric.desc}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Charts Row */}
-        <div className="mb-10">
-            <MetricsChart />
-        </div>
-
-
       </main>
     </>
   );

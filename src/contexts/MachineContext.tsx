@@ -15,6 +15,9 @@ interface MachineContextType {
   isOn: boolean;
   toggleMachine: () => void;
   togglePump: (pumpIndex: number) => void;
+  sendStartCommand: () => void;
+  sendEmergencyStop: () => void;
+  stopPump2FromWeb: () => void;
   resetUptime: () => void;
   uptimeSeconds: number;
   pressure: number;
@@ -22,8 +25,38 @@ interface MachineContextType {
   pumps: boolean[];
   activeTank: number | null;
   ecValue: number;
+  phValue: number;
+  tempValue: number;
+  locked: boolean;
+  wls1: boolean;
+  wls2: boolean;
+  floatAlarm: boolean;
+  pump1On: boolean;
+  pump2On: boolean;
+  greenOn: boolean;
+  redOn: boolean;
+  phOk: boolean;
+  lastTelemetryAt: string | null;
+  telemetryHistory: TelemetrySnapshot[];
   mqttStatus: 'connected' | 'disconnected' | 'connecting';
 }
+
+type TelemetrySnapshot = {
+  timestamp: string;
+  deviceId: string;
+  phValue: number;
+  ecValue: number;
+  tempValue: number;
+  wls1: boolean;
+  wls2: boolean;
+  floatAlarm: boolean;
+  locked: boolean;
+  pump1On: boolean;
+  pump2On: boolean;
+  greenOn: boolean;
+  redOn: boolean;
+  isOn: boolean;
+};
 
 const MachineContext = createContext<MachineContextType | undefined>(undefined);
 
@@ -33,6 +66,10 @@ const MQTT_PASSWORD = 'GreenCropnat123456';
 const TOPIC_SENSORS_LEGACY = 'smartfarm/sensors';
 const TOPIC_CONTROL_LEGACY = 'smartfarm/control';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const HISTORY_LIMIT = 200;
+
+const getTelemetryHistoryKey = (deviceId: string) =>
+  `greencrop.telemetry.history.${safeTopicSegment(deviceId || 'default')}`;
 
 const safeTopicSegment = (value: string) =>
   value.trim().replace(/[^A-Za-z0-9_-]/g, '');
@@ -75,6 +112,19 @@ const asBool = (value: unknown) => {
   if (typeof value === 'number') return value === 1;
   const v = String(value ?? '').toLowerCase().trim();
   return v === '1' || v === 'true' || v === 'on';
+};
+
+const asNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const parseMqttPayload = (raw: string) => {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 };
 
 const normalizePumps = (rawPumps: unknown, fallback: boolean[]) => {
@@ -133,6 +183,19 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   const [pumps, setPumps] = useState<boolean[]>([false, false, false, false, false]);
   const [activeTank, setActiveTank] = useState<number | null>(null);
   const [ecValue, setEcValue] = useState(0);
+  const [phValue, setPhValue] = useState(0);
+  const [tempValue, setTempValue] = useState(0);
+  const [locked, setLocked] = useState(false);
+  const [wls1, setWls1] = useState(false);
+  const [wls2, setWls2] = useState(false);
+  const [floatAlarm, setFloatAlarm] = useState(false);
+  const [pump1On, setPump1On] = useState(false);
+  const [pump2On, setPump2On] = useState(false);
+  const [greenOn, setGreenOn] = useState(false);
+  const [redOn, setRedOn] = useState(false);
+  const [phOk, setPhOk] = useState(false);
+  const [lastTelemetryAt, setLastTelemetryAt] = useState<string | null>(null);
+  const [telemetryHistory, setTelemetryHistory] = useState<TelemetrySnapshot[]>([]);
 
   const [client, setClient] = useState<mqtt.MqttClient | null>(null);
   const [mqttStatus, setMqttStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
@@ -143,6 +206,66 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   const uptimeSyncedAtRef = useRef<number | null>(null);
   const zeroUptimeWhileRunningStreakRef = useRef(0);
   const lastApiUptimeRef = useRef<number | null>(null);
+  const lastHistorySignatureRef = useRef('');
+
+  const loadTelemetryHistory = useCallback((deviceId: string) => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(getTelemetryHistoryKey(deviceId));
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed as TelemetrySnapshot[] : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const persistTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
+    const signature = [
+      snapshot.timestamp,
+      snapshot.deviceId,
+      snapshot.phValue.toFixed(2),
+      snapshot.ecValue.toFixed(2),
+      snapshot.tempValue.toFixed(1),
+      snapshot.wls1 ? '1' : '0',
+      snapshot.wls2 ? '1' : '0',
+      snapshot.floatAlarm ? '1' : '0',
+      snapshot.locked ? '1' : '0',
+      snapshot.pump1On ? '1' : '0',
+      snapshot.pump2On ? '1' : '0',
+    ].join('|');
+
+    if (lastHistorySignatureRef.current === signature) return;
+    lastHistorySignatureRef.current = signature;
+
+    setTelemetryHistory((prev) => {
+      const next = [snapshot, ...prev].slice(0, HISTORY_LIMIT);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(getTelemetryHistoryKey(snapshot.deviceId), JSON.stringify(next));
+      }
+      return next;
+    });
+  }, []);
+
+  const applyTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
+    setPhValue(snapshot.phValue);
+    setEcValue(snapshot.ecValue);
+    setTempValue(snapshot.tempValue);
+    setWls1(snapshot.wls1);
+    setWls2(snapshot.wls2);
+    setFloatAlarm(snapshot.floatAlarm);
+    setLocked(snapshot.locked);
+    setPump1On(snapshot.pump1On);
+    setPump2On(snapshot.pump2On);
+    setGreenOn(snapshot.greenOn);
+    setRedOn(snapshot.redOn);
+    setPhOk(snapshot.phValue >= 6.5 && snapshot.phValue <= 7.5);
+    setIsOn(snapshot.isOn);
+    setPumps([snapshot.pump1On, snapshot.pump2On, false, false, false]);
+    setActiveTank(snapshot.wls2 ? 2 : snapshot.wls1 ? 1 : null);
+    setLastTelemetryAt(snapshot.timestamp);
+    persistTelemetrySnapshot(snapshot);
+  }, [persistTelemetrySnapshot]);
 
   useEffect(() => {
     uptimeBaseRef.current = uptimeBaseSeconds;
@@ -212,6 +335,18 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       setPressure(Number(latest.pressure) || 0);
       setFlowRate(Number(latest.flow_rate) || 0);
       setEcValue(Number(latest.ec_value) || 0);
+      setPhValue(Number(latest.ph_value) || 0);
+      setTempValue(Number(latest.temp_c) || 0);
+      setWls1(asBool(latest.wls1));
+      setWls2(asBool(latest.wls2));
+      setFloatAlarm(asBool(latest.float_alarm));
+      setLocked(asBool(latest.locked));
+      setPump1On(asBool(latest.pump1_on));
+      setPump2On(asBool(latest.pump2_on));
+      setGreenOn(asBool(latest.green_on));
+      setRedOn(asBool(latest.red_on));
+      setPhOk(asBool(latest.ph_ok) || ((Number(latest.ph_value) || 0) >= 6.5 && (Number(latest.ph_value) || 0) <= 7.5));
+      setLastTelemetryAt(typeof latest.timestamp === 'string' ? latest.timestamp : null);
 
       const apiIsOn = asBool(latest.is_on);
       if (!staleByCommand) {
@@ -290,10 +425,31 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       }
 
       setPumps((prev) => normalizePumps(latest.pumps, prev));
+
+      const resolvedDeviceId = String(latest.device_id || activeDeviceId || 'UNKNOWN');
+      const snapshotTimestamp = typeof latest.timestamp === 'string' && latest.timestamp
+        ? latest.timestamp
+        : new Date().toISOString();
+      persistTelemetrySnapshot({
+        timestamp: snapshotTimestamp,
+        deviceId: resolvedDeviceId,
+        phValue: asNumber(latest.ph_value),
+        ecValue: asNumber(latest.ec_value),
+        tempValue: asNumber(latest.temp_c),
+        wls1: asBool(latest.wls1),
+        wls2: asBool(latest.wls2),
+        floatAlarm: asBool(latest.float_alarm),
+        locked: asBool(latest.locked),
+        pump1On: asBool(latest.pump1_on),
+        pump2On: asBool(latest.pump2_on),
+        greenOn: asBool(latest.green_on),
+        redOn: asBool(latest.red_on),
+        isOn: asBool(latest.is_on),
+      });
     } catch (err) {
       console.error('API Polling Error:', err);
     }
-  }, [pendingResetUntilMs, ignoreApiStateUntilMs, pendingIsOnAck, isOn, lastLocalCommandAtMs, getCurrentUptimeSeconds]);
+  }, [pendingResetUntilMs, ignoreApiStateUntilMs, pendingIsOnAck, isOn, lastLocalCommandAtMs, getCurrentUptimeSeconds, persistTelemetrySnapshot]);
 
   const syncAfterCommand = async () => {
     await fetchApiData();
@@ -350,6 +506,19 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 	      setPumps([false, false, false, false, false]);
 	      setActiveTank(null);
 	      setEcValue(0);
+	      setPhValue(0);
+	      setTempValue(0);
+	      setWls1(false);
+	      setWls2(false);
+	      setFloatAlarm(false);
+	      setLocked(false);
+	      setPump1On(false);
+	      setPump2On(false);
+	      setGreenOn(false);
+	      setRedOn(false);
+	      setPhOk(false);
+	      setLastTelemetryAt(null);
+	      setTelemetryHistory(loadTelemetryHistory(nextDeviceId));
 	      setPendingIsOnAck(null);
 	      setLastLocalCommandAtMs(null);
 	      lastApiUptimeRef.current = null;
@@ -361,7 +530,11 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 	      window.removeEventListener(ACTIVE_DEVICE_EVENT_NAME, handleActiveDeviceChange);
 	      window.removeEventListener('storage', handleActiveDeviceChange);
 	    };
-	  }, []);
+	  }, [loadTelemetryHistory]);
+
+  useEffect(() => {
+    setTelemetryHistory(loadTelemetryHistory(activeDeviceId));
+  }, [activeDeviceId, loadTelemetryHistory]);
 
 	  useEffect(() => {
 	    if (!client || mqttStatus !== 'connected') return;
@@ -399,8 +572,46 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       setMqttStatus('disconnected');
     });
 
-    mqttClient.on('message', () => {
-      // API polling is the primary sync source.
+    mqttClient.on('message', (incomingTopic, payload) => {
+      const raw = payload.toString();
+      const parsed = parseMqttPayload(raw);
+      if (!parsed) return;
+
+      const selectedDeviceId = getActiveDeviceId();
+      const incomingDeviceId = String(parsed.device_id || '').trim();
+      if (selectedDeviceId && incomingDeviceId && incomingDeviceId !== selectedDeviceId) {
+        return;
+      }
+
+      const topic = incomingTopic.toString();
+      const { tenantId } = getSessionAuth();
+      const deviceTopic = getDeviceTopic(tenantId, selectedDeviceId, 'sensors');
+      if (selectedDeviceId && topic !== TOPIC_SENSORS_LEGACY && deviceTopic && topic !== deviceTopic) {
+        return;
+      }
+
+      const snapshot: TelemetrySnapshot = {
+        timestamp: typeof parsed.timestamp === 'string' && parsed.timestamp
+          ? parsed.timestamp
+          : new Date().toISOString(),
+        deviceId: incomingDeviceId || selectedDeviceId || 'UNKNOWN',
+        phValue: asNumber(parsed.ph_value),
+        ecValue: asNumber(parsed.ec_value),
+        tempValue: asNumber(parsed.temp_c),
+        wls1: asBool(parsed.wls1),
+        wls2: asBool(parsed.wls2),
+        floatAlarm: asBool(parsed.float_alarm),
+        locked: asBool(parsed.locked),
+        pump1On: asBool(parsed.pump1_on),
+        pump2On: asBool(parsed.pump2_on),
+        greenOn: asBool(parsed.green_on),
+        redOn: asBool(parsed.red_on),
+        isOn: asBool(parsed.is_on),
+      };
+
+      setPressure(asNumber(parsed.pressure));
+      setFlowRate(asNumber(parsed.flow_rate));
+      applyTelemetrySnapshot(snapshot);
     });
 
     setClient(mqttClient);
@@ -413,6 +624,34 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       clearInterval(pollId);
     };
   }, [fetchApiData]);
+
+  const publishCommand = useCallback(async (command: string, pump?: number, state?: 'ON' | 'OFF') => {
+    if (!client || mqttStatus !== 'connected') {
+      toast.error('Command Failed', {
+        description: 'MQTT is not connected, so the board did not receive the command.',
+      });
+      return false;
+    }
+
+    const { tenantId } = getSessionAuth();
+    const activeDeviceId = getActiveDeviceId();
+    const payload = JSON.stringify({
+      command,
+      pump,
+      state,
+      tenant_id: tenantId,
+      device_id: activeDeviceId || undefined,
+      timestamp: Date.now(),
+    });
+    const deviceControlTopic = getDeviceTopic(tenantId, activeDeviceId, 'control');
+
+    client.publish(TOPIC_CONTROL_LEGACY, payload);
+    if (deviceControlTopic) {
+      client.publish(deviceControlTopic, payload);
+    }
+
+    return true;
+  }, [client, mqttStatus]);
 
   const resetUptime = async () => {
     if (isSendingControl) return;
@@ -452,26 +691,10 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     zeroUptimeWhileRunningStreakRef.current = 0;
     lastApiUptimeRef.current = currentUptime;
 
-    if (client && mqttStatus === 'connected') {
-      const { tenantId } = getSessionAuth();
-      const activeDeviceId = getActiveDeviceId();
-      const payload = JSON.stringify({
-        command: newState ? 'START' : 'STOP',
-        tenant_id: tenantId,
-        device_id: activeDeviceId || undefined,
-        timestamp: Date.now(),
-      });
-      const deviceControlTopic = getDeviceTopic(tenantId, activeDeviceId, 'control');
-      client.publish(TOPIC_CONTROL_LEGACY, payload);
-      if (deviceControlTopic) {
-        client.publish(deviceControlTopic, payload);
-      }
-    } else {
+    const published = await publishCommand(newState ? 'START' : 'STOP');
+    if (!published) {
       setIsSendingControl(false);
       setPendingIsOnAck(null);
-      toast.error('Command Failed', {
-        description: 'MQTT is not connected, so the board did not receive the command.',
-      });
       return;
     }
 
@@ -495,39 +718,22 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
   const togglePump = async (pumpIndex: number) => {
     if (isSendingControl) return;
-    if (pumpIndex < 0 || pumpIndex > 2) return;
+    if (pumpIndex < 0 || pumpIndex > 1) return;
 
-    if (!client || mqttStatus !== 'connected') {
-      toast.error('Command Failed', {
-        description: 'MQTT is not connected, so the board did not receive the pump command.',
-      });
-      return;
-    }
-
-    const { tenantId } = getSessionAuth();
-    const activeDeviceId = getActiveDeviceId();
     const nextPumpState = !pumps[pumpIndex];
     const pumpNumber = pumpIndex + 1;
     const command =
       pumpNumber === 2
         ? (nextPumpState ? 'START' : 'STOP')
         : `PUMP${pumpNumber}_${nextPumpState ? 'ON' : 'OFF'}`;
-    const payload = JSON.stringify({
-      command,
-      pump: pumpNumber,
-      state: nextPumpState ? 'ON' : 'OFF',
-      tenant_id: tenantId,
-      device_id: activeDeviceId || undefined,
-      timestamp: Date.now(),
-    });
-    const deviceControlTopic = getDeviceTopic(tenantId, activeDeviceId, 'control');
 
     setIsSendingControl(true);
     setLastLocalCommandAtMs(Date.now());
     setPumps((prev) => prev.map((active, index) => (index === pumpIndex ? nextPumpState : active)));
-    client.publish(TOPIC_CONTROL_LEGACY, payload);
-    if (deviceControlTopic) {
-      client.publish(deviceControlTopic, payload);
+    const published = await publishCommand(command, pumpNumber, nextPumpState ? 'ON' : 'OFF');
+    if (!published) {
+      setIsSendingControl(false);
+      return;
     }
 
     try {
@@ -544,12 +750,57 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const sendStartCommand = useCallback(async () => {
+    if (isSendingControl) return;
+    setIsSendingControl(true);
+    setLastLocalCommandAtMs(Date.now());
+    const published = await publishCommand('START', 2, 'ON');
+    if (published) {
+      await syncAfterCommand();
+      toast.success('Pump 2 START sent', {
+        description: 'The board will run Pump 2 only if manual conditions are satisfied.',
+      });
+    }
+    setIsSendingControl(false);
+  }, [isSendingControl, publishCommand]);
+
+  const sendEmergencyStop = useCallback(async () => {
+    if (isSendingControl) return;
+    setIsSendingControl(true);
+    setLastLocalCommandAtMs(Date.now());
+    const published = await publishCommand('STOP', 2, 'OFF');
+    if (published) {
+      await syncAfterCommand();
+      toast.success('Emergency STOP sent', {
+        description: 'The board should stop all outputs and enter lock mode.',
+      });
+    }
+    setIsSendingControl(false);
+  }, [isSendingControl, publishCommand]);
+
+  const stopPump2FromWeb = useCallback(async () => {
+    if (isSendingControl) return;
+    setIsSendingControl(true);
+    setLastLocalCommandAtMs(Date.now());
+    const published = await publishCommand('PUMP2_OFF', 2, 'OFF');
+    if (published) {
+      await syncAfterCommand();
+      toast.success('Pump 2 OFF sent', {
+        description: 'The board will stop Pump 2 while keeping the rest of the logic unchanged.',
+      });
+    }
+    setIsSendingControl(false);
+  }, [isSendingControl, publishCommand]);
+
   return (
     <MachineContext.Provider
       value={{
         isOn,
         toggleMachine,
         togglePump,
+        sendStartCommand,
+        sendEmergencyStop,
+        stopPump2FromWeb,
         resetUptime,
         uptimeSeconds,
         pressure,
@@ -557,6 +808,19 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         pumps,
         activeTank,
         ecValue,
+        phValue,
+        tempValue,
+        locked,
+        wls1,
+        wls2,
+        floatAlarm,
+        pump1On,
+        pump2On,
+        greenOn,
+        redOn,
+        phOk,
+        lastTelemetryAt,
+        telemetryHistory,
         mqttStatus,
       }}
     >

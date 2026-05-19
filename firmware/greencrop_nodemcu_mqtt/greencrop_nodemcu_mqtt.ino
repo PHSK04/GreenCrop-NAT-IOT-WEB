@@ -1,24 +1,23 @@
 /*
-  GreenCrop NodeMCU MQTT Firmware
-  Board: NodeMCU 1.0 (ESP-12E Module)
+  GreenCrop ESP32 MQTT Firmware
+  Board: ESP32
   Libraries:
-    - ESP8266WiFi
+    - WiFi
+    - WiFiClientSecure
     - PubSubClient
+    - OneWire
+    - DallasTemperature
 
-  Important:
-    - This version uses RX/GPIO3 as pinFloat.
-    - Do not use Serial.begin() or Serial Monitor while RX is connected.
-    - Relay outputs are active-low: LOW = ON, HIGH = OFF.
+  Logic:
+    - ใช้ลอจิกการกดมือและการล็อคตามแมนวลล่าสุด
+    - รีเลย์เป็นแบบ Active LOW: LOW = ON, HIGH = OFF
 */
 
-#include <ESP8266WiFi.h>
+#include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
-
-// Hardware config
-// false = ปุ่ม STOP เป็นปุ่มกดธรรมดา NO ใช้ INPUT_PULLUP (กดแล้วอ่าน LOW)
-// true  = ปุ่ม STOP เป็น NC ตามแมนวลเดิม (เปิดวงจรแล้วอ่าน HIGH)
-const bool STOP_BUTTON_IS_NC = false;
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 // 1. Wi-Fi
 const char* WIFI_SSID     = "P.PHSK";
@@ -40,31 +39,50 @@ const char* DEFAULT_TENANT_ID = "public";
 WiFiClientSecure espClient;
 PubSubClient mqttClient(espClient);
 
-// 3. กำหนดขา Input
-int pinWLS1  = D1;  // Water Level Sensor 1 (ตัวล่าง)
-int pinWLS2  = D6;  // Water Level Sensor 2 (ตัวบน)
-int pinFloat = 3;   // สวิตช์ลูกลอย (ต่อเข้าขา RX ของบอร์ด ซึ่งตรงกับ GPIO3)
-int pinStart = D2;  // ปุ่ม Start (NO)
-int pinStop  = D5;  // ปุ่ม Stop (NC)
+// ==========================================
+// 3. ตั้งค่าอุปกรณ์และขาพอร์ต (ESP32)
+// ==========================================
+const int pinTemp = 4;
+OneWire oneWire(pinTemp);
+DallasTemperature tempSensor(&oneWire);
 
-// 4. กำหนดขา Output
-int relayPump1 = D4;  // รีเลย์ปั๊ม 1
-int relayPump2 = D0;  // รีเลย์ปั๊ม 2 และ ไฟเหลือง (พ่วงขากัน)
-int relayGreen = D7;  // รีเลย์ไฟเขียว
-int relayRed   = D3;  // รีเลย์ไฟแดง
-int pinISD     = D8;  // สั่งเสียง (ขา P-L)
+// ขา Input (ดิจิตอล)
+const int pinWLS1 = 13;
+const int pinWLS2 = 14;
+const int pinStart = 27;  // ปุ่ม Start (NO)
+const int pinStop = 26;   // ปุ่ม Stop (NC)
+const int pinFloat = 25;  // ลูกลอยถัง 2
 
-// 5. ตัวแปรเก็บสถานะ
-int  pump2Status = 0;      // สถานะปั๊ม 2 (0 = ดับ, 1 = ทำงาน)
-bool isLocked    = false;  // สถานะล็อคระบบ (Safety Interlock)
+// ขา Input (แอนะล็อก)
+const int pinPH = 32;
+const int pinTDS = 34;
+
+// ขา Output
+const int relayPump1 = 33;
+const int relayPump2 = 5;   // ปั๊ม 2 + ไฟเหลือง
+const int relayGreen = 18;
+const int relayRed = 19;
+const int pinISD = 23;
+
+// ==========================================
+// 4. ตัวแปรสถานะระบบ
+// ==========================================
+int pump2Status = 0;    // 0 = หยุด, 1 = ทำงาน
+bool isLocked = false;  // false = ปกติ, true = Emergency lock
 bool webStartCommand = false;
-bool webStopCommand  = false;
+bool webStopCommand = false;
 bool webPump2OffCommand = false;
-bool isDevicePaired  = false;
+bool isDevicePaired = false;
 String activeTenantId = DEFAULT_TENANT_ID;
-unsigned long pump2StartedAtMs              = 0;
+
+float pH_Value = 0.0;
+float EC_Value = 0.0;
+float temp_Value = 25.0;
+
+unsigned long pump2StartedAtMs = 0;
 unsigned long accumulatedPump2UptimeSeconds = 0;
-unsigned long lastPublishMs                 = 0;
+unsigned long lastPublishMs = 0;
+unsigned long lastSerialUpdateMs = 0;
 
 const char* boolText(bool value) {
   return value ? "true" : "false";
@@ -91,7 +109,7 @@ bool useTenantTopic() {
   return activeTenantId.length() > 0 && activeTenantId != "public";
 }
 
-String readJsonStringValue(String msg, const char* key) {
+String readJsonStringValue(const String& msg, const char* key) {
   String marker = "\"";
   marker += key;
   marker += "\":\"";
@@ -118,6 +136,14 @@ unsigned long currentUptimeSeconds() {
   return accumulatedPump2UptimeSeconds + ((millis() - pump2StartedAtMs) / 1000);
 }
 
+bool isPump1AllowedByPh() {
+  return pH_Value >= 6.5 && pH_Value <= 7.5;
+}
+
+bool isStopPressed(int stateStop) {
+  return stateStop == HIGH;  // ปุ่ม Stop เป็น NC ตามแมนวลล่าสุด
+}
+
 void turnOffAllOutputs() {
   digitalWrite(relayPump1, HIGH);
   digitalWrite(relayPump2, HIGH);
@@ -127,6 +153,7 @@ void turnOffAllOutputs() {
 }
 
 void startPump2() {
+  if (pump2Status == 1) return;
   pump2Status = 1;
   pump2StartedAtMs = millis();
 }
@@ -145,7 +172,26 @@ void stopAndLock() {
   turnOffAllOutputs();
 }
 
-void applyPairingMessage(String msg) {
+void readSensors() {
+  tempSensor.requestTemperatures();
+  temp_Value = tempSensor.getTempCByIndex(0);
+  if (temp_Value < 0.0 || temp_Value == DEVICE_DISCONNECTED_C) {
+    temp_Value = 25.0;
+  }
+
+  const float voltagePH = analogRead(pinPH) * (3.3f / 4095.0f);
+  pH_Value = (-5.70f * voltagePH) + 21.34f;
+  if (pH_Value < 0.0f) pH_Value = 0.0f;
+  if (pH_Value > 14.0f) pH_Value = 14.0f;
+
+  const float voltageTDS = analogRead(pinTDS) * (3.3f / 4095.0f);
+  const float compCoeff = 1.0f + 0.02f * (temp_Value - 25.0f);
+  const float compVoltage = voltageTDS / compCoeff;
+  const float tds = (133.42f * pow(compVoltage, 3) - 255.86f * pow(compVoltage, 2) + 857.39f * compVoltage) * 0.5f;
+  EC_Value = (tds * 2.0f) / 1000.0f;
+}
+
+void applyPairingMessage(const String& msg) {
   const bool statusPaired = msg.indexOf("PAIRED") >= 0 || msg.indexOf("\"paired\"") >= 0;
   const bool codeMatches = msg.indexOf(PAIRING_CODE) >= 0;
   const String tenantFromWeb = readJsonStringValue(msg, "tenant_id");
@@ -226,8 +272,9 @@ void reconnectMqtt() {
 
   if (mqttClient.connected()) return;
 
-  String clientId = "greencrop_nodemcu_";
-  clientId += String(ESP.getChipId(), HEX);
+  uint64_t chipId = ESP.getEfuseMac();
+  String clientId = "greencrop_esp32_";
+  clientId += String((uint32_t)(chipId >> 24), HEX);
 
   if (mqttClient.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD)) {
     mqttClient.subscribe(TOPIC_CONTROL);
@@ -249,8 +296,8 @@ void publishStatus(
   int stateStart,
   int stateStop
 ) {
-  const bool stopPressed = STOP_BUTTON_IS_NC ? (stateStop == HIGH) : (stateStop == LOW);
-  const bool pump1On = !isLocked && stateWLS2 != HIGH && stateWLS1 == HIGH;
+  const bool stopPressed = isStopPressed(stateStop);
+  const bool pump1On = !isLocked && stateWLS2 != HIGH && stateWLS1 == HIGH && isPump1AllowedByPh();
   const bool greenOn = !isLocked && pump2Status == 0 && stateWLS2 == HIGH;
   const bool redOn = !isLocked && stateFloat == LOW;
 
@@ -265,11 +312,15 @@ void publishStatus(
   payload += "\"float_alarm\":";      payload += boolText(stateFloat == LOW);       payload += ",";
   payload += "\"start_button\":";     payload += boolText(stateStart == LOW);       payload += ",";
   payload += "\"stop_button\":";      payload += boolText(stopPressed);              payload += ",";
-  payload += "\"locked\":";           payload += boolText(isLocked);                payload += ",";
-  payload += "\"pump1_on\":";         payload += boolText(pump1On);                 payload += ",";
-  payload += "\"pump2_on\":";         payload += boolText(pump2Status == 1);        payload += ",";
-  payload += "\"green_on\":";         payload += boolText(greenOn);                 payload += ",";
-  payload += "\"red_on\":";           payload += boolText(redOn);                   payload += ",";
+  payload += "\"locked\":";           payload += boolText(isLocked);                 payload += ",";
+  payload += "\"pump1_on\":";         payload += boolText(pump1On);                  payload += ",";
+  payload += "\"pump2_on\":";         payload += boolText(pump2Status == 1);         payload += ",";
+  payload += "\"green_on\":";         payload += boolText(greenOn);                  payload += ",";
+  payload += "\"red_on\":";           payload += boolText(redOn);                    payload += ",";
+  payload += "\"ph_value\":";         payload += String(pH_Value, 2);                payload += ",";
+  payload += "\"ec_value\":";         payload += String(EC_Value, 2);                payload += ",";
+  payload += "\"temp_c\":";           payload += String(temp_Value, 1);              payload += ",";
+  payload += "\"ph_ok\":";            payload += boolText(isPump1AllowedByPh());     payload += ",";
   payload += "\"is_on\":";            payload += boolText(pump1On || pump2Status == 1); payload += ",";
   payload += "\"uptime_seconds\":";   payload += String(currentUptimeSeconds());
   payload += "}";
@@ -282,14 +333,36 @@ void publishStatus(
   }
 }
 
+void printSerialStatus() {
+  Serial.println("=============================");
+  Serial.print("pH Value : ");
+  Serial.println(pH_Value, 2);
+  Serial.print("EC Value : ");
+  Serial.print(EC_Value, 2);
+  Serial.println(" mS/cm");
+  Serial.print("Temp T2  : ");
+  Serial.print(temp_Value, 1);
+  Serial.println(" C");
+  Serial.print("System Status: ");
+  if (isLocked) {
+    Serial.println("LOCKED! (Emergency Stop)");
+  } else if (pump2Status == 1) {
+    Serial.println("PUMP 2 RUNNING (Manual)");
+  } else {
+    Serial.println("NORMAL (Standby/Pump 1 Auto)");
+  }
+  Serial.println("=============================");
+}
+
 void setup() {
-  // ข้อควรระวัง: ห้ามใส่คำสั่ง Serial.begin() ในโค้ดนี้
-  // เพราะเราดึงขา RX มาใช้เป็น Input สำหรับสวิตช์ลูกลอยแล้ว
-  pinMode(pinWLS1, INPUT);
-  pinMode(pinWLS2, INPUT);
-  pinMode(pinFloat, INPUT_PULLUP);
+  Serial.begin(9600);
+  tempSensor.begin();
+
+  pinMode(pinWLS1, INPUT_PULLDOWN);
+  pinMode(pinWLS2, INPUT_PULLDOWN);
   pinMode(pinStart, INPUT_PULLUP);
   pinMode(pinStop, INPUT_PULLUP);
+  pinMode(pinFloat, INPUT_PULLUP);
 
   pinMode(relayPump1, OUTPUT);
   pinMode(relayPump2, OUTPUT);
@@ -301,10 +374,13 @@ void setup() {
   setupWifi();
 
   espClient.setInsecure();
-  mqttClient.setBufferSize(1024);
+  mqttClient.setBufferSize(1536);
   mqttClient.setKeepAlive(30);
   mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
   mqttClient.setCallback(onMqttMessage);
+
+  Serial.println("System Ready... Start Reading Sensors.");
+  delay(1000);
 }
 
 void loop() {
@@ -313,38 +389,33 @@ void loop() {
   }
   mqttClient.loop();
 
-  // --- อ่านค่า Input ---
-  int stateWLS1  = digitalRead(pinWLS1);
-  int stateWLS2  = digitalRead(pinWLS2);
-  int stateFloat = digitalRead(pinFloat);
-  int stateStart = digitalRead(pinStart);
-  int stateStop  = digitalRead(pinStop);
-  bool stopPressed = STOP_BUTTON_IS_NC ? (stateStop == HIGH) : (stateStop == LOW);
+  const int stateWLS1 = digitalRead(pinWLS1);
+  const int stateWLS2 = digitalRead(pinWLS2);
+  const int stateStart = digitalRead(pinStart);
+  const int stateStop = digitalRead(pinStop);
+  const int stateFloat = digitalRead(pinFloat);
 
-  // กด STOP แบบ NC หรือสั่ง STOP จาก MQTT -> ล็อคระบบ
-  if (stopPressed || webStopCommand) {
+  readSensors();
+
+  if (isStopPressed(stateStop) || webStopCommand) {
     webStopCommand = false;
     stopAndLock();
   } else {
-    // ตรวจสอบการ "ปลดล็อค" : ถ้าระดับน้ำถึง WLS2 ให้ปลดล็อค
     if (stateWLS2 == HIGH) {
       isLocked = false;
     }
 
-    if (isLocked == true) {
-      // [โหมดติดล็อค] ทุกอย่างหยุดนิ่ง รอจนกว่าน้ำจะถึง WLS2
+    if (isLocked) {
       turnOffAllOutputs();
     } else {
-      // [โหมดปกติ]
       if (stateWLS2 == HIGH) {
         digitalWrite(relayPump1, HIGH);
-      } else if (stateWLS1 == HIGH) {
+      } else if (stateWLS1 == HIGH && isPump1AllowedByPh()) {
         digitalWrite(relayPump1, LOW);
       } else {
         digitalWrite(relayPump1, HIGH);
       }
 
-      // กดมือหรือสั่งผ่าน MQTT ให้ปั๊ม 2 ทำงานค้าง
       if (stateStart == LOW || webStartCommand) {
         startPump2();
       }
@@ -357,15 +428,14 @@ void loop() {
 
       if (pump2Status == 1) {
         digitalWrite(relayPump2, LOW);
-        digitalWrite(relayGreen, HIGH);
       } else {
         digitalWrite(relayPump2, HIGH);
+      }
 
-        if (stateWLS2 == HIGH) {
-          digitalWrite(relayGreen, LOW);
-        } else {
-          digitalWrite(relayGreen, HIGH);
-        }
+      if (stateWLS2 == HIGH && pump2Status == 0) {
+        digitalWrite(relayGreen, LOW);
+      } else {
+        digitalWrite(relayGreen, HIGH);
       }
 
       if (stateFloat == LOW) {
@@ -381,6 +451,11 @@ void loop() {
   if (millis() - lastPublishMs >= 1000) {
     lastPublishMs = millis();
     publishStatus(stateWLS1, stateWLS2, stateFloat, stateStart, stateStop);
+  }
+
+  if (millis() - lastSerialUpdateMs >= 500) {
+    lastSerialUpdateMs = millis();
+    printSerialStatus();
   }
 
   delay(50);
