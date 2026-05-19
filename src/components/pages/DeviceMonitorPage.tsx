@@ -1,166 +1,180 @@
-import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
-import { Checkbox } from "../ui/checkbox";
-import { Switch } from "../ui/switch";
-import { Input } from "../ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
-import { ExportFiltersCard } from "@/components/ExportFiltersCard";
-import { 
-  Search, 
-  Filter, 
-  Lightbulb, 
-  Zap, 
-  Droplets, 
-  Activity, 
-  Gauge, 
-  CheckCircle2, 
-  RefreshCw,
-  Power,
-  Eye,
-  BarChart3,
-  Download,
-  FileText
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { Activity, AlertTriangle, CheckCircle2, Download, Gauge, Search, Thermometer, Waves, Wifi } from "lucide-react";
 import { toast } from "sonner";
-import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
+import { ExportFiltersCard } from "@/components/ExportFiltersCard";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
-import { seededNumber } from "@/utils/deviceData";
-
-const initialDeviceData = [
-  {
-    id: 1,
-    name: "LED Grow Light",
-    type: "Actuator",
-    category: "Lighting",
-    status: "Active",
-    value: "85% Intensity",
-    lastUpdate: "Just now",
-    icon: Lightbulb,
-    color: "text-amber-500 dark:text-amber-400"
-  },
-  {
-    id: 2,
-    name: "UV Germicidal Irradiation",
-    type: "Actuator",
-    category: "Sterilization",
-    status: "Active",
-    value: "Running",
-    lastUpdate: "Just now",
-    icon: Zap,
-    color: "text-purple-600 dark:text-purple-400"
-  },
-  {
-    id: 3,
-    name: "RO System",
-    type: "System",
-    category: "Water Treatment",
-    status: "Standby",
-    value: "Tank Full",
-    lastUpdate: "5 mins ago",
-    icon: Droplets,
-    color: "text-blue-600 dark:text-blue-400"
-  },
-  {
-    id: 4,
-    name: "Water Level Sensor",
-    type: "Sensor",
-    category: "Monitoring",
-    status: "Active",
-    value: "82% Level",
-    lastUpdate: "10 sec ago",
-    icon: Gauge,
-    color: "text-cyan-600 dark:text-cyan-400"
-  },
-  {
-    id: 5,
-    name: "Electrical Conductivity (EC)",
-    type: "Sensor",
-    category: "Quality",
-    status: "Active",
-    value: "1.8 mS/cm",
-    lastUpdate: "Just now",
-    icon: Activity,
-    color: "text-emerald-600 dark:text-emerald-400"
-  },
-  {
-    id: 6,
-    name: "Dissolved Oxygen (DO)",
-    type: "Sensor",
-    category: "Quality",
-    status: "Active",
-    value: "6.8 mg/L",
-    lastUpdate: "Just now",
-    icon: Activity,
-    color: "text-emerald-600 dark:text-emerald-400"
-  },
-  {
-    id: 7,
-    name: "pH Sensor",
-    type: "Sensor",
-    category: "Quality",
-    status: "Active",
-    value: "7.2 pH",
-    lastUpdate: "Just now",
-    icon: Activity,
-    color: "text-emerald-600 dark:text-emerald-400"
-  },
-  {
-    id: 8,
-    name: "Temperature Sensor",
-    type: "Sensor",
-    category: "Monitoring",
-    status: "Active",
-    value: "28.5 °C",
-    lastUpdate: "Just now",
-    icon: Activity,
-    color: "text-amber-500 dark:text-amber-400"
-  }
-];
+import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
+import { useMachine } from "../../contexts/MachineContext";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
+import { Input } from "../ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 
 type DeviceMonitorPageProps = {
   language?: string;
 };
 
+type LiveDeviceRow = {
+  id: string;
+  name: string;
+  type: "Sensor" | "Actuator" | "System";
+  category: string;
+  status: "Active" | "Standby" | "Alarm";
+  value: string;
+  lastUpdate: string;
+  icon: typeof Activity;
+};
+
+const formatTimestamp = (value: string | null) => {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
+};
+
+const statusClass = (status: LiveDeviceRow["status"]) => {
+  if (status === "Alarm") return "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400";
+  if (status === "Active") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+  return "border-border bg-muted text-muted-foreground";
+};
+
 export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
-  const { deviceId, seed } = useDeviceSeed();
+  const { deviceId } = useDeviceSeed();
+  const {
+    ecValue,
+    phValue,
+    tempValue,
+    wls1,
+    wls2,
+    floatAlarm,
+    locked,
+    pump1On,
+    pump2On,
+    greenOn,
+    redOn,
+    phOk,
+    mqttStatus,
+    lastTelemetryAt,
+    telemetryHistory,
+  } = useMachine();
+
   const isTH = language === "TH";
-  const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
-
-  const seededDeviceData = useMemo(() => {
-    return initialDeviceData.map((device, index) => {
-      const label = device.name.toLowerCase();
-      let nextValue = device.value;
-      if (label.includes("ec")) {
-        nextValue = `${seededNumber(1.8, seed, index, 0.05, 1.0, 2.4, 2)} mS/cm`;
-      } else if (label.includes("oxygen")) {
-        nextValue = `${seededNumber(6.8, seed, index, 0.07, 5.5, 8.6, 2)} mg/L`;
-      } else if (label.includes("ph")) {
-        nextValue = `${seededNumber(7.2, seed, index, 0.05, 6.4, 7.8, 2)} pH`;
-      } else if (label.includes("temperature")) {
-        nextValue = `${seededNumber(28.5, seed, index, 0.2, 22.0, 29.0, 1)} °C`;
-      } else if (label.includes("water level")) {
-        nextValue = `${seededNumber(82, seed, index, 2, 60, 95, 0)}% Level`;
-      } else if (label.includes("led")) {
-        nextValue = `${seededNumber(85, seed, index, 3, 60, 100, 0)}% Intensity`;
-      }
-      return { ...device, value: nextValue };
-    });
-  }, [seed]);
-
-  const [devices, setDevices] = useState(seededDeviceData);
-  const [selectedDevices, setSelectedDevices] = useState<number[]>([]);
+  const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : isTH ? "ทุกอุปกรณ์" : "All Devices";
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDevice, setSelectedDevice] = useState<typeof initialDeviceData[0] | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<LiveDeviceRow | null>(null);
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
-  const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([
-    "Sensor",
-    "Actuator",
-    "System",
-  ]);
+  const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>(["Sensor", "Actuator", "System"]);
+
+  const lastUpdate = formatTimestamp(lastTelemetryAt);
+
+  const liveRows = useMemo<LiveDeviceRow[]>(
+    () => [
+      {
+        id: "ph",
+        name: isTH ? "เซนเซอร์ pH" : "pH Sensor",
+        type: "Sensor",
+        category: isTH ? "คุณภาพน้ำ" : "Water Quality",
+        status: phOk ? "Active" : "Alarm",
+        value: `${phValue.toFixed(2)} pH`,
+        lastUpdate,
+        icon: Gauge,
+      },
+      {
+        id: "ec",
+        name: isTH ? "เซนเซอร์ EC" : "EC Sensor",
+        type: "Sensor",
+        category: isTH ? "คุณภาพน้ำ" : "Water Quality",
+        status: ecValue > 0 ? "Active" : "Standby",
+        value: `${ecValue.toFixed(2)} mS/cm`,
+        lastUpdate,
+        icon: Waves,
+      },
+      {
+        id: "temp",
+        name: isTH ? "เซนเซอร์อุณหภูมิ" : "Temperature Sensor",
+        type: "Sensor",
+        category: isTH ? "อุณหภูมิน้ำ" : "Water Temperature",
+        status: tempValue > 0 ? "Active" : "Standby",
+        value: `${tempValue.toFixed(1)} °C`,
+        lastUpdate,
+        icon: Thermometer,
+      },
+      {
+        id: "wls1",
+        name: isTH ? "WLS1 ระดับล่าง" : "WLS1 Lower Level",
+        type: "Sensor",
+        category: isTH ? "ระดับน้ำ" : "Water Level",
+        status: wls1 ? "Active" : "Standby",
+        value: wls1 ? (isTH ? "ตรวจพบน้ำ" : "Water detected") : (isTH ? "ยังไม่ถึงระดับ" : "Not reached"),
+        lastUpdate,
+        icon: Waves,
+      },
+      {
+        id: "wls2",
+        name: isTH ? "WLS2 ระดับบน" : "WLS2 Upper Level",
+        type: "Sensor",
+        category: isTH ? "ระดับน้ำ" : "Water Level",
+        status: wls2 ? "Active" : "Standby",
+        value: wls2 ? (isTH ? "น้ำเต็มระดับ" : "Target reached") : (isTH ? "กำลังรอ" : "Waiting"),
+        lastUpdate,
+        icon: Waves,
+      },
+      {
+        id: "float",
+        name: isTH ? "ลูกลอยถัง 2" : "Tank 2 Float Switch",
+        type: "Sensor",
+        category: isTH ? "แจ้งเตือน" : "Alarm",
+        status: floatAlarm ? "Alarm" : "Active",
+        value: floatAlarm ? (isTH ? "แจ้งเตือน" : "Alarm") : (isTH ? "ปกติ" : "Normal"),
+        lastUpdate,
+        icon: AlertTriangle,
+      },
+      {
+        id: "pump1",
+        name: isTH ? "ปั๊ม 1 อัตโนมัติ" : "Pump 1 Auto",
+        type: "Actuator",
+        category: isTH ? "ปั๊ม" : "Pump",
+        status: pump1On ? "Active" : "Standby",
+        value: pump1On ? (isTH ? "กำลังทำงาน" : "Running") : (isTH ? "หยุด" : "Stopped"),
+        lastUpdate,
+        icon: Activity,
+      },
+      {
+        id: "pump2",
+        name: isTH ? "ปั๊ม 2 กดมือ/เว็บ" : "Pump 2 Manual/Web",
+        type: "Actuator",
+        category: isTH ? "ปั๊ม" : "Pump",
+        status: pump2On ? "Active" : "Standby",
+        value: pump2On ? (isTH ? "กำลังทำงาน" : "Running") : (isTH ? "หยุด" : "Stopped"),
+        lastUpdate,
+        icon: Activity,
+      },
+      {
+        id: "lock",
+        name: isTH ? "สถานะล็อคระบบ" : "System Lock",
+        type: "System",
+        category: isTH ? "ความปลอดภัย" : "Safety",
+        status: locked ? "Alarm" : "Active",
+        value: locked ? (isTH ? "ล็อคฉุกเฉิน" : "Emergency locked") : (isTH ? "พร้อมทำงาน" : "Ready"),
+        lastUpdate,
+        icon: AlertTriangle,
+      },
+      {
+        id: "lamp",
+        name: isTH ? "ไฟสถานะ" : "Status Lamps",
+        type: "System",
+        category: isTH ? "ไฟแสดงผล" : "Indicator",
+        status: redOn ? "Alarm" : greenOn ? "Active" : "Standby",
+        value: redOn ? (isTH ? "ไฟแดง" : "Red lamp") : greenOn ? (isTH ? "ไฟเขียว" : "Green lamp") : "-",
+        lastUpdate,
+        icon: CheckCircle2,
+      },
+    ],
+    [ecValue, floatAlarm, greenOn, isTH, lastUpdate, locked, phOk, phValue, pump1On, pump2On, redOn, tempValue, wls1, wls2],
+  );
 
   const dataTypeOptions = [
     { key: "Sensor", label: isTH ? "เซนเซอร์" : "Sensor" },
@@ -168,69 +182,43 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
     { key: "System", label: isTH ? "ระบบ" : "System" },
   ];
 
-  useEffect(() => {
-    setDevices(seededDeviceData);
-    setSelectedDevices([]);
-    setSelectedDevice(null);
-  }, [seededDeviceData]);
-
-  const handleSelectAll = () => {
-    if (selectedDevices.length === devices.length) {
-      setSelectedDevices([]);
-    } else {
-      setSelectedDevices(devices.map(d => d.id));
-    }
-  };
-
-  const handleSelectDevice = (id: number) => {
-    setSelectedDevices(prev => 
-      prev.includes(id) 
-        ? prev.filter(d => d !== id)
-        : [...prev, id]
-    );
-  };
-
-  const toggleDeviceStatus = (id: number) => {
-    setDevices(prevDevices => prevDevices.map(device => {
-      if (device.id === id) {
-        const newStatus = device.status === "Active" ? "Standby" : "Active";
-        const isActive = newStatus === "Active";
-        
-        let newValue = device.value;
-        if (device.name.includes("LED")) newValue = isActive ? "85% Intensity" : "OFF";
-        else if (device.name.includes("UV")) newValue = isActive ? "Running" : "OFF";
-        else if (device.name.includes("RO")) newValue = isActive ? "Filtering" : "Standby";
-
-        toast(isActive ? `${device.name} Activated` : `${device.name} Deactivated`, {
-          description: `Device status changed to ${newStatus}`,
-          icon: isActive ? <CheckCircle2 className="w-4 h-4 text-emerald-500"/> : <Power className="w-4 h-4 text-muted-foreground"/>
-        });
-
-        return { ...device, status: newStatus, value: newValue, lastUpdate: "Just now" };
-      }
-      return device;
-    }));
-  };
-
-  const filteredData = devices.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredData = liveRows.filter((item) => {
+    const q = searchQuery.toLowerCase().trim();
+    return !q || item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q);
+  });
 
   const buildExportPayload = () => {
     const lines: string[] = [];
-    lines.push(isTH ? "รายงาน, สถานะอัจฉริยะของเซนเซอร์" : "Report, Sensor Intelligence");
+    lines.push(isTH ? "รายงานสถานะอุปกรณ์จริงจาก MQTT" : "Live MQTT Device Status Report");
+    lines.push(`${isTH ? "อุปกรณ์" : "Device"}, ${deviceId || "-"}`);
+    lines.push(`${isTH ? "อัปเดตล่าสุด" : "Last Update"}, ${lastUpdate}`);
     if (exportStart || exportEnd) {
       lines.push(`${isTH ? "ช่วงวันที่" : "Date Range"}, ${exportStart || "-"} to ${exportEnd || "-"}`);
     }
-    lines.push(`${isTH ? "ประเภทที่เลือก" : "Selected Types"}, ${selectedDataTypes.join(" | ") || "-"}`);
     lines.push("");
-
     lines.push("id,name,type,category,status,value,lastUpdate");
-    devices
+    liveRows
       .filter((d) => selectedDataTypes.includes(d.type))
       .forEach((d) => {
         lines.push(`${d.id},${d.name},${d.type},${d.category},${d.status},${d.value},${d.lastUpdate}`);
       });
+
+    lines.push("");
+    lines.push("history_timestamp,ph,ec,temp,wls1,wls2,float_alarm,locked,pump1,pump2");
+    telemetryHistory.slice(0, 50).forEach((row) => {
+      lines.push([
+        row.timestamp,
+        row.phValue.toFixed(2),
+        row.ecValue.toFixed(2),
+        row.tempValue.toFixed(1),
+        row.wls1,
+        row.wls2,
+        row.floatAlarm,
+        row.locked,
+        row.pump1On,
+        row.pump2On,
+      ].join(","));
+    });
 
     return lines.join("\n");
   };
@@ -238,59 +226,96 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   const handleExport = async (format: "csv" | "pdf") => {
     try {
       if (selectedDataTypes.length === 0) {
-        toast.error(isTH ? "ส่งออกล้มเหลว" : "Export Failed", { description: isTH ? "กรุณาเลือกอย่างน้อย 1 ประเภทข้อมูล" : "Please select at least one data type." });
+        toast.error(isTH ? "ส่งออกล้มเหลว" : "Export Failed", {
+          description: isTH ? "กรุณาเลือกอย่างน้อย 1 ประเภทข้อมูล" : "Please select at least one data type.",
+        });
         return;
       }
+
       const payload = buildExportPayload();
-      const filename = `sensor_intelligence.${format}`;
+      const filename = `live_device_monitor.${format}`;
       if (format === "pdf") {
         await downloadSimplePdf(filename, payload);
       } else {
         downloadTextFile(filename, payload, "text/csv;charset=utf-8");
       }
+
       toast.success(isTH ? "ส่งออกสำเร็จ" : "Export Successful", {
-        description: isTH ? `ดาวน์โหลด ${filename}` : `Downloaded ${filename}`
+        description: isTH ? `ดาวน์โหลด ${filename}` : `Downloaded ${filename}`,
       });
     } catch {
       toast.error(isTH ? "ส่งออกล้มเหลว" : "Export Failed", {
-        description: isTH ? "ไม่สามารถสร้างไฟล์ได้" : "Could not generate export file."
+        description: isTH ? "ไม่สามารถสร้างไฟล์ได้" : "Could not generate export file.",
       });
     }
   };
 
   return (
     <>
-      <header className="bg-card/50 border-b border-border px-8 py-6 backdrop-blur-sm">
-        <div className="flex items-center justify-between">
+      <header className="border-b border-border bg-card/70 px-4 py-5 backdrop-blur-sm md:px-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
-              <Activity className="w-6 h-6 text-emerald-500" />
-              {isTH ? "ระบบอัจฉริยะเซนเซอร์" : "Sensor Intelligence"}
+            <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
+              <Activity className="h-6 w-6 text-emerald-500" />
+              {isTH ? "มอนิเตอร์อุปกรณ์จริง" : "Live Device Monitor"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {isTH ? "สถานะเรียลไทม์ของเซนเซอร์และแอคชูเอเตอร์" : "Real-time AI status of sensors and actuators"}
+            <p className="mt-1 text-sm text-muted-foreground">
+              {isTH ? "อ่านค่าจริงจาก ESP32 ผ่าน MQTT" : "Live telemetry from the ESP32 over MQTT"}
             </p>
-            <div className="mt-2">
-              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/40">
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 {deviceLabel}
+              </Badge>
+              <Badge variant="outline" className={mqttStatus === "connected" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"}>
+                <Wifi className="mr-1 h-3 w-3" />
+                {mqttStatus === "connected" ? (isTH ? "MQTT เชื่อมต่อ" : "MQTT Connected") : (isTH ? "MQTT ไม่เชื่อมต่อ" : "MQTT Disconnected")}
+              </Badge>
+              <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
+                {isTH ? "อัปเดตล่าสุด" : "Last update"}: {lastUpdate}
               </Badge>
             </div>
           </div>
-          <Button size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-0">
-            <RefreshCw className="w-4 h-4" />
-            {isTH ? "รีเฟรชสถานะ" : "Refresh Status"}
+          <Button size="sm" variant="outline" className="gap-2" onClick={() => toast.info(isTH ? "ข้อมูลจะอัปเดตอัตโนมัติเมื่อบอร์ดส่ง MQTT" : "Data updates automatically when MQTT telemetry arrives")}>
+            <Download className="h-4 w-4" />
+            {isTH ? "สถานะสด" : "Live"}
           </Button>
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto p-8 relative z-10">
+      <main className="relative z-10 flex-1 overflow-auto p-4 md:p-8">
+        <div className="mb-6 grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">{isTH ? "ค่า pH" : "pH"}</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">{phValue.toFixed(2)}</p>
+              <Badge variant="outline" className={phOk ? "mt-3 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "mt-3 border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"}>
+                {phOk ? (isTH ? "อยู่ในช่วง" : "OK") : (isTH ? "นอกช่วง" : "Out of range")}
+              </Badge>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">{isTH ? "ค่า EC" : "EC"}</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">{ecValue.toFixed(2)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">mS/cm</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">{isTH ? "อุณหภูมิ" : "Temperature"}</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">{tempValue.toFixed(1)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">°C</p>
+            </CardContent>
+          </Card>
+        </div>
+
         <ExportFiltersCard
           startDate={exportStart}
           endDate={exportEnd}
           onStartDateChange={setExportStart}
           onEndDateChange={setExportEnd}
-          title={isTH ? "ตัวกรองสำหรับส่งออก" : "Export Filters"}
-          description={isTH ? "เลือกช่วงวันที่และประเภทข้อมูลเพื่อดาวน์โหลด CSV/PDF" : "Select date range and data types to download CSV/PDF"}
+          title={isTH ? "ส่งออกข้อมูลจริง" : "Export Live Data"}
+          description={isTH ? "ดาวน์โหลดสถานะล่าสุดและประวัติที่บันทึกจาก MQTT" : "Download current status and saved MQTT history"}
           startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
           endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
           options={dataTypeOptions}
@@ -306,144 +331,75 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
           downloadPdfLabel={isTH ? "ดาวน์โหลด PDF" : "Download PDF"}
         />
 
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <div className="relative w-80">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={isTH ? "ค้นหาอุปกรณ์..." : "Search devices..."}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-background border-input text-foreground placeholder:text-muted-foreground focus-visible:ring-emerald-500/50"
-              />
-            </div>
-            <Button variant="outline" size="sm" className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground">
-              <Filter className="w-4 h-4" />
-              {isTH ? "กรองตามประเภท" : "Filter by Type"}
-            </Button>
+        <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder={isTH ? "ค้นหาอุปกรณ์จริง..." : "Search live devices..."}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
           </div>
-          {selectedDevices.length > 0 && (
-            <div className="flex items-center space-x-2">
-              <Badge variant="secondary" className="bg-secondary text-secondary-foreground border-secondary">
-                {isTH ? `${selectedDevices.length} รายการ` : `${selectedDevices.length} selected`}
-              </Badge>
-              <Button variant="outline" size="sm" className="border-border text-muted-foreground hover:bg-muted">
-                {isTH ? "ตรวจสอบระบบ" : "Run Diagnostics"}
-              </Button>
-            </div>
-          )}
+          <div className="flex gap-2">
+            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              {liveRows.filter((d) => d.status === "Active").length} {isTH ? "ปกติ" : "Active"}
+            </Badge>
+            <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400">
+              {liveRows.filter((d) => d.status === "Alarm").length} {isTH ? "แจ้งเตือน" : "Alarm"}
+            </Badge>
+          </div>
         </div>
 
-        <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+        <Card className="rounded-lg border border-border bg-card/60 shadow-sm">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-foreground">Connected Peripherals</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Monitoring {filteredData.length} devices across the network
-                </CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Badge variant="outline" className="border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
-                  {devices.filter(d => d.status === "Active").length} Online
-                </Badge>
-                <Badge variant="outline" className="border-border text-muted-foreground">
-                  {devices.filter(d => d.status !== "Active").length} Standby
-                </Badge>
-              </div>
-            </div>
+            <CardTitle>{isTH ? "รายการสถานะจากบอร์ด" : "Board Telemetry List"}</CardTitle>
+            <CardDescription>
+              {isTH ? `แสดง ${filteredData.length} รายการจากข้อมูลจริง` : `Showing ${filteredData.length} live records`}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-border hover:bg-muted/50">
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedDevices.length === devices.length}
-                        onCheckedChange={handleSelectAll}
-                        className="border-muted-foreground data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
-                      />
-                    </TableHead>
-                    <TableHead className="font-semibold text-muted-foreground">Device Name</TableHead>
-                    <TableHead className="font-semibold text-muted-foreground">Category</TableHead>
-                    <TableHead className="font-semibold text-muted-foreground">Status</TableHead>
-                    <TableHead className="font-semibold text-muted-foreground">Current Value</TableHead>
-                    <TableHead className="font-semibold text-muted-foreground">Last Update</TableHead>
-                    <TableHead className="font-semibold text-muted-foreground text-right">Action</TableHead>
+                  <TableRow>
+                    <TableHead>{isTH ? "ชื่อ" : "Name"}</TableHead>
+                    <TableHead>{isTH ? "ประเภท" : "Type"}</TableHead>
+                    <TableHead>{isTH ? "สถานะ" : "Status"}</TableHead>
+                    <TableHead>{isTH ? "ค่าปัจจุบัน" : "Current Value"}</TableHead>
+                    <TableHead>{isTH ? "อัปเดต" : "Updated"}</TableHead>
+                    <TableHead className="text-right">{isTH ? "ดู" : "View"}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredData.map((device) => (
-                    <TableRow 
-                      key={device.id}
-                      className="border-border hover:bg-muted/50 transition-colors"
-                    >
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedDevices.includes(device.id)}
-                          onCheckedChange={() => handleSelectDevice(device.id)}
-                          className="border-muted-foreground data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
-                        />
-                      </TableCell>
+                    <TableRow key={device.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg bg-muted ${device.status === "Active" ? device.color : "text-muted-foreground"}`}>
-                             <device.icon className="w-5 h-5" />
+                          <div className="rounded-lg bg-muted p-2 text-emerald-600 dark:text-emerald-400">
+                            <device.icon className="h-5 w-5" />
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-foreground">{device.name}</p>
-                            <p className="text-xs text-muted-foreground">{device.type}</p>
+                            <p className="font-medium text-foreground">{device.name}</p>
+                            <p className="text-xs text-muted-foreground">{device.category}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="bg-secondary text-secondary-foreground border border-border">
-                          {device.category}
+                        <Badge variant="secondary">{device.type}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={statusClass(device.status)}>
+                          {device.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                           {device.status === "Active" ? (
-                             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                           ) : (
-                             <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
-                           )}
-                           <span className={`text-sm font-medium ${
-                             device.status === "Active" ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
-                           }`}>
-                             {device.status}
-                           </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                         <span className="text-sm font-mono text-foreground">
-                           {device.value}
-                         </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-muted-foreground">{device.lastUpdate}</span>
-                      </TableCell>
+                      <TableCell className="font-mono text-sm text-foreground">{device.value}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{device.lastUpdate}</TableCell>
                       <TableCell className="text-right">
-                        {device.type === "Actuator" ? (
-                          <div className="flex justify-end pr-2">
-                            <Switch 
-                              checked={device.status === "Active"} 
-                              onCheckedChange={() => toggleDeviceStatus(device.id)}
-                              className="data-[state=checked]:bg-emerald-600" 
-                            />
-                          </div>
-                        ) : (
-                           <Button 
-                             variant="ghost" 
-                             size="sm" 
-                             onClick={() => setSelectedDevice(device)}
-                             className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 gap-2 h-8"
-                           >
-                             <Eye className="w-4 h-4" />
-                             <span className="sr-only sm:not-sr-only">Data</span>
-                           </Button>
-                        )}
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedDevice(device)}>
+                          <Activity className="mr-2 h-4 w-4" />
+                          {isTH ? "ข้อมูล" : "Data"}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -455,73 +411,42 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
       </main>
 
       <Dialog open={!!selectedDevice} onOpenChange={() => setSelectedDevice(null)}>
-        <DialogContent className="bg-card border-border text-foreground sm:max-w-md">
+        <DialogContent className="bg-card text-foreground sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <Activity className="w-5 h-5 text-emerald-500" />
-              Sensor Data Analysis
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-emerald-500" />
+              {selectedDevice?.name}
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Real-time telemetry from {selectedDevice?.name}
+            <DialogDescription>
+              {isTH ? "ข้อมูลนี้มาจาก MQTT ของบอร์ด ESP32" : "This value comes from ESP32 MQTT telemetry"}
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedDevice && (
-            <div className="space-y-6 py-4">
-              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border">
-                 <div className="flex items-center gap-3">
-                    <div className={`p-3 rounded-xl bg-card ${selectedDevice.color}`}>
-                       <selectedDevice.icon className="w-6 h-6" />
-                    </div>
-                    <div>
-                       <p className="text-sm text-muted-foreground">Current Reading</p>
-                       <p className="text-2xl font-bold text-foreground">{selectedDevice.value}</p>
-                    </div>
-                 </div>
-                 <Badge variant="outline" className={`
-                    ${selectedDevice.status === "Active" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" : "bg-muted text-muted-foreground border-border"}
-                  `}>
-                    {selectedDevice.status}
-                 </Badge>
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border border-border bg-muted/30 p-4">
+                <p className="text-sm text-muted-foreground">{isTH ? "ค่าปัจจุบัน" : "Current Reading"}</p>
+                <p className="mt-2 text-2xl font-bold text-foreground">{selectedDevice.value}</p>
+                <Badge variant="outline" className={`mt-3 ${statusClass(selectedDevice.status)}`}>
+                  {selectedDevice.status}
+                </Badge>
               </div>
-
-              <div className="space-y-3">
-                 <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4 text-blue-400" />
-                    24h Performance Trend
-                 </h4>
-                 {/* Simulated Chart Placeholder */}
-                 <div className="h-32 w-full bg-muted/30 rounded-lg border border-border relative overflow-hidden flex items-end justify-between px-2 pb-2 gap-1 pointer-events-none">
-                    {[40, 65, 55, 80, 75, 90, 85, 95, 88, 70, 60, 75, 40, 65, 55, 80, 75, 90, 85, 95].map((h, i) => (
-                       <div key={i} className={`w-full bg-gradient-to-t ${selectedDevice.status === "Active" ? "from-emerald-500/20 to-emerald-500/80" : "from-slate-500/20 to-slate-500/50"} rounded-t-sm transition-all duration-500`} style={{ height: `${h}%` }}></div>
-                    ))}
-                 </div>
-                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
-                    <span>00:00</span>
-                    <span>06:00</span>
-                    <span>12:00</span>
-                    <span>18:00</span>
-                    <span>Now</span>
-                 </div>
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
-                 <div className="p-3 bg-muted/30 rounded-lg border border-border">
-                    <p className="text-xs text-muted-foreground mb-1">Stability Score</p>
-                    <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">98.5%</p>
-                 </div>
-                 <div className="p-3 bg-muted/30 rounded-lg border border-border">
-                    <p className="text-xs text-muted-foreground mb-1">Signal Strength</p>
-                    <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">-42 dBm</p>
-                 </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">{isTH ? "ประเภท" : "Type"}</p>
+                  <p className="mt-1 font-semibold text-foreground">{selectedDevice.type}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">{isTH ? "หมวดหมู่" : "Category"}</p>
+                  <p className="mt-1 font-semibold text-foreground">{selectedDevice.category}</p>
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">{isTH ? "อัปเดตล่าสุด" : "Last Update"}</p>
+                <p className="mt-1 font-mono text-sm text-foreground">{selectedDevice.lastUpdate}</p>
               </div>
             </div>
           )}
-
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setSelectedDevice(null)} className="text-muted-foreground hover:text-foreground">Close</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">Export Log</Button>
-          </div>
         </DialogContent>
       </Dialog>
     </>
