@@ -9,13 +9,14 @@ import {
   RefreshCw,
   ArrowRight,
   Waves,
-  Gauge,
   Power,
   ArrowDownToLine,
   ArrowUpFromLine,
   AlertCircle,
   Sun,
-  Leaf
+  Leaf,
+  Thermometer,
+  Zap
 } from "lucide-react";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
 import { seededInt, seededNumber } from "@/utils/deviceData";
@@ -173,10 +174,6 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
   const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
   const t = translations[language as keyof typeof translations] || translations.EN;
   // Safe defaults if props not passed (e.g. before Dashboard update)
-  const totalVolume = seededInt(4250, seed, 0, 60, 3600, 5200);
-  const flowRateLive = seededNumber(24.5, seed, 1, 0.6, 12, 38, 1);
-  const pressureLive = seededInt(42, seed, 2, 2, 28, 58);
-  const activeAlerts = seededInt(0, seed, 3, 1, 0, 4);
   const tank1Level = seededInt(85, seed, 4, 4, 60, 95);
   const tank2Level = seededInt(45, seed, 5, 4, 30, 80);
   const tank3Level = seededInt(30, seed, 6, 4, 20, 70);
@@ -227,48 +224,57 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
 
       <main className="flex-1 overflow-auto p-8 ">
         
-        {/* Metric Overview */}
-        <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_1.85fr] gap-6 mb-8">
-           <Card className="rounded-xl border border-border bg-card/50 p-5 flex items-center gap-4">
-              <div className="p-3 rounded-full bg-blue-500/10 text-blue-500 dark:text-blue-400">
-                 <Droplets className="w-6 h-6" />
+        {/* Water Quality Overview */}
+        <div className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-3">
+           <Card className="rounded-xl border border-emerald-100 bg-card p-5 shadow-lg shadow-emerald-950/5">
+              <div className="flex items-start justify-between">
+                 <div className="grid h-9 w-9 place-items-center rounded-full bg-blue-500/10 text-blue-500">
+                    <Droplets className="h-5 w-5" />
+                 </div>
+                 <Badge variant="outline" className="border-border bg-background/70 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Check
+                 </Badge>
               </div>
-              <div>
-                 <p className="text-sm text-muted-foreground">Total Reserve</p>
-                 <p className="text-3xl font-bold text-foreground">
-                    {totalVolume.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">L</span>
-                 </p>
+              <div className="mt-12">
+                 <p className="text-3xl font-bold leading-none text-foreground">{tank2Ph.toFixed(2)}</p>
+                 <p className="mt-3 text-sm font-semibold text-foreground">{language === "TH" ? "ค่าความเป็นกรดด่าง (pH)" : "pH Level"}</p>
+                 <p className="mt-1 text-xs text-muted-foreground">{language === "TH" ? "ระดับความเป็นกรด" : "Water acidity balance"}</p>
               </div>
            </Card>
-           <Card className="rounded-xl border border-border bg-card/50 p-5">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                 <div className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-4 py-3">
-                    <div className="p-2 rounded-full bg-cyan-500/10 text-cyan-500 dark:text-cyan-400">
-                       <Waves className="w-5 h-5" />
-                    </div>
-                    <div>
-                       <p className="text-sm text-muted-foreground">Net Flow In</p>
-                       <p className="text-2xl font-bold text-foreground">{flowRateLive} <span className="text-sm font-normal text-muted-foreground">L/min</span></p>
-                    </div>
+
+           <Card className="rounded-xl border border-border bg-card p-5 shadow-lg shadow-slate-950/5">
+              <div className="flex items-start justify-between">
+                 <div className="grid h-9 w-9 place-items-center rounded-full bg-cyan-500/10 text-cyan-500">
+                    <Thermometer className="h-5 w-5" />
                  </div>
-                 <div className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-4 py-3">
-                    <div className="p-2 rounded-full bg-purple-500/10 text-purple-500 dark:text-purple-400">
-                       <Gauge className="w-5 h-5" />
-                    </div>
-                    <div>
-                       <p className="text-sm text-muted-foreground">Sys Pressure</p>
-                       <p className="text-2xl font-bold text-foreground">{pressureLive} <span className="text-sm font-normal text-muted-foreground">PSI</span></p>
-                    </div>
+                 <Badge variant="outline" className="border-border bg-background/70 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Waiting
+                 </Badge>
+              </div>
+              <div className="mt-12">
+                 <p className="text-3xl font-bold leading-none text-foreground">
+                    {pondTemp.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">C</span>
+                 </p>
+                 <p className="mt-3 text-sm font-semibold text-foreground">{language === "TH" ? "อุณหภูมิน้ำ" : "Water Temperature"}</p>
+                 <p className="mt-1 text-xs text-muted-foreground">{language === "TH" ? "ค่าจาก DS18B20" : "From DS18B20"}</p>
+              </div>
+           </Card>
+
+           <Card className="rounded-xl border border-border bg-card p-5 shadow-lg shadow-slate-950/5">
+              <div className="flex items-start justify-between">
+                 <div className="grid h-9 w-9 place-items-center rounded-full bg-amber-500/10 text-amber-500">
+                    <Zap className="h-5 w-5" />
                  </div>
-                 <div className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-4 py-3">
-                    <div className="p-2 rounded-full bg-amber-500/10 text-amber-500 dark:text-amber-400">
-                       <AlertCircle className="w-5 h-5" />
-                    </div>
-                    <div>
-                       <p className="text-sm text-muted-foreground">Alerts</p>
-                       <p className="text-2xl font-bold text-foreground">{activeAlerts} <span className="text-sm font-normal text-muted-foreground">Active</span></p>
-                    </div>
-                 </div>
+                 <Badge variant="outline" className="border-border bg-background/70 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Waiting
+                 </Badge>
+              </div>
+              <div className="mt-12">
+                 <p className="text-3xl font-bold leading-none text-foreground">
+                    {tank2Ec.toFixed(2)} <span className="text-sm font-normal text-muted-foreground">mS/cm</span>
+                 </p>
+                 <p className="mt-3 text-sm font-semibold text-foreground">{language === "TH" ? "ค่าการนำไฟฟ้า (EC)" : "Electrical Conductivity (EC)"}</p>
+                 <p className="mt-1 text-xs text-muted-foreground">{language === "TH" ? "ความเข้มข้นของสารอาหาร" : "Nutrient concentration"}</p>
               </div>
            </Card>
         </div>
@@ -432,14 +438,14 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                          <p className="mt-2 text-sm font-semibold text-foreground">{RAW_WATER_REST_PROGRESS_LABEL}</p>
                       </div>
                       <div className="rounded-lg border border-border bg-muted/40 p-3">
-                         <p className="text-xs text-muted-foreground">Live Transfer Readiness</p>
-                         <p className="mt-1 text-lg font-bold text-foreground">{flowRateLive} <span className="text-xs font-normal text-muted-foreground">L/min incoming</span></p>
-                         <p className="text-[10px] text-muted-foreground">System pressure {pressureLive} PSI</p>
+                         <p className="text-xs text-muted-foreground">Preparation pH</p>
+                         <p className="mt-1 text-lg font-bold text-red-600 dark:text-red-400">{tank2Ph}</p>
+                         <p className="text-[10px] text-muted-foreground">Adjustment is paused for review</p>
                       </div>
                       <div className="rounded-lg border border-border bg-muted/40 p-3">
-                         <p className="text-xs text-muted-foreground">Exception Watch</p>
-                         <p className="mt-1 text-lg font-bold text-foreground">{activeAlerts}</p>
-                         <p className="text-[10px] text-muted-foreground">Active alerts affecting transfer</p>
+                         <p className="text-xs text-muted-foreground">Preparation EC</p>
+                         <p className="mt-1 text-lg font-bold text-foreground">{tank2Ec} <span className="text-xs font-normal text-muted-foreground">mS/cm</span></p>
+                         <p className="text-[10px] text-muted-foreground">Nutrient mix snapshot</p>
                       </div>
                    </div>
                 </div>

@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "./utils";
 
@@ -12,6 +13,10 @@ type MinimalDatePickerProps = {
 };
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const POPOVER_WIDTH = 292;
+const POPOVER_HEIGHT = 400;
+const POPOVER_GAP = 8;
+const VIEWPORT_PADDING = 12;
 
 const toDateValue = (date: Date) => {
   const year = date.getFullYear();
@@ -48,6 +53,9 @@ export function MinimalDatePicker({
   const selectedDate = parseDateValue(value);
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(selectedDate || new Date());
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   const monthLabel = viewDate.toLocaleDateString(locale === "TH" ? "th-TH" : "en-US", {
     month: "long",
@@ -83,24 +91,65 @@ export function MinimalDatePicker({
     setOpen(false);
   };
 
-  return (
-    <div className={cn("relative", className)}>
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        onClick={() => setOpen((current) => !current)}
-        className={cn(
-          "flex h-10 w-full items-center justify-between rounded-full border border-border bg-background/90 px-4 text-left text-sm shadow-sm transition",
-          "hover:border-emerald-300 hover:bg-emerald-50/60 focus:outline-none focus:ring-2 focus:ring-emerald-300/60 dark:hover:bg-emerald-950/20",
-          value ? "text-foreground" : "text-muted-foreground",
-        )}
-      >
-        <span>{formatDisplayDate(value, placeholder, locale)}</span>
-        <Calendar className="h-4 w-4 text-emerald-500" />
-      </button>
+  useLayoutEffect(() => {
+    if (!open) return;
 
-      {open && (
-        <div className="absolute right-0 top-12 z-50 w-[292px] rounded-[28px] border border-border bg-card p-4 text-foreground shadow-2xl shadow-emerald-950/10">
+    const updatePosition = () => {
+      const button = buttonRef.current;
+      if (!button) return;
+
+      const rect = button.getBoundingClientRect();
+      const popoverHeight = popoverRef.current?.offsetHeight || POPOVER_HEIGHT;
+      const hasRoomBelow = rect.bottom + POPOVER_GAP + popoverHeight <= window.innerHeight - VIEWPORT_PADDING;
+      const top = hasRoomBelow
+        ? rect.bottom + POPOVER_GAP
+        : Math.max(VIEWPORT_PADDING, rect.top - popoverHeight - POPOVER_GAP);
+      const preferredLeft = rect.right - POPOVER_WIDTH;
+      const maxLeft = window.innerWidth - POPOVER_WIDTH - VIEWPORT_PADDING;
+      const left = Math.min(Math.max(VIEWPORT_PADDING, preferredLeft), maxLeft);
+
+      setPopoverPosition({ top, left });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (buttonRef.current?.contains(target) || popoverRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  const calendarPopover = open
+    ? createPortal(
+        <div
+          ref={popoverRef}
+          className="fixed z-[1000] w-[292px] rounded-[28px] border border-border bg-card p-4 text-foreground shadow-2xl shadow-emerald-950/10"
+          style={{ top: popoverPosition.top, left: popoverPosition.left }}
+        >
           <div className="mb-4 flex items-center justify-between">
             <button
               type="button"
@@ -169,8 +218,29 @@ export function MinimalDatePicker({
               {locale === "TH" ? "วันนี้" : "Today"}
             </button>
           </div>
-        </div>
-      )}
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return (
+    <div className={cn("relative", className)}>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={ariaLabel}
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          "flex h-10 w-full items-center justify-between rounded-full border border-border bg-background/90 px-4 text-left text-sm shadow-sm transition",
+          "hover:border-emerald-300 hover:bg-emerald-50/60 focus:outline-none focus:ring-2 focus:ring-emerald-300/60 dark:hover:bg-emerald-950/20",
+          value ? "text-foreground" : "text-muted-foreground",
+        )}
+      >
+        <span>{formatDisplayDate(value, placeholder, locale)}</span>
+        <Calendar className="h-4 w-4 text-emerald-500" />
+      </button>
+
+      {calendarPopover}
     </div>
   );
 }

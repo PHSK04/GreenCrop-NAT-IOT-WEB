@@ -7,7 +7,7 @@ export function emitActiveDeviceChanged() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(ACTIVE_DEVICE_EVENT_NAME));
 }
-
+                    
 export function setActiveDeviceIdValue(deviceId: string) {
   if (typeof window === "undefined") return;
   if (deviceId) {

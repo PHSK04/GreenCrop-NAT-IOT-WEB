@@ -50,7 +50,6 @@ const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
   { icon: Activity, label: "Device Monitor" },
   { icon: Droplets, label: "Tank Levels" }, 
-  { icon: ClipboardList, label: "Crop Reports" },
   { icon: Zap, label: "Sensor Intelligence" },
   { icon: Settings, label: "Farm Settings" },
   { icon: Cpu, label: "Device Pairing" },
@@ -62,6 +61,7 @@ const insightItems = [
 ];
 
 const analyticsItems = [
+  { icon: ClipboardList, label: "Crop Reports" },
   { icon: Scale, label: "Wolffia Analytics" },
 ];
 
@@ -109,7 +109,7 @@ const navTranslations = {
   TH: {
     "Dashboard": "แดชบอร์ด",
     "Tank Levels": "ระดับถังเก็บน้ำ",
-    "Crop Reports": "รายงานพืชผล",
+    "Crop Reports": "รายงานผลผลิต",
     "Sensor Intelligence": "ระบบเซนเซอร์อัจฉริยะ",
     "Device Monitor": "มอนิเตอร์ละเอียด",
     "Farm Settings": "ตั้งค่าฟาร์ม",
