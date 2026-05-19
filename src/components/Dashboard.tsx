@@ -48,10 +48,10 @@ import { setActiveDeviceIdValue } from "@/hooks/useActiveDeviceId";
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
+  { icon: Activity, label: "Device Monitor" },
   { icon: Droplets, label: "Tank Levels" }, 
   { icon: ClipboardList, label: "Crop Reports" },
   { icon: Zap, label: "Sensor Intelligence" },
-  { icon: Activity, label: "Device Monitor" },
   { icon: Settings, label: "Farm Settings" },
   { icon: Cpu, label: "Device Pairing" },
 ];
