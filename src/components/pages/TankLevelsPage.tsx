@@ -161,6 +161,13 @@ const translations = {
   }
 };
 
+const RAW_WATER_REST_TOTAL_MINUTES = 15;
+const RAW_WATER_REST_ELAPSED_SECONDS = 13 * 60 + 45;
+const RAW_WATER_REST_TOTAL_SECONDS = RAW_WATER_REST_TOTAL_MINUTES * 60;
+const RAW_WATER_REST_PROGRESS = Math.round((RAW_WATER_REST_ELAPSED_SECONDS / RAW_WATER_REST_TOTAL_SECONDS) * 100);
+const RAW_WATER_REST_PROGRESS_LABEL = "13m 45s / 15m";
+const RAW_WATER_REST_REMAINING_LABEL = "1 min 15 secs";
+
 export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, language }: MachineControlPageProps) {
   const { deviceId, seed } = useDeviceSeed();
   const deviceLabel = deviceId ? `Device ${deviceId}` : "All Devices";
@@ -315,12 +322,12 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                 <div className="space-y-2">
                    <div className="flex justify-between items-end">
                       <span className="text-xs text-muted-foreground">{t.restingProgress}</span>
-                      <span className="text-sm font-bold text-muted-foreground">18h 45m / 20h</span>
+                      <span className="text-sm font-bold text-muted-foreground">{RAW_WATER_REST_PROGRESS_LABEL}</span>
                    </div>
-                   <Progress value={93.75} className="h-2 bg-secondary" indicatorClassName="bg-amber-500" />
+                   <Progress value={RAW_WATER_REST_PROGRESS} className="h-2 bg-secondary" indicatorClassName="bg-amber-500" />
                    <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
                       <span className="text-xs text-muted-foreground">{t.timeRemaining}</span>
-                      <span className="text-sm font-bold text-amber-600 dark:text-amber-400">1 hr 15 mins</span>
+                      <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{RAW_WATER_REST_REMAINING_LABEL}</span>
                    </div>
                 </div>
 
@@ -403,7 +410,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
 
                     <div className="p-2 rounded bg-muted/40 border border-border">
                         <p className="text-xs text-muted-foreground">Tank 1 Time Remaining</p>
-                        <p className="text-sm font-bold text-amber-600 dark:text-amber-400">1 hr 15 mins</p>
+                        <p className="text-sm font-bold text-amber-600 dark:text-amber-400">{RAW_WATER_REST_REMAINING_LABEL}</p>
                         <p className="text-[10px] text-muted-foreground">Before release to mix stage</p>
                     </div>
                 </div>
@@ -421,8 +428,8 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div className="rounded-lg border border-border bg-muted/40 p-3">
                          <p className="text-xs text-muted-foreground">{t.restingProgress}</p>
-                         <Progress value={93.75} className="mt-2 h-2 bg-secondary" indicatorClassName="bg-amber-500" />
-                         <p className="mt-2 text-sm font-semibold text-foreground">18h 45m / 20h</p>
+                         <Progress value={RAW_WATER_REST_PROGRESS} className="mt-2 h-2 bg-secondary" indicatorClassName="bg-amber-500" />
+                         <p className="mt-2 text-sm font-semibold text-foreground">{RAW_WATER_REST_PROGRESS_LABEL}</p>
                       </div>
                       <div className="rounded-lg border border-border bg-muted/40 p-3">
                          <p className="text-xs text-muted-foreground">Live Transfer Readiness</p>
