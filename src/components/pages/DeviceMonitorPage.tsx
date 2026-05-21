@@ -434,6 +434,80 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
 
   return (
     <>
+      <style>{`
+        @keyframes waterFullPulse {
+          0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.38), 0 30px 90px rgba(127, 29, 29, 0.32);
+          }
+          50% {
+            transform: scale(1.015);
+            box-shadow: 0 0 0 12px rgba(239, 68, 68, 0.08), 0 34px 110px rgba(127, 29, 29, 0.45);
+          }
+        }
+
+        @keyframes hazardBlink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.56; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .water-full-alert-card,
+          .water-full-hazard {
+            animation: none !important;
+          }
+        }
+      `}</style>
+
+      {wls2 && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/62 p-4 backdrop-blur-sm">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-[repeating-linear-gradient(115deg,#facc15_0_28px,#020617_28px_56px)] water-full-hazard" style={{ animation: "hazardBlink 0.8s ease-in-out infinite" }} />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-[repeating-linear-gradient(115deg,#facc15_0_28px,#020617_28px_56px)] water-full-hazard" style={{ animation: "hazardBlink 0.8s ease-in-out infinite" }} />
+
+          <div
+            className="water-full-alert-card w-full max-w-3xl overflow-hidden rounded-[28px] border-4 border-yellow-400 bg-white/94 text-center shadow-2xl"
+            style={{ animation: "waterFullPulse 1.05s ease-in-out infinite" }}
+            role="alert"
+            aria-live="assertive"
+          >
+            <div className="bg-[repeating-linear-gradient(115deg,#facc15_0_24px,#020617_24px_48px)] px-6 py-4" />
+            <div className="px-6 py-10 sm:px-10">
+              <div className="mx-auto grid h-24 w-24 place-items-center rounded-[24px] border-4 border-yellow-400 bg-yellow-300 shadow-[0_18px_40px_rgba(234,179,8,0.28)]">
+                <AlertTriangle className="h-14 w-14 text-slate-950" />
+              </div>
+              <h2 className="mt-7 text-4xl font-black leading-tight text-slate-950 sm:text-6xl">
+                {isTH ? "น้ำเต็มแล้ว" : "Water Full"}
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-base font-semibold text-slate-700 sm:text-xl">
+                {isTH
+                  ? "เซ็นเซอร์ WLS2 ตรวจพบระดับน้ำเต็ม กรุณาหยุดปั๊มน้ำทันทีเพื่อป้องกันน้ำล้น"
+                  : "WLS2 detected the full water level. Stop the pump immediately to prevent overflow."}
+              </p>
+              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+                <Button
+                  variant="destructive"
+                  className="h-14 min-w-52 text-base font-black shadow-lg shadow-red-900/20"
+                  onClick={stopPump2FromWeb}
+                >
+                  {isTH ? "หยุดปั๊มน้ำ" : "Stop Water Pump"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-14 min-w-52 border-red-500/50 bg-red-50 text-base font-bold text-red-700 hover:bg-red-100"
+                  onClick={sendEmergencyStop}
+                >
+                  {isTH ? "หยุดฉุกเฉิน" : "Emergency Stop"}
+                </Button>
+              </div>
+              <p className="mt-5 text-xs font-medium text-slate-500">
+                {isTH ? "หน้าต่างนี้จะหายไปเมื่อระดับ WLS2 กลับสู่สถานะปกติ" : "This alert clears when WLS2 returns to normal."}
+              </p>
+            </div>
+            <div className="bg-[repeating-linear-gradient(115deg,#facc15_0_24px,#020617_24px_48px)] px-6 py-4" />
+          </div>
+        </div>
+      )}
+
       <header className="border-b border-border bg-card/70 px-4 py-5 backdrop-blur-sm md:px-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
