@@ -50,13 +50,14 @@ Commands from the web:
 
 - `START`: starts pump 2 if the board is not locked.
 - `PUMP2_OFF`: stops pump 2 only, without locking the board.
+- `ACK_ALARM` or `SILENCE_ALARM`: acknowledges the cabinet alarm, stops pump 2, and mutes cabinet indicator/sound until WLS2 and float return to normal or a new start command is sent.
 - `STOP`: stops all outputs and locks the board.
 - `RESET_UPTIME`: resets the pump 2 uptime counter.
 
 Stop / lock behavior:
 
 - The physical cabinet `STOP` button and web `STOP` command can both stop all outputs and lock the board.
-- The web `PUMP2_OFF` command stops only pump 2 and keeps the automatic logic running.
+- The web `PUMP2_OFF` command stops pump 2 and the web also sends `ACK_ALARM` to silence the cabinet indicator/sound while keeping the automatic logic running.
 
 Unlock condition:
 
