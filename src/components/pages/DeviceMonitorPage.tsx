@@ -471,6 +471,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
             onEndTimeChange={setExportEndTime}
             title={isTH ? "ส่งออกข้อมูลจริง" : "Export Live Data"}
           description={isTH ? "ดาวน์โหลดสถานะล่าสุดและประวัติที่บันทึกจาก MQTT" : "Download current status and saved MQTT history"}
+          locale={isTH ? "TH" : "EN"}
           startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
           endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
           options={dataTypeOptions}
