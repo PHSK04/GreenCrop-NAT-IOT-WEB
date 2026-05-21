@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MinimalDatePicker } from "@/components/ui/minimal-date-picker";
+import { Input } from "@/components/ui/input";
 import { Download, FileText } from "lucide-react";
 
 type ExportFilterOption = {
@@ -15,8 +17,14 @@ type ExportFiltersCardProps = {
   endDateLabel?: string;
   startDate: string;
   endDate: string;
+  month?: string;
+  startTime?: string;
+  endTime?: string;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
+  onMonthChange?: (value: string) => void;
+  onStartTimeChange?: (value: string) => void;
+  onEndTimeChange?: (value: string) => void;
   options: ExportFilterOption[];
   selectedKeys: string[];
   onToggleKey: (key: string) => void;
@@ -33,8 +41,14 @@ export function ExportFiltersCard({
   endDateLabel = "End Date",
   startDate,
   endDate,
+  month,
+  startTime,
+  endTime,
   onStartDateChange,
   onEndDateChange,
+  onMonthChange,
+  onStartTimeChange,
+  onEndTimeChange,
   options,
   selectedKeys,
   onToggleKey,
@@ -43,6 +57,16 @@ export function ExportFiltersCard({
   downloadCsvLabel = "Download CSV",
   downloadPdfLabel = "Download PDF",
 }: ExportFiltersCardProps) {
+  const [localMonth, setLocalMonth] = useState("");
+  const [localStartTime, setLocalStartTime] = useState("");
+  const [localEndTime, setLocalEndTime] = useState("");
+  const selectedMonth = month ?? localMonth;
+  const selectedStartTime = startTime ?? localStartTime;
+  const selectedEndTime = endTime ?? localEndTime;
+  const setMonth = onMonthChange ?? setLocalMonth;
+  const setStartTime = onStartTimeChange ?? setLocalStartTime;
+  const setEndTime = onEndTimeChange ?? setLocalEndTime;
+
   return (
     <Card
       className="!rounded-[32px] overflow-visible border border-border shadow-lg bg-card !opacity-100 mb-8"
@@ -52,7 +76,16 @@ export function ExportFiltersCard({
         <CardDescription className="text-muted-foreground">{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">เดือน</label>
+            <Input
+              aria-label="Export month"
+              type="month"
+              value={selectedMonth}
+              onChange={(event) => setMonth(event.target.value)}
+            />
+          </div>
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground">{startDateLabel}</label>
             <MinimalDatePicker
@@ -68,6 +101,26 @@ export function ExportFiltersCard({
               value={endDate}
               onChange={onEndDateChange}
             />
+          </div>
+          <div className="grid grid-cols-2 gap-2 md:col-span-4">
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">เวลาเริ่มต้น</label>
+              <Input
+                aria-label="Export start time"
+                type="time"
+                value={selectedStartTime}
+                onChange={(event) => setStartTime(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">เวลาสิ้นสุด</label>
+              <Input
+                aria-label="Export end time"
+                type="time"
+                value={selectedEndTime}
+                onChange={(event) => setEndTime(event.target.value)}
+              />
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-3">
