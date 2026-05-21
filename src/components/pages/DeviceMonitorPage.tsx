@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, CheckCircle2, Clock3, Download, Gauge, Search, Thermometer, Waves, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
@@ -72,6 +72,17 @@ const boolText = (value: boolean, isTH: boolean) => {
   return isTH ? "หยุด/ไม่พบสัญญาณ" : "OFF / Not detected";
 };
 
+const hasDisplayChange = (previous: LiveDeviceRow | undefined, next: LiveDeviceRow) => {
+  if (!previous) return true;
+  return (
+    previous.name !== next.name ||
+    previous.type !== next.type ||
+    previous.category !== next.category ||
+    previous.status !== next.status ||
+    previous.value !== next.value
+  );
+};
+
 export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   const { deviceId } = useDeviceSeed();
   const {
@@ -90,6 +101,8 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
     mqttStatus,
     lastTelemetryAt,
     telemetryHistory,
+    stopPump2FromWeb,
+    sendEmergencyStop,
   } = useMachine();
 
   const isTH = language === "TH";
@@ -212,13 +225,33 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
     [ecValue, floatAlarm, greenOn, isTH, lastUpdate, locked, phOk, phValue, pump1On, pump2On, redOn, tempValue, wls1, wls2],
   );
 
+  const [stableLiveRows, setStableLiveRows] = useState<LiveDeviceRow[]>(liveRows);
+
+  useEffect(() => {
+    setStableLiveRows((previousRows) => {
+      const previousById = new Map(previousRows.map((row) => [row.id, row]));
+      let didChange = previousRows.length !== liveRows.length;
+
+      const nextRows = liveRows.map((row) => {
+        const previous = previousById.get(row.id);
+        if (hasDisplayChange(previous, row)) {
+          didChange = true;
+          return row;
+        }
+        return previous;
+      });
+
+      return didChange ? nextRows : previousRows;
+    });
+  }, [liveRows]);
+
   const dataTypeOptions = [
     { key: "Sensor", label: isTH ? "เซนเซอร์" : "Sensor" },
     { key: "Actuator", label: isTH ? "แอคชูเอเตอร์" : "Actuator" },
     { key: "System", label: isTH ? "ระบบ" : "System" },
   ];
 
-  const filteredData = liveRows.filter((item) => {
+  const filteredData = stableLiveRows.filter((item) => {
     const q = searchQuery.toLowerCase().trim();
     return !q || item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q);
   });
@@ -499,13 +532,51 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
           </div>
           <div className="flex gap-2">
             <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              {liveRows.filter((d) => d.status === "Active").length} {isTH ? "ปกติ" : "Active"}
+              {stableLiveRows.filter((d) => d.status === "Active").length} {isTH ? "ปกติ" : "Active"}
             </Badge>
             <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400">
-              {liveRows.filter((d) => d.status === "Alarm").length} {isTH ? "แจ้งเตือน" : "Alarm"}
+              {stableLiveRows.filter((d) => d.status === "Alarm").length} {isTH ? "แจ้งเตือน" : "Alarm"}
             </Badge>
           </div>
         </div>
+
+        {wls2 && (
+          <div className="mb-6 overflow-hidden rounded-xl border border-red-500/40 bg-red-500/10 shadow-lg shadow-red-950/10">
+            <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/25">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-base font-bold text-red-700 dark:text-red-200">
+                    {isTH ? "แจ้งเตือน: น้ำเต็มถึงระดับ WLS2" : "Alert: Water reached WLS2 full level"}
+                  </p>
+                  <p className="mt-1 text-sm text-red-700/80 dark:text-red-200/80">
+                    {isTH
+                      ? "ควรหยุดปั๊มทันทีเพื่อป้องกันน้ำล้นหรือทำงานเกินระดับที่กำหนด"
+                      : "Stop the pump now to prevent overflow or operation beyond the target level."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  variant="destructive"
+                  className="h-11 min-w-36 font-semibold"
+                  onClick={stopPump2FromWeb}
+                >
+                  {isTH ? "หยุดปั๊ม 2" : "Stop Pump 2"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-11 min-w-36 border-red-500/40 bg-background/80 font-semibold text-red-700 hover:bg-red-500/10 dark:text-red-200"
+                  onClick={sendEmergencyStop}
+                >
+                  {isTH ? "หยุดฉุกเฉิน" : "Emergency Stop"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Card className="rounded-lg border border-border bg-card/60 shadow-sm">
           <CardHeader>
