@@ -11,6 +11,7 @@ import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
 import { MinimalDatePicker } from "../ui/minimal-date-picker";
+import { MinimalTimePicker } from "../ui/minimal-time-picker";
 import {
   addCropYieldEntry,
   CropYieldEntry,
@@ -24,6 +25,11 @@ type CropReportsPageProps = {
   language?: string;
 };
 
+const currentTimeValue = () => {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+};
+
 export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   const { deviceId, seed } = useDeviceSeed();
   const { phValue, ecValue, tempValue } = useMachine();
@@ -31,12 +37,16 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   const activeDeviceId = deviceId || "default";
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
   const [selectedReport, setSelectedReport] = useState<CropYieldEntry | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [selectedFields, setSelectedFields] = useState<string[]>(["yield", "ph", "oxygen", "ec", "temp"]);
   const [deviceReportData, setDeviceReportData] = useState<CropYieldEntry[]>(() => readCropYieldEntries(activeDeviceId));
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
+    time: currentTimeValue(),
     yield: "",
     ph: "7.0",
     oxygen: "6.5",
@@ -68,14 +78,25 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
     }));
   }, [ecValue, phValue, tempValue]);
 
+  const filteredReportData = useMemo(() => {
+    return deviceReportData.filter((row) => {
+      if (selectedMonth && !row.date.startsWith(selectedMonth)) return false;
+      if (startDate && row.date < startDate) return false;
+      if (endDate && row.date > endDate) return false;
+      if (startTime && row.time < startTime) return false;
+      if (endTime && row.time > endTime) return false;
+      return true;
+    });
+  }, [deviceReportData, endDate, endTime, selectedMonth, startDate, startTime]);
+
   const reportSummary = useMemo(() => {
-    const days = deviceReportData.length;
-    const totalYield = deviceReportData.reduce((sum, row) => sum + row.yield, 0);
+    const days = filteredReportData.length;
+    const totalYield = filteredReportData.reduce((sum, row) => sum + row.yield, 0);
     const avgPh =
-      days > 0 ? deviceReportData.reduce((sum, row) => sum + row.ph, 0) / days : 0;
+      days > 0 ? filteredReportData.reduce((sum, row) => sum + row.ph, 0) / days : 0;
     const avgOxygen =
       days > 0
-        ? deviceReportData.reduce((sum, row) => sum + row.oxygen, 0) / days
+        ? filteredReportData.reduce((sum, row) => sum + row.oxygen, 0) / days
         : 0;
     return {
       days,
@@ -83,23 +104,11 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
       avgPh: Math.round(avgPh * 100) / 100,
       avgOxygen: Math.round(avgOxygen * 100) / 100,
     };
-  }, [deviceReportData]);
-
-  const filteredReportData = useMemo(() => {
-    const start = startDate ? new Date(startDate) : null;
-    const end = endDate ? new Date(endDate) : null;
-    return deviceReportData.filter((row) => {
-      const d = new Date(row.date);
-      if (Number.isNaN(d.getTime())) return false;
-      if (start && d < start) return false;
-      if (end && d > end) return false;
-      return true;
-    });
-  }, [startDate, endDate, deviceReportData]);
+  }, [filteredReportData]);
 
   const exportRows = useMemo(() => {
     return filteredReportData.map((row) => {
-      const base: any = { date: row.date };
+      const base: any = { date: row.date, time: row.time };
       selectedFields.forEach((field) => {
         base[field] = (row as any)[field];
       });
@@ -114,9 +123,9 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
     const ecValue = Number(form.ec);
     const tempValue = Number(form.temp);
 
-    if (!form.date || !Number.isFinite(yieldValue) || yieldValue <= 0) {
+    if (!form.date || !form.time || !Number.isFinite(yieldValue) || yieldValue <= 0) {
       toast.error(isTH ? "กรอกข้อมูลไม่ครบ" : "Missing data", {
-        description: isTH ? "กรุณากรอกวันที่และผลผลิตเป็นตัวเลขมากกว่า 0" : "Please enter a date and yield greater than 0.",
+        description: isTH ? "กรุณากรอกวันที่ เวลา และผลผลิตเป็นตัวเลขมากกว่า 0" : "Please enter date, time, and yield greater than 0.",
       });
       return;
     }
@@ -124,6 +133,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
     addCropYieldEntry({
       deviceId: activeDeviceId,
       date: form.date,
+      time: form.time,
       yield: yieldValue,
       ph: Number.isFinite(phValue) ? phValue : 7,
       oxygen: Number.isFinite(oxygenValue) ? oxygenValue : 0,
@@ -134,6 +144,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
 
     setForm((prev) => ({
       ...prev,
+      time: currentTimeValue(),
       yield: "",
       note: "",
     }));
@@ -216,13 +227,22 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-8">
                 <div>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "วันที่เก็บ" : "Date"}</p>
                   <MinimalDatePicker
                     value={form.date}
                     onChange={(value) => setForm((prev) => ({ ...prev, date: value }))}
                     ariaLabel={isTH ? "เลือกวันที่เก็บ" : "Select harvest date"}
+                    locale={isTH ? "TH" : "EN"}
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "เวลา" : "Time"}</p>
+                  <MinimalTimePicker
+                    value={form.time}
+                    onChange={(value) => setForm((prev) => ({ ...prev, time: value }))}
+                    ariaLabel={isTH ? "เลือกเวลาเก็บ" : "Select harvest time"}
                     locale={isTH ? "TH" : "EN"}
                   />
                 </div>
@@ -286,10 +306,16 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
           <ExportFiltersCard
             startDate={startDate}
             endDate={endDate}
+            month={selectedMonth}
+            startTime={startTime}
+            endTime={endTime}
             onStartDateChange={setStartDate}
             onEndDateChange={setEndDate}
+            onMonthChange={setSelectedMonth}
+            onStartTimeChange={setStartTime}
+            onEndTimeChange={setEndTime}
             title={isTH ? "ตัวกรองสำหรับส่งออก" : "Export Filters"}
-            description={isTH ? "เลือกช่วงวันที่และประเภทข้อมูลเพื่อดาวน์โหลด CSV/PDF" : "Select date range and data types to download CSV/PDF"}
+            description={isTH ? "เลือกเดือน วันที่ เวลา และประเภทข้อมูลเพื่อค้นหา/ดาวน์โหลด CSV/PDF" : "Select month, date, time, and data types to search/download CSV/PDF"}
             startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
             endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
             options={[
@@ -353,6 +379,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               <TableHeader>
                 <TableRow className="border-border hover:bg-muted/50">
                   <TableHead className="font-semibold text-muted-foreground w-[180px]">{isTH ? "วันที่" : "Date"}</TableHead>
+                  <TableHead className="font-semibold text-muted-foreground">{isTH ? "เวลา" : "Time"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "ผลผลิต (กรัม)" : "Yield (g)"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "ค่า pH" : "pH Level"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)"}</TableHead>
@@ -362,7 +389,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {deviceReportData.map((row) => (
+                {filteredReportData.map((row) => (
                   <TableRow 
                     key={row.id}
                     className="border-border hover:bg-muted/50 transition-colors group"
@@ -376,6 +403,9 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                           year: 'numeric'
                         })}</span>
                       </div>
+                    </TableCell>
+                    <TableCell className="font-medium text-muted-foreground">
+                      {row.time || "-"}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -433,10 +463,12 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                     </TableCell>
                   </TableRow>
                 ))}
-                {deviceReportData.length === 0 && (
+                {filteredReportData.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                      {isTH ? "ยังไม่มีข้อมูล กรุณากรอกผลผลิตด้านบน" : "No entries yet. Add a harvest entry above."}
+                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                      {deviceReportData.length === 0
+                        ? (isTH ? "ยังไม่มีข้อมูล กรุณากรอกผลผลิตด้านบน" : "No entries yet. Add a harvest entry above.")
+                        : (isTH ? "ไม่มีข้อมูลที่บันทึก" : "No saved data for this filter.")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -457,8 +489,8 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
             <DialogDescription className="text-muted-foreground">
               {selectedReport &&
                 (isTH
-                  ? `วิเคราะห์สำหรับ ${new Date(selectedReport.date).toLocaleDateString("th-TH")}`
-                  : `Analysis for ${new Date(selectedReport.date).toLocaleDateString()}`)}
+                  ? `วิเคราะห์สำหรับ ${new Date(selectedReport.date).toLocaleDateString("th-TH")} เวลา ${selectedReport.time}`
+                  : `Analysis for ${new Date(selectedReport.date).toLocaleDateString()} at ${selectedReport.time}`)}
             </DialogDescription>
           </DialogHeader>
           
