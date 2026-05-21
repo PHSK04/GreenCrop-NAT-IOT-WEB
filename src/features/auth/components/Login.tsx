@@ -97,12 +97,56 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
           to { opacity: 1; transform: translateY(0); }
         }
 
+        @keyframes logoReveal {
+          0% { opacity: 0; transform: translateY(18px) scale(0.86); filter: blur(10px); }
+          58% { opacity: 1; transform: translateY(-4px) scale(1.04); filter: blur(0); }
+          100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        }
+
+        @keyframes logoGlow {
+          0%, 100% { box-shadow: 0 24px 70px rgba(16,185,129,0.20), 0 0 0 rgba(52,211,153,0); }
+          50% { box-shadow: 0 28px 90px rgba(16,185,129,0.34), 0 0 42px rgba(52,211,153,0.28); }
+        }
+
+        @keyframes logoSweep {
+          0% { transform: translateX(-160%) rotate(16deg); opacity: 0; }
+          26% { opacity: 0.85; }
+          62% { opacity: 0.35; }
+          100% { transform: translateX(170%) rotate(16deg); opacity: 0; }
+        }
+
+        @keyframes logoFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-7px); }
+        }
+
         .fade-up {
           animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
+        .brand-logo-stage {
+          animation: logoReveal 0.9s cubic-bezier(0.16, 1, 0.3, 1) both, logoGlow 4.2s ease-in-out 0.9s infinite;
+        }
+
+        .brand-logo-mark {
+          animation: logoFloat 5.6s ease-in-out 1s infinite;
+        }
+
+        .brand-logo-stage::after {
+          content: "";
+          position: absolute;
+          inset: -24%;
+          width: 44%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.72), transparent);
+          animation: logoSweep 1.35s ease-out 0.45s both;
+          pointer-events: none;
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .fade-up {
+          .fade-up,
+          .brand-logo-stage,
+          .brand-logo-mark,
+          .brand-logo-stage::after {
             animation: none !important;
           }
         }
@@ -112,7 +156,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
         className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: `url(${loginBg})` }}
       />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.76)_46%,rgba(241,245,249,0.88)_46%,rgba(248,250,252,0.96)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.96)_0%,rgba(15,23,42,0.86)_46%,rgba(241,245,249,0.88)_46%,rgba(248,250,252,0.96)_100%)]" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,185,129,0.12),transparent_32%,rgba(37,99,235,0.12))]" />
 
       <div className="relative z-10 min-h-screen px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
@@ -138,7 +182,14 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                 </div>
               </div>
 
-              <div className="fade-up max-w-2xl pb-6">
+              <div className="fade-up flex max-w-2xl flex-col items-start pb-6">
+                <div className="brand-logo-stage relative mb-8 grid h-40 w-40 place-items-center overflow-hidden rounded-[32px] border border-emerald-300/20 bg-white/92 xl:h-48 xl:w-48">
+                  <img
+                    src={appLogoGreen}
+                    alt="GreenCrop NATIOT logo"
+                    className="brand-logo-mark h-32 w-32 object-contain xl:h-40 xl:w-40"
+                  />
+                </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-200">
                   <Leaf className="h-3.5 w-3.5 text-emerald-300" />
                   Professional IoT Operations
