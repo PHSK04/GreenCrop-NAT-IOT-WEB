@@ -69,7 +69,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const HISTORY_LIMIT = 2000;
 const API_POLL_INTERVAL_MS = 2000;
 const HISTORY_SAMPLE_INTERVAL_MS = 3000;
-const MQTT_FRESH_WINDOW_MS = 8000;
 
 const getTelemetryHistoryKey = (deviceId: string) =>
   `greencrop.telemetry.history.${safeTopicSegment(deviceId || 'default')}`;
@@ -226,7 +225,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   const lastHistorySignatureRef = useRef('');
   const lastHistoryStateSignatureRef = useRef('');
   const lastHistorySavedAtMsRef = useRef(0);
-  const lastMqttTelemetryAtMsRef = useRef(0);
+  const lastCarriedTelemetryRef = useRef<TelemetrySnapshot | null>(null);
 
   const loadTelemetryHistory = useCallback((deviceId: string) => {
     if (typeof window === 'undefined') return [];
@@ -238,6 +237,30 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     } catch {
       return [];
     }
+  }, []);
+
+  const carryTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
+    const previous = lastCarriedTelemetryRef.current;
+
+    if (isEmptyTelemetrySnapshot(snapshot)) {
+      if (!previous) return null;
+      const carried = {
+        ...previous,
+        timestamp: snapshot.timestamp,
+        deviceId: snapshot.deviceId || previous.deviceId,
+      };
+      lastCarriedTelemetryRef.current = carried;
+      return carried;
+    }
+
+    const carried = {
+      ...snapshot,
+      phValue: snapshot.phValue > 0 ? snapshot.phValue : previous?.phValue ?? snapshot.phValue,
+      ecValue: snapshot.ecValue > 0 ? snapshot.ecValue : previous?.ecValue ?? snapshot.ecValue,
+      tempValue: snapshot.tempValue > 0 ? snapshot.tempValue : previous?.tempValue ?? snapshot.tempValue,
+    };
+    lastCarriedTelemetryRef.current = carried;
+    return carried;
   }, []);
 
   const persistTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
@@ -387,31 +410,26 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         isOn: asBool(latest.is_on),
       };
 
-      if (
-        isEmptyTelemetrySnapshot(latestSnapshot) &&
-        lastMqttTelemetryAtMsRef.current > 0 &&
-        localNowMs - lastMqttTelemetryAtMsRef.current < MQTT_FRESH_WINDOW_MS
-      ) {
-        return;
-      }
+      const carriedSnapshot = carryTelemetrySnapshot(latestSnapshot);
+      if (!carriedSnapshot) return;
 
       setPressure(Number(latest.pressure) || 0);
       setFlowRate(Number(latest.flow_rate) || 0);
-      setEcValue(latestSnapshot.ecValue);
-      setPhValue(latestSnapshot.phValue);
-      setTempValue(latestSnapshot.tempValue);
-      setWls1(latestSnapshot.wls1);
-      setWls2(latestSnapshot.wls2);
-      setFloatAlarm(latestSnapshot.floatAlarm);
-      setLocked(latestSnapshot.locked);
-      setPump1On(latestSnapshot.pump1On);
-      setPump2On(latestSnapshot.pump2On);
-      setGreenOn(latestSnapshot.greenOn);
-      setRedOn(latestSnapshot.redOn);
-      setPhOk(asBool(latest.ph_ok) || (latestSnapshot.phValue >= 6.5 && latestSnapshot.phValue <= 7.5));
+      setEcValue(carriedSnapshot.ecValue);
+      setPhValue(carriedSnapshot.phValue);
+      setTempValue(carriedSnapshot.tempValue);
+      setWls1(carriedSnapshot.wls1);
+      setWls2(carriedSnapshot.wls2);
+      setFloatAlarm(carriedSnapshot.floatAlarm);
+      setLocked(carriedSnapshot.locked);
+      setPump1On(carriedSnapshot.pump1On);
+      setPump2On(carriedSnapshot.pump2On);
+      setGreenOn(carriedSnapshot.greenOn);
+      setRedOn(carriedSnapshot.redOn);
+      setPhOk(asBool(latest.ph_ok) || (carriedSnapshot.phValue >= 6.5 && carriedSnapshot.phValue <= 7.5));
       setLastTelemetryAt(typeof latest.timestamp === 'string' ? latest.timestamp : null);
 
-      const apiIsOn = latestSnapshot.isOn;
+      const apiIsOn = carriedSnapshot.isOn;
       if (!staleByCommand) {
         const waitingAck = pendingIsOnAck !== null;
         const isAckMatched = waitingAck && apiIsOn === pendingIsOnAck;
@@ -489,11 +507,11 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
       setPumps((prev) => normalizePumps(latest.pumps, prev));
 
-      persistTelemetrySnapshot(latestSnapshot);
+      persistTelemetrySnapshot(carriedSnapshot);
     } catch (err) {
       console.error('API Polling Error:', err);
     }
-  }, [pendingResetUntilMs, ignoreApiStateUntilMs, pendingIsOnAck, isOn, lastLocalCommandAtMs, getCurrentUptimeSeconds, persistTelemetrySnapshot]);
+  }, [pendingResetUntilMs, ignoreApiStateUntilMs, pendingIsOnAck, isOn, lastLocalCommandAtMs, getCurrentUptimeSeconds, carryTelemetrySnapshot, persistTelemetrySnapshot]);
 
   const syncAfterCommand = async () => {
     await fetchApiData();
@@ -562,7 +580,9 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 	      setRedOn(false);
 	      setPhOk(false);
 	      setLastTelemetryAt(null);
-	      setTelemetryHistory(loadTelemetryHistory(nextDeviceId));
+	      const nextHistory = loadTelemetryHistory(nextDeviceId);
+	      setTelemetryHistory(nextHistory);
+	      lastCarriedTelemetryRef.current = nextHistory[0] ?? null;
 	      setPendingIsOnAck(null);
 	      setLastLocalCommandAtMs(null);
 	      lastApiUptimeRef.current = null;
@@ -577,7 +597,9 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 	  }, [loadTelemetryHistory]);
 
   useEffect(() => {
-    setTelemetryHistory(loadTelemetryHistory(activeDeviceId));
+    const nextHistory = loadTelemetryHistory(activeDeviceId);
+    setTelemetryHistory(nextHistory);
+    lastCarriedTelemetryRef.current = nextHistory[0] ?? null;
   }, [activeDeviceId, loadTelemetryHistory]);
 
 	  useEffect(() => {
@@ -655,8 +677,10 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
       setPressure(asNumber(parsed.pressure));
       setFlowRate(asNumber(parsed.flow_rate));
-      lastMqttTelemetryAtMsRef.current = Date.now();
-      applyTelemetrySnapshot(snapshot);
+      const carriedSnapshot = carryTelemetrySnapshot(snapshot);
+      if (carriedSnapshot) {
+        applyTelemetrySnapshot(carriedSnapshot);
+      }
     });
 
     setClient(mqttClient);
@@ -668,7 +692,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       mqttClient.end();
       clearInterval(pollId);
     };
-  }, [fetchApiData]);
+  }, [carryTelemetrySnapshot, fetchApiData]);
 
   const publishCommand = useCallback(async (command: string, pump?: number, state?: 'ON' | 'OFF') => {
     if (!client || mqttStatus !== 'connected') {
