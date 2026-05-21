@@ -371,7 +371,7 @@ void publishStatus(
   const bool stopPressed = isStopPressed(stateStop);
   const bool pump1On = shouldRunPump1(stateWLS1, stateWLS2);
   const bool greenOn = !isLocked && pump2Status == 0 && stateWLS2 == HIGH;
-  const bool redOn = !isLocked && stateFloat == LOW;
+  const bool redOn = !isLocked && stateFloat == LOW && !alarmMutedByWeb;
 
   String payload = "{";
   payload += "\"project\":\"";        payload += PROJECT_NAME;                      payload += "\",";
@@ -391,6 +391,7 @@ void publishStatus(
   payload += "\"pump2_on\":";         payload += boolText(pump2Status == 1);         payload += ",";
   payload += "\"green_on\":";         payload += boolText(greenOn);                  payload += ",";
   payload += "\"red_on\":";           payload += boolText(redOn);                    payload += ",";
+  payload += "\"alarm_muted\":";      payload += boolText(alarmMutedByWeb);          payload += ",";
   payload += "\"ph_value\":";         payload += String(pH_Value, 2);                payload += ",";
   payload += "\"ec_value\":";         payload += String(EC_Value, 2);                payload += ",";
   payload += "\"temp_c\":";           payload += String(temp_Value, 1);              payload += ",";
@@ -502,7 +503,7 @@ void loop() {
   // 3. อ่านค่า pH, EC และอุณหภูมิ
   readSensors();
 
-  if (stateWLS2 != HIGH && stateFloat != LOW) {
+  if (stateFloat != LOW) {
     alarmMutedByWeb = false;
   }
 
@@ -559,8 +560,9 @@ void loop() {
         digitalWrite(relayPump2, HIGH);
       }
 
-      // 8. ไฟเขียวติดเมื่อถัง 1 เต็ม และปั๊ม 2 ไม่ได้ทำงาน
-      if (stateWLS2 == HIGH && pump2Status == 0 && !alarmMutedByWeb) {
+      // 8. ไฟเขียวติดเมื่อมีน้ำพร้อมที่ WLS2 และปั๊ม 2 ไม่ได้ทำงาน
+      // ไฟเขียวไม่ใช่ alarm จึงไม่ถูก mute ตอนรับทราบไฟแดง
+      if (stateWLS2 == HIGH && pump2Status == 0) {
         digitalWrite(relayGreen, LOW);
       } else {
         digitalWrite(relayGreen, HIGH);
