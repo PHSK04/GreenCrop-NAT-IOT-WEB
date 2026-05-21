@@ -30,6 +30,11 @@ const currentTimeValue = () => {
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 };
 
+const toDateTimeValue = (date: string, time: string, fallbackTime: string) => {
+  if (!date) return "";
+  return `${date} ${time || fallbackTime}`;
+};
+
 export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   const { deviceId, seed } = useDeviceSeed();
   const { phValue, ecValue, tempValue } = useMachine();
@@ -79,15 +84,32 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   }, [ecValue, phValue, tempValue]);
 
   const filteredReportData = useMemo(() => {
+    const startDateTime = startDate ? toDateTimeValue(startDate, startTime, "00:00") : "";
+    const endDateTime = endDate ? toDateTimeValue(endDate, endTime, "23:59") : "";
+
     return deviceReportData.filter((row) => {
       if (selectedMonth && !row.date.startsWith(selectedMonth)) return false;
-      if (startDate && row.date < startDate) return false;
-      if (endDate && row.date > endDate) return false;
-      if (startTime && row.time < startTime) return false;
-      if (endTime && row.time > endTime) return false;
+      const rowDateTime = toDateTimeValue(row.date, row.time, "00:00");
+      if (startDateTime && rowDateTime < startDateTime) return false;
+      if (endDateTime && rowDateTime > endDateTime) return false;
+      if (!startDate && startTime && row.time < startTime) return false;
+      if (!endDate && endTime && row.time > endTime) return false;
       return true;
     });
   }, [deviceReportData, endDate, endTime, selectedMonth, startDate, startTime]);
+
+  const activeFilterCount = [selectedMonth, startDate, endDate, startTime, endTime].filter(Boolean).length;
+  const resultSummary = isTH
+    ? `พบ ${filteredReportData.length} รายการ${activeFilterCount ? ` จาก ${activeFilterCount} ตัวกรอง` : ""}`
+    : `${filteredReportData.length} record${filteredReportData.length === 1 ? "" : "s"}${activeFilterCount ? ` from ${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"}` : ""}`;
+
+  const handleClearHistoryFilters = () => {
+    setSelectedMonth("");
+    setStartDate("");
+    setEndDate("");
+    setStartTime("");
+    setEndTime("");
+  };
 
   const reportSummary = useMemo(() => {
     const days = filteredReportData.length;
@@ -314,10 +336,15 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
             onMonthChange={setSelectedMonth}
             onStartTimeChange={setStartTime}
             onEndTimeChange={setEndTime}
-            title={isTH ? "ตัวกรองสำหรับส่งออก" : "Export Filters"}
-            description={isTH ? "เลือกเดือน วันที่ เวลา และประเภทข้อมูลเพื่อค้นหา/ดาวน์โหลด CSV/PDF" : "Select month, date, time, and data types to search/download CSV/PDF"}
+            title={isTH ? "ค้นหาข้อมูลย้อนหลัง" : "Historical Data Search"}
+            description={isTH ? "เลือกเดือน/ปี วันที่ และเวลา เพื่อดูข้อมูลย้อนหลังในตารางและส่งออก CSV/PDF" : "Select month/year, date, and time to review historical records and export CSV/PDF."}
+            locale={isTH ? "TH" : "EN"}
+            resultSummary={resultSummary}
+            monthLabel={isTH ? "เดือน/ปี" : "Month / Year"}
             startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
             endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
+            startTimeLabel={isTH ? "เวลาเริ่มต้น" : "Start Time"}
+            endTimeLabel={isTH ? "เวลาสิ้นสุด" : "End Time"}
             options={[
               { key: "yield", label: isTH ? "ผลผลิต (กรัม)" : "Yield (g)" },
               { key: "ph", label: "pH" },
@@ -333,6 +360,8 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
             }
             onDownloadCsv={() => handleDownload(exportRows, "farm_report.csv", "csv")}
             onDownloadPdf={() => handleDownload(exportRows, "farm_report.pdf", "pdf")}
+            onClearFilters={handleClearHistoryFilters}
+            clearFiltersLabel={isTH ? "ล้างการค้นหา" : "Clear Search"}
             downloadCsvLabel={isTH ? "ดาวน์โหลด CSV" : "Download CSV"}
             downloadPdfLabel={isTH ? "ดาวน์โหลด PDF" : "Download PDF"}
           />
