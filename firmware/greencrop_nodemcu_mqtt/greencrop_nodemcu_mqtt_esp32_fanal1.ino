@@ -90,6 +90,8 @@ bool isLocked = false;  // false = ปกติ, true = Emergency lock
 bool webStartCommand = false;     // true เมื่อเว็บสั่ง START/PUMP2_ON
 bool webStopCommand = false;      // true เมื่อเว็บสั่ง STOP
 bool webPump2OffCommand = false;  // true เมื่อเว็บสั่งปิดเฉพาะปั๊ม 2
+bool webAckAlarmCommand = false;  // true เมื่อเว็บสั่งรับทราบ/ปิดไฟเตือนหน้าตู้
+bool alarmMutedByWeb = false;     // true หลังเว็บกดหยุดและรับทราบ alarm จนกว่า sensor จะกลับปกติ
 bool isDevicePaired = false;      // true เมื่ออุปกรณ์จับคู่กับ tenant แล้ว
 String activeTenantId = DEFAULT_TENANT_ID;  // tenant ปัจจุบันของอุปกรณ์
 
@@ -317,6 +319,10 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
     webPump2OffCommand = true;
   }
 
+  if (msg.indexOf("ACK_ALARM") >= 0 || msg.indexOf("SILENCE_ALARM") >= 0) {
+    webAckAlarmCommand = true;
+  }
+
   if (msg.indexOf("STOP") >= 0) {
     webStopCommand = true;
   }
@@ -496,10 +502,15 @@ void loop() {
   // 3. อ่านค่า pH, EC และอุณหภูมิ
   readSensors();
 
+  if (stateWLS2 != HIGH && stateFloat != LOW) {
+    alarmMutedByWeb = false;
+  }
+
   // 4. เช็ค Emergency Stop จากหน้าตู้หรือคำสั่ง STOP จากเว็บ
   // ถ้าเกิด Stop จะล็อกระบบและปิด output ทั้งหมดทันที
   if (isStopPressed(stateStop) || webStopCommand) {
     webStopCommand = false;
+    alarmMutedByWeb = true;
     stopAndLock();
   } else {
     // 5. ปลดล็อกระบบเมื่อระดับน้ำถึง WLS2
@@ -522,6 +533,7 @@ void loop() {
 
       // 7. ควบคุมปั๊ม 2 จากปุ่ม Start หน้าตู้หรือคำสั่งเว็บ
       if (stateStart == LOW || webStartCommand) {
+        alarmMutedByWeb = false;
         startPump2();
       }
       webStartCommand = false;
@@ -529,8 +541,16 @@ void loop() {
       // คำสั่งนี้ปิดเฉพาะปั๊ม 2 ไม่ได้ล็อกระบบเหมือน Emergency Stop
       if (webPump2OffCommand) {
         stopPump2();
+        alarmMutedByWeb = true;
       }
       webPump2OffCommand = false;
+
+      // รับทราบ alarm จากเว็บ: หยุดปั๊ม 2 และปิดไฟ/เสียงเตือนหน้าตู้จนกว่า sensor จะกลับปกติ
+      if (webAckAlarmCommand) {
+        stopPump2();
+        alarmMutedByWeb = true;
+      }
+      webAckAlarmCommand = false;
 
       // สั่งรีเลย์ปั๊ม 2 ตามสถานะ pump2Status
       if (pump2Status == 1) {
@@ -540,14 +560,14 @@ void loop() {
       }
 
       // 8. ไฟเขียวติดเมื่อถัง 1 เต็ม และปั๊ม 2 ไม่ได้ทำงาน
-      if (stateWLS2 == HIGH && pump2Status == 0) {
+      if (stateWLS2 == HIGH && pump2Status == 0 && !alarmMutedByWeb) {
         digitalWrite(relayGreen, LOW);
       } else {
         digitalWrite(relayGreen, HIGH);
       }
 
       // 9. ไฟแดงและเสียงเตือนทำงานเมื่อลูกลอยถัง 2 แจ้งเตือน
-      if (stateFloat == LOW) {
+      if (stateFloat == LOW && !alarmMutedByWeb) {
         digitalWrite(relayRed, LOW);
         digitalWrite(pinISD, HIGH);
       } else {
