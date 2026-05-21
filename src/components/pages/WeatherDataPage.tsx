@@ -5,10 +5,12 @@ import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Thermometer, Droplets, Activity, AlertTriangle, FileText, CloudRain } from "lucide-react";
+import { Thermometer, Droplets, Activity, AlertTriangle, Download, FileText, CloudRain } from "lucide-react";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
 import { seededNumber } from "@/utils/deviceData";
+import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { useMachine } from "@/contexts/MachineContext";
 import { MinimalDatePicker } from "../ui/minimal-date-picker";
 import { MinimalMonthPicker } from "../ui/minimal-month-picker";
@@ -48,6 +50,8 @@ const currentSensorReadings = [
 type WeatherDataPageProps = {
   language?: string;
 };
+
+const csvCell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
 
 export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
   const { theme } = useTheme();
@@ -174,6 +178,68 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
     [seed],
   );
 
+  const weatherExportRows = useMemo(() => {
+    if (filteredTelemetry.length) {
+      return filteredTelemetry.map((row) => {
+        const ph = row.phValue > 0 ? row.phValue : 0;
+        return {
+          timestamp: row.timestamp,
+          ph: ph.toFixed(2),
+          oxygen_mg_l: ph > 0 ? Math.max(0, 14 - ph).toFixed(2) : "0.00",
+          ec_ms_cm: row.ecValue > 0 ? row.ecValue.toFixed(2) : "0.00",
+          temp_c: row.tempValue > 0 ? row.tempValue.toFixed(1) : "0.0",
+        };
+      });
+    }
+
+    return currentSensorReadingsDevice.map((row) => ({
+      timestamp: new Date().toISOString(),
+      ph: row.name.toLowerCase().includes("ph") ? row.value : "",
+      oxygen_mg_l: row.name.toLowerCase().includes("oxygen") ? row.value : "",
+      ec_ms_cm: row.name.toLowerCase().includes("ec") ? row.value : "",
+      temp_c: row.name.toLowerCase().includes("temperature") ? row.value : "",
+    }));
+  }, [currentSensorReadingsDevice, filteredTelemetry]);
+
+  const buildExportContent = () => {
+    const meta = [
+      `report,${isTH ? "Environmental and Water Data" : "Environmental and Water Data"}`,
+      `device,${deviceLabel}`,
+      `month,${selectedMonth || "-"}`,
+      `date_range,${startDate || "-"} to ${endDate || "-"}`,
+      "",
+    ];
+    const headers = ["timestamp", "ph", "oxygen_mg_l", "ec_ms_cm", "temp_c"];
+    const rows = weatherExportRows.map((row) => headers.map((key) => csvCell(row[key as keyof typeof row])).join(","));
+    return `${meta.join("\n")}${headers.join(",")}\n${rows.join("\n")}`;
+  };
+
+  const handleExport = async (format: "csv" | "pdf") => {
+    try {
+      if (!weatherExportRows.length) {
+        toast.error(isTH ? "ดาวน์โหลดล้มเหลว" : "Download failed", {
+          description: isTH ? "ไม่มีข้อมูลสำหรับส่งออก" : "No data to export.",
+        });
+        return;
+      }
+
+      const content = buildExportContent();
+      if (format === "pdf") {
+        await downloadSimplePdf("weather-water-data.pdf", content);
+      } else {
+        downloadTextFile("weather-water-data.csv", content, "text/csv;charset=utf-8");
+      }
+
+      toast.success(isTH ? "เริ่มดาวน์โหลด" : "Download started", {
+        description: format === "pdf" ? "weather-water-data.pdf" : "weather-water-data.csv",
+      });
+    } catch (error) {
+      toast.error(isTH ? "ดาวน์โหลดล้มเหลว" : "Download failed", {
+        description: isTH ? "ไม่สามารถสร้างไฟล์ได้" : "Could not generate export file.",
+      });
+    }
+  };
+
   return (
     <>
       <header className="bg-card/50 border-b border-border px-8 py-6 backdrop-blur-sm">
@@ -196,10 +262,23 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
             <MinimalMonthPicker ariaLabel="Analytics month" value={selectedMonth} onChange={setSelectedMonth} locale={isTH ? "TH" : "EN"} />
             <MinimalDatePicker ariaLabel="Analytics start date" value={startDate} onChange={setStartDate} locale={isTH ? "TH" : "EN"} />
             <MinimalDatePicker ariaLabel="Analytics end date" value={endDate} onChange={setEndDate} locale={isTH ? "TH" : "EN"} />
-            <Button variant="outline" className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground sm:col-span-3">
-              <FileText className="w-4 h-4" />
-              {isTH ? "ส่งออกข้อมูลบันทึก" : "Export Data Logs"}
-            </Button>
+            <div className="grid gap-2 sm:col-span-3 sm:grid-cols-2">
+              <Button
+                className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={() => handleExport("csv")}
+              >
+                <Download className="w-4 h-4" />
+                {isTH ? "ดาวน์โหลด CSV" : "Download CSV"}
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2 border-border bg-background text-foreground hover:bg-muted shadow-sm"
+                onClick={() => handleExport("pdf")}
+              >
+                <FileText className="w-4 h-4" />
+                {isTH ? "ดาวน์โหลด PDF" : "Download PDF"}
+              </Button>
+            </div>
           </div>
         </div>
       </header>
