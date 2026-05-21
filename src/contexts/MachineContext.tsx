@@ -68,7 +68,7 @@ const TOPIC_CONTROL_LEGACY = 'smartfarm/control';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const HISTORY_LIMIT = 2000;
 const API_POLL_INTERVAL_MS = 2000;
-const HISTORY_SAMPLE_INTERVAL_MS = 3000;
+const HISTORY_SAMPLE_INTERVAL_MS = 1000;
 
 const getTelemetryHistoryKey = (deviceId: string) =>
   `greencrop.telemetry.history.${safeTopicSegment(deviceId || 'default')}`;
@@ -222,7 +222,6 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   const uptimeSyncedAtRef = useRef<number | null>(null);
   const zeroUptimeWhileRunningStreakRef = useRef(0);
   const lastApiUptimeRef = useRef<number | null>(null);
-  const lastHistorySignatureRef = useRef('');
   const lastHistoryStateSignatureRef = useRef('');
   const lastHistorySavedAtMsRef = useRef(0);
   const lastCarriedTelemetryRef = useRef<TelemetrySnapshot | null>(null);
@@ -264,18 +263,6 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const persistTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
-    const valueSignature = [
-      snapshot.deviceId,
-      snapshot.phValue.toFixed(2),
-      snapshot.ecValue.toFixed(2),
-      snapshot.tempValue.toFixed(1),
-      snapshot.wls1 ? '1' : '0',
-      snapshot.wls2 ? '1' : '0',
-      snapshot.floatAlarm ? '1' : '0',
-      snapshot.locked ? '1' : '0',
-      snapshot.pump1On ? '1' : '0',
-      snapshot.pump2On ? '1' : '0',
-    ].join('|');
     const stateSignature = [
       snapshot.deviceId,
       snapshot.wls1 ? '1' : '0',
@@ -290,9 +277,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     const nowMs = Date.now();
     const stateChanged = lastHistoryStateSignatureRef.current !== stateSignature;
 
-    if (lastHistorySignatureRef.current === valueSignature) return;
     if (!stateChanged && nowMs - lastHistorySavedAtMsRef.current < HISTORY_SAMPLE_INTERVAL_MS) return;
-    lastHistorySignatureRef.current = valueSignature;
     lastHistoryStateSignatureRef.current = stateSignature;
     lastHistorySavedAtMsRef.current = nowMs;
 
