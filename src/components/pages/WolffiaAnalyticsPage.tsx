@@ -289,6 +289,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
           onEndTimeChange={setExportEndTime}
           title={isTH ? "ตัวกรองสำหรับส่งออก" : "Export Filters"}
           description={isTH ? "เลือกเดือน วันที่ เวลา และประเภทข้อมูลเพื่อค้นหา/ดาวน์โหลด CSV/PDF" : "Select month, date, time, and data types to search/download CSV/PDF"}
+          locale={isTH ? "TH" : "EN"}
           startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
           endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
           options={dataTypeOptions}
