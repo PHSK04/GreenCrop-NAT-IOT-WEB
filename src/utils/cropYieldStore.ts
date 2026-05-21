@@ -6,6 +6,7 @@ export type CropYieldEntry = {
   ph: number;
   oxygen: number;
   ec: number;
+  temp: number;
   note?: string;
   createdAt: string;
 };
@@ -21,6 +22,7 @@ export type MonthlyYieldSummary = {
   avgPh: number;
   avgOxygen: number;
   avgEc: number;
+  avgTemp: number;
   entries: CropYieldEntry[];
 };
 
@@ -42,6 +44,7 @@ const normalizeEntry = (entry: any): CropYieldEntry | null => {
     ph: safeNumber(entry.ph, 7),
     oxygen: safeNumber(entry.oxygen, 0),
     ec: safeNumber(entry.ec, 0),
+    temp: safeNumber(entry.temp ?? entry.tempValue ?? entry.temperature, 0),
     note: entry.note ? String(entry.note) : "",
     createdAt: String(entry.createdAt || new Date().toISOString()),
   };
@@ -134,6 +137,7 @@ export const getMonthlyYieldSummaries = (
         avgPh: Math.round(avg((entry) => entry.ph) * 100) / 100,
         avgOxygen: Math.round(avg((entry) => entry.oxygen) * 100) / 100,
         avgEc: Math.round(avg((entry) => entry.ec) * 100) / 100,
+        avgTemp: Math.round(avg((entry) => entry.temp) * 100) / 100,
         entries: sortedEntries,
       };
     });
