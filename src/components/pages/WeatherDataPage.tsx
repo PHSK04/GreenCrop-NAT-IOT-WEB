@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -9,6 +9,8 @@ import { Thermometer, Droplets, Activity, AlertTriangle, FileText, CloudRain } f
 import { useTheme } from "next-themes";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
 import { seededNumber } from "@/utils/deviceData";
+import { useMachine } from "@/contexts/MachineContext";
+import { Input } from "../ui/input";
 
 // Mock Data: 24h Water Temperature Trends
 const tempHistory = [
@@ -50,8 +52,12 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const { deviceId, seed } = useDeviceSeed();
+  const { telemetryHistory } = useMachine();
   const isTH = language === "TH";
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const adjustValue = (
     value: string,
@@ -71,25 +77,73 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
     return value.replace(match[0], fixed);
   };
 
-  const tempHistoryDevice = useMemo(
-    () =>
-      tempHistory.map((row, index) => ({
+  const filteredTelemetry = useMemo(() => {
+    return telemetryHistory.filter((row) => {
+      const date = new Date(row.timestamp);
+      if (Number.isNaN(date.getTime())) return false;
+      const day = date.toISOString().slice(0, 10);
+      if (selectedMonth && !day.startsWith(selectedMonth)) return false;
+      if (startDate && day < startDate) return false;
+      if (endDate && day > endDate) return false;
+      return true;
+    });
+  }, [endDate, selectedMonth, startDate, telemetryHistory]);
+
+  const tempHistoryDevice = useMemo(() => {
+    if (filteredTelemetry.length === 0) {
+      return tempHistory.map((row, index) => ({
         ...row,
         water: seededNumber(row.water, seed, index, 0.2, 22.0, 28.8, 1),
-      })),
-    [seed],
-  );
+      }));
+    }
 
-  const waterQualityHistoryDevice = useMemo(
-    () =>
-      waterQualityHistory.map((row, index) => ({
+    const buckets = ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:59"];
+    return buckets.map((time) => {
+      const hour = Number(time.slice(0, 2));
+      const values = filteredTelemetry
+        .filter((row) => {
+          const parsed = new Date(row.timestamp);
+          return Math.abs(parsed.getHours() - hour) <= 2 && row.tempValue > 0;
+        })
+        .map((row) => row.tempValue);
+      const avg = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+      return { time, water: Number(avg.toFixed(1)) };
+    });
+  }, [filteredTelemetry, seed]);
+
+  const waterQualityHistoryDevice = useMemo(() => {
+    if (filteredTelemetry.length === 0) {
+      return waterQualityHistory.map((row, index) => ({
         ...row,
         ph: seededNumber(row.ph, seed, index, 0.05, 6.4, 7.8, 2),
         ec: seededNumber(row.ec, seed, index, 0.05, 1.0, 2.4, 2),
         oxygen: seededNumber(row.oxygen, seed, index, 0.07, 5.5, 8.6, 2),
-      })),
-    [seed],
-  );
+      }));
+    }
+
+    const groups = new Map<string, typeof filteredTelemetry>();
+    filteredTelemetry.forEach((row) => {
+      const day = new Date(row.timestamp).toISOString().slice(0, 10);
+      const rows = groups.get(day) ?? [];
+      rows.push(row);
+      groups.set(day, rows);
+    });
+
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-7)
+      .map(([day, rows]) => {
+        const avg = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+        const ph = avg(rows.map((row) => row.phValue).filter((value) => value > 0));
+        const ec = avg(rows.map((row) => row.ecValue).filter((value) => value > 0));
+        return {
+          time: new Date(`${day}T00:00:00`).toLocaleDateString([], { weekday: "short" }),
+          ph: Number(ph.toFixed(2)),
+          ec: Number(ec.toFixed(2)),
+          oxygen: Number((ph > 0 ? Math.max(0, 14 - ph) : 0).toFixed(2)),
+        };
+      });
+  }, [filteredTelemetry, seed]);
 
   const currentSensorReadingsDevice = useMemo(
     () =>
@@ -137,10 +191,15 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
               </Badge>
             </div>
           </div>
-          <Button variant="outline" className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground">
-            <FileText className="w-4 h-4" />
-            {isTH ? "ส่งออกข้อมูลบันทึก" : "Export Data Logs"}
-          </Button>
+          <div className="grid w-full max-w-2xl gap-2 sm:grid-cols-3">
+            <Input aria-label="Analytics month" type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} />
+            <Input aria-label="Analytics start date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+            <Input aria-label="Analytics end date" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+            <Button variant="outline" className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground sm:col-span-3">
+              <FileText className="w-4 h-4" />
+              {isTH ? "ส่งออกข้อมูลบันทึก" : "Export Data Logs"}
+            </Button>
+          </div>
         </div>
       </header>
 
