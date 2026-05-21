@@ -942,9 +942,10 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     setLastLocalCommandAtMs(Date.now());
     const published = await publishCommand('PUMP2_OFF', 2, 'OFF');
     if (published) {
+      await publishCommand('ACK_ALARM', 2, 'OFF');
       await syncAfterCommand();
       toast.success('Pump 2 OFF sent', {
-        description: 'The board will stop Pump 2 while keeping the rest of the logic unchanged.',
+        description: 'The board will stop Pump 2 and acknowledge the cabinet alarm.',
       });
     }
     setIsSendingControl(false);
