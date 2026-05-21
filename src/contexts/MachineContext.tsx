@@ -67,6 +67,9 @@ const TOPIC_SENSORS_LEGACY = 'smartfarm/sensors';
 const TOPIC_CONTROL_LEGACY = 'smartfarm/control';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const HISTORY_LIMIT = 2000;
+const API_POLL_INTERVAL_MS = 2000;
+const HISTORY_SAMPLE_INTERVAL_MS = 3000;
+const MQTT_FRESH_WINDOW_MS = 8000;
 
 const getTelemetryHistoryKey = (deviceId: string) =>
   `greencrop.telemetry.history.${safeTopicSegment(deviceId || 'default')}`;
@@ -151,6 +154,20 @@ const parseServerTimestampMs = (raw: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const isEmptyTelemetrySnapshot = (snapshot: TelemetrySnapshot) =>
+  snapshot.phValue === 0 &&
+  snapshot.ecValue === 0 &&
+  snapshot.tempValue === 0 &&
+  !snapshot.wls1 &&
+  !snapshot.wls2 &&
+  !snapshot.floatAlarm &&
+  !snapshot.locked &&
+  !snapshot.pump1On &&
+  !snapshot.pump2On &&
+  !snapshot.greenOn &&
+  !snapshot.redOn &&
+  !snapshot.isOn;
+
 const recordSortKey = (item: any) => {
   const ts = parseServerTimestampMs(item?.timestamp);
   if (ts != null) return ts;
@@ -207,6 +224,9 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   const zeroUptimeWhileRunningStreakRef = useRef(0);
   const lastApiUptimeRef = useRef<number | null>(null);
   const lastHistorySignatureRef = useRef('');
+  const lastHistoryStateSignatureRef = useRef('');
+  const lastHistorySavedAtMsRef = useRef(0);
+  const lastMqttTelemetryAtMsRef = useRef(0);
 
   const loadTelemetryHistory = useCallback((deviceId: string) => {
     if (typeof window === 'undefined') return [];
@@ -221,8 +241,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const persistTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
-    const signature = [
-      snapshot.timestamp,
+    const valueSignature = [
       snapshot.deviceId,
       snapshot.phValue.toFixed(2),
       snapshot.ecValue.toFixed(2),
@@ -234,9 +253,25 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       snapshot.pump1On ? '1' : '0',
       snapshot.pump2On ? '1' : '0',
     ].join('|');
+    const stateSignature = [
+      snapshot.deviceId,
+      snapshot.wls1 ? '1' : '0',
+      snapshot.wls2 ? '1' : '0',
+      snapshot.floatAlarm ? '1' : '0',
+      snapshot.locked ? '1' : '0',
+      snapshot.pump1On ? '1' : '0',
+      snapshot.pump2On ? '1' : '0',
+      snapshot.greenOn ? '1' : '0',
+      snapshot.redOn ? '1' : '0',
+    ].join('|');
+    const nowMs = Date.now();
+    const stateChanged = lastHistoryStateSignatureRef.current !== stateSignature;
 
-    if (lastHistorySignatureRef.current === signature) return;
-    lastHistorySignatureRef.current = signature;
+    if (lastHistorySignatureRef.current === valueSignature) return;
+    if (!stateChanged && nowMs - lastHistorySavedAtMsRef.current < HISTORY_SAMPLE_INTERVAL_MS) return;
+    lastHistorySignatureRef.current = valueSignature;
+    lastHistoryStateSignatureRef.current = stateSignature;
+    lastHistorySavedAtMsRef.current = nowMs;
 
     setTelemetryHistory((prev) => {
       const next = [snapshot, ...prev].slice(0, HISTORY_LIMIT);
@@ -331,24 +366,52 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         lastLocalCommandAtMs != null &&
         serverAtMs != null &&
         serverAtMs < lastLocalCommandAtMs - 200;
+      const resolvedDeviceId = String(latest.device_id || activeDeviceId || 'UNKNOWN');
+      const snapshotTimestamp = typeof latest.timestamp === 'string' && latest.timestamp
+        ? latest.timestamp
+        : new Date().toISOString();
+      const latestSnapshot: TelemetrySnapshot = {
+        timestamp: snapshotTimestamp,
+        deviceId: resolvedDeviceId,
+        phValue: asNumber(latest.ph_value),
+        ecValue: asNumber(latest.ec_value),
+        tempValue: asNumber(latest.temp_c),
+        wls1: asBool(latest.wls1),
+        wls2: asBool(latest.wls2),
+        floatAlarm: asBool(latest.float_alarm),
+        locked: asBool(latest.locked),
+        pump1On: asBool(latest.pump1_on),
+        pump2On: asBool(latest.pump2_on),
+        greenOn: asBool(latest.green_on),
+        redOn: asBool(latest.red_on),
+        isOn: asBool(latest.is_on),
+      };
+
+      if (
+        isEmptyTelemetrySnapshot(latestSnapshot) &&
+        lastMqttTelemetryAtMsRef.current > 0 &&
+        localNowMs - lastMqttTelemetryAtMsRef.current < MQTT_FRESH_WINDOW_MS
+      ) {
+        return;
+      }
 
       setPressure(Number(latest.pressure) || 0);
       setFlowRate(Number(latest.flow_rate) || 0);
-      setEcValue(Number(latest.ec_value) || 0);
-      setPhValue(Number(latest.ph_value) || 0);
-      setTempValue(Number(latest.temp_c) || 0);
-      setWls1(asBool(latest.wls1));
-      setWls2(asBool(latest.wls2));
-      setFloatAlarm(asBool(latest.float_alarm));
-      setLocked(asBool(latest.locked));
-      setPump1On(asBool(latest.pump1_on));
-      setPump2On(asBool(latest.pump2_on));
-      setGreenOn(asBool(latest.green_on));
-      setRedOn(asBool(latest.red_on));
-      setPhOk(asBool(latest.ph_ok) || ((Number(latest.ph_value) || 0) >= 6.5 && (Number(latest.ph_value) || 0) <= 7.5));
+      setEcValue(latestSnapshot.ecValue);
+      setPhValue(latestSnapshot.phValue);
+      setTempValue(latestSnapshot.tempValue);
+      setWls1(latestSnapshot.wls1);
+      setWls2(latestSnapshot.wls2);
+      setFloatAlarm(latestSnapshot.floatAlarm);
+      setLocked(latestSnapshot.locked);
+      setPump1On(latestSnapshot.pump1On);
+      setPump2On(latestSnapshot.pump2On);
+      setGreenOn(latestSnapshot.greenOn);
+      setRedOn(latestSnapshot.redOn);
+      setPhOk(asBool(latest.ph_ok) || (latestSnapshot.phValue >= 6.5 && latestSnapshot.phValue <= 7.5));
       setLastTelemetryAt(typeof latest.timestamp === 'string' ? latest.timestamp : null);
 
-      const apiIsOn = asBool(latest.is_on);
+      const apiIsOn = latestSnapshot.isOn;
       if (!staleByCommand) {
         const waitingAck = pendingIsOnAck !== null;
         const isAckMatched = waitingAck && apiIsOn === pendingIsOnAck;
@@ -426,26 +489,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
       setPumps((prev) => normalizePumps(latest.pumps, prev));
 
-      const resolvedDeviceId = String(latest.device_id || activeDeviceId || 'UNKNOWN');
-      const snapshotTimestamp = typeof latest.timestamp === 'string' && latest.timestamp
-        ? latest.timestamp
-        : new Date().toISOString();
-      persistTelemetrySnapshot({
-        timestamp: snapshotTimestamp,
-        deviceId: resolvedDeviceId,
-        phValue: asNumber(latest.ph_value),
-        ecValue: asNumber(latest.ec_value),
-        tempValue: asNumber(latest.temp_c),
-        wls1: asBool(latest.wls1),
-        wls2: asBool(latest.wls2),
-        floatAlarm: asBool(latest.float_alarm),
-        locked: asBool(latest.locked),
-        pump1On: asBool(latest.pump1_on),
-        pump2On: asBool(latest.pump2_on),
-        greenOn: asBool(latest.green_on),
-        redOn: asBool(latest.red_on),
-        isOn: asBool(latest.is_on),
-      });
+      persistTelemetrySnapshot(latestSnapshot);
     } catch (err) {
       console.error('API Polling Error:', err);
     }
@@ -611,12 +655,13 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
       setPressure(asNumber(parsed.pressure));
       setFlowRate(asNumber(parsed.flow_rate));
+      lastMqttTelemetryAtMsRef.current = Date.now();
       applyTelemetrySnapshot(snapshot);
     });
 
     setClient(mqttClient);
 
-    const pollId = setInterval(fetchApiData, 250);
+    const pollId = setInterval(fetchApiData, API_POLL_INTERVAL_MS);
     fetchApiData();
 
     return () => {
