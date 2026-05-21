@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -10,23 +10,27 @@ import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
 import { rotateBy, seededInt } from "@/utils/deviceData";
+import {
+  CropYieldEntry,
+  readCropYieldEntries,
+  subscribeCropYieldEntries,
+} from "@/utils/cropYieldStore";
 
 type MachinePerformancePageProps = {
   language?: string;
 };
 
-// 1. Production Output Over Time (Kg & Growth Rate)
-const productionData = [
-  { date: "Day 1", morningYield: 42, afternoonYield: 38, growthRate: 85 },
-  { date: "Day 2", morningYield: 45, afternoonYield: 40, growthRate: 88 },
-  { date: "Day 3", morningYield: 41, afternoonYield: 39, growthRate: 86 },
-  { date: "Day 4", morningYield: 48, afternoonYield: 42, growthRate: 92 },
-  { date: "Day 5", morningYield: 52, afternoonYield: 45, growthRate: 95 },
-  { date: "Day 6", morningYield: 50, afternoonYield: 44, growthRate: 93 },
-  { date: "Day 7", morningYield: 55, afternoonYield: 48, growthRate: 97 },
-];
+type PredictiveAnalysis = {
+  forecastYield: number;
+  trendLabel: string;
+  confidence: number;
+  waterScore: number;
+  recommendation: string;
+  risk: string;
+  recordCount: number;
+};
 
-// 2. Machine Performance Radar Data
+// 1. Machine Performance Radar Data
 const machinePerformanceData = [
   { category: "Energy Eff.", score: 85, fullMark: 100 },
   { category: "Env Control", score: 92, fullMark: 100 },
@@ -36,7 +40,7 @@ const machinePerformanceData = [
   { category: "Uptime", score: 98, fullMark: 100 },
 ];
 
-// 3. Top Performance Factors
+// 2. Top Performance Factors
 const performanceFactors = [
   "pH levels stabilized (6.5-7.5)",
   "Consistent High DO (>6.0 mg/L)",
@@ -45,19 +49,44 @@ const performanceFactors = [
   "Stable Water Levels",
 ];
 
-// 4. Production Issues / Bottlenecks
+// 3. Production Issues / Bottlenecks
 const bottleneckIssues = [
   "Minor pH Fluctuations at night",
   "DO drops post-harvest",
   "Intermittent EC calibration needed",
 ];
 
+const getHour = (time: string) => {
+  const hour = Number(time.split(":")[0]);
+  return Number.isFinite(hour) ? hour : 0;
+};
+
+const formatDateLabel = (value: string, isTH: boolean) => {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, (month || 1) - 1, day || 1);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(isTH ? "th-TH" : "en-US", {
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const roundNumber = (value: number) => Math.round(value * 100) / 100;
+
+const average = (values: number[]) => {
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+};
+
 export function MachinePerformancePage({ language = "TH" }: MachinePerformancePageProps) {
   const { deviceId, seed } = useDeviceSeed();
   const isTH = language === "TH";
+  const activeDeviceId = deviceId || "default";
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
+  const [cropYieldEntries, setCropYieldEntries] = useState<CropYieldEntry[]>(() => readCropYieldEntries(activeDeviceId));
+  const [predictiveAnalysis, setPredictiveAnalysis] = useState<PredictiveAnalysis | null>(null);
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([
     "production",
     "system",
@@ -72,16 +101,67 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
     { key: "constraints", label: isTH ? "ข้อจำกัด" : "Constraints" },
   ];
 
-  const productionDataDevice = useMemo(
+  useEffect(() => {
+    const refresh = () => setCropYieldEntries(readCropYieldEntries(activeDeviceId));
+    refresh();
+    return subscribeCropYieldEntries(refresh);
+  }, [activeDeviceId]);
+
+  const productionDataDevice = useMemo(() => {
+    const entriesInRange = cropYieldEntries.filter((entry) => {
+      if (exportStart && entry.date < exportStart) return false;
+      if (exportEnd && entry.date > exportEnd) return false;
+      return true;
+    });
+
+    const grouped = new Map<string, { date: string; morningYield: number; afternoonYield: number }>();
+
+    entriesInRange.forEach((entry) => {
+      const current = grouped.get(entry.date) || {
+        date: entry.date,
+        morningYield: 0,
+        afternoonYield: 0,
+      };
+
+      if (getHour(entry.time) < 12) {
+        current.morningYield += entry.yield;
+      } else {
+        current.afternoonYield += entry.yield;
+      }
+
+      grouped.set(entry.date, current);
+    });
+
+    const sortedRows = Array.from(grouped.values())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-7);
+
+    return sortedRows.map((row, index, rows) => {
+      const totalYield = row.morningYield + row.afternoonYield;
+      const previousTotal =
+        index > 0 ? rows[index - 1].morningYield + rows[index - 1].afternoonYield : totalYield;
+      const growthRate = previousTotal > 0 ? ((totalYield - previousTotal) / previousTotal) * 100 : 0;
+
+      return {
+        date: formatDateLabel(row.date, isTH),
+        rawDate: row.date,
+        morningYield: roundNumber(row.morningYield),
+        afternoonYield: roundNumber(row.afternoonYield),
+        growthRate: roundNumber(index === 0 ? 0 : growthRate),
+      };
+    });
+  }, [cropYieldEntries, exportEnd, exportStart, isTH]);
+
+  const hasRealProductionData = productionDataDevice.length > 0;
+
+  const entriesInExportRange = useMemo(
     () =>
-      productionData.map((row, index) => ({
-        ...row,
-        date: isTH ? row.date.replace("Day", "วันที่") : row.date,
-        morningYield: seededInt(row.morningYield, seed, index, 2, 30, 70),
-        afternoonYield: seededInt(row.afternoonYield, seed, index, 2, 28, 68),
-        growthRate: seededInt(row.growthRate, seed, index, 1, 78, 99),
-      })),
-    [seed, isTH],
+      cropYieldEntries.filter((entry) => {
+        if (exportStart && entry.date < exportStart) return false;
+        if (exportEnd && entry.date > exportEnd) return false;
+        return true;
+      }),
+    [cropYieldEntries, exportEnd, exportStart],
   );
 
   const machinePerformanceDataDevice = useMemo(
@@ -132,6 +212,73 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
       ),
     [seed, isTH],
   );
+
+  const handleRunPredictiveAnalysis = () => {
+    if (!entriesInExportRange.length || !productionDataDevice.length) {
+      toast.error(isTH ? "ยังวิเคราะห์ไม่ได้" : "Analysis unavailable", {
+        description: isTH
+          ? "ต้องมีข้อมูลผลผลิตจริงอย่างน้อย 1 รายการในช่วงวันที่ที่เลือก"
+          : "At least one real harvest entry is required in the selected date range.",
+      });
+      return;
+    }
+
+    const totals = productionDataDevice.map((row) => row.morningYield + row.afternoonYield);
+    const latestTotal = totals[totals.length - 1] || 0;
+    const recentAverage = average(totals.slice(-3));
+    const previousAverage = totals.length > 3 ? average(totals.slice(-6, -3)) : average(totals.slice(0, -1));
+    const averageDelta = totals.length > 1 ? average(totals.slice(1).map((total, index) => total - totals[index])) : 0;
+    const forecastYield = Math.max(0, roundNumber(recentAverage + averageDelta));
+    const trendValue = previousAverage > 0 ? ((recentAverage - previousAverage) / previousAverage) * 100 : 0;
+
+    const avgPh = average(entriesInExportRange.map((entry) => entry.ph));
+    const avgEc = average(entriesInExportRange.map((entry) => entry.ec));
+    const avgTemp = average(entriesInExportRange.map((entry) => entry.temp));
+    const avgOxygen = average(entriesInExportRange.map((entry) => entry.oxygen));
+
+    const phScore = Math.max(0, 100 - Math.abs(avgPh - 7) * 35);
+    const ecScore = Math.max(0, 100 - Math.abs(avgEc - 1.8) * 25);
+    const tempScore = Math.max(0, 100 - Math.abs(avgTemp - 25) * 6);
+    const oxygenScore = Math.max(0, 100 - Math.abs(avgOxygen - 6.5) * 12);
+    const waterScore = Math.round(average([phScore, ecScore, tempScore, oxygenScore]));
+
+    const confidence = Math.min(92, Math.max(48, Math.round(45 + entriesInExportRange.length * 7 + Math.min(totals.length, 7) * 3)));
+    const isImproving = trendValue >= 3;
+    const isDropping = trendValue <= -3;
+    const trendLabel = isImproving
+      ? (isTH ? "แนวโน้มเพิ่มขึ้น" : "Improving trend")
+      : isDropping
+        ? (isTH ? "แนวโน้มลดลง" : "Declining trend")
+        : (isTH ? "แนวโน้มคงที่" : "Stable trend");
+
+    const risk = waterScore < 70
+      ? (isTH ? "ค่าน้ำมีความเสี่ยง ควรตรวจ pH/EC/อุณหภูมิ ก่อนรอบเก็บถัดไป" : "Water quality risk detected. Check pH, EC, and temperature before the next harvest.")
+      : isDropping
+        ? (isTH ? "ผลผลิตเริ่มลดลง ควรเทียบเวลารอบเก็บกับค่าน้ำย้อนหลัง" : "Yield is starting to fall. Compare harvest timing with recent water values.")
+        : (isTH ? "ความเสี่ยงต่ำ ระบบอยู่ในช่วงควบคุมได้" : "Low risk. The system is within a controlled range.");
+
+    const recommendation = waterScore < 70
+      ? (isTH ? "ปรับค่าน้ำให้อยู่ใกล้ pH 7, EC 1.8 และอุณหภูมิประมาณ 25°C" : "Move water values closer to pH 7, EC 1.8, and about 25°C.")
+      : latestTotal < recentAverage
+        ? (isTH ? "รักษาสภาพแวดล้อมเดิม แต่เพิ่มการตรวจหลังรอบเก็บเกี่ยว" : "Keep current settings but add post-harvest checks.")
+        : (isTH ? "ใช้ค่าพารามิเตอร์ชุดปัจจุบันต่อ และเก็บข้อมูลเพิ่มเพื่อเพิ่มความแม่นยำ" : "Continue current parameters and collect more records to improve confidence.");
+
+    setPredictiveAnalysis({
+      forecastYield,
+      trendLabel,
+      confidence,
+      waterScore,
+      recommendation,
+      risk,
+      recordCount: entriesInExportRange.length,
+    });
+
+    toast.success(isTH ? "วิเคราะห์สำเร็จ" : "Analysis complete", {
+      description: isTH
+        ? `คาดการณ์ผลผลิตรอบถัดไป ${forecastYield} กรัม`
+        : `Forecast for next harvest: ${forecastYield} g`,
+    });
+  };
 
   const buildExportPayload = () => {
     const lines: string[] = [];
@@ -264,27 +411,40 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
                 {isTH ? "ผลผลิตตามช่วงเวลา" : "Production Output Over Time"}
               </CardTitle>
               <CardDescription className="text-muted-foreground">
-                {isTH ? "ผลผลิต (กรัม) เทียบอัตราการเติบโต (%)" : "Yield (g) vs Growth Rate (%)"}
+                {isTH ? "ดึงจากผลผลิตจริงที่บันทึกในหน้ารายงานผลผลิต" : "Pulled from real harvest entries saved in Crop Reports"}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={productionDataDevice} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} label={{ value: isTH ? "ผลผลิต (กรัม)" : "Yield (g)", angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))' }} />
-                    <YAxis yAxisId="right" orientation="right" stroke="#F59E0B" fontSize={12} tickLine={false} axisLine={false} label={{ value: isTH ? "อัตราเติบโต (%)" : "Growth (%)", angle: 90, position: 'insideRight', fill: '#F59E0B' }} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}
-                      cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
-                    />
-                    <Legend wrapperStyle={{ paddingTop: "20px" }}/>
-                    <Bar yAxisId="left" dataKey="morningYield" name={isTH ? "ผลผลิตเช้า" : "Morning Yield"} fill="#3B82F6" radius={[4, 4, 0, 0]} stackId="a" />
-                    <Bar yAxisId="left" dataKey="afternoonYield" name={isTH ? "ผลผลิตบ่าย" : "Afternoon Yield"} fill="#0EA5E9" radius={[4, 4, 0, 0]} stackId="a" />
-                    <Line yAxisId="right" type="monotone" dataKey="growthRate" name={isTH ? "อัตราเติบโต %" : "Growth Rate %"} stroke="#F59E0B" strokeWidth={3} dot={{ r: 4 }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
+              <div className="relative h-80">
+                {hasRealProductionData ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={productionDataDevice} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} label={{ value: isTH ? "ผลผลิต (กรัม)" : "Yield (g)", angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))' }} />
+                      <YAxis yAxisId="right" orientation="right" stroke="#F59E0B" fontSize={12} tickLine={false} axisLine={false} label={{ value: isTH ? "อัตราเติบโต (%)" : "Growth (%)", angle: 90, position: 'insideRight', fill: '#F59E0B' }} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}
+                        cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
+                      />
+                      <Legend wrapperStyle={{ paddingTop: "20px" }}/>
+                      <Bar yAxisId="left" dataKey="morningYield" name={isTH ? "ผลผลิตเช้า" : "Morning Yield"} fill="#3B82F6" radius={[4, 4, 0, 0]} stackId="a" />
+                      <Bar yAxisId="left" dataKey="afternoonYield" name={isTH ? "ผลผลิตบ่าย" : "Afternoon Yield"} fill="#0EA5E9" radius={[4, 4, 0, 0]} stackId="a" />
+                      <Line yAxisId="right" type="monotone" dataKey="growthRate" name={isTH ? "อัตราเติบโต %" : "Growth Rate %"} stroke="#F59E0B" strokeWidth={3} dot={{ r: 4 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 text-center">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {isTH ? "ยังไม่มีข้อมูลผลผลิตจริง" : "No real production data yet"}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {isTH ? "เพิ่มข้อมูลในหน้า รายงานผลผลิต แล้วกราฟนี้จะอัปเดตอัตโนมัติ" : "Add entries in Crop Reports and this chart will update automatically."}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -374,21 +534,46 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
                 <Activity className="w-8 h-8 text-blue-500" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-foreground">
+                <h3 className="text-lg font-semibold text-white">
                   {isTH ? "วิเคราะห์เชิงพยากรณ์ขั้นสูง" : "Advanced Predictive Analytics"}
                 </h3>
-                <p className="text-muted-foreground text-sm max-w-lg">
+                <p className="max-w-lg text-sm text-slate-300">
                   {isTH
                     ? "ใช้ AI พยากรณ์ผลผลิตจากการเปรียบเทียบการตั้งค่าพารามิเตอร์ และรองรับการเทียบประสิทธิภาพหลายบ่อ"
                     : "Use AI to forecast yield based on parameter tuning comparisons and enable multi-pond performance benchmarking."}
                 </p>
               </div>
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap">
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
+              onClick={handleRunPredictiveAnalysis}
+            >
               {isTH ? "เริ่มวิเคราะห์" : "Run Analysis"}
             </Button>
           </div>
-           {/* Overlay for light mode readability on dark gradient cards - handled by bg-white and dark:bg-transparent with z-index, but the design implies a specific look. Let's keep it dark themed for this CTA for premium feel, but ensure text is readable. actually, let's just make it dark always for 'premium' feel or adapt. The current code sets bg-white for light mode but keeps dark gradient text. that might be weird. Let's fix the class. */}
+          {predictiveAnalysis && (
+            <div className="grid gap-4 border-t border-white/10 p-6 pt-0 md:grid-cols-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                <p className="text-xs text-slate-400">{isTH ? "คาดการณ์รอบถัดไป" : "Next Forecast"}</p>
+                <p className="mt-2 text-2xl font-bold text-white">{predictiveAnalysis.forecastYield} g</p>
+                <p className="mt-1 text-xs text-slate-400">{predictiveAnalysis.trendLabel}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                <p className="text-xs text-slate-400">{isTH ? "ความมั่นใจ" : "Confidence"}</p>
+                <p className="mt-2 text-2xl font-bold text-blue-300">{predictiveAnalysis.confidence}%</p>
+                <p className="mt-1 text-xs text-slate-400">{predictiveAnalysis.recordCount} {isTH ? "รายการจริง" : "real records"}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                <p className="text-xs text-slate-400">{isTH ? "คะแนนค่าน้ำ" : "Water Score"}</p>
+                <p className="mt-2 text-2xl font-bold text-emerald-300">{predictiveAnalysis.waterScore}/100</p>
+                <p className="mt-1 text-xs text-slate-400">{predictiveAnalysis.risk}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                <p className="text-xs text-slate-400">{isTH ? "คำแนะนำ" : "Recommendation"}</p>
+                <p className="mt-2 text-sm font-medium leading-relaxed text-white">{predictiveAnalysis.recommendation}</p>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </>
