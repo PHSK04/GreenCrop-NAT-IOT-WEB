@@ -5,7 +5,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
-import { Download, Eye, Calendar, Filter, FileText, Share2, Sprout, Droplets, Zap, Wind, Plus, Trash2 } from "lucide-react";
+import { Download, Eye, Calendar, Filter, FileText, Share2, Sprout, Droplets, Zap, Wind, Plus, Trash2, Thermometer } from "lucide-react";
 import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
@@ -18,6 +18,7 @@ import {
   readCropYieldEntries,
   subscribeCropYieldEntries,
 } from "@/utils/cropYieldStore";
+import { useMachine } from "@/contexts/MachineContext";
 
 type CropReportsPageProps = {
   language?: string;
@@ -25,13 +26,14 @@ type CropReportsPageProps = {
 
 export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   const { deviceId, seed } = useDeviceSeed();
+  const { phValue, ecValue, tempValue } = useMachine();
   const isTH = language === "TH";
   const activeDeviceId = deviceId || "default";
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
   const [selectedReport, setSelectedReport] = useState<CropYieldEntry | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [selectedFields, setSelectedFields] = useState<string[]>(["yield", "ph", "oxygen", "ec"]);
+  const [selectedFields, setSelectedFields] = useState<string[]>(["yield", "ph", "oxygen", "ec", "temp"]);
   const [deviceReportData, setDeviceReportData] = useState<CropYieldEntry[]>(() => readCropYieldEntries(activeDeviceId));
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
@@ -39,6 +41,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
     ph: "7.0",
     oxygen: "6.5",
     ec: "1.8",
+    temp: "25.0",
     note: "",
   });
 
@@ -47,6 +50,23 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
     refresh();
     return subscribeCropYieldEntries(refresh);
   }, [activeDeviceId, seed]);
+
+  useEffect(() => {
+    const nextPh = phValue > 0 ? phValue : null;
+    const nextEc = ecValue > 0 ? ecValue : null;
+    const nextTemp = tempValue > 0 ? tempValue : null;
+    const derivedOxygen = nextPh != null ? Math.max(0, 14 - nextPh) : null;
+
+    if (nextPh == null && nextEc == null && nextTemp == null && derivedOxygen == null) return;
+
+    setForm((prev) => ({
+      ...prev,
+      ph: nextPh != null ? nextPh.toFixed(2) : prev.ph,
+      oxygen: derivedOxygen != null ? derivedOxygen.toFixed(2) : prev.oxygen,
+      ec: nextEc != null ? nextEc.toFixed(2) : prev.ec,
+      temp: nextTemp != null ? nextTemp.toFixed(1) : prev.temp,
+    }));
+  }, [ecValue, phValue, tempValue]);
 
   const reportSummary = useMemo(() => {
     const days = deviceReportData.length;
@@ -92,6 +112,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
     const phValue = Number(form.ph);
     const oxygenValue = Number(form.oxygen);
     const ecValue = Number(form.ec);
+    const tempValue = Number(form.temp);
 
     if (!form.date || !Number.isFinite(yieldValue) || yieldValue <= 0) {
       toast.error(isTH ? "กรอกข้อมูลไม่ครบ" : "Missing data", {
@@ -107,6 +128,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
       ph: Number.isFinite(phValue) ? phValue : 7,
       oxygen: Number.isFinite(oxygenValue) ? oxygenValue : 0,
       ec: Number.isFinite(ecValue) ? ecValue : 0,
+      temp: Number.isFinite(tempValue) ? tempValue : 0,
       note: form.note,
     });
 
@@ -194,7 +216,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
                 <div>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "วันที่เก็บ" : "Date"}</p>
                   <MinimalDatePicker
@@ -209,16 +231,40 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                   <Input type="number" min="0" step="0.1" value={form.yield} onChange={(event) => setForm((prev) => ({ ...prev, yield: event.target.value }))} placeholder="120" />
                 </div>
                 <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">pH</p>
-                  <Input type="number" step="0.1" value={form.ph} onChange={(event) => setForm((prev) => ({ ...prev, ph: event.target.value }))} />
+                  <p className="mb-1 flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground">
+                    <span>pH</span>
+                    <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-600 dark:text-emerald-400">
+                      AUTO
+                    </Badge>
+                  </p>
+                  <Input type="number" step="0.01" value={form.ph} readOnly className="bg-muted/40" />
                 </div>
                 <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "ออกซิเจน" : "Oxygen"}</p>
-                  <Input type="number" step="0.1" value={form.oxygen} onChange={(event) => setForm((prev) => ({ ...prev, oxygen: event.target.value }))} />
+                  <p className="mb-1 flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground">
+                    <span>{isTH ? "ออกซิเจน" : "Oxygen"}</span>
+                    <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-600 dark:text-emerald-400">
+                      AUTO
+                    </Badge>
+                  </p>
+                  <Input type="number" step="0.01" value={form.oxygen} readOnly className="bg-muted/40" />
                 </div>
                 <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">EC</p>
-                  <Input type="number" step="0.1" value={form.ec} onChange={(event) => setForm((prev) => ({ ...prev, ec: event.target.value }))} />
+                  <p className="mb-1 flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground">
+                    <span>EC</span>
+                    <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-600 dark:text-emerald-400">
+                      AUTO
+                    </Badge>
+                  </p>
+                  <Input type="number" step="0.01" value={form.ec} readOnly className="bg-muted/40" />
+                </div>
+                <div>
+                  <p className="mb-1 flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground">
+                    <span>{isTH ? "อุณหภูมิ" : "Temp"}</span>
+                    <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-600 dark:text-emerald-400">
+                      AUTO
+                    </Badge>
+                  </p>
+                  <Input type="number" step="0.1" value={form.temp} readOnly className="bg-muted/40" />
                 </div>
                 <div className="flex items-end">
                   <Button className="w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700" onClick={handleSaveManualEntry}>
@@ -251,6 +297,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               { key: "ph", label: "pH" },
               { key: "oxygen", label: isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)" },
               { key: "ec", label: isTH ? "EC (mS/cm)" : "EC (mS/cm)" },
+              { key: "temp", label: isTH ? "อุณหภูมิ (°C)" : "Temperature (°C)" },
             ]}
             selectedKeys={selectedFields}
             onToggleKey={(key) =>
@@ -310,6 +357,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "ค่า pH" : "pH Level"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "EC (mS/cm)" : "EC (mS/cm)"}</TableHead>
+                  <TableHead className="font-semibold text-muted-foreground">{isTH ? "อุณหภูมิ" : "Temp"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground text-right">{isTH ? "การทำงาน" : "Action"}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -355,6 +403,12 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                         {row.ec}
                       </div>
                     </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Thermometer className="w-4 h-4 text-blue-500" />
+                        {row.temp} °C
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button 
@@ -381,7 +435,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                 ))}
                 {deviceReportData.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                       {isTH ? "ยังไม่มีข้อมูล กรุณากรอกผลผลิตด้านบน" : "No entries yet. Add a harvest entry above."}
                     </TableCell>
                   </TableRow>
@@ -438,6 +492,13 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                     <p className="text-xs font-medium text-muted-foreground">{isTH ? "การนำไฟฟ้า" : "Conductivity"}</p>
                   </div>
                   <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{selectedReport.ec} <span className="text-xs text-muted-foreground font-normal">mS/cm</span></p>
+                </div>
+                <div className="space-y-1 p-3 bg-muted/30 rounded-lg border border-border">
+                   <div className="flex items-center gap-2 mb-1">
+                    <Thermometer className="w-3 h-3 text-blue-500" />
+                    <p className="text-xs font-medium text-muted-foreground">{isTH ? "อุณหภูมิ" : "Temperature"}</p>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{selectedReport.temp} <span className="text-xs text-muted-foreground font-normal">°C</span></p>
                 </div>
               </div>
               
