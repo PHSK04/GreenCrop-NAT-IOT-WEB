@@ -98,6 +98,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   const [selectedDevice, setSelectedDevice] = useState<LiveDeviceRow | null>(null);
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
+  const [exportMonth, setExportMonth] = useState("");
+  const [exportStartTime, setExportStartTime] = useState("");
+  const [exportEndTime, setExportEndTime] = useState("");
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>(["Sensor", "Actuator", "System"]);
   const [historyDateMode, setHistoryDateMode] = useState<"latest" | "all" | string>("latest");
 
@@ -312,6 +315,21 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
     return "border-border bg-muted/40 text-muted-foreground";
   };
 
+  const exportHistoryRows = useMemo(() => {
+    return telemetryHistory.filter((row) => {
+      const day = formatDateKey(row.timestamp);
+      if (!day) return false;
+      if (exportMonth && !day.startsWith(exportMonth)) return false;
+      if (exportStart && day < exportStart) return false;
+      if (exportEnd && day > exportEnd) return false;
+
+      const time = formatCompactTime(row.timestamp).slice(0, 5);
+      if (exportStartTime && time < exportStartTime) return false;
+      if (exportEndTime && time > exportEndTime) return false;
+      return true;
+    });
+  }, [exportEnd, exportEndTime, exportMonth, exportStart, exportStartTime, telemetryHistory]);
+
   const buildExportPayload = () => {
     const lines: string[] = [];
     lines.push(isTH ? "รายงานสถานะอุปกรณ์จริงจาก MQTT" : "Live MQTT Device Status Report");
@@ -319,6 +337,12 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
     lines.push(`${isTH ? "อัปเดตล่าสุด" : "Last Update"}, ${lastUpdate}`);
     if (exportStart || exportEnd) {
       lines.push(`${isTH ? "ช่วงวันที่" : "Date Range"}, ${exportStart || "-"} to ${exportEnd || "-"}`);
+    }
+    if (exportMonth) {
+      lines.push(`${isTH ? "เดือน" : "Month"}, ${exportMonth}`);
+    }
+    if (exportStartTime || exportEndTime) {
+      lines.push(`${isTH ? "ช่วงเวลา" : "Time Range"}, ${exportStartTime || "00:00"} to ${exportEndTime || "23:59"}`);
     }
     lines.push("");
     lines.push("id,name,type,category,status,value,lastUpdate");
@@ -330,7 +354,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
 
     lines.push("");
     lines.push("history_timestamp,ph,ec,temp,wls1,wls2,float_alarm,locked,pump1,pump2");
-    telemetryHistory.slice(0, 50).forEach((row) => {
+    exportHistoryRows.slice(0, 500).forEach((row) => {
       lines.push([
         row.timestamp,
         row.phValue.toFixed(2),
@@ -438,8 +462,14 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
           startDate={exportStart}
           endDate={exportEnd}
           onStartDateChange={setExportStart}
-          onEndDateChange={setExportEnd}
-          title={isTH ? "ส่งออกข้อมูลจริง" : "Export Live Data"}
+            onEndDateChange={setExportEnd}
+            month={exportMonth}
+            startTime={exportStartTime}
+            endTime={exportEndTime}
+            onMonthChange={setExportMonth}
+            onStartTimeChange={setExportStartTime}
+            onEndTimeChange={setExportEndTime}
+            title={isTH ? "ส่งออกข้อมูลจริง" : "Export Live Data"}
           description={isTH ? "ดาวน์โหลดสถานะล่าสุดและประวัติที่บันทึกจาก MQTT" : "Download current status and saved MQTT history"}
           startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
           endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
