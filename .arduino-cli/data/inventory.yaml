@@ -3,7 +3,7 @@ cache:
         arduino:
             cc/boards/v1/boards?vid-pid=0x10c4-0xea60:
                 data: '[]'
-                ts: 2026-05-20T12:32:01.203221+07:00
+                ts: 2026-05-22T03:42:14.677746+07:00
             cc/boards/v1/boards?vid-pid=0x0403-0x6001:
                 data: '[]'
                 ts: 2026-05-11T09:28:52.622605+07:00
