@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useMachine } from "../../contexts/MachineContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -25,6 +26,18 @@ interface DashboardPageProps {
   activeDeviceId?: string;
   onDeviceChange?: (deviceId: string) => void;
 }
+
+const useStablePositiveValue = (value: number) => {
+  const [stableValue, setStableValue] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (Number.isFinite(value) && value > 0) {
+      setStableValue(value);
+    }
+  }, [value]);
+
+  return stableValue;
+};
 
 const translations = {
   EN: {
@@ -144,6 +157,11 @@ export function DashboardPage({
   const activeDeviceName = activeDevice?.device_name || activeDeviceId || t.noDevice;
   const activeDeviceLocation = activeDevice?.location || "-";
   const waterFullAlarm = floatAlarm;
+  const stablePhValue = useStablePositiveValue(phValue);
+  const stableTempValue = useStablePositiveValue(tempValue);
+  const stableEcValue = useStablePositiveValue(ecValue);
+  const stablePhOk =
+    stablePhValue != null ? stablePhValue >= 6.5 && stablePhValue <= 7.5 : phOk;
 
   const formatUptime = (seconds: number) => {
     const hh = String(Math.floor(seconds / 3600)).padStart(2, "0");
@@ -491,8 +509,8 @@ export function DashboardPage({
           {[
             {
               title: t.metrics.ph.title,
-              value: phValue.toFixed(2),
-              status: phOk ? "Optimal" : "Check",
+              value: stablePhValue != null ? stablePhValue.toFixed(2) : "--",
+              status: stablePhValue != null ? (stablePhOk ? "Optimal" : "Check") : "Waiting",
               desc: t.metrics.ph.desc,
               icon: Beaker,
               color: "text-blue-500 dark:text-blue-400",
@@ -500,9 +518,9 @@ export function DashboardPage({
             },
             {
               title: t.metrics.temp.title,
-              value: tempValue.toFixed(1),
+              value: stableTempValue != null ? stableTempValue.toFixed(1) : "--",
               unit: "C",
-              status: tempValue > 0 ? "Live" : "Waiting",
+              status: stableTempValue != null ? "Live" : "Waiting",
               desc: t.metrics.temp.desc,
               icon: Thermometer,
               color: "text-cyan-600 dark:text-cyan-400",
@@ -510,9 +528,9 @@ export function DashboardPage({
             },
             {
               title: t.metrics.ec.title,
-              value: ecValue.toFixed(2),
+              value: stableEcValue != null ? stableEcValue.toFixed(2) : "--",
               unit: "mS/cm",
-              status: ecValue > 0 ? "Live" : "Waiting",
+              status: stableEcValue != null ? "Live" : "Waiting",
               desc: t.metrics.ec.desc,
               icon: Zap,
               color: "text-yellow-600 dark:text-yellow-400", 
