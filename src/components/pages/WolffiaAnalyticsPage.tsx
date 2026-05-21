@@ -29,8 +29,11 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
   const activeDeviceId = deviceId || "default";
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [exportMonth, setExportMonth] = useState("");
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
+  const [exportStartTime, setExportStartTime] = useState("");
+  const [exportEndTime, setExportEndTime] = useState("");
   const [entries, setEntries] = useState<CropYieldEntry[]>(() => readCropYieldEntries(activeDeviceId));
   const [selectedMonth, setSelectedMonth] = useState<MonthlyYieldSummary | null>(null);
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([
@@ -52,16 +55,15 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
   }, [activeDeviceId, seed]);
 
   const filteredEntries = useMemo(() => {
-    const start = exportStart ? new Date(exportStart) : null;
-    const end = exportEnd ? new Date(exportEnd) : null;
     return entries.filter((entry) => {
-      const date = new Date(entry.date);
-      if (Number.isNaN(date.getTime())) return false;
-      if (start && date < start) return false;
-      if (end && date > end) return false;
+      if (exportMonth && !entry.date.startsWith(exportMonth)) return false;
+      if (exportStart && entry.date < exportStart) return false;
+      if (exportEnd && entry.date > exportEnd) return false;
+      if (exportStartTime && entry.time < exportStartTime) return false;
+      if (exportEndTime && entry.time > exportEndTime) return false;
       return true;
     });
-  }, [entries, exportEnd, exportStart]);
+  }, [entries, exportEnd, exportEndTime, exportMonth, exportStart, exportStartTime]);
 
   const wolffiaStatsDevice = useMemo(
     () => getMonthlyYieldSummaries(filteredEntries, locale),
@@ -74,7 +76,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
     : 0;
   const avgYieldPerHarvest = filteredEntries.length ? totalYield / filteredEntries.length : 0;
   const latestEntries = useMemo(
-    () => [...filteredEntries].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8),
+    () => [...filteredEntries].sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`)).slice(0, 8),
     [filteredEntries],
   );
 
@@ -148,9 +150,9 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
 
     if (selectedDataTypes.includes("harvest")) {
       lines.push(`${isTH ? "ส่วน" : "Section"}, ${isTH ? "ประวัติเก็บเกี่ยว" : "Harvest History"}`);
-      lines.push("date,yield_g,ph,oxygen,ec,note");
+      lines.push("date,time,yield_g,ph,oxygen,ec,temp,note");
       filteredEntries.forEach((row) => {
-        lines.push(`${row.date},${row.yield},${row.ph},${row.oxygen},${row.ec},${row.note || ""}`);
+        lines.push(`${row.date},${row.time},${row.yield},${row.ph},${row.oxygen},${row.ec},${row.temp},${row.note || ""}`);
       });
       lines.push("");
     }
@@ -277,10 +279,16 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
         <ExportFiltersCard
           startDate={exportStart}
           endDate={exportEnd}
+          month={exportMonth}
+          startTime={exportStartTime}
+          endTime={exportEndTime}
           onStartDateChange={setExportStart}
           onEndDateChange={setExportEnd}
+          onMonthChange={setExportMonth}
+          onStartTimeChange={setExportStartTime}
+          onEndTimeChange={setExportEndTime}
           title={isTH ? "ตัวกรองสำหรับส่งออก" : "Export Filters"}
-          description={isTH ? "เลือกช่วงวันที่และประเภทข้อมูลเพื่อดาวน์โหลด CSV/PDF" : "Select date range and data types to download CSV/PDF"}
+          description={isTH ? "เลือกเดือน วันที่ เวลา และประเภทข้อมูลเพื่อค้นหา/ดาวน์โหลด CSV/PDF" : "Select month, date, time, and data types to search/download CSV/PDF"}
           startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
           endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
           options={dataTypeOptions}
@@ -364,7 +372,9 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
             </div>
             {wolffiaStatsDevice.length === 0 && (
               <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/30 p-4 text-center text-sm text-muted-foreground">
-                {isTH ? "ยังไม่มีข้อมูลผลผลิต กรุณากรอกที่หน้า รายงานผลผลิต" : "No harvest entries yet. Add data in Crop Reports."}
+                {entries.length
+                  ? (isTH ? "ไม่มีข้อมูลที่บันทึก" : "No saved data for this filter.")
+                  : (isTH ? "ยังไม่มีข้อมูลผลผลิต กรุณากรอกที่หน้า รายงานผลผลิต" : "No harvest entries yet. Add data in Crop Reports.")}
               </div>
             )}
           </CardContent>
@@ -440,7 +450,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                           #{log.id.slice(0, 8)}
                         </span>
                         <div className="text-[10px] text-muted-foreground mt-0.5">
-                          {new Date(log.date).toLocaleDateString(locale)}
+                          {new Date(log.date).toLocaleDateString(locale)} {log.time}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -456,7 +466,9 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                   {latestEntries.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
-                        {isTH ? "ยังไม่มีประวัติเก็บเกี่ยว" : "No harvest history yet."}
+                        {entries.length
+                          ? (isTH ? "ไม่มีข้อมูลที่บันทึก" : "No saved data for this filter.")
+                          : (isTH ? "ยังไม่มีประวัติเก็บเกี่ยว" : "No harvest history yet.")}
                       </TableCell>
                     </TableRow>
                   )}
@@ -513,6 +525,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                   <TableHeader className="bg-muted/50">
                     <TableRow className="border-border">
                       <TableHead>{isTH ? "วันที่" : "Date"}</TableHead>
+                      <TableHead>{isTH ? "เวลา" : "Time"}</TableHead>
                       <TableHead className="text-right">{isTH ? "ผลผลิต" : "Yield"}</TableHead>
                       <TableHead className="text-right">pH</TableHead>
                       <TableHead className="text-right">{isTH ? "ออกซิเจน" : "Oxygen"}</TableHead>
@@ -524,6 +537,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                     {selectedMonth.entries.map((entry) => (
                       <TableRow key={entry.id} className="border-border hover:bg-muted/50">
                         <TableCell>{new Date(entry.date).toLocaleDateString(locale)}</TableCell>
+                        <TableCell>{entry.time}</TableCell>
                         <TableCell className="text-right font-bold text-emerald-600 dark:text-emerald-400">{entry.yield} g</TableCell>
                         <TableCell className="text-right">{entry.ph}</TableCell>
                         <TableCell className="text-right">{entry.oxygen}</TableCell>
