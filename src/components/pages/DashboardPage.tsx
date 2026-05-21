@@ -11,7 +11,8 @@ import {
   Cpu,
   Clock3,
   Siren,
-  Thermometer
+  Thermometer,
+  AlertTriangle
 } from "lucide-react";
 import machineModel from "@/assets/images/machine_model.png";
 import { MetricsChart } from "../MetricsChart";
@@ -47,6 +48,9 @@ const translations = {
     noDevice: "No paired device selected",
     deviceId: "Device ID",
     location: "Location",
+    waterFull: "Water Full",
+    waterFullDesc: "Red alarm sensor is active. Pump 2 can be stopped from the web or the cabinet.",
+    stopPump2: "Stop Pump 2",
     tankLevels: "Tank Levels & Flow",
     filling: "Filling Tank",
     idle: "Idle",
@@ -83,6 +87,9 @@ const translations = {
     noDevice: "ยังไม่ได้เลือกอุปกรณ์ที่จับคู่",
     deviceId: "Device ID",
     location: "ตำแหน่ง",
+    waterFull: "น้ำเต็ม",
+    waterFullDesc: "เซ็นเซอร์ไฟแดงแจ้งเตือนน้ำเต็ม สามารถหยุดปั๊ม 2 ได้ทั้งหน้าเว็บและหน้าตู้",
+    stopPump2: "หยุดปั๊ม 2",
     tankLevels: "ระดับน้ำและการไหล",
     filling: "กำลังเติมน้ำถัง",
     idle: "ว่าง",
@@ -136,6 +143,7 @@ export function DashboardPage({
   const activeDevice = devices.find((device) => device.device_id === activeDeviceId);
   const activeDeviceName = activeDevice?.device_name || activeDeviceId || t.noDevice;
   const activeDeviceLocation = activeDevice?.location || "-";
+  const waterFullAlarm = floatAlarm;
 
   const formatUptime = (seconds: number) => {
     const hh = String(Math.floor(seconds / 3600)).padStart(2, "0");
@@ -227,6 +235,39 @@ export function DashboardPage({
             </div>
           </CardContent>
         </Card>
+
+        {waterFullAlarm && (
+          <section className="mb-6 overflow-hidden rounded-2xl border border-red-500/30 bg-red-500/10 shadow-lg shadow-red-500/10 backdrop-blur-xl md:mb-8">
+            <div className="flex flex-col gap-5 p-5 sm:p-6 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-4">
+                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-red-600 text-white shadow-lg shadow-red-500/25 sm:h-16 sm:w-16">
+                  <AlertTriangle className="h-8 w-8" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-red-700 dark:text-red-300">
+                    {language === "TH" ? "แจ้งเตือนระดับน้ำ" : "Water Level Alert"}
+                  </p>
+                  <h2 className="mt-1 text-3xl font-black text-red-700 dark:text-red-200 sm:text-4xl md:text-5xl">
+                    {t.waterFull}
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm font-medium text-red-700/85 dark:text-red-100/85 sm:text-base">
+                    {t.waterFullDesc}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row md:flex-col lg:flex-row">
+                <Button onClick={stopPump2FromWeb} variant="destructive" className="h-12 min-w-40 text-sm font-bold">
+                  <Cpu className="mr-2 h-4 w-4" />
+                  {t.stopPump2}
+                </Button>
+                <Button onClick={sendEmergencyStop} variant="outline" className="h-12 min-w-40 border-red-500/40 bg-background/70 text-red-700 hover:bg-red-500/10 dark:text-red-200">
+                  <Siren className="mr-2 h-4 w-4" />
+                  {language === "TH" ? "หยุดฉุกเฉิน" : "E-Stop"}
+                </Button>
+              </div>
+            </div>
+          </section>
+        )}
 
         <div className="mb-6 grid grid-cols-1 gap-4 md:mb-8">
           <Card className="rounded-2xl border-border/60 bg-card/70 shadow-sm backdrop-blur-sm">

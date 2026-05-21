@@ -1,4 +1,4 @@
-# GreenCrop NodeMCU MQTT Firmware
+# GreenCrop ESP32 MQTT Firmware
 
 Open `greencrop_nodemcu_mqtt.ino` with Arduino IDE, or use VS Code with the Arduino extension.
 
@@ -7,43 +7,56 @@ Open `greencrop_nodemcu_mqtt.ino` with Arduino IDE, or use VS Code with the Ardu
 This repo includes `.vscode/arduino.json` for:
 
 - Sketch: `firmware/greencrop_nodemcu_mqtt/greencrop_nodemcu_mqtt.ino`
-- Board: `NodeMCU 1.0 (ESP-12E Module)`
+- Board: `ESP32 Dev Module`
 
 In VS Code:
 
 1. Install recommended extensions when prompted.
 2. Install Arduino IDE or `arduino-cli`.
-3. Install ESP8266 board package.
+3. Install ESP32 board package.
 4. Install `PubSubClient`.
 5. Select the serial port from the Arduino extension, or edit `.vscode/arduino.json`.
 
 ## Required Arduino setup
 
-1. Install ESP8266 board package.
-2. Select `NodeMCU 1.0 (ESP-12E Module)`.
+1. Install ESP32 board package.
+2. Select `ESP32 Dev Module`.
 3. Install `PubSubClient`.
 4. Edit Wi-Fi credentials in the `.ino` file.
-5. Upload to the NodeMCU.
+5. Upload to the ESP32.
 
 ## Current control logic
 
 This firmware follows the latest wiring:
 
-- `D1`: WLS1 lower water level sensor.
-- `D6`: WLS2 upper water level sensor.
-- `GPIO3/RX`: float switch input.
-- `D2`: Start button.
-- `D5`: Stop NC button.
-- `D4`: pump 1 relay.
-- `D0`: pump 2 relay + yellow light.
-- `D7`: green light.
-- `D3`: red light.
-- `D8`: ISD1820 sound trigger.
+- `GPIO13`: WLS1 lower water level sensor.
+- `GPIO14`: WLS2 upper water level sensor.
+- `GPIO25`: float switch input.
+- `GPIO27`: Start button.
+- `GPIO26`: Stop NC button.
+- `GPIO33`: pump 1 relay.
+- `GPIO5`: pump 2 relay + yellow light.
+- `GPIO18`: green light.
+- `GPIO19`: red light.
+- `GPIO23`: ISD1820 sound trigger.
+
+Pump 1 behavior:
+
+- Pump 1 turns on when the board is not locked, WLS1 detects water, and WLS2 is not full.
+- pH is still published as telemetry, but it does not block pump 1 by default because an uncalibrated pH probe can keep pump 1 off.
+- To make pH block pump 1 again after calibration, set `PUMP1_REQUIRES_PH_OK` to `true` in the firmware.
 
 Commands from the web:
 
 - `START`: starts pump 2 if the board is not locked.
+- `PUMP2_OFF`: stops pump 2 only, without locking the board.
 - `STOP`: stops all outputs and locks the board.
+- `RESET_UPTIME`: resets the pump 2 uptime counter.
+
+Stop / lock behavior:
+
+- The physical cabinet `STOP` button and web `STOP` command can both stop all outputs and lock the board.
+- The web `PUMP2_OFF` command stops only pump 2 and keeps the automatic logic running.
 
 Unlock condition:
 
@@ -51,9 +64,8 @@ Unlock condition:
 
 Important hardware note:
 
-- `GPIO3/RX` is used as the float switch input, so this firmware does not use `Serial.begin()` or Serial Monitor.
-- `D3`, `D4`, and `D8` are ESP8266 boot-sensitive pins.
-- If upload or boot fails, disconnect relays/switches from boot-sensitive pins during upload or move those signals to safer pins.
+- Relay outputs are Active LOW: `LOW` = ON, `HIGH` = OFF.
+- Serial Monitor is enabled at `9600` baud and prints WLS, pH, Pump1, Pump2, and the Pump1 block reason.
 
 ## MQTT topics
 
@@ -69,7 +81,6 @@ const char* DEVICE_ID = "GREENCROP01";
 const char* PAIRING_CODE = "123456";
 ```
 
-Because `GPIO3/RX` is used by the float switch, the board does not print these values in Serial Monitor.
 Use the constants in the `.ino` file when pairing from the web.
 
 After a successful web pairing, the web app publishes a pairing acknowledgement to:
@@ -86,4 +97,10 @@ greencrop/devices/<device_id>/pairing/status
 
 ## Serial Monitor
 
-Do not use Serial Monitor with this wiring because `GPIO3/RX` is used by the float switch.
+Open Serial Monitor at `9600` baud. Check `Pump1 Block`:
+
+- `READY`: pump 1 should be ON.
+- `LOCKED`: system is locked.
+- `WLS2_FULL`: tank 1 is already full.
+- `WLS1_DRY`: lower water sensor is not active.
+- `PH_OUT_OF_RANGE`: only appears if `PUMP1_REQUIRES_PH_OK` is set to `true`.
