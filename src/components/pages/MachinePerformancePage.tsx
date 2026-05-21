@@ -238,6 +238,7 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
           onEndDateChange={setExportEnd}
           title={isTH ? "ตัวกรองสำหรับส่งออก" : "Export Filters"}
           description={isTH ? "เลือกช่วงวันที่และประเภทข้อมูลเพื่อดาวน์โหลด CSV/PDF" : "Select date range and data types to download CSV/PDF"}
+          locale={isTH ? "TH" : "EN"}
           startDateLabel={isTH ? "วันที่เริ่มต้น" : "Start Date"}
           endDateLabel={isTH ? "วันที่สิ้นสุด" : "End Date"}
           options={dataTypeOptions}
