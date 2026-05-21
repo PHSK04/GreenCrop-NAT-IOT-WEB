@@ -72,6 +72,7 @@ const HISTORY_SAMPLE_INTERVAL_MS = 1000;
 
 const getTelemetryHistoryKey = (deviceId: string) =>
   `greencrop.telemetry.history.${safeTopicSegment(deviceId || 'default')}`;
+const TELEMETRY_HISTORY_PREFIX = 'greencrop.telemetry.history.';
 
 const safeTopicSegment = (value: string) =>
   value.trim().replace(/[^A-Za-z0-9_-]/g, '');
@@ -167,6 +168,50 @@ const isEmptyTelemetrySnapshot = (snapshot: TelemetrySnapshot) =>
   !snapshot.redOn &&
   !snapshot.isOn;
 
+const normalizeTelemetrySnapshot = (raw: any): TelemetrySnapshot | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const timestamp = typeof raw.timestamp === 'string' && raw.timestamp
+    ? raw.timestamp
+    : typeof raw.created_at === 'string' && raw.created_at
+      ? raw.created_at
+      : typeof raw.createdAt === 'string' && raw.createdAt
+        ? raw.createdAt
+        : '';
+  if (!timestamp || !Number.isFinite(Date.parse(timestamp))) return null;
+
+  return {
+    timestamp,
+    deviceId: String(raw.deviceId || raw.device_id || 'UNKNOWN'),
+    phValue: asNumber(raw.phValue ?? raw.ph_value),
+    ecValue: asNumber(raw.ecValue ?? raw.ec_value),
+    tempValue: asNumber(raw.tempValue ?? raw.temp_c),
+    wls1: asBool(raw.wls1),
+    wls2: asBool(raw.wls2),
+    floatAlarm: asBool(raw.floatAlarm ?? raw.float_alarm),
+    locked: asBool(raw.locked),
+    pump1On: asBool(raw.pump1On ?? raw.pump1_on),
+    pump2On: asBool(raw.pump2On ?? raw.pump2_on),
+    greenOn: asBool(raw.greenOn ?? raw.green_on),
+    redOn: asBool(raw.redOn ?? raw.red_on),
+    isOn: asBool(raw.isOn ?? raw.is_on),
+  };
+};
+
+const telemetryFingerprint = (snapshot: TelemetrySnapshot) =>
+  [
+    snapshot.timestamp,
+    snapshot.deviceId,
+    snapshot.phValue,
+    snapshot.ecValue,
+    snapshot.tempValue,
+    snapshot.wls1,
+    snapshot.wls2,
+    snapshot.floatAlarm,
+    snapshot.locked,
+    snapshot.pump1On,
+    snapshot.pump2On,
+  ].join('|');
+
 const recordSortKey = (item: any) => {
   const ts = parseServerTimestampMs(item?.timestamp);
   if (ts != null) return ts;
@@ -228,11 +273,37 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
   const loadTelemetryHistory = useCallback((deviceId: string) => {
     if (typeof window === 'undefined') return [];
+    const requestedDevice = safeTopicSegment(deviceId || '');
+    const fallbackDevices = new Set(['', 'UNKNOWN', 'default', requestedDevice]);
+    const merged = new Map<string, TelemetrySnapshot>();
+
+    const addRows = (rows: unknown) => {
+      if (!Array.isArray(rows)) return;
+      rows.forEach((row) => {
+        const snapshot = normalizeTelemetrySnapshot(row);
+        if (!snapshot) return;
+        const snapshotDevice = safeTopicSegment(snapshot.deviceId || '');
+        const belongsToRequestedDevice =
+          !requestedDevice ||
+          snapshotDevice === requestedDevice ||
+          fallbackDevices.has(snapshotDevice);
+        if (!belongsToRequestedDevice) return;
+        merged.set(telemetryFingerprint(snapshot), snapshot);
+      });
+    };
+
     try {
-      const raw = window.localStorage.getItem(getTelemetryHistoryKey(deviceId));
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed as TelemetrySnapshot[] : [];
+      for (let index = 0; index < window.localStorage.length; index += 1) {
+        const key = window.localStorage.key(index);
+        if (!key?.startsWith(TELEMETRY_HISTORY_PREFIX)) continue;
+        const raw = window.localStorage.getItem(key);
+        if (!raw) continue;
+        addRows(JSON.parse(raw));
+      }
+
+      return Array.from(merged.values())
+        .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+        .slice(0, HISTORY_LIMIT);
     } catch {
       return [];
     }
@@ -282,10 +353,38 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     lastHistorySavedAtMsRef.current = nowMs;
 
     setTelemetryHistory((prev) => {
-      const next = [snapshot, ...prev].slice(0, HISTORY_LIMIT);
+      const merged = new Map<string, TelemetrySnapshot>();
+      [snapshot, ...prev].forEach((row) => merged.set(telemetryFingerprint(row), row));
+      const next = Array.from(merged.values())
+        .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+        .slice(0, HISTORY_LIMIT);
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(getTelemetryHistoryKey(snapshot.deviceId), JSON.stringify(next));
       }
+      return next;
+    });
+  }, []);
+
+  const persistTelemetrySnapshots = useCallback((snapshots: TelemetrySnapshot[]) => {
+    if (!snapshots.length) return;
+    setTelemetryHistory((prev) => {
+      const merged = new Map<string, TelemetrySnapshot>();
+      [...snapshots, ...prev].forEach((row) => merged.set(telemetryFingerprint(row), row));
+      const next = Array.from(merged.values())
+        .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+        .slice(0, HISTORY_LIMIT);
+
+      if (typeof window !== 'undefined') {
+        const groups = new Map<string, TelemetrySnapshot[]>();
+        next.forEach((row) => {
+          const key = row.deviceId || 'UNKNOWN';
+          groups.set(key, [...(groups.get(key) || []), row]);
+        });
+        groups.forEach((rows, key) => {
+          window.localStorage.setItem(getTelemetryHistoryKey(key), JSON.stringify(rows.slice(0, HISTORY_LIMIT)));
+        });
+      }
+
       return next;
     });
   }, []);
@@ -363,6 +462,11 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
       const dataList = await response.json();
       if (!Array.isArray(dataList) || dataList.length === 0) return;
+
+      const apiHistory = dataList
+        .map(normalizeTelemetrySnapshot)
+        .filter((snapshot): snapshot is TelemetrySnapshot => Boolean(snapshot && !isEmptyTelemetrySnapshot(snapshot)));
+      persistTelemetrySnapshots(apiHistory);
 
       const latest = [...dataList].sort((a, b) => recordSortKey(b) - recordSortKey(a))[0];
       if (!latest) return;
@@ -496,7 +600,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('API Polling Error:', err);
     }
-  }, [pendingResetUntilMs, ignoreApiStateUntilMs, pendingIsOnAck, isOn, lastLocalCommandAtMs, getCurrentUptimeSeconds, carryTelemetrySnapshot, persistTelemetrySnapshot]);
+  }, [pendingResetUntilMs, ignoreApiStateUntilMs, pendingIsOnAck, isOn, lastLocalCommandAtMs, getCurrentUptimeSeconds, carryTelemetrySnapshot, persistTelemetrySnapshot, persistTelemetrySnapshots]);
 
   const syncAfterCommand = async () => {
     await fetchApiData();
