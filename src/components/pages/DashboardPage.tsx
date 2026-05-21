@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMachine } from "../../contexts/MachineContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -153,10 +154,12 @@ export function DashboardPage({
     .map((isActive, idx) => (isActive ? `P${idx + 1}` : null))
     .filter(Boolean)
     .join(", ");
+  const [dismissedWaterFullAlarm, setDismissedWaterFullAlarm] = useState(false);
   const activeDevice = devices.find((device) => device.device_id === activeDeviceId);
   const activeDeviceName = activeDevice?.device_name || activeDeviceId || t.noDevice;
   const activeDeviceLocation = activeDevice?.location || "-";
-  const waterFullAlarm = floatAlarm;
+  const waterFullAlarm = wls2 || floatAlarm;
+  const showWaterFullAlarm = waterFullAlarm && !dismissedWaterFullAlarm;
   const stablePhValue = useStablePositiveValue(phValue);
   const stableTempValue = useStablePositiveValue(tempValue);
   const stableEcValue = useStablePositiveValue(ecValue);
@@ -170,8 +173,133 @@ export function DashboardPage({
     return hh + ":" + mm + ":" + ss;
   };
 
+  useEffect(() => {
+    if (!waterFullAlarm) {
+      setDismissedWaterFullAlarm(false);
+    }
+  }, [waterFullAlarm]);
+
+  const handleStopWaterFullAlarm = () => {
+    setDismissedWaterFullAlarm(true);
+    stopPump2FromWeb();
+  };
+
+  const handleEmergencyWaterFullAlarm = () => {
+    setDismissedWaterFullAlarm(true);
+    sendEmergencyStop();
+  };
+
+  const waterFullAlarmOverlay =
+    showWaterFullAlarm && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 99999,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 24,
+              background: "rgba(2, 6, 23, 0.68)",
+              backdropFilter: "blur(6px)",
+            }}
+          >
+            <div
+              className="dashboard-water-alarm-stripe pointer-events-none absolute inset-x-0 top-0 h-20 bg-[repeating-linear-gradient(115deg,#facc15_0_40px,#020617_40px_80px)]"
+              style={{ animation: "dashboardSignalBlink 0.75s ease-in-out infinite" }}
+            />
+            <div
+              className="dashboard-water-alarm-stripe pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-[repeating-linear-gradient(115deg,#facc15_0_40px,#020617_40px_80px)]"
+              style={{ animation: "dashboardSignalBlink 0.75s ease-in-out infinite" }}
+            />
+
+            <div
+              className="dashboard-water-alarm-card max-h-[calc(100vh-8rem)] w-[min(96vw,1180px)] overflow-hidden rounded-[36px] border-4 border-yellow-400 bg-white/98 text-center shadow-2xl"
+              style={{ animation: "dashboardAlarmPulse 0.95s ease-in-out infinite" }}
+              role="alert"
+              aria-live="assertive"
+            >
+              <div className="bg-[repeating-linear-gradient(115deg,#facc15_0_34px,#020617_34px_68px)] px-6 py-6" />
+              <div className="px-6 py-12 sm:px-14 sm:py-16">
+                <div
+                  className="dashboard-water-alarm-signal mx-auto grid h-32 w-32 place-items-center rounded-[32px] border-4 border-yellow-400 bg-yellow-300 shadow-[0_20px_45px_rgba(234,179,8,0.32)]"
+                  style={{ animation: "dashboardSignalBlink 0.72s ease-in-out infinite" }}
+                >
+                  <AlertTriangle className="h-20 w-20 text-slate-950" />
+                </div>
+                <p className="mt-8 text-base font-black uppercase tracking-[0.24em] text-red-600">
+                  {language === "TH" ? "สัญญาณเตือนระดับน้ำ" : "Water Level Alarm"}
+                </p>
+                <h2 className="mt-3 text-6xl font-black leading-none text-slate-950 sm:text-8xl md:text-9xl">
+                  {t.waterFull}
+                </h2>
+                <p className="mx-auto mt-7 max-w-3xl text-xl font-bold leading-9 text-slate-800 sm:text-3xl">
+                  {language === "TH"
+                    ? "เซ็นเซอร์แจ้งว่าน้ำเต็ม กรุณาหยุดปั๊มน้ำทันที"
+                    : "The sensor reports water full. Stop the water pump immediately."}
+                </p>
+                <p className="mx-auto mt-3 max-w-3xl text-sm font-medium text-slate-500 sm:text-lg">
+                  {language === "TH"
+                    ? "กดหยุดแล้วหน้าต่างนี้จะหายไป และเว็บจะส่งคำสั่งหยุดพร้อมรับทราบ alarm ไปที่ตู้"
+                    : "After stopping, this alert closes and sends stop plus alarm acknowledgement to the cabinet."}
+                </p>
+                <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
+                  <Button
+                    onClick={handleStopWaterFullAlarm}
+                    variant="destructive"
+                    className="h-16 min-w-72 text-xl font-black shadow-xl shadow-red-900/20"
+                  >
+                    <Cpu className="mr-2 h-6 w-6" />
+                    {language === "TH" ? "หยุดปั๊มน้ำ" : "Stop Water Pump"}
+                  </Button>
+                  <Button
+                    onClick={handleEmergencyWaterFullAlarm}
+                    variant="outline"
+                    className="h-16 min-w-72 border-red-500/50 bg-red-50 text-xl font-black text-red-700 hover:bg-red-100"
+                  >
+                    <Siren className="mr-2 h-6 w-6" />
+                    {language === "TH" ? "หยุดฉุกเฉิน" : "Emergency Stop"}
+                  </Button>
+                </div>
+              </div>
+              <div className="bg-[repeating-linear-gradient(115deg,#facc15_0_34px,#020617_34px_68px)] px-6 py-6" />
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
     <>
+      <style>{`
+        @keyframes dashboardAlarmPulse {
+          0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45), 0 28px 90px rgba(127, 29, 29, 0.34);
+          }
+          50% {
+            transform: scale(1.018);
+            box-shadow: 0 0 0 16px rgba(239, 68, 68, 0.08), 0 38px 120px rgba(127, 29, 29, 0.48);
+          }
+        }
+
+        @keyframes dashboardSignalBlink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.42; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .dashboard-water-alarm-card,
+          .dashboard-water-alarm-signal,
+          .dashboard-water-alarm-stripe {
+            animation: none !important;
+          }
+        }
+      `}</style>
+
+      {waterFullAlarmOverlay}
+
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-border/60 bg-card/75 px-4 py-4 backdrop-blur-xl md:px-8 md:py-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
@@ -253,39 +381,6 @@ export function DashboardPage({
             </div>
           </CardContent>
         </Card>
-
-        {waterFullAlarm && (
-          <section className="mb-6 overflow-hidden rounded-2xl border border-red-500/30 bg-red-500/10 shadow-lg shadow-red-500/10 backdrop-blur-xl md:mb-8">
-            <div className="flex flex-col gap-5 p-5 sm:p-6 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-start gap-4">
-                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-red-600 text-white shadow-lg shadow-red-500/25 sm:h-16 sm:w-16">
-                  <AlertTriangle className="h-8 w-8" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-red-700 dark:text-red-300">
-                    {language === "TH" ? "แจ้งเตือนระดับน้ำ" : "Water Level Alert"}
-                  </p>
-                  <h2 className="mt-1 text-3xl font-black text-red-700 dark:text-red-200 sm:text-4xl md:text-5xl">
-                    {t.waterFull}
-                  </h2>
-                  <p className="mt-2 max-w-2xl text-sm font-medium text-red-700/85 dark:text-red-100/85 sm:text-base">
-                    {t.waterFullDesc}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row md:flex-col lg:flex-row">
-                <Button onClick={stopPump2FromWeb} variant="destructive" className="h-12 min-w-40 text-sm font-bold">
-                  <Cpu className="mr-2 h-4 w-4" />
-                  {t.stopPump2}
-                </Button>
-                <Button onClick={sendEmergencyStop} variant="outline" className="h-12 min-w-40 border-red-500/40 bg-background/70 text-red-700 hover:bg-red-500/10 dark:text-red-200">
-                  <Siren className="mr-2 h-4 w-4" />
-                  {language === "TH" ? "หยุดฉุกเฉิน" : "E-Stop"}
-                </Button>
-              </div>
-            </div>
-          </section>
-        )}
 
         <div className="mb-6 grid grid-cols-1 gap-4 md:mb-8">
           <Card className="rounded-2xl border-border/60 bg-card/70 shadow-sm backdrop-blur-sm">
