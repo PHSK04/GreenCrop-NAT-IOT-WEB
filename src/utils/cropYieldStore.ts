@@ -2,6 +2,7 @@ export type CropYieldEntry = {
   id: string;
   deviceId: string;
   date: string;
+  time: string;
   yield: number;
   ph: number;
   oxygen: number;
@@ -36,17 +37,23 @@ const safeNumber = (value: unknown, fallback = 0) => {
 
 const normalizeEntry = (entry: any): CropYieldEntry | null => {
   if (!entry || typeof entry !== "object" || !entry.date) return null;
+  const createdAt = String(entry.createdAt || new Date().toISOString());
+  const createdDate = new Date(createdAt);
+  const fallbackTime = Number.isNaN(createdDate.getTime())
+    ? "00:00"
+    : `${String(createdDate.getHours()).padStart(2, "0")}:${String(createdDate.getMinutes()).padStart(2, "0")}`;
   return {
     id: String(entry.id || `${entry.date}-${Date.now()}`),
     deviceId: String(entry.deviceId || ""),
     date: String(entry.date),
+    time: String(entry.time || fallbackTime),
     yield: safeNumber(entry.yield),
     ph: safeNumber(entry.ph, 7),
     oxygen: safeNumber(entry.oxygen, 0),
     ec: safeNumber(entry.ec, 0),
     temp: safeNumber(entry.temp ?? entry.tempValue ?? entry.temperature, 0),
     note: entry.note ? String(entry.note) : "",
-    createdAt: String(entry.createdAt || new Date().toISOString()),
+    createdAt,
   };
 };
 
@@ -61,7 +68,7 @@ export const readCropYieldEntries = (deviceId?: string): CropYieldEntry[] => {
       : [];
     return entries
       .filter((entry) => !deviceId || entry.deviceId === deviceId)
-      .sort((a, b) => b.date.localeCompare(a.date));
+      .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
   } catch {
     return [];
   }
@@ -76,7 +83,7 @@ export const writeCropYieldEntries = (entries: CropYieldEntry[]) => {
 export const addCropYieldEntry = (entry: Omit<CropYieldEntry, "id" | "createdAt">) => {
   const nextEntry: CropYieldEntry = {
     ...entry,
-    id: crypto?.randomUUID?.() || `${entry.deviceId}-${entry.date}-${Date.now()}`,
+    id: crypto?.randomUUID?.() || `${entry.deviceId}-${entry.date}-${entry.time}-${Date.now()}`,
     createdAt: new Date().toISOString(),
   };
   writeCropYieldEntries([nextEntry, ...readCropYieldEntries()]);
