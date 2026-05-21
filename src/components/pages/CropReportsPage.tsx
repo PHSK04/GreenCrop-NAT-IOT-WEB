@@ -11,6 +11,7 @@ import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
 import { MinimalDatePicker } from "../ui/minimal-date-picker";
+import { MinimalMonthPicker } from "../ui/minimal-month-picker";
 import { MinimalTimePicker } from "../ui/minimal-time-picker";
 import {
   addCropYieldEntry,
@@ -404,6 +405,79 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+              <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {isTH ? "ค้นหาข้อมูลย้อนหลัง" : "Historical Search"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isTH ? "เลือกวัน เดือน ปี และเวลาเพื่อกรองรายการในตารางนี้" : "Filter this table by month, date, and time."}
+                  </p>
+                </div>
+                <Badge variant="outline" className="w-fit border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                  {resultSummary}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "เดือน/ปี" : "Month / Year"}</p>
+                  <MinimalMonthPicker
+                    value={selectedMonth}
+                    onChange={setSelectedMonth}
+                    ariaLabel={isTH ? "เลือกเดือนที่ต้องการค้นหา" : "Select search month"}
+                    locale={isTH ? "TH" : "EN"}
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "วันที่เริ่มต้น" : "Start Date"}</p>
+                  <MinimalDatePicker
+                    value={startDate}
+                    onChange={setStartDate}
+                    ariaLabel={isTH ? "เลือกวันที่เริ่มต้น" : "Select start date"}
+                    locale={isTH ? "TH" : "EN"}
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "วันที่สิ้นสุด" : "End Date"}</p>
+                  <MinimalDatePicker
+                    value={endDate}
+                    onChange={setEndDate}
+                    ariaLabel={isTH ? "เลือกวันที่สิ้นสุด" : "Select end date"}
+                    locale={isTH ? "TH" : "EN"}
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "เวลาเริ่มต้น" : "Start Time"}</p>
+                  <MinimalTimePicker
+                    value={startTime}
+                    onChange={setStartTime}
+                    ariaLabel={isTH ? "เลือกเวลาเริ่มต้น" : "Select start time"}
+                    locale={isTH ? "TH" : "EN"}
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "เวลาสิ้นสุด" : "End Time"}</p>
+                  <div className="flex gap-2">
+                    <MinimalTimePicker
+                      value={endTime}
+                      onChange={setEndTime}
+                      ariaLabel={isTH ? "เลือกเวลาสิ้นสุด" : "Select end time"}
+                      locale={isTH ? "TH" : "EN"}
+                      className="min-w-0 flex-1"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-10 shrink-0 border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+                      onClick={handleClearHistoryFilters}
+                    >
+                      {isTH ? "ล้าง" : "Clear"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-muted/50">
