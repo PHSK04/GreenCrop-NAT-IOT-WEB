@@ -50,7 +50,7 @@ Commands from the web:
 
 - `START`: starts pump 2 if the board is not locked.
 - `PUMP2_OFF`: stops pump 2 only, without locking the board.
-- `ACK_ALARM` or `SILENCE_ALARM`: acknowledges the cabinet alarm, stops pump 2, and mutes cabinet indicator/sound until WLS2 and float return to normal or a new start command is sent.
+- `ACK_ALARM` or `SILENCE_ALARM`: acknowledges the cabinet red alarm, stops pump 2, and mutes the red indicator/sound until the float alarm returns to normal or a new start command is sent. WLS2/green light is treated as ready/available water, not an alarm.
 - `STOP`: stops all outputs and locks the board.
 - `RESET_UPTIME`: resets the pump 2 uptime counter.
 
