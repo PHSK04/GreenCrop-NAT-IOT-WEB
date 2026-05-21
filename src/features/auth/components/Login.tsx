@@ -28,6 +28,7 @@ import {
 import { ModeToggle } from "@/components/mode-toggle";
 import { useAuth } from "../contexts/AuthContext";
 import appLogoGreen from "@/assets/images/3_transparent_logo_green.png";
+import loginBg from "@/assets/images/login_bg.png";
 
 import { SocialAuth } from "./SocialAuth";
 
@@ -89,21 +90,11 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#f4f7f1] text-slate-900">
+    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-900">
       <style>{`
-        @keyframes softFloat {
-          0% { transform: translate3d(0, 0, 0); }
-          50% { transform: translate3d(0, -14px, 0); }
-          100% { transform: translate3d(0, 0, 0); }
-        }
-
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(18px); }
           to { opacity: 1; transform: translateY(0); }
-        }
-
-        .soft-float {
-          animation: softFloat 14s ease-in-out infinite;
         }
 
         .fade-up {
@@ -111,44 +102,27 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .soft-float,
           .fade-up {
             animation: none !important;
           }
         }
       `}</style>
 
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,#fbfcf8_0%,#f0f5ee_58%,#edf2ea_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(167,243,208,0.22),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(187,247,208,0.16),transparent_28%)]" />
       <div
-        className="absolute inset-0 opacity-[0.045]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(15,23,42,0.9) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.9) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-        }}
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url(${loginBg})` }}
       />
-      <div className="soft-float absolute left-[-8%] top-[10%] h-72 w-72 rounded-full bg-emerald-200/20 blur-3xl" />
-      <div className="soft-float absolute bottom-[-8%] right-[-6%] h-80 w-80 rounded-full bg-lime-100/30 blur-3xl [animation-delay:-7s]" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.76)_46%,rgba(241,245,249,0.88)_46%,rgba(248,250,252,0.96)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,185,129,0.12),transparent_32%,rgba(37,99,235,0.12))]" />
 
-      <div className="relative z-10 min-h-screen px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-        <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-[1240px] overflow-hidden rounded-[2rem] border border-white/70 bg-white/82 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur-xl lg:min-h-[calc(100vh-4rem)]">
-          <section className="relative hidden w-[54%] overflow-hidden border-r border-slate-200/70 lg:flex">
-            <div className="absolute inset-0 bg-[linear-gradient(160deg,rgba(15,23,42,0.96)_0%,rgba(20,43,35,0.94)_52%,rgba(33,77,57,0.88)_100%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(110,231,183,0.18),transparent_20%),radial-gradient(circle_at_80%_24%,rgba(255,255,255,0.08),transparent_20%),radial-gradient(circle_at_70%_78%,rgba(134,239,172,0.16),transparent_22%)]" />
-            <div
-              className="absolute inset-0 opacity-[0.08]"
-              style={{
-                backgroundImage:
-                  "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
-                backgroundSize: "52px 52px",
-              }}
-            />
-
+      <div className="relative z-10 min-h-screen px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
+        <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1280px] overflow-hidden rounded-[28px] border border-white/18 bg-white/10 shadow-[0_30px_90px_rgba(2,6,23,0.34)] backdrop-blur-md lg:min-h-[calc(100vh-3rem)]">
+          <section className="relative hidden w-[56%] overflow-hidden lg:flex">
+            <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(2,6,23,0.90)_0%,rgba(15,23,42,0.70)_62%,rgba(15,118,110,0.18)_100%)]" />
             <div className="relative z-10 flex w-full flex-col justify-between p-8 xl:p-10">
               <div className="flex items-center justify-between">
-                <div className="inline-flex items-center gap-3 rounded-full border border-white/12 bg-white/8 py-2 pl-2 pr-5 backdrop-blur">
-                  <div className="grid h-12 w-12 place-items-center rounded-full bg-white/92 shadow-sm">
+                <div className="inline-flex items-center gap-3 rounded-2xl border border-white/14 bg-white/10 py-2 pl-2 pr-5 backdrop-blur">
+                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-white/95 shadow-sm">
                     <img src={appLogoGreen} alt="GreenCrop NATIOT logo" className="h-9 w-9 object-contain" />
                   </div>
                   <div>
@@ -159,22 +133,22 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                   </div>
                 </div>
 
-                <div className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
+                <div className="rounded-full border border-emerald-300/24 bg-emerald-400/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
                   Secure Access
                 </div>
               </div>
 
-              <div className="fade-up max-w-2xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-200">
+              <div className="fade-up max-w-2xl pb-6">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-200">
                   <Leaf className="h-3.5 w-3.5 text-emerald-300" />
                   Professional IoT Operations
                 </div>
-                <h1 className="mt-6 max-w-xl font-['Montserrat'] text-5xl font-semibold leading-[1.05] tracking-[-0.05em] text-white xl:text-6xl">
-                  Formal access to your modern farm command center.
+                <h1 className="mt-6 max-w-xl font-['Montserrat'] text-5xl font-semibold leading-[1.04] text-white xl:text-6xl">
+                  Command your farm from one secure console.
                 </h1>
                 <p className="mt-6 max-w-xl text-base leading-8 text-slate-300">
-                  Monitor crop systems, tank levels, machine performance, and live telemetry through a clean
-                  and secure interface built for day-to-day operations.
+                  Monitor crops, tanks, devices, and machine performance through a focused control room built
+                  for daily operation, not decoration.
                 </p>
               </div>
 
@@ -182,7 +156,7 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
                 {platformSignals.map(({ icon: Icon, label, value, detail }, index) => (
                   <div
                     key={label}
-                    className="fade-up rounded-[1.6rem] border border-white/10 bg-white/8 p-5 backdrop-blur-sm"
+                    className="fade-up rounded-2xl border border-white/12 bg-white/10 p-5 backdrop-blur-sm"
                     style={{ animationDelay: `${160 + index * 110}ms` }}
                   >
                     <div className="flex items-center justify-between">
@@ -202,16 +176,16 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
             </div>
           </section>
 
-          <section className="relative flex w-full flex-1 items-center justify-center px-4 py-8 sm:px-6 lg:w-[46%] lg:px-10 xl:px-12">
+          <section className="relative flex w-full flex-1 items-center justify-center bg-slate-50/96 px-4 py-8 sm:px-6 lg:w-[44%] lg:px-10 xl:px-12">
             <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
               <ModeToggle />
             </div>
 
             <div className="fade-up relative z-10 w-full max-w-[460px]">
-              <div className="rounded-[1.9rem] border border-slate-200/90 bg-white/92 p-5 shadow-[0_20px_55px_rgba(15,23,42,0.08)] backdrop-blur sm:p-8">
+              <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_22px_60px_rgba(15,23,42,0.12)] sm:p-8">
                 <div className="lg:hidden">
-                  <div className="inline-flex items-center gap-3 rounded-full border border-emerald-100 bg-emerald-50 py-2 pl-2 pr-4">
-                    <div className="grid h-11 w-11 place-items-center rounded-full bg-white shadow-sm">
+                  <div className="inline-flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 py-2 pl-2 pr-4">
+                    <div className="grid h-11 w-11 place-items-center rounded-xl bg-white shadow-sm">
                       <img src={appLogoGreen} alt="GreenCrop NATIOT logo" className="h-8 w-8 object-contain" />
                     </div>
                     <div className="text-left">
