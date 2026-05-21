@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MinimalDatePicker } from "@/components/ui/minimal-date-picker";
-import { Input } from "@/components/ui/input";
+import { MinimalMonthPicker } from "@/components/ui/minimal-month-picker";
+import { MinimalTimePicker } from "@/components/ui/minimal-time-picker";
 import { Download, FileText } from "lucide-react";
 
 type ExportFilterOption = {
@@ -79,17 +80,16 @@ export function ExportFiltersCard({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground">เดือน</label>
-            <Input
-              aria-label="Export month"
-              type="month"
+            <MinimalMonthPicker
+              ariaLabel="Export month"
               value={selectedMonth}
-              onChange={(event) => setMonth(event.target.value)}
+              onChange={setMonth}
             />
           </div>
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground">{startDateLabel}</label>
             <MinimalDatePicker
-              aria-label="Export start date"
+              ariaLabel="Export start date"
               value={startDate}
               onChange={onStartDateChange}
             />
@@ -97,7 +97,7 @@ export function ExportFiltersCard({
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground">{endDateLabel}</label>
             <MinimalDatePicker
-              aria-label="Export end date"
+              ariaLabel="Export end date"
               value={endDate}
               onChange={onEndDateChange}
             />
@@ -105,20 +105,18 @@ export function ExportFiltersCard({
           <div className="grid grid-cols-2 gap-2 md:col-span-4">
             <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground">เวลาเริ่มต้น</label>
-              <Input
-                aria-label="Export start time"
-                type="time"
+              <MinimalTimePicker
+                ariaLabel="Export start time"
                 value={selectedStartTime}
-                onChange={(event) => setStartTime(event.target.value)}
+                onChange={setStartTime}
               />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground">เวลาสิ้นสุด</label>
-              <Input
-                aria-label="Export end time"
-                type="time"
+              <MinimalTimePicker
+                ariaLabel="Export end time"
                 value={selectedEndTime}
-                onChange={(event) => setEndTime(event.target.value)}
+                onChange={setEndTime}
               />
             </div>
           </div>

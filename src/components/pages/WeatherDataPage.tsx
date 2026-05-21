@@ -10,7 +10,8 @@ import { useTheme } from "next-themes";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
 import { seededNumber } from "@/utils/deviceData";
 import { useMachine } from "@/contexts/MachineContext";
-import { Input } from "../ui/input";
+import { MinimalDatePicker } from "../ui/minimal-date-picker";
+import { MinimalMonthPicker } from "../ui/minimal-month-picker";
 
 // Mock Data: 24h Water Temperature Trends
 const tempHistory = [
@@ -192,9 +193,9 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
             </div>
           </div>
           <div className="grid w-full max-w-2xl gap-2 sm:grid-cols-3">
-            <Input aria-label="Analytics month" type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} />
-            <Input aria-label="Analytics start date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-            <Input aria-label="Analytics end date" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+            <MinimalMonthPicker ariaLabel="Analytics month" value={selectedMonth} onChange={setSelectedMonth} locale={isTH ? "TH" : "EN"} />
+            <MinimalDatePicker ariaLabel="Analytics start date" value={startDate} onChange={setStartDate} locale={isTH ? "TH" : "EN"} />
+            <MinimalDatePicker ariaLabel="Analytics end date" value={endDate} onChange={setEndDate} locale={isTH ? "TH" : "EN"} />
             <Button variant="outline" className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground sm:col-span-3">
               <FileText className="w-4 h-4" />
               {isTH ? "ส่งออกข้อมูลบันทึก" : "Export Data Logs"}

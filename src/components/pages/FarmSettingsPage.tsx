@@ -5,6 +5,7 @@ import { Badge } from "../ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Switch } from "../ui/switch";
 import { Input } from "../ui/input";
+import { MinimalTimePicker } from "../ui/minimal-time-picker";
 import { Label } from "../ui/label";
 import { Slider } from "../ui/slider";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
@@ -80,6 +81,8 @@ export function FarmSettingsPage({
   const [editLocation, setEditLocation] = useState("");
   const [markPrimary, setMarkPrimary] = useState(false);
   const [savingDevice, setSavingDevice] = useState(false);
+  const [lightStartTime, setLightStartTime] = useState("06:00");
+  const [lightEndTime, setLightEndTime] = useState("18:00");
 
   const openEditDevice = (device: AdminDbDeviceRow) => {
     setEditingDevice(device);
@@ -178,9 +181,21 @@ export function FarmSettingsPage({
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                       <Input type="time" defaultValue="06:00" className="w-32 bg-background border-input text-foreground" />
+                       <MinimalTimePicker
+                         ariaLabel="Light cycle start time"
+                         value={lightStartTime}
+                         onChange={setLightStartTime}
+                         locale={isTH ? "TH" : "EN"}
+                         className="w-32"
+                       />
                        <span className="text-muted-foreground">to</span>
-                       <Input type="time" defaultValue="18:00" className="w-32 bg-background border-input text-foreground" />
+                       <MinimalTimePicker
+                         ariaLabel="Light cycle end time"
+                         value={lightEndTime}
+                         onChange={setLightEndTime}
+                         locale={isTH ? "TH" : "EN"}
+                         className="w-32"
+                       />
                     </div>
                     <Switch defaultChecked />
                   </div>

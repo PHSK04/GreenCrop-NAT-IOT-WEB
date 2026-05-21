@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Input } from "./ui/input";
+import { MinimalDatePicker } from "./ui/minimal-date-picker";
+import { MinimalMonthPicker } from "./ui/minimal-month-picker";
 import { useMachine } from "@/contexts/MachineContext";
 
 const formatDateKey = (value: string) => {
@@ -75,9 +76,9 @@ export function MetricsChart() {
             </CardDescription>
           </div>
           <div className="grid gap-2 sm:grid-cols-3 lg:w-[620px]">
-            <Input aria-label="Chart month" type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} />
-            <Input aria-label="Chart start date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-            <Input aria-label="Chart end date" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+            <MinimalMonthPicker ariaLabel="Chart month" value={selectedMonth} onChange={setSelectedMonth} />
+            <MinimalDatePicker ariaLabel="Chart start date" value={startDate} onChange={setStartDate} />
+            <MinimalDatePicker ariaLabel="Chart end date" value={endDate} onChange={setEndDate} />
           </div>
         </div>
       </CardHeader>
