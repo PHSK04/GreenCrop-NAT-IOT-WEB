@@ -116,8 +116,26 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   const [exportEndTime, setExportEndTime] = useState("");
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>(["Sensor", "Actuator", "System"]);
   const [historyDateMode, setHistoryDateMode] = useState<"latest" | "all" | string>("latest");
+  const [dismissedCabinetAlarm, setDismissedCabinetAlarm] = useState(false);
 
   const lastUpdate = formatTimestamp(lastTelemetryAt);
+  const cabinetAlarmActive = redOn;
+
+  useEffect(() => {
+    if (!cabinetAlarmActive) {
+      setDismissedCabinetAlarm(false);
+    }
+  }, [cabinetAlarmActive]);
+
+  const handleStopCabinetAlarm = () => {
+    setDismissedCabinetAlarm(true);
+    stopPump2FromWeb();
+  };
+
+  const handleEmergencyCabinetAlarm = () => {
+    setDismissedCabinetAlarm(true);
+    sendEmergencyStop();
+  };
 
   const liveRows = useMemo<LiveDeviceRow[]>(
     () => [
@@ -459,7 +477,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         }
       `}</style>
 
-      {wls2 && (
+      {cabinetAlarmActive && !dismissedCabinetAlarm && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/62 p-4 backdrop-blur-sm">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-[repeating-linear-gradient(115deg,#facc15_0_28px,#020617_28px_56px)] water-full-hazard" style={{ animation: "hazardBlink 0.8s ease-in-out infinite" }} />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-[repeating-linear-gradient(115deg,#facc15_0_28px,#020617_28px_56px)] water-full-hazard" style={{ animation: "hazardBlink 0.8s ease-in-out infinite" }} />
@@ -480,27 +498,27 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-base font-semibold text-slate-700 sm:text-xl">
                 {isTH
-                  ? "เซ็นเซอร์ WLS2 ตรวจพบระดับน้ำเต็ม กรุณาหยุดปั๊มน้ำทันทีเพื่อป้องกันน้ำล้น"
-                  : "WLS2 detected the full water level. Stop the pump immediately to prevent overflow."}
+                    ? "ไฟแดงที่ตู้แจ้งเตือน alarm กรุณาหยุดปั๊มน้ำทันที"
+                    : "The cabinet red alarm is active. Stop the pump immediately."}
               </p>
               <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
                 <Button
                   variant="destructive"
                   className="h-14 min-w-52 text-base font-black shadow-lg shadow-red-900/20"
-                  onClick={stopPump2FromWeb}
+                  onClick={handleStopCabinetAlarm}
                 >
                   {isTH ? "หยุดปั๊มน้ำ" : "Stop Water Pump"}
                 </Button>
                 <Button
                   variant="outline"
                   className="h-14 min-w-52 border-red-500/50 bg-red-50 text-base font-bold text-red-700 hover:bg-red-100"
-                  onClick={sendEmergencyStop}
+                  onClick={handleEmergencyCabinetAlarm}
                 >
                   {isTH ? "หยุดฉุกเฉิน" : "Emergency Stop"}
                 </Button>
               </div>
               <p className="mt-5 text-xs font-medium text-slate-500">
-                {isTH ? "หน้าต่างนี้จะหายไปเมื่อระดับ WLS2 กลับสู่สถานะปกติ" : "This alert clears when WLS2 returns to normal."}
+                {isTH ? "หน้าต่างนี้จะหายไปเมื่อกดหยุด หรือเมื่อไฟแดงกลับสู่สถานะปกติ" : "This alert clears when stopped or when the red alarm returns to normal."}
               </p>
             </div>
             <div className="bg-[repeating-linear-gradient(115deg,#facc15_0_24px,#020617_24px_48px)] px-6 py-4" />
@@ -614,7 +632,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
           </div>
         </div>
 
-        {wls2 && (
+        {cabinetAlarmActive && !dismissedCabinetAlarm && (
           <div className="mb-6 overflow-hidden rounded-xl border border-red-500/40 bg-red-500/10 shadow-lg shadow-red-950/10">
             <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-start gap-3">
@@ -623,12 +641,12 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 </div>
                 <div>
                   <p className="text-base font-bold text-red-700 dark:text-red-200">
-                    {isTH ? "แจ้งเตือน: น้ำเต็มถึงระดับ WLS2" : "Alert: Water reached WLS2 full level"}
+                    {isTH ? "แจ้งเตือน: ไฟแดงที่ตู้กำลังทำงาน" : "Alert: Cabinet red alarm is active"}
                   </p>
                   <p className="mt-1 text-sm text-red-700/80 dark:text-red-200/80">
                     {isTH
-                      ? "ควรหยุดปั๊มทันทีเพื่อป้องกันน้ำล้นหรือทำงานเกินระดับที่กำหนด"
-                      : "Stop the pump now to prevent overflow or operation beyond the target level."}
+                      ? "ควรหยุดปั๊มทันที และรับทราบ alarm เพื่อปิดสัญญาณเตือนหน้าตู้"
+                      : "Stop the pump now and acknowledge the alarm to silence the cabinet warning."}
                   </p>
                 </div>
               </div>
@@ -636,14 +654,14 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 <Button
                   variant="destructive"
                   className="h-11 min-w-36 font-semibold"
-                  onClick={stopPump2FromWeb}
+                  onClick={handleStopCabinetAlarm}
                 >
                   {isTH ? "หยุดปั๊ม 2" : "Stop Pump 2"}
                 </Button>
                 <Button
                   variant="outline"
                   className="h-11 min-w-36 border-red-500/40 bg-background/80 font-semibold text-red-700 hover:bg-red-500/10 dark:text-red-200"
-                  onClick={sendEmergencyStop}
+                  onClick={handleEmergencyCabinetAlarm}
                 >
                   {isTH ? "หยุดฉุกเฉิน" : "Emergency Stop"}
                 </Button>
