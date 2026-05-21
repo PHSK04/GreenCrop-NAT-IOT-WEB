@@ -145,6 +145,7 @@ export function DashboardPage({
     floatAlarm,
     pump1On,
     pump2On,
+    redOn,
     phOk,
     mqttStatus
   } = useMachine();
@@ -158,7 +159,7 @@ export function DashboardPage({
   const activeDevice = devices.find((device) => device.device_id === activeDeviceId);
   const activeDeviceName = activeDevice?.device_name || activeDeviceId || t.noDevice;
   const activeDeviceLocation = activeDevice?.location || "-";
-  const waterFullAlarm = wls2 || floatAlarm;
+  const waterFullAlarm = redOn;
   const showWaterFullAlarm = waterFullAlarm && !dismissedWaterFullAlarm;
   const stablePhValue = useStablePositiveValue(phValue);
   const stableTempValue = useStablePositiveValue(tempValue);
