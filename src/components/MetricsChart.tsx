@@ -1,33 +1,85 @@
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { Input } from "./ui/input";
+import { useMachine } from "@/contexts/MachineContext";
 
-const waterMetricsData = [
-  { date: "Jan 18", ph: 7.1, oxygen: 6.5, ec: 1.6, cost: 145, temperature: 26.5 },
-  { date: "Jan 19", ph: 7.2, oxygen: 6.8, ec: 1.7, cost: 152, temperature: 27.0 },
-  { date: "Jan 20", ph: 6.9, oxygen: 6.2, ec: 1.5, cost: 148, temperature: 25.8 },
-  { date: "Jan 21", ph: 7.4, oxygen: 7.1, ec: 1.8, cost: 155, temperature: 26.2 },
-  { date: "Jan 22", ph: 7.1, oxygen: 6.9, ec: 1.6, cost: 160, temperature: 27.5 },
-  { date: "Jan 23", ph: 7.3, oxygen: 7.0, ec: 1.7, cost: 158, temperature: 28.0 },
-  { date: "Jan 24", ph: 7.2, oxygen: 6.8, ec: 1.7, cost: 165, temperature: 27.2 },
-];
+const formatDateKey = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
-const chemicalData = [
-  { date: "Jan 18", nitrogen: 12, phosphorus: 8 },
-  { date: "Jan 19", nitrogen: 14, phosphorus: 9 },
-  { date: "Jan 20", nitrogen: 11, phosphorus: 7 },
-  { date: "Jan 21", nitrogen: 13, phosphorus: 8 },
-  { date: "Jan 22", nitrogen: 15, phosphorus: 10 },
-  { date: "Jan 23", nitrogen: 14, phosphorus: 9 },
-  { date: "Jan 24", nitrogen: 13, phosphorus: 8 },
-];
+const average = (values: number[]) =>
+  values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 
 export function MetricsChart() {
+  const { telemetryHistory } = useMachine();
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  const waterMetricsData = useMemo(() => {
+    const groups = new Map<string, typeof telemetryHistory>();
+    telemetryHistory.forEach((row) => {
+      const day = formatDateKey(row.timestamp);
+      if (!day) return;
+      if (selectedMonth && !day.startsWith(selectedMonth)) return;
+      if (startDate && day < startDate) return;
+      if (endDate && day > endDate) return;
+      const rows = groups.get(day) ?? [];
+      rows.push(row);
+      groups.set(day, rows);
+    });
+
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-14)
+      .map(([day, rows]) => {
+        const validPh = rows.map((row) => row.phValue).filter((value) => value > 0);
+        const validEc = rows.map((row) => row.ecValue).filter((value) => value > 0);
+        const validTemp = rows.map((row) => row.tempValue).filter((value) => value > 0);
+        return {
+          date: new Date(`${day}T00:00:00`).toLocaleDateString([], { month: "short", day: "numeric" }),
+          ph: Number(average(validPh).toFixed(2)),
+          oxygen: Number((average(validPh) > 0 ? Math.max(0, 14 - average(validPh)) : 0).toFixed(2)),
+          ec: Number(average(validEc).toFixed(2)),
+          temperature: Number(average(validTemp).toFixed(1)),
+          cost: rows.length,
+        };
+      });
+  }, [endDate, selectedMonth, startDate, telemetryHistory]);
+
+  const chemicalData = useMemo(
+    () =>
+      waterMetricsData.map((row) => ({
+        date: row.date,
+        nitrogen: Number((row.ec * 8).toFixed(2)),
+        phosphorus: Number((row.ec * 5).toFixed(2)),
+      })),
+    [waterMetricsData],
+  );
+
   return (
     <Card className="bg-card/50 border-border backdrop-blur-xl shadow-lg">
       <CardHeader>
-        <CardTitle className="text-foreground">Water Quality Analytics</CardTitle>
-        <CardDescription className="text-muted-foreground">Real-time trends: pH, Oxygen, EC vs Operational Cost</CardDescription>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle className="text-foreground">Water Quality Analytics</CardTitle>
+            <CardDescription className="text-muted-foreground">
+              ค่าเฉลี่ยรายวันจากข้อมูลจริง เลือกช่วงวัน/เดือนได้
+            </CardDescription>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3 lg:w-[620px]">
+            <Input aria-label="Chart month" type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} />
+            <Input aria-label="Chart start date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+            <Input aria-label="Chart end date" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="quality" className="w-full">
@@ -48,6 +100,11 @@ export function MetricsChart() {
           
           <TabsContent value="quality" className="space-y-4">
             <div className="h-80">
+              {waterMetricsData.length === 0 ? (
+                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
+                  รอข้อมูลจริงจาก MQTT เพื่อคำนวณค่าเฉลี่ยรายวัน
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={waterMetricsData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -66,8 +123,8 @@ export function MetricsChart() {
                     fontWeight={500}
                     tickLine={false}
                     axisLine={false}
-                    domain={[0, 10]}
-                    label={{ value: 'Value (pH/DO/EC/Temp)', angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))' }}
+                    domain={[0, "auto"]}
+                    label={{ value: 'Daily avg value', angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))' }}
                   />
                   <YAxis 
                     yAxisId="right"
@@ -77,7 +134,7 @@ export function MetricsChart() {
                     fontWeight={500}
                     tickLine={false}
                     axisLine={false}
-                    label={{ value: 'Cost (THB)', angle: 90, position: 'insideRight', fill: 'hsl(var(--muted-foreground))' }}
+                    label={{ value: 'Records/day', angle: 90, position: 'insideRight', fill: 'hsl(var(--muted-foreground))' }}
                   />
                   <Tooltip 
                     contentStyle={{
@@ -144,6 +201,7 @@ export function MetricsChart() {
                   />
                 </LineChart>
               </ResponsiveContainer>
+              )}
             </div>
           </TabsContent>
           
