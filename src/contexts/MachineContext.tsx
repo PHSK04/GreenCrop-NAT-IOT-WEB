@@ -37,6 +37,7 @@ interface MachineContextType {
   redOn: boolean;
   phOk: boolean;
   lastTelemetryAt: string | null;
+  boardConnected: boolean;
   telemetryHistory: TelemetrySnapshot[];
   mqttStatus: 'connected' | 'disconnected' | 'connecting';
 }
@@ -69,6 +70,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const HISTORY_LIMIT = 2000;
 const API_POLL_INTERVAL_MS = 2000;
 const HISTORY_SAMPLE_INTERVAL_MS = 1000;
+const BOARD_TELEMETRY_STALE_MS = 10000;
 
 const getTelemetryHistoryKey = (deviceId: string) =>
   `greencrop.telemetry.history.${safeTopicSegment(deviceId || 'default')}`;
@@ -256,6 +258,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   const [redOn, setRedOn] = useState(false);
   const [phOk, setPhOk] = useState(false);
   const [lastTelemetryAt, setLastTelemetryAt] = useState<string | null>(null);
+  const [boardConnected, setBoardConnected] = useState(false);
   const [telemetryHistory, setTelemetryHistory] = useState<TelemetrySnapshot[]>([]);
 
   const [client, setClient] = useState<mqtt.MqttClient | null>(null);
@@ -270,6 +273,17 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   const lastHistoryStateSignatureRef = useRef('');
   const lastHistorySavedAtMsRef = useRef(0);
   const lastCarriedTelemetryRef = useRef<TelemetrySnapshot | null>(null);
+
+  useEffect(() => {
+    const updateBoardConnected = () => {
+      const telemetryMs = parseServerTimestampMs(lastTelemetryAt);
+      setBoardConnected(telemetryMs != null && Date.now() - telemetryMs <= BOARD_TELEMETRY_STALE_MS);
+    };
+
+    updateBoardConnected();
+    const intervalId = window.setInterval(updateBoardConnected, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [lastTelemetryAt]);
 
   const loadTelemetryHistory = useCallback((deviceId: string) => {
     if (typeof window === 'undefined') return [];
@@ -669,6 +683,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 	      setRedOn(false);
 	      setPhOk(false);
 	      setLastTelemetryAt(null);
+	      setBoardConnected(false);
 	      const nextHistory = loadTelemetryHistory(nextDeviceId);
 	      setTelemetryHistory(nextHistory);
 	      lastCarriedTelemetryRef.current = nextHistory[0] ?? null;
@@ -979,6 +994,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         redOn,
         phOk,
         lastTelemetryAt,
+        boardConnected,
         telemetryHistory,
         mqttStatus,
       }}

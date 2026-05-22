@@ -100,6 +100,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
     phOk,
     mqttStatus,
     lastTelemetryAt,
+    boardConnected,
     telemetryHistory,
     stopPump2FromWeb,
     sendEmergencyStop,
@@ -119,7 +120,8 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   const [dismissedCabinetAlarm, setDismissedCabinetAlarm] = useState(false);
 
   const lastUpdate = formatTimestamp(lastTelemetryAt);
-  const cabinetAlarmActive = redOn;
+  const liveLastUpdate = boardConnected ? lastUpdate : "-";
+  const cabinetAlarmActive = boardConnected && redOn;
 
   useEffect(() => {
     if (!cabinetAlarmActive) {
@@ -144,9 +146,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         name: isTH ? "เซนเซอร์ pH" : "pH Sensor",
         type: "Sensor",
         category: isTH ? "คุณภาพน้ำ" : "Water Quality",
-        status: phOk ? "Active" : "Alarm",
-        value: `${phValue.toFixed(2)} pH`,
-        lastUpdate,
+        status: !boardConnected ? "Standby" : phOk ? "Active" : "Alarm",
+        value: boardConnected ? `${phValue.toFixed(2)} pH` : "--",
+        lastUpdate: liveLastUpdate,
         icon: Gauge,
       },
       {
@@ -154,9 +156,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         name: isTH ? "เซนเซอร์ EC" : "EC Sensor",
         type: "Sensor",
         category: isTH ? "คุณภาพน้ำ" : "Water Quality",
-        status: ecValue > 0 ? "Active" : "Standby",
-        value: `${ecValue.toFixed(2)} mS/cm`,
-        lastUpdate,
+        status: boardConnected && ecValue > 0 ? "Active" : "Standby",
+        value: boardConnected ? `${ecValue.toFixed(2)} mS/cm` : "--",
+        lastUpdate: liveLastUpdate,
         icon: Waves,
       },
       {
@@ -164,9 +166,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         name: isTH ? "เซนเซอร์อุณหภูมิ" : "Temperature Sensor",
         type: "Sensor",
         category: isTH ? "อุณหภูมิน้ำ" : "Water Temperature",
-        status: tempValue > 0 ? "Active" : "Standby",
-        value: `${tempValue.toFixed(1)} °C`,
-        lastUpdate,
+        status: boardConnected && tempValue > 0 ? "Active" : "Standby",
+        value: boardConnected ? `${tempValue.toFixed(1)} °C` : "--",
+        lastUpdate: liveLastUpdate,
         icon: Thermometer,
       },
       {
@@ -174,9 +176,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         name: isTH ? "WLS1 ระดับล่าง" : "WLS1 Lower Level",
         type: "Sensor",
         category: isTH ? "ระดับน้ำ" : "Water Level",
-        status: wls1 ? "Active" : "Standby",
-        value: wls1 ? (isTH ? "ตรวจพบน้ำ" : "Water detected") : (isTH ? "ยังไม่ถึงระดับ" : "Not reached"),
-        lastUpdate,
+        status: boardConnected && wls1 ? "Active" : "Standby",
+        value: boardConnected ? wls1 ? (isTH ? "ตรวจพบน้ำ" : "Water detected") : (isTH ? "ยังไม่ถึงระดับ" : "Not reached") : "--",
+        lastUpdate: liveLastUpdate,
         icon: Waves,
       },
       {
@@ -184,9 +186,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         name: isTH ? "WLS2 ระดับบน" : "WLS2 Upper Level",
         type: "Sensor",
         category: isTH ? "ระดับน้ำ" : "Water Level",
-        status: wls2 ? "Active" : "Standby",
-        value: wls2 ? (isTH ? "น้ำเต็มระดับ" : "Target reached") : (isTH ? "กำลังรอ" : "Waiting"),
-        lastUpdate,
+        status: boardConnected && wls2 ? "Active" : "Standby",
+        value: boardConnected ? wls2 ? (isTH ? "น้ำเต็มระดับ" : "Target reached") : (isTH ? "กำลังรอ" : "Waiting") : "--",
+        lastUpdate: liveLastUpdate,
         icon: Waves,
       },
       {
@@ -194,9 +196,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         name: isTH ? "ลูกลอยถัง 2" : "Tank 2 Float Switch",
         type: "Sensor",
         category: isTH ? "แจ้งเตือน" : "Alarm",
-        status: floatAlarm ? "Alarm" : "Active",
-        value: floatAlarm ? (isTH ? "แจ้งเตือน" : "Alarm") : (isTH ? "ปกติ" : "Normal"),
-        lastUpdate,
+        status: !boardConnected ? "Standby" : floatAlarm ? "Alarm" : "Active",
+        value: boardConnected ? floatAlarm ? (isTH ? "แจ้งเตือน" : "Alarm") : (isTH ? "ปกติ" : "Normal") : "--",
+        lastUpdate: liveLastUpdate,
         icon: AlertTriangle,
       },
       {
@@ -204,9 +206,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         name: isTH ? "ปั๊ม 1 อัตโนมัติ" : "Pump 1 Auto",
         type: "Actuator",
         category: isTH ? "ปั๊ม" : "Pump",
-        status: pump1On ? "Active" : "Standby",
-        value: pump1On ? (isTH ? "กำลังทำงาน" : "Running") : (isTH ? "หยุด" : "Stopped"),
-        lastUpdate,
+        status: boardConnected && pump1On ? "Active" : "Standby",
+        value: boardConnected ? pump1On ? (isTH ? "กำลังทำงาน" : "Running") : (isTH ? "หยุด" : "Stopped") : "--",
+        lastUpdate: liveLastUpdate,
         icon: Activity,
       },
       {
@@ -214,9 +216,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         name: isTH ? "ปั๊ม 2 กดมือ/เว็บ" : "Pump 2 Manual/Web",
         type: "Actuator",
         category: isTH ? "ปั๊ม" : "Pump",
-        status: pump2On ? "Active" : "Standby",
-        value: pump2On ? (isTH ? "กำลังทำงาน" : "Running") : (isTH ? "หยุด" : "Stopped"),
-        lastUpdate,
+        status: boardConnected && pump2On ? "Active" : "Standby",
+        value: boardConnected ? pump2On ? (isTH ? "กำลังทำงาน" : "Running") : (isTH ? "หยุด" : "Stopped") : "--",
+        lastUpdate: liveLastUpdate,
         icon: Activity,
       },
       {
@@ -224,9 +226,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         name: isTH ? "สถานะล็อคระบบ" : "System Lock",
         type: "System",
         category: isTH ? "ความปลอดภัย" : "Safety",
-        status: locked ? "Alarm" : "Active",
-        value: locked ? (isTH ? "ล็อคฉุกเฉิน" : "Emergency locked") : (isTH ? "พร้อมทำงาน" : "Ready"),
-        lastUpdate,
+        status: !boardConnected ? "Standby" : locked ? "Alarm" : "Active",
+        value: boardConnected ? locked ? (isTH ? "ล็อคฉุกเฉิน" : "Emergency locked") : (isTH ? "พร้อมทำงาน" : "Ready") : "--",
+        lastUpdate: liveLastUpdate,
         icon: AlertTriangle,
       },
       {
@@ -234,13 +236,13 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         name: isTH ? "ไฟสถานะ" : "Status Lamps",
         type: "System",
         category: isTH ? "ไฟแสดงผล" : "Indicator",
-        status: redOn ? "Alarm" : greenOn ? "Active" : "Standby",
-        value: redOn ? (isTH ? "ไฟแดง" : "Red lamp") : greenOn ? (isTH ? "ไฟเขียว" : "Green lamp") : "-",
-        lastUpdate,
+        status: !boardConnected ? "Standby" : redOn ? "Alarm" : greenOn ? "Active" : "Standby",
+        value: boardConnected ? redOn ? (isTH ? "ไฟแดง" : "Red lamp") : greenOn ? (isTH ? "ไฟเขียว" : "Green lamp") : "-" : "--",
+        lastUpdate: liveLastUpdate,
         icon: CheckCircle2,
       },
     ],
-    [ecValue, floatAlarm, greenOn, isTH, lastUpdate, locked, phOk, phValue, pump1On, pump2On, redOn, tempValue, wls1, wls2],
+    [boardConnected, ecValue, floatAlarm, greenOn, isTH, liveLastUpdate, locked, phOk, phValue, pump1On, pump2On, redOn, tempValue, wls1, wls2],
   );
 
   const [stableLiveRows, setStableLiveRows] = useState<LiveDeviceRow[]>(liveRows);
@@ -545,7 +547,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 {mqttStatus === "connected" ? (isTH ? "MQTT เชื่อมต่อ" : "MQTT Connected") : (isTH ? "MQTT ไม่เชื่อมต่อ" : "MQTT Disconnected")}
               </Badge>
               <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
-                {isTH ? "อัปเดตล่าสุด" : "Last update"}: {lastUpdate}
+                {isTH ? "อัปเดตล่าสุด" : "Last update"}: {liveLastUpdate}
               </Badge>
             </div>
           </div>
@@ -561,23 +563,23 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
           <Card>
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground">{isTH ? "ค่า pH" : "pH"}</p>
-              <p className="mt-2 text-3xl font-bold text-foreground">{phValue.toFixed(2)}</p>
-              <Badge variant="outline" className={phOk ? "mt-3 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "mt-3 border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"}>
-                {phOk ? (isTH ? "อยู่ในช่วง" : "OK") : (isTH ? "นอกช่วง" : "Out of range")}
+              <p className="mt-2 text-3xl font-bold text-foreground">{boardConnected ? phValue.toFixed(2) : "--"}</p>
+              <Badge variant="outline" className={boardConnected && phOk ? "mt-3 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : boardConnected ? "mt-3 border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400" : "mt-3 border-border bg-muted text-muted-foreground"}>
+                {!boardConnected ? (isTH ? "ไม่มีสัญญาณ" : "No signal") : phOk ? (isTH ? "อยู่ในช่วง" : "OK") : (isTH ? "นอกช่วง" : "Out of range")}
               </Badge>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground">{isTH ? "ค่า EC" : "EC"}</p>
-              <p className="mt-2 text-3xl font-bold text-foreground">{ecValue.toFixed(2)}</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">{boardConnected ? ecValue.toFixed(2) : "--"}</p>
               <p className="mt-1 text-xs text-muted-foreground">mS/cm</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground">{isTH ? "อุณหภูมิ" : "Temperature"}</p>
-              <p className="mt-2 text-3xl font-bold text-foreground">{tempValue.toFixed(1)}</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">{boardConnected ? tempValue.toFixed(1) : "--"}</p>
               <p className="mt-1 text-xs text-muted-foreground">°C</p>
             </CardContent>
           </Card>

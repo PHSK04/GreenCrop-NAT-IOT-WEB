@@ -29,6 +29,7 @@ export type MonthlyYieldSummary = {
 
 const STORAGE_KEY = "greencrop_crop_yield_entries_v1";
 const CHANGE_EVENT = "greencrop_crop_yield_entries_changed";
+const LEGACY_DEVICE_IDS = new Set(["", "default", "UNKNOWN"]);
 
 const safeNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
@@ -66,8 +67,13 @@ export const readCropYieldEntries = (deviceId?: string): CropYieldEntry[] => {
     const entries = Array.isArray(parsed)
       ? parsed.map(normalizeEntry).filter(Boolean) as CropYieldEntry[]
       : [];
+    const requestedDeviceId = String(deviceId || "");
     return entries
-      .filter((entry) => !deviceId || entry.deviceId === deviceId)
+      .filter((entry) => {
+        if (!requestedDeviceId) return true;
+        if (entry.deviceId === requestedDeviceId) return true;
+        return requestedDeviceId !== "default" && LEGACY_DEVICE_IDS.has(entry.deviceId);
+      })
       .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
   } catch {
     return [];

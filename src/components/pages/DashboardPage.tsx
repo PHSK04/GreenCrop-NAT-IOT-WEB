@@ -28,14 +28,18 @@ interface DashboardPageProps {
   onDeviceChange?: (deviceId: string) => void;
 }
 
-const useStablePositiveValue = (value: number) => {
+const useStablePositiveValue = (value: number, enabled = true) => {
   const [stableValue, setStableValue] = useState<number | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      setStableValue(null);
+      return;
+    }
     if (Number.isFinite(value) && value > 0) {
       setStableValue(value);
     }
-  }, [value]);
+  }, [enabled, value]);
 
   return stableValue;
 };
@@ -147,7 +151,8 @@ export function DashboardPage({
     pump2On,
     redOn,
     phOk,
-    mqttStatus
+    mqttStatus,
+    boardConnected
   } = useMachine();
 
   const visiblePumpStates = [pump1On, pump2On];
@@ -159,11 +164,11 @@ export function DashboardPage({
   const activeDevice = devices.find((device) => device.device_id === activeDeviceId);
   const activeDeviceName = activeDevice?.device_name || activeDeviceId || t.noDevice;
   const activeDeviceLocation = activeDevice?.location || "-";
-  const waterFullAlarm = redOn;
+  const waterFullAlarm = boardConnected && redOn;
   const showWaterFullAlarm = waterFullAlarm && !dismissedWaterFullAlarm;
-  const stablePhValue = useStablePositiveValue(phValue);
-  const stableTempValue = useStablePositiveValue(tempValue);
-  const stableEcValue = useStablePositiveValue(ecValue);
+  const stablePhValue = useStablePositiveValue(phValue, boardConnected);
+  const stableTempValue = useStablePositiveValue(tempValue, boardConnected);
+  const stableEcValue = useStablePositiveValue(ecValue, boardConnected);
   const stablePhOk =
     stablePhValue != null ? stablePhValue >= 6.5 && stablePhValue <= 7.5 : phOk;
 
@@ -314,16 +319,22 @@ export function DashboardPage({
             <p className="mt-1 text-xs font-medium text-muted-foreground md:text-sm">{t.subtitle}</p>
           </div>
           <Badge 
-            variant={mqttStatus === "connected" ? "default" : "secondary"}
-            className={`self-end border px-4 py-1.5 font-mono text-xs sm:self-auto ${mqttStatus === "connected" ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20" : "border-border bg-muted text-muted-foreground"}`}
+            variant={mqttStatus === "connected" && boardConnected ? "default" : "secondary"}
+            className={`self-end border px-4 py-1.5 font-mono text-xs sm:self-auto ${mqttStatus === "connected" && boardConnected ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20" : "border-border bg-muted text-muted-foreground"}`}
           >
             {mqttStatus === "connected" ? (
               <span className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                </span>
-                {language === "TH" ? "MQTT เชื่อมต่อ" : "MQTT CONNECTED"}
+                {boardConnected ? (
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                  </span>
+                ) : (
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground"></span>
+                )}
+                {boardConnected
+                  ? language === "TH" ? "บอร์ดเชื่อมต่อ" : "BOARD ONLINE"
+                  : language === "TH" ? "รอสัญญาณบอร์ด" : "WAITING FOR BOARD"}
               </span>
             ) : (
               <span className="flex items-center gap-2">
@@ -573,13 +584,15 @@ export function DashboardPage({
             <Card className="rounded-2xl border-border/70 bg-card/55 shadow-lg">
                <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${locked || floatAlarm ? "bg-red-500/10 text-red-500" : isOn ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"}`}>
+                    <div className={`p-2 rounded-full ${!boardConnected ? "bg-muted text-muted-foreground" : locked || floatAlarm ? "bg-red-500/10 text-red-500" : isOn ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"}`}>
                        <Cpu className="w-5 h-5" />
                     </div>
                     <div>
                       <h4 className="text-sm font-semibold text-foreground">{t.sensorNetwork}</h4>
                       <p className="text-xs text-muted-foreground">
-                        {locked
+                        {!boardConnected
+                          ? (language === "TH" ? "ยังไม่มีสัญญาณสดจากบอร์ด" : "No live board telemetry")
+                          : locked
                           ? (language === "TH" ? "หยุดฉุกเฉินและล็อคระบบ" : "Emergency lock active")
                           : floatAlarm
                             ? (language === "TH" ? "ลูกลอยแจ้งเตือน" : "Float alarm")
@@ -590,8 +603,8 @@ export function DashboardPage({
                     </div>
                   </div>
                   <div className="text-right">
-                     <span className={`text-xs font-bold px-2 py-1 rounded bg-muted border border-border ${locked || floatAlarm ? "text-red-500" : isOn ? "text-emerald-500" : "text-muted-foreground"}`}>
-                       {locked ? "LOCKED" : floatAlarm ? "ALARM" : isOn ? t.statusOnline : t.statusSleep}
+                     <span className={`text-xs font-bold px-2 py-1 rounded bg-muted border border-border ${!boardConnected ? "text-muted-foreground" : locked || floatAlarm ? "text-red-500" : isOn ? "text-emerald-500" : "text-muted-foreground"}`}>
+                       {!boardConnected ? (language === "TH" ? "ไม่มีสัญญาณ" : "NO SIGNAL") : locked ? "LOCKED" : floatAlarm ? "ALARM" : isOn ? t.statusOnline : t.statusSleep}
                      </span>
                   </div>
                </CardContent>
