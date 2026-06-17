@@ -3,31 +3,54 @@ import { useEffect, useMemo, useState } from "react";
 export const ACTIVE_DEVICE_STORAGE_KEY = "active_device_id";
 export const ACTIVE_DEVICE_EVENT_NAME = "active-device-changed";
 
+const getSessionTenantId = () => {
+  if (typeof window === "undefined") return "";
+  const raw = window.localStorage.getItem("smart_iot_session");
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw);
+    return String(parsed?.user?.id || parsed?.id || "").trim();
+  } catch {
+    return "";
+  }
+};
+
+export const scopedStorageKey = (key: string) => {
+  const tenantId = getSessionTenantId();
+  return tenantId ? `${key}:${tenantId}` : key;
+};
+
 export function emitActiveDeviceChanged() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(ACTIVE_DEVICE_EVENT_NAME));
 }
+
+export function getActiveDeviceIdValue() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(scopedStorageKey(ACTIVE_DEVICE_STORAGE_KEY)) || "";
+}
                     
 export function setActiveDeviceIdValue(deviceId: string) {
   if (typeof window === "undefined") return;
+  const scopedKey = scopedStorageKey(ACTIVE_DEVICE_STORAGE_KEY);
   if (deviceId) {
-    window.localStorage.setItem(ACTIVE_DEVICE_STORAGE_KEY, deviceId);
+    window.localStorage.setItem(scopedKey, deviceId);
   } else {
-    window.localStorage.removeItem(ACTIVE_DEVICE_STORAGE_KEY);
+    window.localStorage.removeItem(scopedKey);
   }
+  window.localStorage.removeItem(ACTIVE_DEVICE_STORAGE_KEY);
   emitActiveDeviceChanged();
 }
 
 export function useActiveDeviceId() {
   const [deviceId, setDeviceId] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return window.localStorage.getItem(ACTIVE_DEVICE_STORAGE_KEY) || "";
+    return getActiveDeviceIdValue();
   });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const update = () => {
-      setDeviceId(window.localStorage.getItem(ACTIVE_DEVICE_STORAGE_KEY) || "");
+      setDeviceId(getActiveDeviceIdValue());
     };
     window.addEventListener("storage", update);
     window.addEventListener(ACTIVE_DEVICE_EVENT_NAME, update as EventListener);
