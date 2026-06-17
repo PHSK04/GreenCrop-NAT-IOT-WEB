@@ -137,6 +137,8 @@ async function initDb() {
             ec_value DOUBLE PRECISION,
             pumps TEXT,
             raw_payload TEXT,
+            source VARCHAR(32),
+            mqtt_topic VARCHAR(191),
             active_tank INTEGER,
             is_on BOOLEAN,
             uptime_seconds DOUBLE PRECISION DEFAULT 0,
@@ -152,6 +154,12 @@ async function initDb() {
 
         CREATE INDEX IF NOT EXISTS ix_sensor_data_tenant_ts
         ON sensor_data(tenant_id, timestamp DESC);
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS source VARCHAR(32);
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS mqtt_topic VARCHAR(191);
 
         CREATE TABLE IF NOT EXISTS login_sessions (
             id SERIAL PRIMARY KEY,
