@@ -50,12 +50,14 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || DEFAULT_CORS_ORIGINS.join('
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
+const LOCAL_DEV_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/;
 
 app.use(cors({
     origin: (origin, callback) => {
         // Allow mobile apps, curl, and same-network tools that do not send Origin.
         if (!origin) return callback(null, true);
         if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        if (LOCAL_DEV_ORIGIN_RE.test(origin)) return callback(null, true);
         return callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
