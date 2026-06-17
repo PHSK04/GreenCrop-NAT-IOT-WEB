@@ -210,8 +210,12 @@ function normalizePumpsJson(value) {
     return JSON.stringify(normalizePumpsArray(value).map((item) => item ? 1 : 0));
 }
 
+function firstDefined(...values) {
+    return values.find((value) => value !== undefined && value !== null);
+}
+
 function hasMeaningfulSensorSignal(body) {
-    const numericKeys = ['pressure', 'flow_rate', 'flow', 'ec_value', 'ec'];
+    const numericKeys = ['pressure', 'flow_rate', 'flow', 'ec_value', 'ec', 'ph_value', 'phValue', 'temp_c', 'tempValue'];
     const hasNumericSignal = numericKeys.some((key) => {
         if (body[key] === undefined || body[key] === null || body[key] === '') return false;
         return Math.abs(asNumber(body[key], 0)) > 0;
@@ -224,18 +228,32 @@ function hasMeaningfulSensorSignal(body) {
         asNumber(activeTank, 0) > 0;
     const eventKeys = ['triggered', 'event', 'detected', 'changed'];
     const hasEventSignal = eventKeys.some((key) => asBool(body[key]));
-    return hasNumericSignal || hasPumpSignal || hasTankSignal || hasEventSignal;
+    const booleanKeys = ['wls1', 'wls2', 'float_alarm', 'floatAlarm', 'locked', 'pump1_on', 'pump1On', 'pump2_on', 'pump2On', 'green_on', 'greenOn', 'red_on', 'redOn', 'ph_ok', 'phOk'];
+    const hasBooleanSignal = booleanKeys.some((key) => body[key] !== undefined && body[key] !== null && body[key] !== '');
+    return hasNumericSignal || hasPumpSignal || hasTankSignal || hasEventSignal || hasBooleanSignal;
 }
 
 function sensorSignature(row) {
+    const enriched = enrichSensorRow(row);
     if (!row) return '';
     return JSON.stringify({
-        pressure: Number(asNumber(row.pressure, 0).toFixed(3)),
-        flow_rate: Number(asNumber(row.flow_rate, 0).toFixed(3)),
-        ec_value: Number(asNumber(row.ec_value, 0).toFixed(3)),
-        pumps: normalizePumpsArray(row.pumps).map((item) => item ? 1 : 0),
-        active_tank: row.active_tank ?? null,
-        is_on: asBool(row.is_on)
+        pressure: Number(asNumber(enriched.pressure, 0).toFixed(3)),
+        flow_rate: Number(asNumber(enriched.flow_rate, 0).toFixed(3)),
+        ec_value: Number(asNumber(enriched.ec_value, 0).toFixed(3)),
+        ph_value: Number(asNumber(enriched.ph_value, 0).toFixed(3)),
+        temp_c: Number(asNumber(enriched.temp_c, 0).toFixed(2)),
+        pumps: normalizePumpsArray(enriched.pumps).map((item) => item ? 1 : 0),
+        active_tank: enriched.active_tank ?? null,
+        is_on: asBool(enriched.is_on),
+        wls1: asBool(enriched.wls1),
+        wls2: asBool(enriched.wls2),
+        float_alarm: asBool(enriched.float_alarm),
+        locked: asBool(enriched.locked),
+        pump1_on: asBool(enriched.pump1_on),
+        pump2_on: asBool(enriched.pump2_on),
+        green_on: asBool(enriched.green_on),
+        red_on: asBool(enriched.red_on),
+        ph_ok: asBool(enriched.ph_ok)
     });
 }
 
@@ -246,19 +264,19 @@ function enrichSensorRow(row) {
         if (!raw || typeof raw !== 'object') return row;
         return {
             ...row,
-            ph_value: raw.ph_value ?? raw.phValue ?? row.ph_value,
-            temp_c: raw.temp_c ?? raw.tempValue ?? row.temp_c,
-            wls1: raw.wls1 ?? row.wls1,
-            wls2: raw.wls2 ?? row.wls2,
-            float_alarm: raw.float_alarm ?? row.float_alarm,
-            locked: raw.locked ?? row.locked,
-            pump1_on: raw.pump1_on ?? row.pump1_on,
-            pump2_on: raw.pump2_on ?? row.pump2_on,
-            green_on: raw.green_on ?? row.green_on,
-            red_on: raw.red_on ?? row.red_on,
-            ph_ok: raw.ph_ok ?? row.ph_ok,
-            is_on: raw.is_on ?? row.is_on,
-            uptime_seconds: raw.uptime_seconds ?? row.uptime_seconds
+            ph_value: firstDefined(raw.ph_value, raw.phValue, raw.ph, row.ph_value),
+            temp_c: firstDefined(raw.temp_c, raw.tempValue, raw.temperature, row.temp_c),
+            wls1: firstDefined(raw.wls1, raw.WLS1, row.wls1),
+            wls2: firstDefined(raw.wls2, raw.WLS2, row.wls2),
+            float_alarm: firstDefined(raw.float_alarm, raw.floatAlarm, raw.float, row.float_alarm),
+            locked: firstDefined(raw.locked, raw.lock, raw.reed, raw.reed_switch, row.locked),
+            pump1_on: firstDefined(raw.pump1_on, raw.pump1On, row.pump1_on),
+            pump2_on: firstDefined(raw.pump2_on, raw.pump2On, row.pump2_on),
+            green_on: firstDefined(raw.green_on, raw.greenOn, row.green_on),
+            red_on: firstDefined(raw.red_on, raw.redOn, row.red_on),
+            ph_ok: firstDefined(raw.ph_ok, raw.phOk, row.ph_ok),
+            is_on: firstDefined(raw.is_on, raw.isOn, row.is_on),
+            uptime_seconds: firstDefined(raw.uptime_seconds, raw.uptimeSeconds, row.uptime_seconds)
         };
     } catch (_) {
         return row;
@@ -503,7 +521,7 @@ async function loadSensorHistoryRows(tenantIds, deviceId) {
     for (const tenantId of tenantIds) {
         const history = await db.all(
             `
-            SELECT TOP 50 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
+            SELECT TOP 2000 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
             FROM sensor_data 
             WHERE tenant_id = ?${deviceId ? ' AND device_id = ?' : ''}
             ORDER BY id DESC
@@ -526,7 +544,7 @@ async function loadSensorHistoryRows(tenantIds, deviceId) {
             const bTime = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
             return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0) || Number(b.id || 0) - Number(a.id || 0);
         })
-        .slice(0, 50);
+        .slice(0, 2000);
 }
 
 function httpsGetJson(url) {
@@ -2858,8 +2876,19 @@ app.post('/api/sensor-data', async (req, res) => {
 
         const { device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp } = req.body;
         const deviceId = device_id ? String(device_id).trim().toUpperCase() : null;
+        const rawPayload = JSON.stringify({
+            ...req.body,
+            tenant_id: tenant,
+            device_id: deviceId || req.body.device_id || null,
+            pressure: asNumber(pressure, 0),
+            flow_rate: asNumber(flow_rate, 0),
+            ec_value: asNumber(ec_value, 0),
+            active_tank: active_tank ?? null,
+            is_on: asBool(is_on),
+            uptime_seconds: Math.max(0, Math.floor(asNumber(uptime_seconds, 0))),
+        });
         const latest = await db.get(
-            `SELECT TOP 1 is_on, uptime_seconds, timestamp, pressure, flow_rate, ec_value, pumps, active_tank
+            `SELECT TOP 1 is_on, uptime_seconds, timestamp, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank
              FROM sensor_data
              WHERE tenant_id = ?${deviceId ? ' AND device_id = ?' : ''}
              ORDER BY id DESC`,
@@ -2896,7 +2925,8 @@ app.post('/api/sensor-data', async (req, res) => {
             ec_value: asNumber(ec_value, 0),
             pumps: pumpsJson,
             active_tank: active_tank ?? null,
-            is_on: normalizedIsOn
+            is_on: normalizedIsOn,
+            raw_payload: rawPayload
         };
         if (latest && sensorSignature(latest) === sensorSignature(nextRow)) {
             const duplicateWindowMs = isTrustedControlSource ? 2000 : 30000;
@@ -2911,8 +2941,8 @@ app.post('/api/sensor-data', async (req, res) => {
         const safeTimestamp = (clientTsSkewMs <= 5 * 60 * 1000) ? new Date(parsedTsMs) : new Date(nowMs);
 
         const result = await db.run(
-            `INSERT INTO sensor_data (tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO sensor_data (tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 tenant,
                 deviceId,
@@ -2921,6 +2951,7 @@ app.post('/api/sensor-data', async (req, res) => {
                 nextRow.flow_rate,
                 nextRow.ec_value,
                 pumpsJson,
+                rawPayload,
                 nextRow.active_tank,
                 normalizedIsOn,
                 parsedIncomingUptime,

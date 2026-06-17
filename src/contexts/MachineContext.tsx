@@ -125,6 +125,8 @@ const asNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const firstDefined = (...values: unknown[]) => values.find((value) => value !== undefined && value !== null);
+
 const parseMqttPayload = (raw: string) => {
   try {
     return JSON.parse(raw);
@@ -185,18 +187,18 @@ const normalizeTelemetrySnapshot = (raw: any): TelemetrySnapshot | null => {
   return {
     timestamp,
     deviceId: String(raw.deviceId || raw.device_id || 'UNKNOWN'),
-    phValue: asNumber(raw.phValue ?? raw.ph_value),
-    ecValue: asNumber(raw.ecValue ?? raw.ec_value),
-    tempValue: asNumber(raw.tempValue ?? raw.temp_c),
-    wls1: asBool(raw.wls1),
-    wls2: asBool(raw.wls2),
-    floatAlarm: asBool(raw.floatAlarm ?? raw.float_alarm),
-    locked: asBool(raw.locked),
-    pump1On: asBool(raw.pump1On ?? raw.pump1_on),
-    pump2On: asBool(raw.pump2On ?? raw.pump2_on),
-    greenOn: asBool(raw.greenOn ?? raw.green_on),
-    redOn: asBool(raw.redOn ?? raw.red_on),
-    isOn: asBool(raw.isOn ?? raw.is_on),
+    phValue: asNumber(firstDefined(raw.phValue, raw.ph_value, raw.ph)),
+    ecValue: asNumber(firstDefined(raw.ecValue, raw.ec_value, raw.ec)),
+    tempValue: asNumber(firstDefined(raw.tempValue, raw.temp_c, raw.temperature)),
+    wls1: asBool(firstDefined(raw.wls1, raw.WLS1)),
+    wls2: asBool(firstDefined(raw.wls2, raw.WLS2)),
+    floatAlarm: asBool(firstDefined(raw.floatAlarm, raw.float_alarm, raw.float)),
+    locked: asBool(firstDefined(raw.locked, raw.lock, raw.reed, raw.reed_switch)),
+    pump1On: asBool(firstDefined(raw.pump1On, raw.pump1_on)),
+    pump2On: asBool(firstDefined(raw.pump2On, raw.pump2_on)),
+    greenOn: asBool(firstDefined(raw.greenOn, raw.green_on)),
+    redOn: asBool(firstDefined(raw.redOn, raw.red_on)),
+    isOn: asBool(firstDefined(raw.isOn, raw.is_on)),
   };
 };
 
@@ -554,18 +556,18 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       const latestSnapshot: TelemetrySnapshot = {
         timestamp: snapshotTimestamp,
         deviceId: resolvedDeviceId,
-        phValue: asNumber(latest.ph_value),
-        ecValue: asNumber(latest.ec_value),
-        tempValue: asNumber(latest.temp_c),
-        wls1: asBool(latest.wls1),
-        wls2: asBool(latest.wls2),
-        floatAlarm: asBool(latest.float_alarm),
-        locked: asBool(latest.locked),
-        pump1On: asBool(latest.pump1_on),
-        pump2On: asBool(latest.pump2_on),
-        greenOn: asBool(latest.green_on),
-        redOn: asBool(latest.red_on),
-        isOn: asBool(latest.is_on),
+        phValue: asNumber(firstDefined(latest.ph_value, latest.phValue, latest.ph)),
+        ecValue: asNumber(firstDefined(latest.ec_value, latest.ecValue, latest.ec)),
+        tempValue: asNumber(firstDefined(latest.temp_c, latest.tempValue, latest.temperature)),
+        wls1: asBool(firstDefined(latest.wls1, latest.WLS1)),
+        wls2: asBool(firstDefined(latest.wls2, latest.WLS2)),
+        floatAlarm: asBool(firstDefined(latest.float_alarm, latest.floatAlarm, latest.float)),
+        locked: asBool(firstDefined(latest.locked, latest.lock, latest.reed, latest.reed_switch)),
+        pump1On: asBool(firstDefined(latest.pump1_on, latest.pump1On)),
+        pump2On: asBool(firstDefined(latest.pump2_on, latest.pump2On)),
+        greenOn: asBool(firstDefined(latest.green_on, latest.greenOn)),
+        redOn: asBool(firstDefined(latest.red_on, latest.redOn)),
+        isOn: asBool(firstDefined(latest.is_on, latest.isOn)),
       };
 
       const carriedSnapshot = carryTelemetrySnapshot(latestSnapshot);
@@ -584,7 +586,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       setPump2On(carriedSnapshot.pump2On);
       setGreenOn(carriedSnapshot.greenOn);
       setRedOn(carriedSnapshot.redOn);
-      setPhOk(asBool(latest.ph_ok) || (carriedSnapshot.phValue >= 6.5 && carriedSnapshot.phValue <= 7.5));
+      setPhOk(asBool(firstDefined(latest.ph_ok, latest.phOk)) || (carriedSnapshot.phValue >= 6.5 && carriedSnapshot.phValue <= 7.5));
       setLastTelemetryAt(typeof latest.timestamp === 'string' ? latest.timestamp : null);
 
       const apiIsOn = carriedSnapshot.isOn;
@@ -670,6 +672,35 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       console.error('API Polling Error:', err);
     }
   }, [pendingResetUntilMs, ignoreApiStateUntilMs, pendingIsOnAck, isOn, lastLocalCommandAtMs, getCurrentUptimeSeconds, carryTelemetrySnapshot, persistTelemetrySnapshot, persistTelemetrySnapshots]);
+
+  const fetchApiHistory = useCallback(async () => {
+    const { tenantId, token } = getSessionAuth();
+    if (!tenantId || !token) {
+      return;
+    }
+
+    try {
+      const activeDeviceId = getActiveDeviceId();
+      const deviceParam = activeDeviceId ? `&device_id=${encodeURIComponent(activeDeviceId)}` : '';
+      const response = await fetch(`${API_BASE_URL}/sensor-data?tenant_id=${tenantId}&history=true${deviceParam}`, {
+        headers: {
+          'x-tenant-id': tenantId,
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) return;
+      const dataList = await response.json();
+      if (!Array.isArray(dataList) || dataList.length === 0) return;
+
+      const apiHistory = dataList
+        .map(normalizeTelemetrySnapshot)
+        .filter((snapshot): snapshot is TelemetrySnapshot => Boolean(snapshot && !isEmptyTelemetrySnapshot(snapshot)));
+      persistTelemetrySnapshots(apiHistory);
+    } catch (err) {
+      console.error('API History Error:', err);
+    }
+  }, [persistTelemetrySnapshots]);
 
   const syncAfterCommand = async () => {
     await fetchApiData();
@@ -768,8 +799,9 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 	    if (deviceSensorsTopic) {
 	      client.subscribe(deviceSensorsTopic);
 	    }
-	    fetchApiData();
-	  }, [activeDeviceId, client, fetchApiData, mqttStatus]);
+		    fetchApiData();
+		    fetchApiHistory();
+		  }, [activeDeviceId, client, fetchApiData, fetchApiHistory, mqttStatus]);
 
 	  useEffect(() => {
 	    const mqttClient = mqtt.connect(MQTT_BROKER, {
@@ -820,22 +852,22 @@ export function MachineProvider({ children }: { children: ReactNode }) {
           ? parsed.timestamp
           : new Date().toISOString(),
         deviceId: incomingDeviceId || selectedDeviceId || 'UNKNOWN',
-        phValue: asNumber(parsed.ph_value),
-        ecValue: asNumber(parsed.ec_value),
-        tempValue: asNumber(parsed.temp_c),
-        wls1: asBool(parsed.wls1),
-        wls2: asBool(parsed.wls2),
-        floatAlarm: asBool(parsed.float_alarm),
-        locked: asBool(parsed.locked),
-        pump1On: asBool(parsed.pump1_on),
-        pump2On: asBool(parsed.pump2_on),
-        greenOn: asBool(parsed.green_on),
-        redOn: asBool(parsed.red_on),
-        isOn: asBool(parsed.is_on),
+        phValue: asNumber(firstDefined(parsed.ph_value, parsed.phValue, parsed.ph)),
+        ecValue: asNumber(firstDefined(parsed.ec_value, parsed.ecValue, parsed.ec)),
+        tempValue: asNumber(firstDefined(parsed.temp_c, parsed.tempValue, parsed.temperature)),
+        wls1: asBool(firstDefined(parsed.wls1, parsed.WLS1)),
+        wls2: asBool(firstDefined(parsed.wls2, parsed.WLS2)),
+        floatAlarm: asBool(firstDefined(parsed.float_alarm, parsed.floatAlarm, parsed.float)),
+        locked: asBool(firstDefined(parsed.locked, parsed.lock, parsed.reed, parsed.reed_switch)),
+        pump1On: asBool(firstDefined(parsed.pump1_on, parsed.pump1On)),
+        pump2On: asBool(firstDefined(parsed.pump2_on, parsed.pump2On)),
+        greenOn: asBool(firstDefined(parsed.green_on, parsed.greenOn)),
+        redOn: asBool(firstDefined(parsed.red_on, parsed.redOn)),
+        isOn: asBool(firstDefined(parsed.is_on, parsed.isOn)),
       };
 
       setPressure(asNumber(parsed.pressure));
-      setFlowRate(asNumber(parsed.flow_rate));
+      setFlowRate(asNumber(firstDefined(parsed.flow_rate, parsed.flow)));
       const carriedSnapshot = carryTelemetrySnapshot(snapshot);
       if (carriedSnapshot) {
         applyTelemetrySnapshot(carriedSnapshot);
@@ -846,12 +878,13 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
     const pollId = setInterval(fetchApiData, API_POLL_INTERVAL_MS);
     fetchApiData();
+    fetchApiHistory();
 
     return () => {
       mqttClient.end();
       clearInterval(pollId);
     };
-  }, [carryTelemetrySnapshot, fetchApiData]);
+  }, [carryTelemetrySnapshot, fetchApiData, fetchApiHistory]);
 
   const publishCommand = useCallback(async (command: string, pump?: number, state?: 'ON' | 'OFF') => {
     if (!client || mqttStatus !== 'connected') {
