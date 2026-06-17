@@ -7,9 +7,12 @@ import { Login } from "@/features/auth/components/Login";
 import { Register } from "@/features/auth/components/Register";
 import { DevicePairingPage } from "@/components/pages/DevicePairingPage";
 import { authService } from "@/features/auth/services/authService";
+import { getActiveDeviceIdValue, scopedStorageKey, setActiveDeviceIdValue } from "@/hooks/useActiveDeviceId";
 
 const PAIRING_COMPLETED_KEY = "device_pairing_completed";
 const PAIRING_DEVICE_ID_KEY = "device_pairing_device_id";
+const pairingCompletedKey = () => scopedStorageKey(PAIRING_COMPLETED_KEY);
+const pairingDeviceIdKey = () => scopedStorageKey(PAIRING_DEVICE_ID_KEY);
 
 export function AppRouter() {
   const { user, logout } = useAuth();
@@ -31,8 +34,9 @@ export function AppRouter() {
     }
 
     const hasCachedPairing = typeof window !== 'undefined' && (
-      localStorage.getItem(PAIRING_COMPLETED_KEY) === 'true' ||
-      Boolean(localStorage.getItem(PAIRING_DEVICE_ID_KEY))
+      localStorage.getItem(pairingCompletedKey()) === 'true' ||
+      Boolean(localStorage.getItem(pairingDeviceIdKey())) ||
+      Boolean(getActiveDeviceIdValue())
     );
 
     if (hasCachedPairing) {
@@ -46,14 +50,23 @@ export function AppRouter() {
         if (!isMounted) return;
         if (rows.length > 0) {
           setPairingStatus('paired');
-          localStorage.setItem(PAIRING_COMPLETED_KEY, 'true');
+          localStorage.setItem(pairingCompletedKey(), 'true');
           if (rows[0]?.device_id) {
-            localStorage.setItem(PAIRING_DEVICE_ID_KEY, String(rows[0].device_id));
+            localStorage.setItem(pairingDeviceIdKey(), String(rows[0].device_id));
+            setActiveDeviceIdValue(String(rows[0].device_id));
           }
           return;
         }
-        localStorage.removeItem(PAIRING_COMPLETED_KEY);
-        localStorage.removeItem(PAIRING_DEVICE_ID_KEY);
+        const cachedDeviceId = getActiveDeviceIdValue() || localStorage.getItem(pairingDeviceIdKey()) || '';
+        if (cachedDeviceId) {
+          localStorage.setItem(pairingCompletedKey(), 'true');
+          localStorage.setItem(pairingDeviceIdKey(), cachedDeviceId);
+          setActiveDeviceIdValue(cachedDeviceId);
+          setPairingStatus('paired');
+          return;
+        }
+        localStorage.removeItem(pairingCompletedKey());
+        localStorage.removeItem(pairingDeviceIdKey());
         setPairingStatus('required');
       })
       .catch(() => {
@@ -85,8 +98,9 @@ export function AppRouter() {
         <DevicePairingPage
           user={user}
           onPaired={({ deviceId }) => {
-            localStorage.setItem(PAIRING_COMPLETED_KEY, 'true');
-            localStorage.setItem('device_pairing_device_id', deviceId);
+            localStorage.setItem(pairingCompletedKey(), 'true');
+            localStorage.setItem(pairingDeviceIdKey(), deviceId);
+            setActiveDeviceIdValue(deviceId);
             setPairingStatus('paired');
           }}
           onSkip={() => {
