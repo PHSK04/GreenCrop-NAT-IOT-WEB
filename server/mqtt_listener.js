@@ -8,6 +8,64 @@ const TOPIC_TENANT_PATTERN = 'tenants/+/devices/+/sensors';
 
 let client;
 
+function asBool(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value === 1;
+    const v = String(value ?? '').toLowerCase().trim();
+    return v === '1' || v === 'true' || v === 'on';
+}
+
+function asNumber(value, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizePumpsArray(value) {
+    if (Array.isArray(value)) return value.map((item) => asBool(item));
+    if (typeof value === 'string' && value.trim()) {
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed.map((item) => asBool(item)) : [];
+        } catch (_) {
+            return [];
+        }
+    }
+    return [];
+}
+
+function normalizePumpsJson(value) {
+    return JSON.stringify(normalizePumpsArray(value).map((item) => item ? 1 : 0));
+}
+
+function hasMeaningfulSensorSignal(payload) {
+    const numericKeys = ['pressure', 'flow_rate', 'flow', 'ec_value', 'ec'];
+    const hasNumericSignal = numericKeys.some((key) => {
+        if (payload[key] === undefined || payload[key] === null || payload[key] === '') return false;
+        return Math.abs(asNumber(payload[key], 0)) > 0;
+    });
+    const activeTank = payload.active_tank ?? payload.activeTank;
+    const hasTankSignal = activeTank !== undefined &&
+        activeTank !== null &&
+        String(activeTank).trim() !== '' &&
+        asNumber(activeTank, 0) > 0;
+    const hasPumpSignal = normalizePumpsArray(payload.pumps).some(Boolean);
+    const eventKeys = ['triggered', 'event', 'detected', 'changed'];
+    const hasEventSignal = eventKeys.some((key) => asBool(payload[key]));
+    return hasNumericSignal || hasTankSignal || hasPumpSignal || hasEventSignal;
+}
+
+function sensorSignature(row) {
+    if (!row) return '';
+    return JSON.stringify({
+        pressure: Number(asNumber(row.pressure, 0).toFixed(3)),
+        flow_rate: Number(asNumber(row.flow_rate, 0).toFixed(3)),
+        ec_value: Number(asNumber(row.ec_value, 0).toFixed(3)),
+        pumps: normalizePumpsArray(row.pumps).map((item) => item ? 1 : 0),
+        active_tank: row.active_tank ?? null,
+        is_on: asBool(row.is_on)
+    });
+}
+
 function startMqttListener() {
     console.log(`[MQTT] Connecting to ${MQTT_BROKER}...`);
     client = mqtt.connect(MQTT_BROKER, {
@@ -40,20 +98,21 @@ function startMqttListener() {
             const payload = JSON.parse(message.toString());
             console.log(`[MQTT] Received data on ${topic}:`, payload);
 
+            if (!hasMeaningfulSensorSignal(payload)) {
+                console.log(`[MQTT] Suppressed empty/no-trigger payload on ${topic}`);
+                return;
+            }
+
             // Extract data
-            const pressure = payload.pressure || 0;
-            const flow_rate = payload.flow || payload.flow_rate || 0;
-            const ec_value = payload.ec || payload.ec_value || 0;
+            const pressure = asNumber(payload.pressure, 0);
+            const flow_rate = asNumber(payload.flow ?? payload.flow_rate, 0);
+            const ec_value = asNumber(payload.ec ?? payload.ec_value, 0);
             const hasIsOn = payload.isOn !== undefined || payload.is_on !== undefined;
             const hasUptime = payload.uptime_seconds !== undefined || payload.uptimeSeconds !== undefined;
-            const active_tank = payload.activeTank || payload.active_tank || null;
+            const active_tank = payload.activeTank ?? payload.active_tank ?? null;
 
             // Pumps array handling
-            let pumpsJson = "[]";
-            if (payload.pumps && Array.isArray(payload.pumps)) {
-                const pumpStates = payload.pumps.map(p => p ? 1 : 0);
-                pumpsJson = JSON.stringify(pumpStates);
-            }
+            const pumpsJson = normalizePumpsJson(payload.pumps);
 
             // Obtain device_id and sensor_id from payload if not from topic
             const payloadDeviceId = payload.device_id || payload.device || deviceId || null;
@@ -65,11 +124,11 @@ function startMqttListener() {
                 const raw = message.toString();
                 const msgId = payload.msg_id || payload.msgId || payload.id || null;
                 const latest = await db.get(
-                    `SELECT TOP 1 is_on, uptime_seconds
+                    `SELECT TOP 1 is_on, uptime_seconds, pressure, flow_rate, ec_value, pumps, active_tank, timestamp
                      FROM sensor_data
-                     WHERE tenant_id = ?
+                     WHERE tenant_id = ?${payloadDeviceId ? ' AND device_id = ?' : ''}
                      ORDER BY id DESC`,
-                    [finalTenant]
+                    payloadDeviceId ? [finalTenant, payloadDeviceId] : [finalTenant]
                 );
 
                 const is_on = hasIsOn
@@ -78,6 +137,26 @@ function startMqttListener() {
                 const uptime_seconds = hasUptime
                     ? Number(payload.uptime_seconds ?? payload.uptimeSeconds ?? 0)
                     : Number(latest?.uptime_seconds ?? 0);
+
+                const nextRow = {
+                    pressure,
+                    flow_rate,
+                    ec_value,
+                    pumps: pumpsJson,
+                    active_tank,
+                    is_on
+                };
+                const latestTsMs = latest?.timestamp ? new Date(latest.timestamp).getTime() : 0;
+                if (
+                    latest &&
+                    sensorSignature(latest) === sensorSignature(nextRow) &&
+                    Number.isFinite(latestTsMs) &&
+                    latestTsMs > 0 &&
+                    (Date.now() - latestTsMs) <= 30000
+                ) {
+                    console.log(`[MQTT] Suppressed duplicate sensor state for tenant=${finalTenant} device=${payloadDeviceId || 'none'}`);
+                    return;
+                }
 
                 await db.run(
                     `INSERT INTO sensor_data 
