@@ -190,6 +190,54 @@ function asNumber(value, fallback = 0) {
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function normalizePumpsArray(value) {
+    if (Array.isArray(value)) {
+        return value.map((item) => asBool(item));
+    }
+    if (typeof value === 'string' && value.trim()) {
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed.map((item) => asBool(item)) : [];
+        } catch (_) {
+            return [];
+        }
+    }
+    return [];
+}
+
+function normalizePumpsJson(value) {
+    return JSON.stringify(normalizePumpsArray(value).map((item) => item ? 1 : 0));
+}
+
+function hasMeaningfulSensorSignal(body) {
+    const numericKeys = ['pressure', 'flow_rate', 'flow', 'ec_value', 'ec'];
+    const hasNumericSignal = numericKeys.some((key) => {
+        if (body[key] === undefined || body[key] === null || body[key] === '') return false;
+        return Math.abs(asNumber(body[key], 0)) > 0;
+    });
+    const hasPumpSignal = normalizePumpsArray(body.pumps).some(Boolean);
+    const activeTank = body.active_tank ?? body.activeTank;
+    const hasTankSignal = activeTank !== undefined &&
+        activeTank !== null &&
+        String(activeTank).trim() !== '' &&
+        asNumber(activeTank, 0) > 0;
+    const eventKeys = ['triggered', 'event', 'detected', 'changed'];
+    const hasEventSignal = eventKeys.some((key) => asBool(body[key]));
+    return hasNumericSignal || hasPumpSignal || hasTankSignal || hasEventSignal;
+}
+
+function sensorSignature(row) {
+    if (!row) return '';
+    return JSON.stringify({
+        pressure: Number(asNumber(row.pressure, 0).toFixed(3)),
+        flow_rate: Number(asNumber(row.flow_rate, 0).toFixed(3)),
+        ec_value: Number(asNumber(row.ec_value, 0).toFixed(3)),
+        pumps: normalizePumpsArray(row.pumps).map((item) => item ? 1 : 0),
+        active_tank: row.active_tank ?? null,
+        is_on: asBool(row.is_on)
+    });
+}
+
 function computeLiveUptimeSeconds(row, nowMs = Date.now()) {
     const baseUptime = Math.max(0, Math.floor(asNumber(row?.uptime_seconds, 0)));
     if (!asBool(row?.is_on)) return baseUptime;
@@ -2543,15 +2591,17 @@ app.get('/api/sensor-data', async (req, res) => {
         
         console.log(`[READ] Sensor Request - Tenant ID: ${tenantId}`);
 
+        const noDataPayload = (message) => ([{
+            no_data: true,
+            status: 'no_data',
+            is_on: false,
+            tenant_id: tenantId || null,
+            message,
+            server_now: serverNowIso
+        }]);
+
         if (!tenantId) {
-            // New User or No Login? Return empty default state instead of global data
-            return res.json([{
-                pressure: 0, 
-                flow_rate: 0, 
-                is_on: false,
-                message: "No tenant_id provided, please login.",
-                server_now: serverNowIso
-            }]);
+            return res.json(noDataPayload('No tenant_id provided, please login.'));
         }
 
         // 2. Fetch DATA specific to this User Only
@@ -2577,43 +2627,26 @@ app.get('/api/sensor-data', async (req, res) => {
 
         let rows = await db.all(query, params);
 
-        // 2b. Fallback: If no user-specific data, check for 'public' legacy data
-        if (rows.length === 0 && tenantId !== 'public') {
-            console.log(`[READ] No data for Tenant ${tenantId}, falling back to 'public'`);
-            rows = await db.all(query, deviceId ? ['public', deviceId] : ['public']);
-        }
-
         // History mode for charts (optional)
         if (req.query.history === 'true') {
-             const targetTenant = rows.length > 0 ? (rows[0].tenant_id || tenantId) : tenantId;
              const history = await db.all(
                 `
-                SELECT TOP 50 pressure, flow_rate, timestamp 
+                SELECT TOP 50 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp
                 FROM sensor_data 
                 WHERE tenant_id = ?${deviceId ? ' AND device_id = ?' : ''}
                 ORDER BY id DESC
               `,
-              deviceId ? [targetTenant, deviceId] : [targetTenant]
+              deviceId ? [tenantId, deviceId] : [tenantId]
             );
             for (const row of history) {
                 row.server_now = serverNowIso;
+                row.is_on = asBool(row.is_on);
             }
             return res.json(history); 
         }
 
-        // If still no data found, return default OFF state
         if (rows.length === 0) {
-            return res.json([{
-                pressure: 0,
-                flow_rate: 0,
-                ec_value: 0,
-                is_on: false, // Default OFF
-                pumps: '[]',
-                active_tank: 0,
-                uptime_seconds: 0,
-                tenant_id: tenantId, // Echo back
-                server_now: serverNowIso
-            }]);
+            return res.json(noDataPayload('No sensor data for this account/device.'));
         }
         
         // Return as Array (Mobile App expects List)
@@ -2642,12 +2675,13 @@ app.post('/api/sensor-data', async (req, res) => {
         console.log(`[DATA SYNC] Update from Tenant ID: ${tenant} | Power: ${req.body.is_on} | source=${source}`);
 
         const { device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp } = req.body;
+        const deviceId = device_id ? String(device_id).trim().toUpperCase() : null;
         const latest = await db.get(
-            `SELECT TOP 1 is_on, uptime_seconds, timestamp
+            `SELECT TOP 1 is_on, uptime_seconds, timestamp, pressure, flow_rate, ec_value, pumps, active_tank
              FROM sensor_data
-             WHERE tenant_id = ?
+             WHERE tenant_id = ?${deviceId ? ' AND device_id = ?' : ''}
              ORDER BY id DESC`,
-            [tenant]
+            deviceId ? [tenant, deviceId] : [tenant]
         );
 
         const isTrustedControlSource = source === 'app-ui' || source === 'web-ui';
@@ -2668,7 +2702,28 @@ app.post('/api/sensor-data', async (req, res) => {
             return res.json({ ok: true, suppressed: true, reason: 'stale-off-overwrite' });
         }
 
-        const pumpsJson = pumps && Array.isArray(pumps) ? JSON.stringify(pumps.map(p => p ? 1 : 0)) : '[]';
+        if (!isTrustedControlSource && !hasMeaningfulSensorSignal(req.body)) {
+            console.warn(`[DATA SYNC] Suppressed empty sensor payload for tenant=${tenant} source=${source}`);
+            return res.json({ ok: true, suppressed: true, reason: 'no-sensor-signal' });
+        }
+
+        const pumpsJson = normalizePumpsJson(pumps);
+        const nextRow = {
+            pressure: asNumber(pressure, 0),
+            flow_rate: asNumber(flow_rate, 0),
+            ec_value: asNumber(ec_value, 0),
+            pumps: pumpsJson,
+            active_tank: active_tank ?? null,
+            is_on: normalizedIsOn
+        };
+        if (latest && sensorSignature(latest) === sensorSignature(nextRow)) {
+            const duplicateWindowMs = isTrustedControlSource ? 2000 : 30000;
+            if (Number.isFinite(latestTsMs) && latestTsMs > 0 && (nowMs - latestTsMs) <= duplicateWindowMs) {
+                console.log(`[DATA SYNC] Suppressed duplicate row for tenant=${tenant} source=${source}`);
+                return res.json({ ok: true, suppressed: true, reason: 'duplicate-sensor-state' });
+            }
+        }
+
         const parsedTsMs = timestamp ? new Date(timestamp).getTime() : NaN;
         const clientTsSkewMs = Number.isFinite(parsedTsMs) ? Math.abs(nowMs - parsedTsMs) : Number.POSITIVE_INFINITY;
         const safeTimestamp = (clientTsSkewMs <= 5 * 60 * 1000) ? new Date(parsedTsMs) : new Date(nowMs);
@@ -2678,13 +2733,13 @@ app.post('/api/sensor-data', async (req, res) => {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 tenant,
-                device_id || null,
+                deviceId,
                 sensor_id || null,
-                asNumber(pressure, 0),
-                asNumber(flow_rate, 0),
-                asNumber(ec_value, 0),
+                nextRow.pressure,
+                nextRow.flow_rate,
+                nextRow.ec_value,
                 pumpsJson,
-                active_tank ?? null,
+                nextRow.active_tank,
                 normalizedIsOn,
                 parsedIncomingUptime,
                 safeTimestamp
