@@ -67,6 +67,7 @@ const MQTT_PASSWORD = 'GreenCropnat123456';
 const TOPIC_SENSORS_LEGACY = 'smartfarm/sensors';
 const TOPIC_CONTROL_LEGACY = 'smartfarm/control';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const ACCEPT_LEGACY_MQTT = import.meta.env.VITE_ACCEPT_LEGACY_MQTT === 'true';
 const HISTORY_LIMIT = 2000;
 const API_POLL_INTERVAL_MS = 2000;
 const HISTORY_SAMPLE_INTERVAL_MS = 1000;
@@ -814,7 +815,9 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
     mqttClient.on('connect', () => {
       setMqttStatus('connected');
-      mqttClient.subscribe(TOPIC_SENSORS_LEGACY);
+      if (ACCEPT_LEGACY_MQTT) {
+        mqttClient.subscribe(TOPIC_SENSORS_LEGACY);
+      }
 
       const { tenantId } = getSessionAuth();
       const activeDeviceId = getActiveDeviceId();
@@ -843,6 +846,9 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       const topic = incomingTopic.toString();
       const { tenantId } = getSessionAuth();
       const deviceTopic = getDeviceTopic(tenantId, selectedDeviceId, 'sensors');
+      if (topic === TOPIC_SENSORS_LEGACY && !ACCEPT_LEGACY_MQTT) {
+        return;
+      }
       if (selectedDeviceId && topic !== TOPIC_SENSORS_LEGACY && deviceTopic && topic !== deviceTopic) {
         return;
       }
