@@ -44,7 +44,7 @@ import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { ModeToggle } from "./mode-toggle";
 import { useMachine } from "../contexts/MachineContext";
 import appLogoGreen from "@/assets/images/3_transparent_logo_green.png";
-import { setActiveDeviceIdValue } from "@/hooks/useActiveDeviceId";
+import { getActiveDeviceIdValue, scopedStorageKey, setActiveDeviceIdValue } from "@/hooks/useActiveDeviceId";
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
@@ -355,7 +355,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       const rows = await authService.getMyDevices();
       setDevices(rows);
       const stored = typeof window !== 'undefined'
-        ? (localStorage.getItem('active_device_id') || localStorage.getItem('device_pairing_device_id'))
+        ? (getActiveDeviceIdValue() || localStorage.getItem(scopedStorageKey('device_pairing_device_id')))
         : null;
       const hasStored = stored ? rows.some((d) => d.device_id === stored) : false;
       const primary = rows.find((d) => d.is_primary)?.device_id;
@@ -428,9 +428,9 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
           <DevicePairingPage
             user={user}
             onPaired={({ deviceId }) => {
-              localStorage.setItem("device_pairing_completed", "true");
-              localStorage.removeItem("device_pairing_skipped");
-              localStorage.setItem("device_pairing_device_id", deviceId);
+              localStorage.setItem(scopedStorageKey("device_pairing_completed"), "true");
+              localStorage.removeItem(scopedStorageKey("device_pairing_skipped"));
+              localStorage.setItem(scopedStorageKey("device_pairing_device_id"), deviceId);
 	              setActiveDeviceId(deviceId);
 	              setActiveDeviceIdValue(deviceId);
               authService.getMyDevices().then(setDevices).catch(() => {});
