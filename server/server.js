@@ -286,7 +286,7 @@ function socialFallbackEmail(provider, providerUserId) {
 
 function appTokenForUser(user) {
     return jwt.sign(
-        { id: user.id, email: user.email, role: user.role, tenant_id: user.id },
+        { id: user.id, name: user.name, email: user.email, role: user.role, tenant_id: user.id },
         JWT_SECRET,
         { expiresIn: '24h' }
     );
@@ -364,6 +364,169 @@ function auditDeviceFromRequest(req, fallback = 'Web') {
     const networkType = String(req.headers['x-network-type'] || '').trim();
     const base = clientPlatform || fallback;
     return networkType ? `${base} (${networkType})` : base;
+}
+
+function uniqueStrings(values) {
+    const seen = new Set();
+    return values
+        .map((value) => String(value || '').trim())
+        .filter((value) => {
+            if (!value || seen.has(value)) return false;
+            seen.add(value);
+            return true;
+        });
+}
+
+async function reconcileUserLinkedData(user) {
+    if (!user?.id) return;
+    const normalizedEmail = normalizeEmail(user.email || '');
+    if (!normalizedEmail) return;
+
+    const userEmail = String(user.email || '').trim();
+    const now = new Date();
+    await db.run(
+        `UPDATE device_pairings
+         SET user_id = ?, user_email = ?, updated_at = ?
+         WHERE LOWER(user_email) = ?
+           AND CAST(user_id AS VARCHAR) <> ?`,
+        [user.id, userEmail, now, normalizedEmail, String(user.id)]
+    );
+    await db.run(
+        `UPDATE login_sessions
+         SET user_id = ?, user_email = ?
+         WHERE LOWER(user_email) = ?
+           AND (user_id IS NULL OR CAST(user_id AS VARCHAR) <> ?)`,
+        [user.id, userEmail, normalizedEmail, String(user.id)]
+    );
+    await db.run(
+        `UPDATE chat_threads
+         SET customer_user_id = ?, customer_email = ?, updated_at = ?
+         WHERE LOWER(customer_email) = ?
+           AND CAST(customer_user_id AS VARCHAR) <> ?`,
+        [user.id, userEmail, now, normalizedEmail, String(user.id)]
+    );
+}
+
+async function getDevicesForUser(user) {
+    const userId = user?.id;
+    if (!userId) return [];
+    const normalizedEmail = normalizeEmail(user?.email || '');
+    const where = ['user_id = ?'];
+    const params = [userId];
+
+    if (normalizedEmail) {
+        where.push('LOWER(user_email) = ?');
+        params.push(normalizedEmail);
+    }
+
+    await reconcileUserLinkedData(user);
+    return db.all(`
+        SELECT id, user_id, user_email, device_id, device_name, location, pairing_code, status, created_at, paired_at, last_seen, is_primary, updated_at
+        FROM device_pairings
+        WHERE ${where.join(' OR ')}
+        ORDER BY is_primary DESC, paired_at DESC
+    `, params);
+}
+
+async function userCanUseDevice(user, deviceId) {
+    const normalizedDeviceId = String(deviceId || '').trim().toUpperCase();
+    if (!user?.id || !normalizedDeviceId) return false;
+    const normalizedEmail = normalizeEmail(user.email || '');
+    const where = ['device_id = ?', 'user_id = ?'];
+    const params = [normalizedDeviceId, user.id];
+
+    if (normalizedEmail) {
+        where[1] = '(user_id = ? OR LOWER(user_email) = ?)';
+        params.push(normalizedEmail);
+    }
+
+    const row = await db.get(
+        `SELECT id FROM device_pairings WHERE ${where.join(' AND ')}`,
+        params
+    );
+    return Boolean(row);
+}
+
+async function getSensorTenantCandidates(req, requestedTenantId, deviceId) {
+    const candidates = [requestedTenantId];
+    const normalizedDeviceId = String(deviceId || '').trim().toUpperCase();
+
+    if (normalizedDeviceId) {
+        candidates.push(DEFAULT_TENANT_ID);
+    }
+
+    if (normalizedDeviceId && await userCanUseDevice(req.user, normalizedDeviceId)) {
+        const rows = await db.all(
+            `SELECT DISTINCT tenant_id
+             FROM sensor_data
+             WHERE device_id = ?
+             ORDER BY tenant_id`,
+            [normalizedDeviceId]
+        );
+        candidates.push(...rows.map((row) => row.tenant_id));
+    }
+
+    return uniqueStrings(candidates);
+}
+
+async function loadLatestSensorRows(tenantIds, deviceId) {
+    const rows = [];
+    for (const tenantId of tenantIds) {
+        const params = [tenantId];
+        let query = `
+            SELECT TOP 1 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
+            FROM sensor_data
+            WHERE tenant_id = ? AND raw_payload IS NOT NULL
+            ORDER BY id DESC
+        `;
+        if (deviceId) {
+            query = `
+                SELECT TOP 1 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
+                FROM sensor_data
+                WHERE tenant_id = ? AND device_id = ? AND raw_payload IS NOT NULL
+                ORDER BY id DESC
+            `;
+            params.push(deviceId);
+        }
+        const found = await db.all(query, params);
+        rows.push(...found);
+    }
+    return rows.sort((a, b) => {
+        const aTime = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const bTime = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0) || Number(b.id || 0) - Number(a.id || 0);
+    }).slice(0, 1);
+}
+
+async function loadSensorHistoryRows(tenantIds, deviceId) {
+    const rows = [];
+    for (const tenantId of tenantIds) {
+        const history = await db.all(
+            `
+            SELECT TOP 50 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
+            FROM sensor_data 
+            WHERE tenant_id = ?${deviceId ? ' AND device_id = ?' : ''}
+            ORDER BY id DESC
+          `,
+          deviceId ? [tenantId, deviceId] : [tenantId]
+        );
+        rows.push(...history);
+    }
+
+    const seen = new Set();
+    return rows
+        .filter((row) => {
+            const key = `${row.tenant_id}|${row.device_id || ''}|${row.sensor_id || ''}|${row.timestamp || ''}|${row.id || ''}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        })
+        .sort((a, b) => {
+            const aTime = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
+            const bTime = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
+            return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0) || Number(b.id || 0) - Number(a.id || 0);
+        })
+        .slice(0, 50);
 }
 
 function httpsGetJson(url) {
@@ -745,7 +908,9 @@ async function upsertSocialUser({ provider, providerUserId, email, name, avatar 
              WHERE id = ?`,
             [finalName, finalEmail, avatar || null, provider, providerUserId, user.id]
         );
-        return db.get("SELECT * FROM users WHERE id = ?", [user.id]);
+        const updatedUser = await db.get("SELECT * FROM users WHERE id = ?", [user.id]);
+        await reconcileUserLinkedData(updatedUser);
+        return updatedUser;
     }
 
     const passwordHash = await bcrypt.hash(randomLocalPassword(), 10);
@@ -754,7 +919,9 @@ async function upsertSocialUser({ provider, providerUserId, email, name, avatar 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [finalName, finalEmail, passwordHash, null, 'user', avatar || null, provider, providerUserId, new Date()]
     );
-    return db.get("SELECT * FROM users WHERE id = ?", [insertResult.id]);
+    const createdUser = await db.get("SELECT * FROM users WHERE id = ?", [insertResult.id]);
+    await reconcileUserLinkedData(createdUser);
+    return createdUser;
 }
 
 const handleLogin = async (req, res) => {
@@ -780,6 +947,7 @@ const handleLogin = async (req, res) => {
         }
 
         await logAudit(user.name, 'LOGIN', auditDeviceFromRequest(req, 'Web'), 'SUCCESS', 'User logged in successfully');
+        await reconcileUserLinkedData(user);
 
         const token = appTokenForUser(user);
         
@@ -1891,15 +2059,8 @@ app.get('/api/chat/unread-summary', async (req, res) => {
 // --- Device APIs (for logged-in users) ---
 app.get('/api/devices/my', async (req, res) => {
     try {
-        const userId = req.user?.id;
-        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-        const devices = await db.all(`
-            SELECT id, user_id, user_email, device_id, device_name, location, pairing_code, status, created_at, paired_at, last_seen, is_primary, updated_at
-            FROM device_pairings
-            WHERE user_id = ?
-            ORDER BY is_primary DESC, paired_at DESC
-        `, [userId]);
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const devices = await getDevicesForUser(req.user);
 
         res.json(devices);
     } catch (err) {
@@ -1964,7 +2125,15 @@ app.post('/api/devices/pair', async (req, res) => {
             [deviceId]
         );
 
-        if (existing && String(existing.user_id) !== String(userId)) {
+        const existingOwnedByThisEmail =
+            existing &&
+            userEmail &&
+            await db.get(
+                "SELECT id FROM device_pairings WHERE device_id = ? AND LOWER(user_email) = ?",
+                [deviceId, normalizeEmail(userEmail)]
+            );
+
+        if (existing && String(existing.user_id) !== String(userId) && !existingOwnedByThisEmail) {
             await logAudit(userName, 'DEVICE_PAIR', auditDeviceFromRequest(req, 'Web'), 'FAILED', `device_id=${deviceId} already claimed`);
             return res.status(409).json({ error: 'Device already claimed by another account' });
         }
@@ -1986,9 +2155,9 @@ app.post('/api/devices/pair', async (req, res) => {
         if (existing) {
             await db.run(
                 `UPDATE device_pairings 
-                 SET pairing_code = ?, status = 'paired', paired_at = ?, user_email = ?, device_name = ?, location = ?, is_primary = ?, updated_at = ?
+                 SET user_id = ?, pairing_code = ?, status = 'paired', paired_at = ?, user_email = ?, device_name = ?, location = ?, is_primary = ?, updated_at = ?
                  WHERE id = ?`,
-                [pairingCode, new Date(), userEmail, deviceName, location, shouldBePrimary, new Date(), existing.id]
+                [userId, pairingCode, new Date(), userEmail, deviceName, location, shouldBePrimary, new Date(), existing.id]
             );
         } else {
             await db.run(
@@ -2631,44 +2800,20 @@ app.get('/api/sensor-data', async (req, res) => {
             return res.json(noDataPayload('No tenant_id provided, please login.'));
         }
 
-        // 2. Fetch DATA specific to this User Only
-        const deviceId = req.query.device_id ? String(req.query.device_id) : null;
-
-        let query = `
-            SELECT TOP 1 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
-            FROM sensor_data
-            WHERE tenant_id = ? AND raw_payload IS NOT NULL
-            ORDER BY id DESC
-        `;
-        
-        const params = [tenantId];
-        if (deviceId) {
-            query = `
-                SELECT TOP 1 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
-                FROM sensor_data
-                WHERE tenant_id = ? AND device_id = ? AND raw_payload IS NOT NULL
-                ORDER BY id DESC
-            `;
-            params.push(deviceId);
-        }
-
-        let rows = await db.all(query, params);
+        const deviceId = req.query.device_id ? String(req.query.device_id).trim().toUpperCase() : null;
+        const tenantCandidates = await getSensorTenantCandidates(req, tenantId, deviceId);
+        let rows = await loadLatestSensorRows(tenantCandidates, deviceId);
 
         // History mode for charts (optional)
         if (req.query.history === 'true') {
-             const history = await db.all(
-                `
-                SELECT TOP 50 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
-                FROM sensor_data 
-                WHERE tenant_id = ? AND raw_payload IS NOT NULL${deviceId ? ' AND device_id = ?' : ''}
-                ORDER BY id DESC
-              `,
-              deviceId ? [tenantId, deviceId] : [tenantId]
-            );
+             const history = await loadSensorHistoryRows(tenantCandidates, deviceId);
             for (const row of history) {
                 Object.assign(row, enrichSensorRow(row));
                 row.server_now = serverNowIso;
                 row.is_on = asBool(row.is_on);
+                row.is_stale = row.timestamp
+                    ? serverNowMs - new Date(row.timestamp).getTime() > SENSOR_DATA_STALE_MS
+                    : true;
             }
             return res.json(history); 
         }
@@ -2678,20 +2823,19 @@ app.get('/api/sensor-data', async (req, res) => {
         }
 
         const latestSensorAtMs = rows[0]?.timestamp ? new Date(rows[0].timestamp).getTime() : 0;
-        if (
-            !Number.isFinite(latestSensorAtMs) ||
-            latestSensorAtMs <= 0 ||
-            serverNowMs - latestSensorAtMs > SENSOR_DATA_STALE_MS
-        ) {
-            return res.json(noDataPayload('Sensor data is stale or device is offline.'));
-        }
-        
         // Return as Array (Mobile App expects List)
         for (const row of rows) {
             Object.assign(row, enrichSensorRow(row));
             row.uptime_seconds = computeLiveUptimeSeconds(row, serverNowMs);
             row.is_on = asBool(row.is_on);
             row.server_now = serverNowIso;
+            row.is_stale =
+                !Number.isFinite(latestSensorAtMs) ||
+                latestSensorAtMs <= 0 ||
+                serverNowMs - latestSensorAtMs > SENSOR_DATA_STALE_MS;
+            if (row.is_stale) {
+                row.message = 'Showing latest saved sensor data; device may be offline.';
+            }
         }
         res.json(rows); 
         
