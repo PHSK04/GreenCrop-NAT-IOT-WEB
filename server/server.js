@@ -276,11 +276,37 @@ function enrichSensorRow(row) {
             red_on: firstDefined(raw.red_on, raw.redOn, row.red_on),
             ph_ok: firstDefined(raw.ph_ok, raw.phOk, row.ph_ok),
             is_on: firstDefined(raw.is_on, raw.isOn, row.is_on),
-            uptime_seconds: firstDefined(raw.uptime_seconds, raw.uptimeSeconds, row.uptime_seconds)
+            uptime_seconds: firstDefined(raw.uptime_seconds, raw.uptimeSeconds, row.uptime_seconds),
+            source: firstDefined(row.source, raw.source),
+            mqtt_topic: firstDefined(row.mqtt_topic, raw.mqtt_topic)
         };
     } catch (_) {
         return row;
     }
+}
+
+function parseSensorRawPayload(row) {
+    if (!row?.raw_payload) return null;
+    try {
+        const raw = typeof row.raw_payload === 'string' ? JSON.parse(row.raw_payload) : row.raw_payload;
+        return raw && typeof raw === 'object' ? raw : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function getSensorRowSource(row) {
+    const raw = parseSensorRawPayload(row);
+    return String(row?.source || raw?.source || '').trim().toLowerCase();
+}
+
+function isControlSnapshotRow(row) {
+    const source = getSensorRowSource(row);
+    return ['web-ui', 'app-ui', 'web-control', 'app-control'].includes(source);
+}
+
+function isBoardTelemetryRow(row) {
+    return !isControlSnapshotRow(row);
 }
 
 function computeLiveUptimeSeconds(row, nowMs = Date.now()) {
@@ -492,14 +518,14 @@ async function loadLatestSensorRows(tenantIds, deviceId) {
     for (const tenantId of tenantIds) {
         const params = [tenantId];
         let query = `
-            SELECT TOP 1 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
+            SELECT TOP 25 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank, is_on, uptime_seconds, timestamp
             FROM sensor_data
             WHERE tenant_id = ? AND raw_payload IS NOT NULL
             ORDER BY id DESC
         `;
         if (deviceId) {
             query = `
-                SELECT TOP 1 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
+                SELECT TOP 25 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank, is_on, uptime_seconds, timestamp
                 FROM sensor_data
                 WHERE tenant_id = ? AND device_id = ? AND raw_payload IS NOT NULL
                 ORDER BY id DESC
@@ -507,7 +533,7 @@ async function loadLatestSensorRows(tenantIds, deviceId) {
             params.push(deviceId);
         }
         const found = await db.all(query, params);
-        rows.push(...found);
+        rows.push(...found.filter(isBoardTelemetryRow));
     }
     return rows.sort((a, b) => {
         const aTime = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
@@ -521,7 +547,7 @@ async function loadSensorHistoryRows(tenantIds, deviceId) {
     for (const tenantId of tenantIds) {
         const history = await db.all(
             `
-            SELECT TOP 2000 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
+            SELECT TOP 2000 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank, is_on, uptime_seconds, timestamp
             FROM sensor_data 
             WHERE tenant_id = ?${deviceId ? ' AND device_id = ?' : ''}
             ORDER BY id DESC
@@ -533,6 +559,7 @@ async function loadSensorHistoryRows(tenantIds, deviceId) {
 
     const seen = new Set();
     return rows
+        .filter(isBoardTelemetryRow)
         .filter((row) => {
             const key = `${row.tenant_id}|${row.device_id || ''}|${row.sensor_id || ''}|${row.timestamp || ''}|${row.id || ''}`;
             if (seen.has(key)) return false;
@@ -2876,10 +2903,12 @@ app.post('/api/sensor-data', async (req, res) => {
 
         const { device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp } = req.body;
         const deviceId = device_id ? String(device_id).trim().toUpperCase() : null;
+        const normalizedSource = source.trim().toLowerCase();
         const rawPayload = JSON.stringify({
             ...req.body,
             tenant_id: tenant,
             device_id: deviceId || req.body.device_id || null,
+            source: normalizedSource,
             pressure: asNumber(pressure, 0),
             flow_rate: asNumber(flow_rate, 0),
             ec_value: asNumber(ec_value, 0),
@@ -2888,14 +2917,14 @@ app.post('/api/sensor-data', async (req, res) => {
             uptime_seconds: Math.max(0, Math.floor(asNumber(uptime_seconds, 0))),
         });
         const latest = await db.get(
-            `SELECT TOP 1 is_on, uptime_seconds, timestamp, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank
+            `SELECT TOP 1 is_on, uptime_seconds, timestamp, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank
              FROM sensor_data
              WHERE tenant_id = ?${deviceId ? ' AND device_id = ?' : ''}
              ORDER BY id DESC`,
             deviceId ? [tenant, deviceId] : [tenant]
         );
 
-        const isTrustedControlSource = source === 'app-ui' || source === 'web-ui';
+        const isTrustedControlSource = normalizedSource === 'app-ui' || normalizedSource === 'web-ui';
         const parsedIncomingUptime = Math.max(0, Math.floor(asNumber(uptime_seconds, 0)));
         const normalizedIsOn = asBool(is_on);
         const incomingIsOffReset = !normalizedIsOn && parsedIncomingUptime === 0;
@@ -2941,8 +2970,8 @@ app.post('/api/sensor-data', async (req, res) => {
         const safeTimestamp = (clientTsSkewMs <= 5 * 60 * 1000) ? new Date(parsedTsMs) : new Date(nowMs);
 
         const result = await db.run(
-            `INSERT INTO sensor_data (tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO sensor_data (tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank, is_on, uptime_seconds, timestamp)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 tenant,
                 deviceId,
@@ -2952,6 +2981,8 @@ app.post('/api/sensor-data', async (req, res) => {
                 nextRow.ec_value,
                 pumpsJson,
                 rawPayload,
+                normalizedSource,
+                null,
                 nextRow.active_tank,
                 normalizedIsOn,
                 parsedIncomingUptime,
