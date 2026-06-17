@@ -242,6 +242,8 @@ async function initDb() {
                     ec_value FLOAT,
                     pumps NVARCHAR(MAX), 
                     raw_payload NVARCHAR(MAX) NULL,
+                    source NVARCHAR(32) NULL,
+                    mqtt_topic NVARCHAR(191) NULL,
                     active_tank INT,
                     is_on BIT,
                     uptime_seconds FLOAT DEFAULT 0,
@@ -262,6 +264,10 @@ async function initDb() {
                     ALTER TABLE sensor_data ADD msg_id NVARCHAR(128) NULL;
                 IF COL_LENGTH('sensor_data', 'raw_payload') IS NULL
                     ALTER TABLE sensor_data ADD raw_payload NVARCHAR(MAX) NULL;
+                IF COL_LENGTH('sensor_data', 'source') IS NULL
+                    ALTER TABLE sensor_data ADD source NVARCHAR(32) NULL;
+                IF COL_LENGTH('sensor_data', 'mqtt_topic') IS NULL
+                    ALTER TABLE sensor_data ADD mqtt_topic NVARCHAR(191) NULL;
                 IF COL_LENGTH('sensor_data', 'uptime_seconds') IS NULL
                     ALTER TABLE sensor_data ADD uptime_seconds FLOAT DEFAULT 0;
             END
