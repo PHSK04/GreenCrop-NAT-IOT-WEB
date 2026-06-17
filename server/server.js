@@ -21,6 +21,7 @@ const HOST = process.env.API_HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret';
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || 'public';
 const SHARED_SENSOR_TENANT = String(process.env.SHARED_SENSOR_TENANT || 'false').toLowerCase() === 'true';
+const SENSOR_DATA_STALE_MS = Math.max(1000, Number(process.env.SENSOR_DATA_STALE_MS || 10000));
 const GOOGLE_CLIENT_IDS = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
     .split(',')
     .map((value) => value.trim())
@@ -236,6 +237,32 @@ function sensorSignature(row) {
         active_tank: row.active_tank ?? null,
         is_on: asBool(row.is_on)
     });
+}
+
+function enrichSensorRow(row) {
+    if (!row || !row.raw_payload) return row;
+    try {
+        const raw = typeof row.raw_payload === 'string' ? JSON.parse(row.raw_payload) : row.raw_payload;
+        if (!raw || typeof raw !== 'object') return row;
+        return {
+            ...row,
+            ph_value: raw.ph_value ?? raw.phValue ?? row.ph_value,
+            temp_c: raw.temp_c ?? raw.tempValue ?? row.temp_c,
+            wls1: raw.wls1 ?? row.wls1,
+            wls2: raw.wls2 ?? row.wls2,
+            float_alarm: raw.float_alarm ?? row.float_alarm,
+            locked: raw.locked ?? row.locked,
+            pump1_on: raw.pump1_on ?? row.pump1_on,
+            pump2_on: raw.pump2_on ?? row.pump2_on,
+            green_on: raw.green_on ?? row.green_on,
+            red_on: raw.red_on ?? row.red_on,
+            ph_ok: raw.ph_ok ?? row.ph_ok,
+            is_on: raw.is_on ?? row.is_on,
+            uptime_seconds: raw.uptime_seconds ?? row.uptime_seconds
+        };
+    } catch (_) {
+        return row;
+    }
 }
 
 function computeLiveUptimeSeconds(row, nowMs = Date.now()) {
@@ -2608,18 +2635,18 @@ app.get('/api/sensor-data', async (req, res) => {
         const deviceId = req.query.device_id ? String(req.query.device_id) : null;
 
         let query = `
-            SELECT TOP 1 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp
+            SELECT TOP 1 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
             FROM sensor_data
-            WHERE tenant_id = ?
+            WHERE tenant_id = ? AND raw_payload IS NOT NULL
             ORDER BY id DESC
         `;
         
         const params = [tenantId];
         if (deviceId) {
             query = `
-                SELECT TOP 1 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp
+                SELECT TOP 1 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
                 FROM sensor_data
-                WHERE tenant_id = ? AND device_id = ?
+                WHERE tenant_id = ? AND device_id = ? AND raw_payload IS NOT NULL
                 ORDER BY id DESC
             `;
             params.push(deviceId);
@@ -2631,14 +2658,15 @@ app.get('/api/sensor-data', async (req, res) => {
         if (req.query.history === 'true') {
              const history = await db.all(
                 `
-                SELECT TOP 50 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp
+                SELECT TOP 50 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, is_on, uptime_seconds, timestamp
                 FROM sensor_data 
-                WHERE tenant_id = ?${deviceId ? ' AND device_id = ?' : ''}
+                WHERE tenant_id = ? AND raw_payload IS NOT NULL${deviceId ? ' AND device_id = ?' : ''}
                 ORDER BY id DESC
               `,
               deviceId ? [tenantId, deviceId] : [tenantId]
             );
             for (const row of history) {
+                Object.assign(row, enrichSensorRow(row));
                 row.server_now = serverNowIso;
                 row.is_on = asBool(row.is_on);
             }
@@ -2648,9 +2676,19 @@ app.get('/api/sensor-data', async (req, res) => {
         if (rows.length === 0) {
             return res.json(noDataPayload('No sensor data for this account/device.'));
         }
+
+        const latestSensorAtMs = rows[0]?.timestamp ? new Date(rows[0].timestamp).getTime() : 0;
+        if (
+            !Number.isFinite(latestSensorAtMs) ||
+            latestSensorAtMs <= 0 ||
+            serverNowMs - latestSensorAtMs > SENSOR_DATA_STALE_MS
+        ) {
+            return res.json(noDataPayload('Sensor data is stale or device is offline.'));
+        }
         
         // Return as Array (Mobile App expects List)
         for (const row of rows) {
+            Object.assign(row, enrichSensorRow(row));
             row.uptime_seconds = computeLiveUptimeSeconds(row, serverNowMs);
             row.is_on = asBool(row.is_on);
             row.server_now = serverNowIso;
