@@ -214,6 +214,36 @@ const telemetryFingerprint = (snapshot: TelemetrySnapshot) =>
     snapshot.pump2On,
   ].join('|');
 
+const telemetryStateSignature = (snapshot: TelemetrySnapshot) =>
+  [
+    snapshot.deviceId,
+    snapshot.phValue.toFixed(3),
+    snapshot.ecValue.toFixed(3),
+    snapshot.tempValue.toFixed(2),
+    snapshot.wls1 ? '1' : '0',
+    snapshot.wls2 ? '1' : '0',
+    snapshot.floatAlarm ? '1' : '0',
+    snapshot.locked ? '1' : '0',
+    snapshot.pump1On ? '1' : '0',
+    snapshot.pump2On ? '1' : '0',
+    snapshot.greenOn ? '1' : '0',
+    snapshot.redOn ? '1' : '0',
+    snapshot.isOn ? '1' : '0',
+  ].join('|');
+
+const compactTelemetryHistory = (rows: TelemetrySnapshot[]) => {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = telemetryStateSignature(row);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const isNoDataRecord = (raw: any) =>
+  Boolean(raw?.no_data) || String(raw?.status || '').toLowerCase().trim() === 'no_data';
+
 const recordSortKey = (item: any) => {
   const ts = parseServerTimestampMs(item?.timestamp);
   if (ts != null) return ts;
@@ -315,9 +345,10 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         addRows(JSON.parse(raw));
       }
 
-      return Array.from(merged.values())
-        .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
-        .slice(0, HISTORY_LIMIT);
+      return compactTelemetryHistory(
+        Array.from(merged.values())
+          .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp)),
+      ).slice(0, HISTORY_LIMIT);
     } catch {
       return [];
     }
@@ -348,30 +379,22 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const persistTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
-    const stateSignature = [
-      snapshot.deviceId,
-      snapshot.wls1 ? '1' : '0',
-      snapshot.wls2 ? '1' : '0',
-      snapshot.floatAlarm ? '1' : '0',
-      snapshot.locked ? '1' : '0',
-      snapshot.pump1On ? '1' : '0',
-      snapshot.pump2On ? '1' : '0',
-      snapshot.greenOn ? '1' : '0',
-      snapshot.redOn ? '1' : '0',
-    ].join('|');
+    if (isEmptyTelemetrySnapshot(snapshot)) return;
+    const stateSignature = telemetryStateSignature(snapshot);
     const nowMs = Date.now();
     const stateChanged = lastHistoryStateSignatureRef.current !== stateSignature;
 
-    if (!stateChanged && nowMs - lastHistorySavedAtMsRef.current < HISTORY_SAMPLE_INTERVAL_MS) return;
+    if (!stateChanged) return;
     lastHistoryStateSignatureRef.current = stateSignature;
     lastHistorySavedAtMsRef.current = nowMs;
 
     setTelemetryHistory((prev) => {
       const merged = new Map<string, TelemetrySnapshot>();
       [snapshot, ...prev].forEach((row) => merged.set(telemetryFingerprint(row), row));
-      const next = Array.from(merged.values())
-        .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
-        .slice(0, HISTORY_LIMIT);
+      const next = compactTelemetryHistory(
+        Array.from(merged.values())
+          .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp)),
+      ).slice(0, HISTORY_LIMIT);
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(getTelemetryHistoryKey(snapshot.deviceId), JSON.stringify(next));
       }
@@ -384,9 +407,10 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     setTelemetryHistory((prev) => {
       const merged = new Map<string, TelemetrySnapshot>();
       [...snapshots, ...prev].forEach((row) => merged.set(telemetryFingerprint(row), row));
-      const next = Array.from(merged.values())
-        .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
-        .slice(0, HISTORY_LIMIT);
+      const next = compactTelemetryHistory(
+        Array.from(merged.values())
+          .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp)),
+      ).slice(0, HISTORY_LIMIT);
 
       if (typeof window !== 'undefined') {
         const groups = new Map<string, TelemetrySnapshot[]>();
