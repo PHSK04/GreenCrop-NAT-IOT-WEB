@@ -9,7 +9,7 @@ import React, {
 } from 'react';
 import { toast } from 'sonner';
 import mqtt from 'mqtt';
-import { ACTIVE_DEVICE_EVENT_NAME } from '@/hooks/useActiveDeviceId';
+import { ACTIVE_DEVICE_EVENT_NAME, getActiveDeviceIdValue } from '@/hooks/useActiveDeviceId';
 
 interface MachineContextType {
   isOn: boolean;
@@ -72,7 +72,9 @@ const API_POLL_INTERVAL_MS = 2000;
 const HISTORY_SAMPLE_INTERVAL_MS = 1000;
 const BOARD_TELEMETRY_STALE_MS = 10000;
 
-const getTelemetryHistoryKey = (deviceId: string) =>
+const getTelemetryHistoryKey = (tenantId: string, deviceId: string) =>
+  `greencrop.telemetry.history.${safeTopicSegment(tenantId || 'anonymous')}.${safeTopicSegment(deviceId || 'default')}`;
+const getLegacyTelemetryHistoryKey = (deviceId: string) =>
   `greencrop.telemetry.history.${safeTopicSegment(deviceId || 'default')}`;
 const TELEMETRY_HISTORY_PREFIX = 'greencrop.telemetry.history.';
 
@@ -80,8 +82,7 @@ const safeTopicSegment = (value: string) =>
   value.trim().replace(/[^A-Za-z0-9_-]/g, '');
 
 const getActiveDeviceId = () => {
-  if (typeof window === 'undefined') return '';
-  return window.localStorage.getItem('active_device_id') || '';
+  return getActiveDeviceIdValue();
 };
 
 const getDeviceTopic = (
@@ -231,16 +232,6 @@ const telemetryStateSignature = (snapshot: TelemetrySnapshot) =>
     snapshot.isOn ? '1' : '0',
   ].join('|');
 
-const compactTelemetryHistory = (rows: TelemetrySnapshot[]) => {
-  const seen = new Set<string>();
-  return rows.filter((row) => {
-    const key = telemetryStateSignature(row);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-};
-
 const isNoDataRecord = (raw: any) =>
   Boolean(raw?.no_data) || String(raw?.status || '').toLowerCase().trim() === 'no_data';
 
@@ -317,38 +308,52 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
   const loadTelemetryHistory = useCallback((deviceId: string) => {
     if (typeof window === 'undefined') return [];
+    const { tenantId } = getSessionAuth();
+    if (!tenantId) return [];
     const requestedDevice = safeTopicSegment(deviceId || '');
-    const fallbackDevices = new Set(['', 'UNKNOWN', 'default', requestedDevice]);
     const merged = new Map<string, TelemetrySnapshot>();
 
-    const addRows = (rows: unknown) => {
+    const addRows = (rows: unknown, forceDeviceId = '') => {
       if (!Array.isArray(rows)) return;
       rows.forEach((row) => {
         const snapshot = normalizeTelemetrySnapshot(row);
         if (!snapshot) return;
+        if (forceDeviceId) snapshot.deviceId = forceDeviceId;
         const snapshotDevice = safeTopicSegment(snapshot.deviceId || '');
-        const belongsToRequestedDevice =
-          !requestedDevice ||
-          snapshotDevice === requestedDevice ||
-          fallbackDevices.has(snapshotDevice);
+        const belongsToRequestedDevice = !requestedDevice || snapshotDevice === requestedDevice;
         if (!belongsToRequestedDevice) return;
         merged.set(telemetryFingerprint(snapshot), snapshot);
       });
     };
 
     try {
-      for (let index = 0; index < window.localStorage.length; index += 1) {
-        const key = window.localStorage.key(index);
-        if (!key?.startsWith(TELEMETRY_HISTORY_PREFIX)) continue;
-        const raw = window.localStorage.getItem(key);
-        if (!raw) continue;
-        addRows(JSON.parse(raw));
+      if (requestedDevice) {
+        const raw = window.localStorage.getItem(getTelemetryHistoryKey(tenantId, requestedDevice));
+        if (raw) addRows(JSON.parse(raw));
+        if (merged.size === 0) {
+          [requestedDevice, 'UNKNOWN', 'default'].forEach((legacyDeviceId) => {
+            const legacyRaw = window.localStorage.getItem(getLegacyTelemetryHistoryKey(legacyDeviceId));
+            if (legacyRaw) addRows(JSON.parse(legacyRaw), requestedDevice);
+          });
+        }
+      } else {
+        const tenantPrefix = `${TELEMETRY_HISTORY_PREFIX}${safeTopicSegment(tenantId)}.`;
+        for (let index = 0; index < window.localStorage.length; index += 1) {
+          const key = window.localStorage.key(index);
+          if (!key?.startsWith(tenantPrefix)) continue;
+          const raw = window.localStorage.getItem(key);
+          if (!raw) continue;
+          addRows(JSON.parse(raw));
+        }
       }
 
-      return compactTelemetryHistory(
-        Array.from(merged.values())
-          .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp)),
-      ).slice(0, HISTORY_LIMIT);
+      const next = Array.from(merged.values())
+        .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+        .slice(0, HISTORY_LIMIT);
+      if (requestedDevice && next.length > 0) {
+        window.localStorage.setItem(getTelemetryHistoryKey(tenantId, requestedDevice), JSON.stringify(next));
+      }
+      return next;
     } catch {
       return [];
     }
@@ -391,12 +396,14 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     setTelemetryHistory((prev) => {
       const merged = new Map<string, TelemetrySnapshot>();
       [snapshot, ...prev].forEach((row) => merged.set(telemetryFingerprint(row), row));
-      const next = compactTelemetryHistory(
-        Array.from(merged.values())
-          .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp)),
-      ).slice(0, HISTORY_LIMIT);
+      const next = Array.from(merged.values())
+        .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+        .slice(0, HISTORY_LIMIT);
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(getTelemetryHistoryKey(snapshot.deviceId), JSON.stringify(next));
+        const { tenantId } = getSessionAuth();
+        if (tenantId) {
+          window.localStorage.setItem(getTelemetryHistoryKey(tenantId, snapshot.deviceId), JSON.stringify(next));
+        }
       }
       return next;
     });
@@ -407,19 +414,20 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     setTelemetryHistory((prev) => {
       const merged = new Map<string, TelemetrySnapshot>();
       [...snapshots, ...prev].forEach((row) => merged.set(telemetryFingerprint(row), row));
-      const next = compactTelemetryHistory(
-        Array.from(merged.values())
-          .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp)),
-      ).slice(0, HISTORY_LIMIT);
+      const next = Array.from(merged.values())
+        .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+        .slice(0, HISTORY_LIMIT);
 
       if (typeof window !== 'undefined') {
+        const { tenantId } = getSessionAuth();
+        if (!tenantId) return next;
         const groups = new Map<string, TelemetrySnapshot[]>();
         next.forEach((row) => {
           const key = row.deviceId || 'UNKNOWN';
           groups.set(key, [...(groups.get(key) || []), row]);
         });
         groups.forEach((rows, key) => {
-          window.localStorage.setItem(getTelemetryHistoryKey(key), JSON.stringify(rows.slice(0, HISTORY_LIMIT)));
+          window.localStorage.setItem(getTelemetryHistoryKey(tenantId, key), JSON.stringify(rows.slice(0, HISTORY_LIMIT)));
         });
       }
 
@@ -508,6 +516,29 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
       const latest = [...dataList].sort((a, b) => recordSortKey(b) - recordSortKey(a))[0];
       if (!latest) return;
+      if (isNoDataRecord(latest)) {
+        setPressure(0);
+        setFlowRate(0);
+        setEcValue(0);
+        setPhValue(0);
+        setTempValue(0);
+        setWls1(false);
+        setWls2(false);
+        setFloatAlarm(false);
+        setLocked(false);
+        setPump1On(false);
+        setPump2On(false);
+        setGreenOn(false);
+        setRedOn(false);
+        setPhOk(false);
+        setLastTelemetryAt(null);
+        setBoardConnected(false);
+        setIsOn(false);
+        setPumps([false, false, false, false, false]);
+        setActiveTank(null);
+        lastCarriedTelemetryRef.current = null;
+        return;
+      }
 
       const localNowMs = Date.now();
       const serverAtMs = parseServerTimestampMs(latest.timestamp);
