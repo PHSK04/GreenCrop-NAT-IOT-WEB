@@ -70,15 +70,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const ACCEPT_LEGACY_MQTT = import.meta.env.VITE_ACCEPT_LEGACY_MQTT === 'true';
 const HISTORY_LIMIT = 2000;
 const API_POLL_INTERVAL_MS = 2000;
-const HISTORY_SAMPLE_INTERVAL_MS = 1000;
 const BOARD_TELEMETRY_STALE_MS = 10000;
-const USE_TELEMETRY_CACHE = import.meta.env.VITE_USE_TELEMETRY_CACHE === 'true';
-
-const getTelemetryHistoryKey = (tenantId: string, deviceId: string) =>
-  `greencrop.telemetry.history.${safeTopicSegment(tenantId || 'anonymous')}.${safeTopicSegment(deviceId || 'default')}`;
-const getLegacyTelemetryHistoryKey = (deviceId: string) =>
-  `greencrop.telemetry.history.${safeTopicSegment(deviceId || 'default')}`;
-const TELEMETRY_HISTORY_PREFIX = 'greencrop.telemetry.history.';
 
 const safeTopicSegment = (value: string) =>
   value.trim().replace(/[^A-Za-z0-9_-]/g, '');
@@ -160,20 +152,6 @@ const parseServerTimestampMs = (raw: unknown): number | null => {
   const parsed = Date.parse(raw);
   return Number.isFinite(parsed) ? parsed : null;
 };
-
-const isEmptyTelemetrySnapshot = (snapshot: TelemetrySnapshot) =>
-  snapshot.phValue === 0 &&
-  snapshot.ecValue === 0 &&
-  snapshot.tempValue === 0 &&
-  !snapshot.wls1 &&
-  !snapshot.wls2 &&
-  !snapshot.floatAlarm &&
-  !snapshot.locked &&
-  !snapshot.pump1On &&
-  !snapshot.pump2On &&
-  !snapshot.greenOn &&
-  !snapshot.redOn &&
-  !snapshot.isOn;
 
 const normalizeTelemetrySnapshot = (raw: any): TelemetrySnapshot | null => {
   if (!raw || typeof raw !== 'object') return null;
@@ -310,60 +288,6 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(intervalId);
   }, [lastTelemetryAt]);
 
-  const loadTelemetryHistory = useCallback((deviceId: string) => {
-    if (typeof window === 'undefined') return [];
-    if (!USE_TELEMETRY_CACHE) return [];
-    const { tenantId } = getSessionAuth();
-    if (!tenantId) return [];
-    const requestedDevice = safeTopicSegment(deviceId || '');
-    const merged = new Map<string, TelemetrySnapshot>();
-
-    const addRows = (rows: unknown, forceDeviceId = '') => {
-      if (!Array.isArray(rows)) return;
-      rows.forEach((row) => {
-        const snapshot = normalizeTelemetrySnapshot(row);
-        if (!snapshot) return;
-        if (forceDeviceId) snapshot.deviceId = forceDeviceId;
-        const snapshotDevice = safeTopicSegment(snapshot.deviceId || '');
-        const belongsToRequestedDevice = !requestedDevice || snapshotDevice === requestedDevice;
-        if (!belongsToRequestedDevice) return;
-        merged.set(telemetryFingerprint(snapshot), snapshot);
-      });
-    };
-
-    try {
-      if (requestedDevice) {
-        const raw = window.localStorage.getItem(getTelemetryHistoryKey(tenantId, requestedDevice));
-        if (raw) addRows(JSON.parse(raw));
-        if (merged.size === 0) {
-          [requestedDevice, 'UNKNOWN', 'default'].forEach((legacyDeviceId) => {
-            const legacyRaw = window.localStorage.getItem(getLegacyTelemetryHistoryKey(legacyDeviceId));
-            if (legacyRaw) addRows(JSON.parse(legacyRaw), requestedDevice);
-          });
-        }
-      } else {
-        const tenantPrefix = `${TELEMETRY_HISTORY_PREFIX}${safeTopicSegment(tenantId)}.`;
-        for (let index = 0; index < window.localStorage.length; index += 1) {
-          const key = window.localStorage.key(index);
-          if (!key?.startsWith(tenantPrefix)) continue;
-          const raw = window.localStorage.getItem(key);
-          if (!raw) continue;
-          addRows(JSON.parse(raw));
-        }
-      }
-
-      const next = Array.from(merged.values())
-        .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
-        .slice(0, HISTORY_LIMIT);
-      if (requestedDevice && next.length > 0) {
-        window.localStorage.setItem(getTelemetryHistoryKey(tenantId, requestedDevice), JSON.stringify(next));
-      }
-      return next;
-    } catch {
-      return [];
-    }
-  }, []);
-
   const carryTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
     lastCarriedTelemetryRef.current = snapshot;
     return snapshot;
@@ -384,12 +308,6 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       const next = Array.from(merged.values())
         .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
         .slice(0, HISTORY_LIMIT);
-      if (typeof window !== 'undefined') {
-        const { tenantId } = getSessionAuth();
-        if (tenantId && USE_TELEMETRY_CACHE) {
-          window.localStorage.setItem(getTelemetryHistoryKey(tenantId, snapshot.deviceId), JSON.stringify(next));
-        }
-      }
       return next;
     });
   }, []);
@@ -402,20 +320,6 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       const next = Array.from(merged.values())
         .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
         .slice(0, HISTORY_LIMIT);
-
-      if (typeof window !== 'undefined' && USE_TELEMETRY_CACHE) {
-        const { tenantId } = getSessionAuth();
-        if (!tenantId) return next;
-        const groups = new Map<string, TelemetrySnapshot[]>();
-        next.forEach((row) => {
-          const key = row.deviceId || 'UNKNOWN';
-          groups.set(key, [...(groups.get(key) || []), row]);
-        });
-        groups.forEach((rows, key) => {
-          window.localStorage.setItem(getTelemetryHistoryKey(tenantId, key), JSON.stringify(rows.slice(0, HISTORY_LIMIT)));
-        });
-      }
-
       return next;
     });
   }, []);
@@ -754,9 +658,8 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 	      setPhOk(false);
 	      setLastTelemetryAt(null);
 	      setBoardConnected(false);
-	      const nextHistory = loadTelemetryHistory(nextDeviceId);
-	      setTelemetryHistory(nextHistory);
-	      lastCarriedTelemetryRef.current = nextHistory[0] ?? null;
+	      setTelemetryHistory([]);
+	      lastCarriedTelemetryRef.current = null;
 	      setPendingIsOnAck(null);
 	      setLastLocalCommandAtMs(null);
 	      lastApiUptimeRef.current = null;
@@ -768,13 +671,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 	      window.removeEventListener(ACTIVE_DEVICE_EVENT_NAME, handleActiveDeviceChange);
 	      window.removeEventListener('storage', handleActiveDeviceChange);
 	    };
-	  }, [loadTelemetryHistory]);
-
-  useEffect(() => {
-    const nextHistory = loadTelemetryHistory(activeDeviceId);
-    setTelemetryHistory(nextHistory);
-    lastCarriedTelemetryRef.current = nextHistory[0] ?? null;
-  }, [activeDeviceId, loadTelemetryHistory]);
+	  }, []);
 
 	  useEffect(() => {
 	    if (!client || mqttStatus !== 'connected') return;
