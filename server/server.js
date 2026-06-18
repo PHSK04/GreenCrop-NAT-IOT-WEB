@@ -218,7 +218,7 @@ function hasMeaningfulSensorSignal(body) {
     const numericKeys = ['pressure', 'flow_rate', 'flow', 'ec_value', 'ec', 'ph_value', 'phValue', 'temp_c', 'tempValue'];
     const hasNumericSignal = numericKeys.some((key) => {
         if (body[key] === undefined || body[key] === null || body[key] === '') return false;
-        return Math.abs(asNumber(body[key], 0)) > 0;
+        return Number.isFinite(asNumber(body[key], Number.NaN));
     });
     const hasPumpSignal = normalizePumpsArray(body.pumps).some(Boolean);
     const activeTank = body.active_tank ?? body.activeTank;
