@@ -72,6 +72,7 @@ const HISTORY_LIMIT = 2000;
 const API_POLL_INTERVAL_MS = 2000;
 const HISTORY_SAMPLE_INTERVAL_MS = 1000;
 const BOARD_TELEMETRY_STALE_MS = 10000;
+const USE_TELEMETRY_CACHE = import.meta.env.VITE_USE_TELEMETRY_CACHE === 'true';
 
 const getTelemetryHistoryKey = (tenantId: string, deviceId: string) =>
   `greencrop.telemetry.history.${safeTopicSegment(tenantId || 'anonymous')}.${safeTopicSegment(deviceId || 'default')}`;
@@ -311,6 +312,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
   const loadTelemetryHistory = useCallback((deviceId: string) => {
     if (typeof window === 'undefined') return [];
+    if (!USE_TELEMETRY_CACHE) return [];
     const { tenantId } = getSessionAuth();
     if (!tenantId) return [];
     const requestedDevice = safeTopicSegment(deviceId || '');
@@ -363,31 +365,11 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const carryTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
-    const previous = lastCarriedTelemetryRef.current;
-
-    if (isEmptyTelemetrySnapshot(snapshot)) {
-      if (!previous) return null;
-      const carried = {
-        ...previous,
-        timestamp: snapshot.timestamp,
-        deviceId: snapshot.deviceId || previous.deviceId,
-      };
-      lastCarriedTelemetryRef.current = carried;
-      return carried;
-    }
-
-    const carried = {
-      ...snapshot,
-      phValue: snapshot.phValue > 0 ? snapshot.phValue : previous?.phValue ?? snapshot.phValue,
-      ecValue: snapshot.ecValue > 0 ? snapshot.ecValue : previous?.ecValue ?? snapshot.ecValue,
-      tempValue: snapshot.tempValue > 0 ? snapshot.tempValue : previous?.tempValue ?? snapshot.tempValue,
-    };
-    lastCarriedTelemetryRef.current = carried;
-    return carried;
+    lastCarriedTelemetryRef.current = snapshot;
+    return snapshot;
   }, []);
 
   const persistTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
-    if (isEmptyTelemetrySnapshot(snapshot)) return;
     const stateSignature = telemetryStateSignature(snapshot);
     const nowMs = Date.now();
     const stateChanged = lastHistoryStateSignatureRef.current !== stateSignature;
@@ -404,7 +386,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         .slice(0, HISTORY_LIMIT);
       if (typeof window !== 'undefined') {
         const { tenantId } = getSessionAuth();
-        if (tenantId) {
+        if (tenantId && USE_TELEMETRY_CACHE) {
           window.localStorage.setItem(getTelemetryHistoryKey(tenantId, snapshot.deviceId), JSON.stringify(next));
         }
       }
@@ -421,7 +403,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
         .slice(0, HISTORY_LIMIT);
 
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && USE_TELEMETRY_CACHE) {
         const { tenantId } = getSessionAuth();
         if (!tenantId) return next;
         const groups = new Map<string, TelemetrySnapshot[]>();
@@ -514,7 +496,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
       const apiHistory = dataList
         .map(normalizeTelemetrySnapshot)
-        .filter((snapshot): snapshot is TelemetrySnapshot => Boolean(snapshot && !isEmptyTelemetrySnapshot(snapshot)));
+        .filter((snapshot): snapshot is TelemetrySnapshot => Boolean(snapshot));
       persistTelemetrySnapshots(apiHistory);
 
       const latest = [...dataList].sort((a, b) => recordSortKey(b) - recordSortKey(a))[0];
@@ -539,6 +521,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         setIsOn(false);
         setPumps([false, false, false, false, false]);
         setActiveTank(null);
+        setTelemetryHistory([]);
         lastCarriedTelemetryRef.current = null;
         return;
       }
@@ -696,7 +679,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
       const apiHistory = dataList
         .map(normalizeTelemetrySnapshot)
-        .filter((snapshot): snapshot is TelemetrySnapshot => Boolean(snapshot && !isEmptyTelemetrySnapshot(snapshot)));
+        .filter((snapshot): snapshot is TelemetrySnapshot => Boolean(snapshot));
       persistTelemetrySnapshots(apiHistory);
     } catch (err) {
       console.error('API History Error:', err);
