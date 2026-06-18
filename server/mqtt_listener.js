@@ -48,7 +48,7 @@ function hasMeaningfulSensorSignal(payload) {
     const numericKeys = ['pressure', 'flow_rate', 'flow', 'ec_value', 'ec', 'ph_value', 'phValue', 'ph', 'temp_c', 'tempValue', 'temperature'];
     const hasNumericSignal = numericKeys.some((key) => {
         if (payload[key] === undefined || payload[key] === null || payload[key] === '') return false;
-        return Math.abs(asNumber(payload[key], 0)) > 0;
+        return Number.isFinite(asNumber(payload[key], Number.NaN));
     });
     const activeTank = payload.active_tank ?? payload.activeTank;
     const hasTankSignal = activeTank !== undefined &&
