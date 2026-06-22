@@ -434,7 +434,6 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         setIsOn(false);
         setPumps([false, false, false, false, false]);
         setActiveTank(null);
-        setTelemetryHistory([]);
         lastCarriedTelemetryRef.current = null;
         return;
       }
