@@ -22,7 +22,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret';
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || 'public';
 const SHARED_SENSOR_TENANT = String(process.env.SHARED_SENSOR_TENANT || 'false').toLowerCase() === 'true';
 const SENSOR_DATA_STALE_MS = Math.max(1000, Number(process.env.SENSOR_DATA_STALE_MS || 10000));
-const SENSOR_DUPLICATE_WINDOW_MS = Math.max(1000, Number(process.env.SENSOR_DUPLICATE_WINDOW_MS || 1000));
 const SENSOR_DATA_SELECT_COLUMNS = [
     'id',
     'tenant_id',
@@ -467,6 +466,17 @@ function parsePositiveInt(raw, fallback, min = 1, max = 1000) {
     const n = Number.parseInt(String(raw ?? ''), 10);
     if (!Number.isFinite(n)) return fallback;
     return Math.max(min, Math.min(max, n));
+}
+
+function isSensorTimestampUniqueError(error) {
+    const message = String(error?.message || '').toLowerCase();
+    const constraint = String(error?.constraint || '').toLowerCase();
+    return (
+        constraint.includes('uq_tenant_device_sensor_ts') ||
+        message.includes('uq_tenant_device_sensor_ts') ||
+        (message.includes('sensor_data.tenant_id') && message.includes('sensor_data.timestamp')) ||
+        message.includes('tenant_id, device_id, sensor_id, timestamp')
+    );
 }
 
 function normalizeDateTime(raw, endOfDay = false) {
@@ -3070,53 +3080,54 @@ app.post('/api/sensor-data', async (req, res) => {
             raw_payload: rawPayload,
             ...sensorColumns
         };
-        if (latest && sensorSignature(latest) === sensorSignature(nextRow)) {
-            const duplicateWindowMs = isTrustedControlSource ? 2000 : SENSOR_DUPLICATE_WINDOW_MS;
-            if (Number.isFinite(latestTsMs) && latestTsMs > 0 && (nowMs - latestTsMs) <= duplicateWindowMs) {
-                console.log(`[DATA SYNC] Suppressed duplicate row for tenant=${tenant} source=${source}`);
-                return res.json({ ok: true, suppressed: true, reason: 'duplicate-sensor-state' });
-            }
-        }
-
         const parsedTsMs = timestamp ? new Date(timestamp).getTime() : NaN;
         const clientTsSkewMs = Number.isFinite(parsedTsMs) ? Math.abs(nowMs - parsedTsMs) : Number.POSITIVE_INFINITY;
-        const safeTimestamp = (clientTsSkewMs <= 5 * 60 * 1000) ? new Date(parsedTsMs) : new Date(nowMs);
+        const safeTimestampMs = (clientTsSkewMs <= 5 * 60 * 1000) ? parsedTsMs : nowMs;
+        const insertSql = `INSERT INTO sensor_data (tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, ph_value, temp_c, wls1, wls2, float_alarm, locked, pump1_on, pump2_on, green_on, red_on, ph_ok, start_button, stop_button, alarm_muted, pairing_status, active_tank, is_on, uptime_seconds, timestamp)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const insertParams = [
+            tenant,
+            deviceId,
+            sensor_id || null,
+            nextRow.pressure,
+            nextRow.flow_rate,
+            nextRow.ec_value,
+            pumpsJson,
+            rawPayload,
+            normalizedSource,
+            null,
+            sensorColumns.ph_value,
+            sensorColumns.temp_c,
+            sensorColumns.wls1,
+            sensorColumns.wls2,
+            sensorColumns.float_alarm,
+            sensorColumns.locked,
+            sensorColumns.pump1_on,
+            sensorColumns.pump2_on,
+            sensorColumns.green_on,
+            sensorColumns.red_on,
+            sensorColumns.ph_ok,
+            sensorColumns.start_button,
+            sensorColumns.stop_button,
+            sensorColumns.alarm_muted,
+            sensorColumns.pairing_status,
+            nextRow.active_tank,
+            normalizedIsOn,
+            parsedIncomingUptime,
+            new Date(safeTimestampMs),
+        ];
 
-        const result = await db.run(
-            `INSERT INTO sensor_data (tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, ph_value, temp_c, wls1, wls2, float_alarm, locked, pump1_on, pump2_on, green_on, red_on, ph_ok, start_button, stop_button, alarm_muted, pairing_status, active_tank, is_on, uptime_seconds, timestamp)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                tenant,
-                deviceId,
-                sensor_id || null,
-                nextRow.pressure,
-                nextRow.flow_rate,
-                nextRow.ec_value,
-                pumpsJson,
-                rawPayload,
-                normalizedSource,
-                null,
-                sensorColumns.ph_value,
-                sensorColumns.temp_c,
-                sensorColumns.wls1,
-                sensorColumns.wls2,
-                sensorColumns.float_alarm,
-                sensorColumns.locked,
-                sensorColumns.pump1_on,
-                sensorColumns.pump2_on,
-                sensorColumns.green_on,
-                sensorColumns.red_on,
-                sensorColumns.ph_ok,
-                sensorColumns.start_button,
-                sensorColumns.stop_button,
-                sensorColumns.alarm_muted,
-                sensorColumns.pairing_status,
-                nextRow.active_tank,
-                normalizedIsOn,
-                parsedIncomingUptime,
-                safeTimestamp
-            ]
-        );
+        let result;
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+            try {
+                insertParams[28] = new Date(safeTimestampMs + attempt);
+                result = await db.run(insertSql, insertParams);
+                break;
+            } catch (insertErr) {
+                if (attempt < 4 && isSensorTimestampUniqueError(insertErr)) continue;
+                throw insertErr;
+            }
+        }
 
         res.json({ ok: true, id: result.id });
     } catch (err) {
