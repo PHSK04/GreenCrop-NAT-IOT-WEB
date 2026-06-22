@@ -139,6 +139,21 @@ async function initDb() {
             raw_payload TEXT,
             source VARCHAR(32),
             mqtt_topic VARCHAR(191),
+            ph_value DOUBLE PRECISION,
+            temp_c DOUBLE PRECISION,
+            wls1 BOOLEAN,
+            wls2 BOOLEAN,
+            float_alarm BOOLEAN,
+            locked BOOLEAN,
+            pump1_on BOOLEAN,
+            pump2_on BOOLEAN,
+            green_on BOOLEAN,
+            red_on BOOLEAN,
+            ph_ok BOOLEAN,
+            start_button BOOLEAN,
+            stop_button BOOLEAN,
+            alarm_muted BOOLEAN,
+            pairing_status VARCHAR(32),
             active_tank INTEGER,
             is_on BOOLEAN,
             uptime_seconds DOUBLE PRECISION DEFAULT 0,
@@ -160,6 +175,51 @@ async function initDb() {
 
         ALTER TABLE sensor_data
         ADD COLUMN IF NOT EXISTS mqtt_topic VARCHAR(191);
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS ph_value DOUBLE PRECISION;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS temp_c DOUBLE PRECISION;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS wls1 BOOLEAN;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS wls2 BOOLEAN;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS float_alarm BOOLEAN;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS locked BOOLEAN;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS pump1_on BOOLEAN;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS pump2_on BOOLEAN;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS green_on BOOLEAN;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS red_on BOOLEAN;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS ph_ok BOOLEAN;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS start_button BOOLEAN;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS stop_button BOOLEAN;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS alarm_muted BOOLEAN;
+
+        ALTER TABLE sensor_data
+        ADD COLUMN IF NOT EXISTS pairing_status VARCHAR(32);
 
         CREATE TABLE IF NOT EXISTS login_sessions (
             id SERIAL PRIMARY KEY,
