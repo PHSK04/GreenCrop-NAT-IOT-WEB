@@ -244,6 +244,21 @@ async function initDb() {
                     raw_payload NVARCHAR(MAX) NULL,
                     source NVARCHAR(32) NULL,
                     mqtt_topic NVARCHAR(191) NULL,
+                    ph_value FLOAT NULL,
+                    temp_c FLOAT NULL,
+                    wls1 BIT NULL,
+                    wls2 BIT NULL,
+                    float_alarm BIT NULL,
+                    locked BIT NULL,
+                    pump1_on BIT NULL,
+                    pump2_on BIT NULL,
+                    green_on BIT NULL,
+                    red_on BIT NULL,
+                    ph_ok BIT NULL,
+                    start_button BIT NULL,
+                    stop_button BIT NULL,
+                    alarm_muted BIT NULL,
+                    pairing_status NVARCHAR(32) NULL,
                     active_tank INT,
                     is_on BIT,
                     uptime_seconds FLOAT DEFAULT 0,
@@ -270,6 +285,36 @@ async function initDb() {
                     ALTER TABLE sensor_data ADD mqtt_topic NVARCHAR(191) NULL;
                 IF COL_LENGTH('sensor_data', 'uptime_seconds') IS NULL
                     ALTER TABLE sensor_data ADD uptime_seconds FLOAT DEFAULT 0;
+                IF COL_LENGTH('sensor_data', 'ph_value') IS NULL
+                    ALTER TABLE sensor_data ADD ph_value FLOAT NULL;
+                IF COL_LENGTH('sensor_data', 'temp_c') IS NULL
+                    ALTER TABLE sensor_data ADD temp_c FLOAT NULL;
+                IF COL_LENGTH('sensor_data', 'wls1') IS NULL
+                    ALTER TABLE sensor_data ADD wls1 BIT NULL;
+                IF COL_LENGTH('sensor_data', 'wls2') IS NULL
+                    ALTER TABLE sensor_data ADD wls2 BIT NULL;
+                IF COL_LENGTH('sensor_data', 'float_alarm') IS NULL
+                    ALTER TABLE sensor_data ADD float_alarm BIT NULL;
+                IF COL_LENGTH('sensor_data', 'locked') IS NULL
+                    ALTER TABLE sensor_data ADD locked BIT NULL;
+                IF COL_LENGTH('sensor_data', 'pump1_on') IS NULL
+                    ALTER TABLE sensor_data ADD pump1_on BIT NULL;
+                IF COL_LENGTH('sensor_data', 'pump2_on') IS NULL
+                    ALTER TABLE sensor_data ADD pump2_on BIT NULL;
+                IF COL_LENGTH('sensor_data', 'green_on') IS NULL
+                    ALTER TABLE sensor_data ADD green_on BIT NULL;
+                IF COL_LENGTH('sensor_data', 'red_on') IS NULL
+                    ALTER TABLE sensor_data ADD red_on BIT NULL;
+                IF COL_LENGTH('sensor_data', 'ph_ok') IS NULL
+                    ALTER TABLE sensor_data ADD ph_ok BIT NULL;
+                IF COL_LENGTH('sensor_data', 'start_button') IS NULL
+                    ALTER TABLE sensor_data ADD start_button BIT NULL;
+                IF COL_LENGTH('sensor_data', 'stop_button') IS NULL
+                    ALTER TABLE sensor_data ADD stop_button BIT NULL;
+                IF COL_LENGTH('sensor_data', 'alarm_muted') IS NULL
+                    ALTER TABLE sensor_data ADD alarm_muted BIT NULL;
+                IF COL_LENGTH('sensor_data', 'pairing_status') IS NULL
+                    ALTER TABLE sensor_data ADD pairing_status NVARCHAR(32) NULL;
             END
         `);
         console.log('✅ Sensor Data table validated');
