@@ -809,12 +809,12 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Clock3 className="h-5 w-5 text-emerald-500" />
-                  {isTH ? "ประวัติข้อมูลที่รันต่อเนื่อง" : "Continuous Telemetry Log"}
+                  {isTH ? "ประวัติข้อมูลทุกวัน" : "All-Day Telemetry Log"}
                 </CardTitle>
                 <CardDescription>
                   {isTH
-                    ? `แสดง log ทุก packet ที่รับจากเซ็นเซอร์ ตอนนี้พบ ${historyForSelectedDate.length} รายการ จาก ${historyDates.length} วัน`
-                    : `Shows every received sensor packet. Showing ${historyForSelectedDate.length} records from ${historyDates.length} days.`}
+                    ? `แสดง log ทุก packet ที่รับจากเซ็นเซอร์ ตอนนี้พบ ${historyForSelectedDate.length} รายการ จากทั้งหมด ${historyDates.length} วัน`
+                    : `Shows every received sensor packet. Showing ${historyForSelectedDate.length} records across ${historyDates.length} days.`}
                 </CardDescription>
               </div>
 
@@ -825,7 +825,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                   variant={historyDateMode === "all" ? "default" : "outline"}
                   onClick={() => setHistoryDateMode("all")}
                 >
-                  {isTH ? "รันต่อเนื่อง" : "Live Log"}
+                  {isTH ? "ทุกวัน" : "All Days"}
                 </Button>
                 <Button
                   type="button"
@@ -850,7 +850,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
               <div className="rounded-xl border border-border bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">{isTH ? "รอบข้อมูล" : "Data Cycle"}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">
-                  {activeHistoryDate === "all" ? (isTH ? "รันต่อเนื่องทุกวัน" : "Continuous all days") : formatDateLabel(activeHistoryDate, isTH)}
+                  {activeHistoryDate === "all" ? (isTH ? "ทุกวันที่บันทึก" : "All saved days") : formatDateLabel(activeHistoryDate, isTH)}
                 </p>
               </div>
               <div className="rounded-xl border border-border bg-muted/30 p-3">
