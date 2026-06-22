@@ -297,9 +297,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   const persistTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
     const stateSignature = telemetryStateSignature(snapshot);
     const nowMs = Date.now();
-    const stateChanged = lastHistoryStateSignatureRef.current !== stateSignature;
 
-    if (!stateChanged) return;
     lastHistoryStateSignatureRef.current = stateSignature;
     lastHistorySavedAtMsRef.current = nowMs;
 
