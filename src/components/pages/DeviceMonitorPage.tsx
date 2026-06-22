@@ -116,7 +116,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   const [exportStartTime, setExportStartTime] = useState("");
   const [exportEndTime, setExportEndTime] = useState("");
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>(["Sensor", "Actuator", "System"]);
-  const [historyDateMode, setHistoryDateMode] = useState<"latest" | "all" | string>("latest");
+  const [historyDateMode, setHistoryDateMode] = useState<"latest" | "all" | string>("all");
   const [dismissedCabinetAlarm, setDismissedCabinetAlarm] = useState(false);
 
   const lastUpdate = formatTimestamp(lastTelemetryAt);
@@ -813,12 +813,20 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 </CardTitle>
                 <CardDescription>
                   {isTH
-                    ? `เลือกดูตามวันและเลื่อนดูข้อมูลเก่าได้ ตอนนี้พบ ${historyForSelectedDate.length} รายการ`
-                    : `Filter by day and scroll older records. Showing ${historyForSelectedDate.length} records.`}
+                    ? `แสดง log ทุก packet ที่รับจากเซ็นเซอร์ ตอนนี้พบ ${historyForSelectedDate.length} รายการ จาก ${historyDates.length} วัน`
+                    : `Shows every received sensor packet. Showing ${historyForSelectedDate.length} records from ${historyDates.length} days.`}
                 </CardDescription>
               </div>
 
               <div className="flex flex-col gap-2 rounded-xl border border-border bg-background/70 p-3 sm:flex-row sm:items-center">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={historyDateMode === "all" ? "default" : "outline"}
+                  onClick={() => setHistoryDateMode("all")}
+                >
+                  {isTH ? "รันต่อเนื่อง" : "Live Log"}
+                </Button>
                 <Button
                   type="button"
                   size="sm"
@@ -827,17 +835,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 >
                   {isTH ? "วันล่าสุด" : "Latest Day"}
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={historyDateMode === "all" ? "default" : "outline"}
-                  onClick={() => setHistoryDateMode("all")}
-                >
-                  {isTH ? "ทุกวัน" : "All Days"}
-                </Button>
                 <MinimalDatePicker
                   value={activeHistoryDate === "all" ? "" : activeHistoryDate}
-                  onChange={(value) => setHistoryDateMode(value || "latest")}
+                  onChange={(value) => setHistoryDateMode(value || "all")}
                   ariaLabel={isTH ? "เลือกวันที่ประวัติ" : "Select history date"}
                   locale={isTH ? "TH" : "EN"}
                   className="w-full sm:w-44"
@@ -850,7 +850,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
               <div className="rounded-xl border border-border bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">{isTH ? "รอบข้อมูล" : "Data Cycle"}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">
-                  {activeHistoryDate === "all" ? (isTH ? "ทุกวัน" : "All days") : formatDateLabel(activeHistoryDate, isTH)}
+                  {activeHistoryDate === "all" ? (isTH ? "รันต่อเนื่องทุกวัน" : "Continuous all days") : formatDateLabel(activeHistoryDate, isTH)}
                 </p>
               </div>
               <div className="rounded-xl border border-border bg-muted/30 p-3">
