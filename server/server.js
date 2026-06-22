@@ -572,6 +572,17 @@ async function userCanUseDevice(user, deviceId) {
 async function getSensorTenantCandidates(req, requestedTenantId, deviceId) {
     const candidates = [requestedTenantId];
     const normalizedDeviceId = String(deviceId || '').trim().toUpperCase();
+    const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
+
+    if (isAdmin) {
+        const rows = await db.all(
+            `SELECT DISTINCT tenant_id
+             FROM sensor_data
+             WHERE tenant_id IS NOT NULL
+             ORDER BY tenant_id`
+        );
+        candidates.push(...rows.map((row) => row.tenant_id));
+    }
 
     if (normalizedDeviceId) {
         candidates.push(DEFAULT_TENANT_ID);
