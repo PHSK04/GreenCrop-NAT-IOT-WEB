@@ -55,13 +55,19 @@ const LineIcon = () => (
 interface SocialAuthProps {
     onLoginSuccess?: () => void;
     actionText?: string;
+    dividerLabel?: string;
     showDivider?: boolean;
+    providers?: Array<'Google' | 'Microsoft' | 'LINE' | 'Facebook'>;
+    tone?: 'default' | 'light';
 }
 
 export function SocialAuth({
     onLoginSuccess,
     actionText = "register",
+    dividerLabel,
     showDivider = true,
+    providers = ['Google', 'Microsoft', 'LINE', 'Facebook'],
+    tone = 'default',
 }: SocialAuthProps) {
     const { socialLogin } = useAuth();
     const [isLoading, setIsLoading] = useState<string | null>(null);
@@ -230,10 +236,16 @@ export function SocialAuth({
         }
     };
 
-    const socialButtonBase =
-        "group relative h-12 w-full overflow-hidden rounded-[1.1rem] border transition-all duration-200 disabled:opacity-60 " +
-        "border-slate-200 bg-white/90 text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.05)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)] " +
-        "dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-emerald-500/40 dark:hover:bg-slate-900";
+    const socialButtonBase = tone === 'light'
+        ? "group relative h-11 w-full overflow-hidden rounded-[13px] border !border-emerald-100 !bg-white/92 !text-slate-700 shadow-[0_8px_18px_rgba(15,118,110,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:!border-emerald-200 hover:!bg-white hover:shadow-[0_12px_24px_rgba(15,118,110,0.14)] disabled:opacity-60 dark:!border-emerald-100 dark:!bg-white/92 dark:!text-slate-700"
+        : "group relative h-12 w-full overflow-hidden rounded-[1.1rem] border transition-all duration-200 disabled:opacity-60 " +
+          "border-slate-200 bg-white/90 text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.05)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)] " +
+          "dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-emerald-500/40 dark:hover:bg-slate-900";
+
+    const gridClassName = providers.length === 1 ? "grid grid-cols-1 gap-4" : tone === 'light' ? "grid grid-cols-2 gap-3" : "grid grid-cols-2 gap-4";
+    const dividerClassName = tone === 'light'
+        ? "bg-emerald-50/90 px-3 text-slate-400"
+        : "bg-slate-50 px-3 text-slate-400 dark:bg-slate-900/95 dark:text-slate-300";
 
     return (
         <div className="space-y-4 pt-2 text-center">
@@ -243,14 +255,15 @@ export function SocialAuth({
                         <span className="w-full border-t border-slate-200 dark:border-slate-700/80" />
                     </div>
                     <div className="relative flex justify-center text-xs font-semibold uppercase tracking-[0.12em]">
-                        <span className="bg-slate-50 px-3 text-slate-400 dark:bg-slate-900/95 dark:text-slate-300">
-                            Or {actionText} with
+                        <span className={dividerClassName}>
+                            {dividerLabel || `Or ${actionText} with`}
                         </span>
                     </div>
                 </div>
             ) : null}
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className={gridClassName}>
+                {providers.includes('Google') ? (
                 <Button 
                     type="button"
                     variant="outline" 
@@ -262,7 +275,9 @@ export function SocialAuth({
                     <GoogleIcon />
                     <span className="ml-3 text-sm font-semibold tracking-tight">Google</span>
                 </Button>
+                ) : null}
                 
+                {providers.includes('Microsoft') ? (
                 <Button 
                     type="button"
                     variant="outline" 
@@ -274,7 +289,9 @@ export function SocialAuth({
                     <MicrosoftIcon />
                     <span className="ml-3 text-sm font-semibold tracking-tight">Microsoft</span>
                 </Button>
+                ) : null}
 
+                {providers.includes('LINE') ? (
                 <Button 
                     type="button"
                     variant="outline" 
@@ -286,7 +303,9 @@ export function SocialAuth({
                     <LineIcon />
                     <span className="ml-3 text-sm font-semibold tracking-tight">LINE</span>
                 </Button>
+                ) : null}
 
+                {providers.includes('Facebook') ? (
                 <Button 
                     type="button"
                     variant="outline" 
@@ -298,6 +317,7 @@ export function SocialAuth({
                     <FacebookIcon />
                     <span className="ml-3 text-sm font-semibold tracking-tight">Facebook</span>
                 </Button>
+                ) : null}
             </div>
         </div>
     );
