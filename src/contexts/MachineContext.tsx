@@ -70,6 +70,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const ACCEPT_LEGACY_MQTT = import.meta.env.VITE_ACCEPT_LEGACY_MQTT === 'true';
 const HISTORY_LIMIT = 50000;
 const HISTORY_FETCH_LIMIT = 50000;
+const HISTORY_CACHE_LIMIT = 5000;
+const HISTORY_CACHE_KEY_PREFIX = 'smart_iot_telemetry_history';
 const API_POLL_INTERVAL_MS = 2000;
 const BOARD_TELEMETRY_STALE_MS = 10000;
 
@@ -105,6 +107,43 @@ const getSessionAuth = () => {
   } catch (err) {
     console.error('Failed to parse smart_iot_session:', err);
     return { token: '', tenantId: '' };
+  }
+};
+
+const getTelemetryHistoryCacheKey = () => {
+  const { tenantId } = getSessionAuth();
+  const deviceId = getActiveDeviceId() || 'all-devices';
+  if (!tenantId) return '';
+  return `${HISTORY_CACHE_KEY_PREFIX}:${tenantId}:${deviceId}`;
+};
+
+const readCachedTelemetryHistory = () => {
+  const cacheKey = getTelemetryHistoryCacheKey();
+  if (!cacheKey) return [];
+
+  try {
+    const raw = localStorage.getItem(cacheKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map(normalizeTelemetrySnapshot)
+      .filter((snapshot): snapshot is TelemetrySnapshot => Boolean(snapshot))
+      .slice(0, HISTORY_CACHE_LIMIT);
+  } catch (err) {
+    console.error('Failed to load cached telemetry history:', err);
+    return [];
+  }
+};
+
+const writeCachedTelemetryHistory = (history: TelemetrySnapshot[]) => {
+  const cacheKey = getTelemetryHistoryCacheKey();
+  if (!cacheKey || history.length === 0) return;
+
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(history.slice(0, HISTORY_CACHE_LIMIT)));
+  } catch (err) {
+    console.error('Failed to save cached telemetry history:', err);
   }
 };
 
@@ -277,6 +316,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   const lastHistoryStateSignatureRef = useRef('');
   const lastHistorySavedAtMsRef = useRef(0);
   const lastCarriedTelemetryRef = useRef<TelemetrySnapshot | null>(null);
+  const historyCacheSaveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const updateBoardConnected = () => {
@@ -595,6 +635,32 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       console.error('API History Error:', err);
     }
   }, [persistTelemetrySnapshots]);
+
+  useEffect(() => {
+    const cachedHistory = readCachedTelemetryHistory();
+    setTelemetryHistory(cachedHistory);
+    fetchApiData();
+    fetchApiHistory();
+  }, [activeDeviceId]);
+
+  useEffect(() => {
+    if (telemetryHistory.length === 0) return;
+    if (historyCacheSaveTimerRef.current != null) {
+      window.clearTimeout(historyCacheSaveTimerRef.current);
+    }
+
+    historyCacheSaveTimerRef.current = window.setTimeout(() => {
+      writeCachedTelemetryHistory(telemetryHistory);
+      historyCacheSaveTimerRef.current = null;
+    }, 250);
+
+    return () => {
+      if (historyCacheSaveTimerRef.current != null) {
+        window.clearTimeout(historyCacheSaveTimerRef.current);
+        historyCacheSaveTimerRef.current = null;
+      }
+    };
+  }, [activeDeviceId, telemetryHistory]);
 
   const syncAfterCommand = async () => {
     await fetchApiData();
