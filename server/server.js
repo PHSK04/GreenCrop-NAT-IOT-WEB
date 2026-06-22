@@ -22,7 +22,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret';
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || 'public';
 const SHARED_SENSOR_TENANT = String(process.env.SHARED_SENSOR_TENANT || 'false').toLowerCase() === 'true';
 const SENSOR_DATA_STALE_MS = Math.max(1000, Number(process.env.SENSOR_DATA_STALE_MS || 10000));
-const SENSOR_DUPLICATE_WINDOW_MS = Math.max(1000, Number(process.env.SENSOR_DUPLICATE_WINDOW_MS || 5000));
+const SENSOR_DUPLICATE_WINDOW_MS = Math.max(1000, Number(process.env.SENSOR_DUPLICATE_WINDOW_MS || 1000));
 const SENSOR_DATA_SELECT_COLUMNS = [
     'id',
     'tenant_id',
