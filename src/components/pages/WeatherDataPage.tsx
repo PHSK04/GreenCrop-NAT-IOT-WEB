@@ -9,78 +9,45 @@ import { Thermometer, Droplets, Activity, AlertTriangle, Download, FileText, Clo
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
-import { seededNumber } from "@/utils/deviceData";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { useMachine } from "@/contexts/MachineContext";
 import { MinimalDatePicker } from "../ui/minimal-date-picker";
 import { MinimalMonthPicker } from "../ui/minimal-month-picker";
-
-// Mock Data: 24h Water Temperature Trends
-const tempHistory = [
-  { time: "00:00", water: 24.5 },
-  { time: "04:00", water: 24.2 },
-  { time: "08:00", water: 25.1 },
-  { time: "12:00", water: 26.8 },
-  { time: "16:00", water: 26.5 },
-  { time: "20:00", water: 25.4 },
-  { time: "23:59", water: 24.8 },
-];
-
-// Mock Data: Water Quality Trends
-const waterQualityHistory = [
-  { time: "Mon", ph: 6.8, ec: 1.2, oxygen: 6.5 },
-  { time: "Tue", ph: 6.9, ec: 1.3, oxygen: 6.4 },
-  { time: "Wed", ph: 7.0, ec: 1.2, oxygen: 6.6 },
-  { time: "Thu", ph: 7.2, ec: 1.4, oxygen: 6.8 },
-  { time: "Fri", ph: 7.1, ec: 1.3, oxygen: 6.7 },
-  { time: "Sat", ph: 6.9, ec: 1.2, oxygen: 6.5 },
-  { time: "Sun", ph: 6.8, ec: 1.1, oxygen: 6.6 },
-];
-
-// Detailed Sensor Status List
-const currentSensorReadings = [
-  { id: "S-TMP-W1", name: "Water Temperature (Pond A)", value: "25.2 °C", status: "Normal", lastUpdate: "1 min ago" },
-  { id: "S-PH-01", name: "Water pH (Tank 1)", value: "7.2", status: "Normal", lastUpdate: "2 mins ago" },
-  { id: "S-EC-01", name: "Water EC (Tank 1)", value: "1.4 mS/cm", status: "Normal", lastUpdate: "2 mins ago" },
-  { id: "S-DO-01", name: "Dissolved Oxygen (Tank 1)", value: "6.1 mg/L", status: "Low Warning", lastUpdate: "2 mins ago" },
-  { id: "S-LGT-01", name: "Light Intensity (Zone A)", value: "450 PPFD", status: "Normal", lastUpdate: "1 min ago" },
-  { id: "S-CO2-01", name: "CO2 Level (Greenhouse)", value: "800 ppm", status: "Optimal", lastUpdate: "10 mins ago" },
-];
 
 type WeatherDataPageProps = {
   language?: string;
 };
 
 const csvCell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+const average = (values: number[]) =>
+  values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+
+const formatTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value || "-";
+  return date.toLocaleString();
+};
+
+const sensorStatusClass = (status: string) => {
+  if (status === "Normal" || status === "Optimal") {
+    return "border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10";
+  }
+  if (status.includes("Warning")) {
+    return "border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10";
+  }
+  return "border-red-500/30 text-red-600 dark:text-red-400 bg-red-500/10";
+};
 
 export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const { deviceId, seed } = useDeviceSeed();
+  const { deviceId } = useDeviceSeed();
   const { telemetryHistory } = useMachine();
   const isTH = language === "TH";
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-
-  const adjustValue = (
-    value: string,
-    index: number,
-    step: number,
-    min: number,
-    max: number,
-    precision: number,
-  ) => {
-    const match = value.match(/-?\d+(\.\d+)?/);
-    if (!match) return value;
-    const base = Number(match[0]);
-    if (!Number.isFinite(base)) return value;
-    const adjusted = seededNumber(base, seed, index, step, min, max, precision);
-    const fixed =
-      precision === 0 ? `${Math.round(adjusted)}` : adjusted.toFixed(precision);
-    return value.replace(match[0], fixed);
-  };
 
   const filteredTelemetry = useMemo(() => {
     return telemetryHistory.filter((row) => {
@@ -94,38 +61,26 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
     });
   }, [endDate, selectedMonth, startDate, telemetryHistory]);
 
-  const tempHistoryDevice = useMemo(() => {
-    if (filteredTelemetry.length === 0) {
-      return tempHistory.map((row, index) => ({
-        ...row,
-        water: seededNumber(row.water, seed, index, 0.2, 22.0, 28.8, 1),
-      }));
-    }
+  const latestTelemetry = filteredTelemetry[0] || telemetryHistory[0] || null;
 
+  const tempHistoryDevice = useMemo(() => {
     const buckets = ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:59"];
-    return buckets.map((time) => {
-      const hour = Number(time.slice(0, 2));
-      const values = filteredTelemetry
-        .filter((row) => {
-          const parsed = new Date(row.timestamp);
-          return Math.abs(parsed.getHours() - hour) <= 2 && row.tempValue > 0;
-        })
-        .map((row) => row.tempValue);
-      const avg = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
-      return { time, water: Number(avg.toFixed(1)) };
-    });
-  }, [filteredTelemetry, seed]);
+    return buckets
+      .map((time) => {
+        const hour = Number(time.slice(0, 2));
+        const values = filteredTelemetry
+          .filter((row) => {
+            const parsed = new Date(row.timestamp);
+            return Math.abs(parsed.getHours() - hour) <= 2 && row.tempValue > 0;
+          })
+          .map((row) => row.tempValue);
+        if (!values.length) return null;
+        return { time, water: Number(average(values).toFixed(1)) };
+      })
+      .filter((row): row is { time: string; water: number } => Boolean(row));
+  }, [filteredTelemetry]);
 
   const waterQualityHistoryDevice = useMemo(() => {
-    if (filteredTelemetry.length === 0) {
-      return waterQualityHistory.map((row, index) => ({
-        ...row,
-        ph: seededNumber(row.ph, seed, index, 0.05, 6.4, 7.8, 2),
-        ec: seededNumber(row.ec, seed, index, 0.05, 1.0, 2.4, 2),
-        oxygen: seededNumber(row.oxygen, seed, index, 0.07, 5.5, 8.6, 2),
-      }));
-    }
-
     const groups = new Map<string, typeof filteredTelemetry>();
     filteredTelemetry.forEach((row) => {
       const day = new Date(row.timestamp).toISOString().slice(0, 10);
@@ -138,68 +93,104 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-7)
       .map(([day, rows]) => {
-        const avg = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
-        const ph = avg(rows.map((row) => row.phValue).filter((value) => value > 0));
-        const ec = avg(rows.map((row) => row.ecValue).filter((value) => value > 0));
+        const ph = average(rows.map((row) => row.phValue).filter((value) => value > 0));
+        const ec = average(rows.map((row) => row.ecValue).filter((value) => value > 0));
         return {
           time: new Date(`${day}T00:00:00`).toLocaleDateString([], { weekday: "short" }),
           ph: Number(ph.toFixed(2)),
           ec: Number(ec.toFixed(2)),
           oxygen: Number((ph > 0 ? Math.max(0, 14 - ph) : 0).toFixed(2)),
         };
-      });
-  }, [filteredTelemetry, seed]);
+      })
+      .filter((row) => row.ph > 0 || row.ec > 0 || row.oxygen > 0);
+  }, [filteredTelemetry]);
 
-  const currentSensorReadingsDevice = useMemo(
-    () =>
-      currentSensorReadings.map((row, index) => {
-        const label = row.name.toLowerCase();
-        let nextValue = row.value;
-        if (label.includes("temperature")) {
-          nextValue = adjustValue(row.value, index, 0.2, 22.0, 28.8, 1);
-        } else if (label.includes("ph")) {
-          nextValue = adjustValue(row.value, index, 0.05, 6.4, 7.8, 2);
-        } else if (label.includes("ec")) {
-          nextValue = adjustValue(row.value, index, 0.05, 1.0, 2.4, 2);
-        } else if (label.includes("oxygen")) {
-          nextValue = adjustValue(row.value, index, 0.07, 5.5, 8.6, 2);
-        } else if (label.includes("co2")) {
-          nextValue = adjustValue(row.value, index, 20, 600, 1200, 0);
-        } else if (label.includes("light")) {
-          nextValue = adjustValue(row.value, index, 15, 300, 800, 0);
-        } else {
-          const numeric = row.value.match(/-?\d+(\.\d+)?/);
-          if (numeric) {
-            nextValue = adjustValue(row.value, index, 1, 0, 9999, 0);
-          }
-        }
-        return { ...row, value: nextValue };
-      }),
-    [seed],
-  );
+  const currentSensorReadingsDevice = useMemo(() => {
+    if (!latestTelemetry) return [];
+    const lastUpdate = formatTime(latestTelemetry.timestamp);
+    const phStatus = latestTelemetry.phValue > 0 && latestTelemetry.phValue >= 6.5 && latestTelemetry.phValue <= 7.5 ? "Normal" : "Warning";
+    const tempStatus = latestTelemetry.tempValue > 0 && latestTelemetry.tempValue >= 20 && latestTelemetry.tempValue <= 32 ? "Normal" : "Warning";
+    const ecStatus = latestTelemetry.ecValue > 0 ? "Normal" : "Warning";
+    return [
+      {
+        id: "S-TMP-W1",
+        name: isTH ? "อุณหภูมิน้ำ" : "Water Temperature",
+        value: latestTelemetry.tempValue > 0 ? `${latestTelemetry.tempValue.toFixed(1)} °C` : "-",
+        status: tempStatus,
+        lastUpdate,
+      },
+      {
+        id: "S-PH-01",
+        name: isTH ? "ค่า pH น้ำ" : "Water pH",
+        value: latestTelemetry.phValue > 0 ? latestTelemetry.phValue.toFixed(2) : "-",
+        status: phStatus,
+        lastUpdate,
+      },
+      {
+        id: "S-EC-01",
+        name: isTH ? "ค่า EC น้ำ" : "Water EC",
+        value: latestTelemetry.ecValue > 0 ? `${latestTelemetry.ecValue.toFixed(2)} mS/cm` : "-",
+        status: ecStatus,
+        lastUpdate,
+      },
+      {
+        id: "WLS1",
+        name: isTH ? "ระดับน้ำ WLS1" : "Water Level WLS1",
+        value: latestTelemetry.wls1 ? (isTH ? "ตรวจพบ" : "Detected") : (isTH ? "ไม่พบ" : "Not detected"),
+        status: latestTelemetry.wls1 ? "Normal" : "Warning",
+        lastUpdate,
+      },
+      {
+        id: "WLS2",
+        name: isTH ? "ระดับน้ำ WLS2" : "Water Level WLS2",
+        value: latestTelemetry.wls2 ? (isTH ? "ตรวจพบ" : "Detected") : (isTH ? "ไม่พบ" : "Not detected"),
+        status: latestTelemetry.wls2 ? "Normal" : "Warning",
+        lastUpdate,
+      },
+      {
+        id: "FLOAT",
+        name: isTH ? "ลูกลอยแจ้งเตือน" : "Float Alarm",
+        value: latestTelemetry.floatAlarm ? (isTH ? "แจ้งเตือน" : "Alarm") : (isTH ? "ปกติ" : "Normal"),
+        status: latestTelemetry.floatAlarm ? "Warning" : "Normal",
+        lastUpdate,
+      },
+    ];
+  }, [isTH, latestTelemetry]);
+
+  const alertRows = useMemo(() => {
+    return filteredTelemetry
+      .filter((row) =>
+        row.floatAlarm ||
+        row.locked ||
+        row.redOn ||
+        (row.phValue > 0 && (row.phValue < 6.5 || row.phValue > 7.5)),
+      )
+      .slice(0, 200)
+      .map((row) => ({
+        timestamp: row.timestamp,
+        type: row.locked ? "LOCKED" : row.redOn ? "RED_ALARM" : row.floatAlarm ? "FLOAT_ALARM" : "PH_RANGE",
+        detail: row.locked
+          ? (isTH ? "ระบบล็อค" : "System locked")
+          : row.redOn
+            ? (isTH ? "ไฟแดงแจ้งเตือน" : "Red alarm active")
+            : row.floatAlarm
+              ? (isTH ? "ลูกลอยแจ้งเตือน" : "Float alarm detected")
+              : `pH ${row.phValue.toFixed(2)}`,
+      }));
+  }, [filteredTelemetry, isTH]);
 
   const weatherExportRows = useMemo(() => {
-    if (filteredTelemetry.length) {
-      return filteredTelemetry.map((row) => {
-        const ph = row.phValue > 0 ? row.phValue : 0;
-        return {
-          timestamp: row.timestamp,
-          ph: ph.toFixed(2),
-          oxygen_mg_l: ph > 0 ? Math.max(0, 14 - ph).toFixed(2) : "0.00",
-          ec_ms_cm: row.ecValue > 0 ? row.ecValue.toFixed(2) : "0.00",
-          temp_c: row.tempValue > 0 ? row.tempValue.toFixed(1) : "0.0",
-        };
-      });
-    }
-
-    return currentSensorReadingsDevice.map((row) => ({
-      timestamp: new Date().toISOString(),
-      ph: row.name.toLowerCase().includes("ph") ? row.value : "",
-      oxygen_mg_l: row.name.toLowerCase().includes("oxygen") ? row.value : "",
-      ec_ms_cm: row.name.toLowerCase().includes("ec") ? row.value : "",
-      temp_c: row.name.toLowerCase().includes("temperature") ? row.value : "",
-    }));
-  }, [currentSensorReadingsDevice, filteredTelemetry]);
+    return filteredTelemetry.map((row) => {
+      const ph = row.phValue > 0 ? row.phValue : 0;
+      return {
+        timestamp: row.timestamp,
+        ph: ph > 0 ? ph.toFixed(2) : "",
+        oxygen_mg_l: ph > 0 ? Math.max(0, 14 - ph).toFixed(2) : "",
+        ec_ms_cm: row.ecValue > 0 ? row.ecValue.toFixed(2) : "",
+        temp_c: row.tempValue > 0 ? row.tempValue.toFixed(1) : "",
+      };
+    });
+  }, [filteredTelemetry]);
 
   const buildExportContent = () => {
     const meta = [
@@ -308,42 +299,32 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={tempHistoryDevice} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="colorWater" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <XAxis 
-                          dataKey="time" 
-                          stroke="hsl(var(--muted-foreground))" 
-                          fontSize={12} 
-                          tickLine={false} 
-                          axisLine={false} 
-                        />
-                        <YAxis 
-                          stroke="hsl(var(--muted-foreground))" 
-                          fontSize={12} 
-                          tickLine={false} 
-                          axisLine={false} 
-                        />
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: "hsl(var(--card))", 
-                              borderColor: "hsl(var(--border))", 
-                              color: "hsl(var(--foreground))",
-                              borderRadius: "0.5rem"
-                            }} 
-                           itemStyle={{ color: "hsl(var(--foreground))" }}
-                           labelStyle={{ color: "hsl(var(--muted-foreground))" }}
-                        />
-                        <Legend wrapperStyle={{ paddingTop: "20px" }}/>
-                        <Area type="monotone" dataKey="water" stroke="#3b82f6" fillOpacity={1} fill="url(#colorWater)" name={isTH ? "อุณหภูมิน้ำ (°C)" : "Water Temp (°C)"} />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                    {tempHistoryDevice.length === 0 ? (
+                      <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
+                        {isTH ? "ยังไม่มีข้อมูลอุณหภูมิน้ำจริงในช่วงที่เลือก" : "No real water temperature data in this range."}
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={tempHistoryDevice} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorWater" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <Tooltip
+                              contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))", borderRadius: "0.5rem" }}
+                             itemStyle={{ color: "hsl(var(--foreground))" }}
+                             labelStyle={{ color: "hsl(var(--muted-foreground))" }}
+                          />
+                          <Legend wrapperStyle={{ paddingTop: "20px" }}/>
+                          <Area type="monotone" dataKey="water" stroke="#3b82f6" fillOpacity={1} fill="url(#colorWater)" name={isTH ? "อุณหภูมิน้ำ (°C)" : "Water Temp (°C)"} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -361,38 +342,28 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={waterQualityHistoryDevice} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis 
-                          dataKey="time" 
-                          stroke="hsl(var(--muted-foreground))" 
-                          fontSize={12} 
-                          tickLine={false} 
-                          axisLine={false} 
-                        />
-                        <YAxis 
-                          stroke="hsl(var(--muted-foreground))" 
-                          fontSize={12} 
-                          tickLine={false} 
-                          axisLine={false} 
-                        />
-                        <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: "hsl(var(--card))", 
-                              borderColor: "hsl(var(--border))", 
-                              color: "hsl(var(--foreground))",
-                              borderRadius: "0.5rem"
-                            }} 
-                           itemStyle={{ color: "hsl(var(--foreground))" }}
-                           labelStyle={{ color: "hsl(var(--muted-foreground))" }}
-                        />
-                        <Legend wrapperStyle={{ paddingTop: "20px" }}/>
-                        <Line type="monotone" dataKey="ph" stroke="#10b981" strokeWidth={2} name={isTH ? "ค่า pH" : "pH Level"} />
-                        <Line type="monotone" dataKey="oxygen" stroke="#0ea5e9" strokeWidth={2} name={isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)"} />
-                        <Line type="monotone" dataKey="ec" stroke="#eab308" strokeWidth={2} name={isTH ? "EC (mS/cm)" : "EC (mS/cm)"} />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    {waterQualityHistoryDevice.length === 0 ? (
+                      <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
+                        {isTH ? "ยังไม่มีข้อมูล pH/EC จริงในช่วงที่เลือก" : "No real pH/EC data in this range."}
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={waterQualityHistoryDevice} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                          <Tooltip
+                              contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))", borderRadius: "0.5rem" }}
+                             itemStyle={{ color: "hsl(var(--foreground))" }}
+                             labelStyle={{ color: "hsl(var(--muted-foreground))" }}
+                          />
+                          <Legend wrapperStyle={{ paddingTop: "20px" }}/>
+                          <Line type="monotone" dataKey="ph" stroke="#10b981" strokeWidth={2} name={isTH ? "ค่า pH" : "pH Level"} />
+                          <Line type="monotone" dataKey="oxygen" stroke="#0ea5e9" strokeWidth={2} name={isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)"} />
+                          <Line type="monotone" dataKey="ec" stroke="#eab308" strokeWidth={2} name={isTH ? "EC (mS/cm)" : "EC (mS/cm)"} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -422,16 +393,20 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
                          <TableCell className="text-muted-foreground font-mono text-xs">{sensor.id}</TableCell>
                          <TableCell className="text-foreground font-bold">{sensor.value}</TableCell>
                          <TableCell>
-                           <Badge variant="outline" className={`
-                             ${sensor.status === 'Normal' || sensor.status === 'Optimal' ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' : 
-                               sensor.status.includes('Warning') ? 'border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10' : 'border-red-500/30 text-red-600 dark:text-red-400 bg-red-500/10'}
-                           `}>
+                           <Badge variant="outline" className={sensorStatusClass(sensor.status)}>
                              {sensor.status}
                            </Badge>
                          </TableCell>
                          <TableCell className="text-right text-muted-foreground text-sm">{sensor.lastUpdate}</TableCell>
                        </TableRow>
                      ))}
+                     {currentSensorReadingsDevice.length === 0 && (
+                       <TableRow>
+                         <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                           {isTH ? "ยังไม่มีค่าจริงจาก sensor_data ในช่วงที่เลือก" : "No real sensor_data readings in this range."}
+                         </TableCell>
+                       </TableRow>
+                     )}
                    </TableBody>
                  </Table>
                </CardContent>
@@ -439,37 +414,128 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
           </TabsContent>
 
           <TabsContent value="weather">
-            <div className="p-12 text-center border border-dashed border-border rounded-xl">
-               <CloudRain className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-               <h3 className="text-lg font-medium text-foreground">
-                 {isTH ? "โมดูลประวัติสภาพอากาศ" : "Weather History Module"}
-               </h3>
-               <p className="text-muted-foreground">
-                 {isTH ? "ระบบบันทึกปริมาณฝนและพยากรณ์อากาศในอดีต" : "Historical precipitation and forecast data integration."}
-               </p>
-            </div>
+            <Card className="rounded-xl border border-border bg-card/50 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <CloudRain className="w-5 h-5 text-blue-500" />
+                  {isTH ? "ข้อมูลบรรยากาศจากเซ็นเซอร์จริง" : "Atmosphere Data From Real Sensors"}
+                </CardTitle>
+                <CardDescription>
+                  {isTH ? "ตอนนี้ระบบมีข้อมูลอุณหภูมิน้ำจาก sensor_data ยังไม่มีคีย์ฝน/อากาศภายนอกแยกต่างหาก" : "The system currently has water temperature in sensor_data; rain/outdoor weather keys are not present yet."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{isTH ? "เวลา" : "Time"}</TableHead>
+                      <TableHead>{isTH ? "อุณหภูมิน้ำ" : "Water Temp"}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTelemetry.filter((row) => row.tempValue > 0).slice(0, 200).map((row) => (
+                      <TableRow key={`weather-${row.timestamp}`}>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{formatTime(row.timestamp)}</TableCell>
+                        <TableCell className="font-semibold">{row.tempValue.toFixed(1)} °C</TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredTelemetry.filter((row) => row.tempValue > 0).length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={2} className="py-8 text-center text-muted-foreground">
+                          {isTH ? "ยังไม่มีข้อมูลอุณหภูมิน้ำจริงในช่วงที่เลือก" : "No real temperature rows in this range."}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </TabsContent>
           <TabsContent value="water">
-             <div className="p-12 text-center border border-dashed border-border rounded-xl">
-               <Droplets className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-               <h3 className="text-lg font-medium text-foreground">
-                 {isTH ? "บันทึกคุณภาพน้ำแบบละเอียด" : "Water Quality Detailed Logs"}
-               </h3>
-               <p className="text-muted-foreground">
-                 {isTH ? "บันทึกค่าคุณภาพน้ำแบบละเอียดรายนาที" : "Granular minute-by-minute water parameter logs."}
-               </p>
-            </div>
+             <Card className="rounded-xl border border-border bg-card/50 shadow-lg">
+               <CardHeader>
+                 <CardTitle className="flex items-center gap-2 text-foreground">
+                   <Droplets className="w-5 h-5 text-cyan-500" />
+                   {isTH ? "บันทึกคุณภาพน้ำแบบละเอียด" : "Water Quality Detailed Logs"}
+                 </CardTitle>
+                 <CardDescription>{isTH ? "ข้อมูลจริงจาก sensor_data ไม่ใช้ข้อมูลจำลอง" : "Real rows from sensor_data, no generated demo values."}</CardDescription>
+               </CardHeader>
+               <CardContent>
+                 <Table>
+                   <TableHeader>
+                     <TableRow>
+                       <TableHead>{isTH ? "เวลา" : "Time"}</TableHead>
+                       <TableHead>pH</TableHead>
+                       <TableHead>EC</TableHead>
+                       <TableHead>{isTH ? "อุณหภูมิ" : "Temp"}</TableHead>
+                       <TableHead>WLS1</TableHead>
+                       <TableHead>WLS2</TableHead>
+                     </TableRow>
+                   </TableHeader>
+                   <TableBody>
+                     {filteredTelemetry.slice(0, 500).map((row) => (
+                       <TableRow key={`water-${row.timestamp}`}>
+                         <TableCell className="font-mono text-xs text-muted-foreground">{formatTime(row.timestamp)}</TableCell>
+                         <TableCell>{row.phValue > 0 ? row.phValue.toFixed(2) : "-"}</TableCell>
+                         <TableCell>{row.ecValue > 0 ? row.ecValue.toFixed(2) : "-"}</TableCell>
+                         <TableCell>{row.tempValue > 0 ? `${row.tempValue.toFixed(1)} °C` : "-"}</TableCell>
+                         <TableCell>{row.wls1 ? "ON" : "OFF"}</TableCell>
+                         <TableCell>{row.wls2 ? "ON" : "OFF"}</TableCell>
+                       </TableRow>
+                     ))}
+                     {filteredTelemetry.length === 0 && (
+                       <TableRow>
+                         <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                           {isTH ? "ยังไม่มีข้อมูลคุณภาพน้ำจริงในช่วงที่เลือก" : "No real water-quality rows in this range."}
+                         </TableCell>
+                       </TableRow>
+                     )}
+                   </TableBody>
+                 </Table>
+               </CardContent>
+            </Card>
           </TabsContent>
           <TabsContent value="alerts">
-             <div className="p-12 text-center border border-dashed border-border rounded-xl">
-               <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-               <h3 className="text-lg font-medium text-foreground">
-                 {isTH ? "ประวัติการแจ้งเตือนระบบ" : "System Alert History"}
-               </h3>
-               <p className="text-muted-foreground">
-                 {isTH ? "บันทึกการแจ้งเตือนเกินค่าและการตอบสนองอัตโนมัติ" : "Log of all sensor threshold breaches and automated responses."}
-               </p>
-            </div>
+             <Card className="rounded-xl border border-border bg-card/50 shadow-lg">
+               <CardHeader>
+                 <CardTitle className="flex items-center gap-2 text-foreground">
+                   <AlertTriangle className="w-5 h-5 text-amber-500" />
+                   {isTH ? "ประวัติการแจ้งเตือนระบบ" : "System Alert History"}
+                 </CardTitle>
+                 <CardDescription>{isTH ? "แจ้งเตือนที่คำนวณจากค่า sensor_data จริง" : "Alerts derived from real sensor_data rows."}</CardDescription>
+               </CardHeader>
+               <CardContent>
+                 <Table>
+                   <TableHeader>
+                     <TableRow>
+                       <TableHead>{isTH ? "เวลา" : "Time"}</TableHead>
+                       <TableHead>{isTH ? "ประเภท" : "Type"}</TableHead>
+                       <TableHead>{isTH ? "รายละเอียด" : "Detail"}</TableHead>
+                     </TableRow>
+                   </TableHeader>
+                   <TableBody>
+                     {alertRows.map((row) => (
+                       <TableRow key={`alert-${row.timestamp}-${row.type}`}>
+                         <TableCell className="font-mono text-xs text-muted-foreground">{formatTime(row.timestamp)}</TableCell>
+                         <TableCell>
+                           <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                             {row.type}
+                           </Badge>
+                         </TableCell>
+                         <TableCell>{row.detail}</TableCell>
+                       </TableRow>
+                     ))}
+                     {alertRows.length === 0 && (
+                       <TableRow>
+                         <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
+                           {isTH ? "ไม่พบการแจ้งเตือนจริงในช่วงที่เลือก" : "No real alerts in this range."}
+                         </TableCell>
+                       </TableRow>
+                     )}
+                   </TableBody>
+                 </Table>
+               </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
