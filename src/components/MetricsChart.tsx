@@ -103,7 +103,7 @@ export function MetricsChart() {
             <div className="h-80">
               {waterMetricsData.length === 0 ? (
                 <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
-                  รอข้อมูลจริงจาก MQTT เพื่อคำนวณค่าเฉลี่ยรายวัน
+                  ยังไม่มีข้อมูลย้อนหลังในช่วงที่เลือก
                 </div>
               ) : (
               <ResponsiveContainer width="100%" height="100%">
