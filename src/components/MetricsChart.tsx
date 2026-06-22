@@ -37,10 +37,10 @@ export function MetricsChart() {
       groups.set(day, rows);
     });
 
-    return Array.from(groups.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-14)
-      .map(([day, rows]) => {
+    const sortedGroups = Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+    const visibleGroups = selectedMonth || startDate || endDate ? sortedGroups : sortedGroups.slice(-14);
+
+    return visibleGroups.map(([day, rows]) => {
         const validPh = rows.map((row) => row.phValue).filter((value) => value > 0);
         const validEc = rows.map((row) => row.ecValue).filter((value) => value > 0);
         const validTemp = rows.map((row) => row.tempValue).filter((value) => value > 0);
