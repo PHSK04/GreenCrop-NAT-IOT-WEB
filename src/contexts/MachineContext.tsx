@@ -70,7 +70,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const ACCEPT_LEGACY_MQTT = import.meta.env.VITE_ACCEPT_LEGACY_MQTT === 'true';
 const HISTORY_LIMIT = 50000;
 const HISTORY_FETCH_LIMIT = 50000;
-const HISTORY_LOOKBACK_DAYS = 14;
 const API_POLL_INTERVAL_MS = 2000;
 const BOARD_TELEMETRY_STALE_MS = 10000;
 
@@ -79,13 +78,6 @@ const safeTopicSegment = (value: string) =>
 
 const getActiveDeviceId = () => {
   return getActiveDeviceIdValue();
-};
-
-const formatLocalDateKey = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 };
 
 const getDeviceTopic = (
@@ -577,13 +569,10 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 
     try {
       const activeDeviceId = getActiveDeviceId();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - HISTORY_LOOKBACK_DAYS);
       const historyParams = new URLSearchParams({
         tenant_id: tenantId,
         history: 'true',
         limit: String(HISTORY_FETCH_LIMIT),
-        startDate: formatLocalDateKey(startDate),
       });
       if (activeDeviceId) {
         historyParams.set('device_id', activeDeviceId);
