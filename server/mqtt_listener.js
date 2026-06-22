@@ -8,7 +8,7 @@ const MQTT_PASSWORD = process.env.MQTT_PASSWORD || 'GreenCropnat123456';
 const TOPIC_LEGACY = 'smartfarm/sensors';
 const TOPIC_TENANT_PATTERN = 'tenants/+/devices/+/sensors';
 const ACCEPT_LEGACY_SENSOR_TOPIC = String(process.env.ACCEPT_LEGACY_SENSOR_TOPIC || 'false').toLowerCase() === 'true';
-const SENSOR_DUPLICATE_WINDOW_MS = Math.max(1000, Number(process.env.SENSOR_DUPLICATE_WINDOW_MS || 5000));
+const SENSOR_DUPLICATE_WINDOW_MS = Math.max(1000, Number(process.env.SENSOR_DUPLICATE_WINDOW_MS || 1000));
 const SENSOR_DATA_SELECT_COLUMNS = [
     'id',
     'tenant_id',
