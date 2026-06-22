@@ -9,6 +9,38 @@ const TOPIC_LEGACY = 'smartfarm/sensors';
 const TOPIC_TENANT_PATTERN = 'tenants/+/devices/+/sensors';
 const ACCEPT_LEGACY_SENSOR_TOPIC = String(process.env.ACCEPT_LEGACY_SENSOR_TOPIC || 'false').toLowerCase() === 'true';
 const SENSOR_DUPLICATE_WINDOW_MS = Math.max(1000, Number(process.env.SENSOR_DUPLICATE_WINDOW_MS || 5000));
+const SENSOR_DATA_SELECT_COLUMNS = [
+    'id',
+    'tenant_id',
+    'device_id',
+    'sensor_id',
+    'pressure',
+    'flow_rate',
+    'ec_value',
+    'pumps',
+    'raw_payload',
+    'source',
+    'mqtt_topic',
+    'ph_value',
+    'temp_c',
+    'wls1',
+    'wls2',
+    'float_alarm',
+    'locked',
+    'pump1_on',
+    'pump2_on',
+    'green_on',
+    'red_on',
+    'ph_ok',
+    'start_button',
+    'stop_button',
+    'alarm_muted',
+    'pairing_status',
+    'active_tank',
+    'is_on',
+    'uptime_seconds',
+    'timestamp'
+].join(', ');
 
 let client;
 
@@ -26,6 +58,43 @@ function asNumber(value, fallback = 0) {
 
 function firstDefined(...values) {
     return values.find((value) => value !== undefined && value !== null);
+}
+
+function asOptionalBool(value) {
+    if (value === undefined || value === null || value === '') return null;
+    return asBool(value);
+}
+
+function asOptionalNumber(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function asOptionalText(value) {
+    if (value === undefined || value === null) return null;
+    const text = String(value).trim();
+    return text || null;
+}
+
+function normalizeSensorColumnValues(payload) {
+    return {
+        ph_value: asOptionalNumber(firstDefined(payload.ph_value, payload.phValue, payload.ph)),
+        temp_c: asOptionalNumber(firstDefined(payload.temp_c, payload.tempValue, payload.temperature)),
+        wls1: asOptionalBool(firstDefined(payload.wls1, payload.WLS1)),
+        wls2: asOptionalBool(firstDefined(payload.wls2, payload.WLS2)),
+        float_alarm: asOptionalBool(firstDefined(payload.float_alarm, payload.floatAlarm, payload.float)),
+        locked: asOptionalBool(firstDefined(payload.locked, payload.lock, payload.reed, payload.reed_switch)),
+        pump1_on: asOptionalBool(firstDefined(payload.pump1_on, payload.pump1On)),
+        pump2_on: asOptionalBool(firstDefined(payload.pump2_on, payload.pump2On)),
+        green_on: asOptionalBool(firstDefined(payload.green_on, payload.greenOn)),
+        red_on: asOptionalBool(firstDefined(payload.red_on, payload.redOn)),
+        ph_ok: asOptionalBool(firstDefined(payload.ph_ok, payload.phOk)),
+        start_button: asOptionalBool(firstDefined(payload.start_button, payload.startButton)),
+        stop_button: asOptionalBool(firstDefined(payload.stop_button, payload.stopButton)),
+        alarm_muted: asOptionalBool(firstDefined(payload.alarm_muted, payload.alarmMuted)),
+        pairing_status: asOptionalText(firstDefined(payload.pairing_status, payload.pairingStatus)),
+    };
 }
 
 function normalizePumpsArray(value) {
@@ -59,9 +128,9 @@ function hasMeaningfulSensorSignal(payload) {
     const hasPumpSignal = normalizePumpsArray(payload.pumps).some(Boolean);
     const eventKeys = ['triggered', 'event', 'detected', 'changed'];
     const hasEventSignal = eventKeys.some((key) => asBool(payload[key]));
-    const booleanKeys = ['wls1', 'wls2', 'float_alarm', 'floatAlarm', 'locked', 'lock', 'reed', 'reed_switch', 'pump1_on', 'pump1On', 'pump2_on', 'pump2On', 'green_on', 'greenOn', 'red_on', 'redOn', 'ph_ok', 'phOk'];
+    const booleanKeys = ['wls1', 'wls2', 'float_alarm', 'floatAlarm', 'locked', 'lock', 'reed', 'reed_switch', 'pump1_on', 'pump1On', 'pump2_on', 'pump2On', 'green_on', 'greenOn', 'red_on', 'redOn', 'ph_ok', 'phOk', 'start_button', 'startButton', 'stop_button', 'stopButton', 'alarm_muted', 'alarmMuted'];
     const hasBooleanSignal = booleanKeys.some((key) => payload[key] !== undefined && payload[key] !== null && payload[key] !== '');
-    return hasNumericSignal || hasTankSignal || hasPumpSignal || hasEventSignal || hasBooleanSignal;
+    return hasNumericSignal || hasTankSignal || hasPumpSignal || hasEventSignal || hasBooleanSignal || Boolean(asOptionalText(payload.pairing_status || payload.pairingStatus));
 }
 
 function sensorSignature(row) {
@@ -83,7 +152,11 @@ function sensorSignature(row) {
         pump2_on: asBool(firstDefined(row.pump2_on, row.pump2On)),
         green_on: asBool(firstDefined(row.green_on, row.greenOn)),
         red_on: asBool(firstDefined(row.red_on, row.redOn)),
-        ph_ok: asBool(firstDefined(row.ph_ok, row.phOk))
+        ph_ok: asBool(firstDefined(row.ph_ok, row.phOk)),
+        start_button: asBool(firstDefined(row.start_button, row.startButton)),
+        stop_button: asBool(firstDefined(row.stop_button, row.stopButton)),
+        alarm_muted: asBool(firstDefined(row.alarm_muted, row.alarmMuted)),
+        pairing_status: String(firstDefined(row.pairing_status, row.pairingStatus, '') || '')
     });
 }
 
@@ -94,17 +167,21 @@ function enrichSensorLikeRow(row) {
         if (!raw || typeof raw !== 'object') return row;
         return {
             ...row,
-            ph_value: firstDefined(raw.ph_value, raw.phValue, raw.ph, row.ph_value),
-            temp_c: firstDefined(raw.temp_c, raw.tempValue, raw.temperature, row.temp_c),
-            wls1: firstDefined(raw.wls1, raw.WLS1, row.wls1),
-            wls2: firstDefined(raw.wls2, raw.WLS2, row.wls2),
-            float_alarm: firstDefined(raw.float_alarm, raw.floatAlarm, raw.float, row.float_alarm),
-            locked: firstDefined(raw.locked, raw.lock, raw.reed, raw.reed_switch, row.locked),
-            pump1_on: firstDefined(raw.pump1_on, raw.pump1On, row.pump1_on),
-            pump2_on: firstDefined(raw.pump2_on, raw.pump2On, row.pump2_on),
-            green_on: firstDefined(raw.green_on, raw.greenOn, row.green_on),
-            red_on: firstDefined(raw.red_on, raw.redOn, row.red_on),
-            ph_ok: firstDefined(raw.ph_ok, raw.phOk, row.ph_ok),
+            ph_value: firstDefined(row.ph_value, raw.ph_value, raw.phValue, raw.ph),
+            temp_c: firstDefined(row.temp_c, raw.temp_c, raw.tempValue, raw.temperature),
+            wls1: firstDefined(row.wls1, raw.wls1, raw.WLS1),
+            wls2: firstDefined(row.wls2, raw.wls2, raw.WLS2),
+            float_alarm: firstDefined(row.float_alarm, raw.float_alarm, raw.floatAlarm, raw.float),
+            locked: firstDefined(row.locked, raw.locked, raw.lock, raw.reed, raw.reed_switch),
+            pump1_on: firstDefined(row.pump1_on, raw.pump1_on, raw.pump1On),
+            pump2_on: firstDefined(row.pump2_on, raw.pump2_on, raw.pump2On),
+            green_on: firstDefined(row.green_on, raw.green_on, raw.greenOn),
+            red_on: firstDefined(row.red_on, raw.red_on, raw.redOn),
+            ph_ok: firstDefined(row.ph_ok, raw.ph_ok, raw.phOk),
+            start_button: firstDefined(row.start_button, raw.start_button, raw.startButton),
+            stop_button: firstDefined(row.stop_button, raw.stop_button, raw.stopButton),
+            alarm_muted: firstDefined(row.alarm_muted, raw.alarm_muted, raw.alarmMuted),
+            pairing_status: firstDefined(row.pairing_status, raw.pairing_status, raw.pairingStatus),
         };
     } catch (_) {
         return row;
@@ -166,6 +243,7 @@ function startMqttListener() {
             const hasIsOn = payload.isOn !== undefined || payload.is_on !== undefined;
             const hasUptime = payload.uptime_seconds !== undefined || payload.uptimeSeconds !== undefined;
             const active_tank = payload.activeTank ?? payload.active_tank ?? null;
+            const sensorColumns = normalizeSensorColumnValues(payload);
 
             // Pumps array handling
             const pumpsJson = normalizePumpsJson(payload.pumps);
@@ -185,7 +263,7 @@ function startMqttListener() {
                 const raw = JSON.stringify(rawPayload);
                 const msgId = payload.msg_id || payload.msgId || payload.id || null;
                 const latest = await db.get(
-                    `SELECT TOP 1 is_on, uptime_seconds, pressure, flow_rate, ec_value, pumps, raw_payload, active_tank, timestamp
+                    `SELECT TOP 1 ${SENSOR_DATA_SELECT_COLUMNS}
                      FROM sensor_data
                      WHERE tenant_id = ?${payloadDeviceId ? ' AND device_id = ?' : ''}
                      ORDER BY id DESC`,
@@ -205,7 +283,8 @@ function startMqttListener() {
                     ec_value,
                     pumps: pumpsJson,
                     active_tank,
-                    is_on
+                    is_on,
+                    ...sensorColumns
                 };
                 const latestForCompare = enrichSensorLikeRow(latest);
                 const latestTsMs = latest?.timestamp ? new Date(latest.timestamp).getTime() : 0;
@@ -222,9 +301,39 @@ function startMqttListener() {
 
                 await db.run(
                     `INSERT INTO sensor_data 
-                    (tenant_id, device_id, sensor_id, msg_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank, is_on, uptime_seconds, timestamp) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-                    [finalTenant, payloadDeviceId, payloadSensorId, msgId, pressure, flow_rate, ec_value, pumpsJson, raw, 'mqtt', topic, active_tank, is_on, Number.isFinite(uptime_seconds) ? uptime_seconds : 0]
+                    (tenant_id, device_id, sensor_id, msg_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, ph_value, temp_c, wls1, wls2, float_alarm, locked, pump1_on, pump2_on, green_on, red_on, ph_ok, start_button, stop_button, alarm_muted, pairing_status, active_tank, is_on, uptime_seconds, timestamp) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                    [
+                        finalTenant,
+                        payloadDeviceId,
+                        payloadSensorId,
+                        msgId,
+                        pressure,
+                        flow_rate,
+                        ec_value,
+                        pumpsJson,
+                        raw,
+                        'mqtt',
+                        topic,
+                        sensorColumns.ph_value,
+                        sensorColumns.temp_c,
+                        sensorColumns.wls1,
+                        sensorColumns.wls2,
+                        sensorColumns.float_alarm,
+                        sensorColumns.locked,
+                        sensorColumns.pump1_on,
+                        sensorColumns.pump2_on,
+                        sensorColumns.green_on,
+                        sensorColumns.red_on,
+                        sensorColumns.ph_ok,
+                        sensorColumns.start_button,
+                        sensorColumns.stop_button,
+                        sensorColumns.alarm_muted,
+                        sensorColumns.pairing_status,
+                        active_tank,
+                        is_on,
+                        Number.isFinite(uptime_seconds) ? uptime_seconds : 0
+                    ]
                 );
                 console.log(`[DB] Saved sensor data for tenant=${finalTenant} device=${payloadDeviceId} msg_id=${msgId || 'none'}`);
             } catch (dbErr) {
