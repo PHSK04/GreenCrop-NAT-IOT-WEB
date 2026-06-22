@@ -14,7 +14,8 @@ import {
   Clock3,
   Siren,
   Thermometer,
-  AlertTriangle
+  AlertTriangle,
+  Waves
 } from "lucide-react";
 import machineModel from "@/assets/images/machine_model.png";
 import { MetricsChart } from "../MetricsChart";
@@ -171,6 +172,22 @@ export function DashboardPage({
   const stableEcValue = useStablePositiveValue(ecValue, boardConnected);
   const stablePhOk =
     stablePhValue != null ? stablePhValue >= 6.5 && stablePhValue <= 7.5 : phOk;
+  const liveSignal = mqttStatus === "connected" && boardConnected;
+  const flowActive = liveSignal && (isOn || pump1On || pump2On);
+  const tank1Level = !liveSignal ? 10 : wls1 || activeTank === 1 ? 72 : flowActive ? 42 : 18;
+  const tank2Level = !liveSignal ? 10 : wls2 || activeTank === 2 ? 86 : pump2On ? 56 : 24;
+  const flowStatusLabel = !liveSignal
+    ? language === "TH" ? "รอสัญญาณจริง" : "Waiting for live signal"
+    : flowActive
+      ? language === "TH" ? "กำลังไหล" : "Flow active"
+      : language === "TH" ? "พร้อมทำงาน" : "Ready";
+  const safetyStatusLabel = locked
+    ? language === "TH" ? "ระบบล็อค" : "Locked"
+    : redOn || floatAlarm
+      ? language === "TH" ? "แจ้งเตือน" : "Alarm"
+      : liveSignal
+        ? language === "TH" ? "ปกติ" : "Normal"
+        : language === "TH" ? "ไม่มีสัญญาณ" : "No signal";
 
   const formatUptime = (seconds: number) => {
     const hh = String(Math.floor(seconds / 3600)).padStart(2, "0");
@@ -295,10 +312,41 @@ export function DashboardPage({
           50% { opacity: 0.42; }
         }
 
+        @keyframes dashboardFlowDash {
+          to { stroke-dashoffset: -48; }
+        }
+
+        @keyframes dashboardFanSpin {
+          to { transform: rotate(360deg); }
+        }
+
+        @keyframes dashboardNodePulse {
+          0%, 100% { opacity: 0.58; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.18); }
+        }
+
+        .dashboard-flow-active {
+          animation: dashboardFlowDash 1.25s linear infinite;
+        }
+
+        .dashboard-fan-active {
+          animation: dashboardFanSpin 1.1s linear infinite;
+          transform-origin: center;
+          transform-box: fill-box;
+        }
+
+        .dashboard-node-active {
+          animation: dashboardNodePulse 1.4s ease-in-out infinite;
+          transform-origin: center;
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .dashboard-water-alarm-card,
           .dashboard-water-alarm-signal,
-          .dashboard-water-alarm-stripe {
+          .dashboard-water-alarm-stripe,
+          .dashboard-flow-active,
+          .dashboard-fan-active,
+          .dashboard-node-active {
             animation: none !important;
           }
         }
@@ -418,20 +466,154 @@ export function DashboardPage({
                 <CardTitle className="text-foreground">{t.visualizer}</CardTitle>
                 <CardDescription className="text-muted-foreground">{t.visualizerDesc}</CardDescription>
               </CardHeader>
-              <CardContent className="flex h-full items-center justify-center rounded-b-2xl bg-gradient-to-b from-transparent to-background/30 p-4 sm:p-6 lg:p-8">
-                <div className="relative w-full h-full flex items-center justify-center">
-                   {/* Glow effect */}
-                   {isOn && <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full transition-all duration-1000"></div>}
-                  
-                   <img 
-                    src={machineModel} 
-                    alt="Water System Model" 
-                    className="max-h-[260px] w-auto object-contain drop-shadow-2xl transition-all duration-700 sm:max-h-[380px] lg:max-h-[500px]"
-                    style={{ 
-                      filter: isOn ? 'brightness(1.1) contrast(1.05)' : 'grayscale(1)',
-                      transform: isOn ? 'scale(1.02)' : 'scale(1)'
+              <CardContent className="rounded-b-2xl bg-gradient-to-b from-transparent to-background/30 p-4 sm:p-6 lg:p-8">
+                <div className="relative min-h-[600px] overflow-hidden rounded-2xl border border-emerald-500/20 bg-slate-950 text-slate-100 shadow-inner sm:min-h-[460px]">
+                  <div
+                    className="absolute inset-0 opacity-40"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(rgba(20,184,166,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(20,184,166,0.12) 1px, transparent 1px)",
+                      backgroundSize: "46px 46px",
                     }}
-                   />
+                  />
+                  <div className="absolute inset-x-4 top-4 z-10 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-300">
+                        {language === "TH" ? "แผนผังการทำงานจริง" : "Live System Topology"}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {language === "TH" ? "ปั๊ม น้ำ เซนเซอร์ และ alarm อิงจาก telemetry ล่าสุด" : "Pumps, water, sensors, and alarms follow the latest telemetry"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className={`${liveSignal ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-200"} hover:bg-emerald-500`}>
+                        <span className={`mr-2 h-2 w-2 rounded-full ${liveSignal ? "dashboard-node-active bg-white" : "bg-slate-400"}`} />
+                        {liveSignal ? "ONLINE" : "OFFLINE"}
+                      </Badge>
+                      <Badge className={`${redOn || floatAlarm || locked ? "bg-red-500 text-white" : "bg-cyan-500 text-white"} hover:bg-cyan-500`}>
+                        {safetyStatusLabel}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1000 560" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="dashboardWaterLine" x1="0%" x2="100%" y1="0%" y2="0%">
+                        <stop offset="0%" stopColor="#22d3ee" />
+                        <stop offset="52%" stopColor="#10b981" />
+                        <stop offset="100%" stopColor="#38bdf8" />
+                      </linearGradient>
+                      <filter id="dashboardFlowGlow">
+                        <feGaussianBlur stdDeviation="4" result="blur" />
+                        <feMerge>
+                          <feMergeNode in="blur" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                      </filter>
+                    </defs>
+                    <path
+                      d="M130 300 H315 C360 300 360 190 420 190 H590 C650 190 650 300 710 300 H870"
+                      fill="none"
+                      stroke={flowActive ? "url(#dashboardWaterLine)" : "#334155"}
+                      strokeLinecap="round"
+                      strokeWidth="14"
+                      strokeDasharray="22 26"
+                      className={flowActive ? "dashboard-flow-active" : ""}
+                      filter={flowActive ? "url(#dashboardFlowGlow)" : undefined}
+                    />
+                    <path
+                      d="M870 360 H690 C630 360 630 450 560 450 H350 C300 450 300 360 230 360 H130"
+                      fill="none"
+                      stroke={pump2On ? "#a78bfa" : "#334155"}
+                      strokeLinecap="round"
+                      strokeWidth="10"
+                      strokeDasharray="16 22"
+                      className={pump2On ? "dashboard-flow-active" : ""}
+                    />
+                    {[130, 315, 590, 710, 870].map((x, index) => (
+                      <circle
+                        key={x}
+                        cx={x}
+                        cy={index === 1 || index === 2 ? 190 : 300}
+                        r="8"
+                        fill={flowActive ? "#67e8f9" : "#475569"}
+                        className={flowActive ? "dashboard-node-active" : ""}
+                      />
+                    ))}
+                  </svg>
+
+                  <div className="absolute left-[4%] top-[18%] z-10 w-[42%] min-w-0 rounded-2xl border border-cyan-400/25 bg-slate-900/86 p-3 shadow-xl sm:top-[24%] sm:w-[23%] sm:min-w-32">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300">
+                      {language === "TH" ? "ถังพักน้ำ" : "Tank 1"}
+                    </p>
+                    <div className="mt-3 h-32 overflow-hidden rounded-xl border border-cyan-300/30 bg-slate-950/80">
+                      <div
+                        className="absolute bottom-3 left-3 right-3 rounded-b-xl bg-cyan-400/35 transition-all duration-700"
+                        style={{ height: `${tank1Level}%` }}
+                      />
+                      <div className="relative z-10 flex h-full items-center justify-center">
+                        <Database className="h-10 w-10 text-cyan-100" />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-300">WLS1: {wls1 ? "ON" : "OFF"}</p>
+                  </div>
+
+                  <div className="absolute right-[4%] top-[18%] z-10 w-[42%] min-w-0 rounded-2xl border border-emerald-400/25 bg-slate-900/86 p-3 shadow-xl sm:top-[24%] sm:w-[23%] sm:min-w-32">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300">
+                      {language === "TH" ? "ถังปลายทาง" : "Tank 2"}
+                    </p>
+                    <div className="mt-3 h-32 overflow-hidden rounded-xl border border-emerald-300/30 bg-slate-950/80">
+                      <div
+                        className="absolute bottom-3 left-3 right-3 rounded-b-xl bg-emerald-400/35 transition-all duration-700"
+                        style={{ height: `${tank2Level}%` }}
+                      />
+                      <div className="relative z-10 flex h-full items-center justify-center">
+                        <Waves className="h-10 w-10 text-emerald-100" />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-300">WLS2: {wls2 ? "ON" : "OFF"}</p>
+                  </div>
+
+                  <div className="absolute left-1/2 top-[48%] z-10 flex w-44 -translate-x-1/2 flex-col items-center rounded-2xl border border-blue-400/25 bg-slate-900/88 p-3 shadow-xl sm:top-[34%] sm:w-52 sm:p-4">
+                    <div className={`grid h-20 w-20 place-items-center rounded-full border-4 ${flowActive ? "border-blue-300 bg-blue-500/20 text-blue-100 shadow-[0_0_28px_rgba(59,130,246,0.35)]" : "border-slate-600 bg-slate-800 text-slate-500"}`}>
+                      <Cpu className={`h-9 w-9 ${flowActive ? "dashboard-fan-active" : ""}`} />
+                    </div>
+                    <p className="mt-3 text-sm font-bold text-slate-100">
+                      {language === "TH" ? "ชุดปั๊มน้ำ" : "Pump Unit"}
+                    </p>
+                    <p className="text-xs text-slate-400">{flowStatusLabel}</p>
+                    <div className="mt-3 grid w-full grid-cols-2 gap-2 text-center text-[10px] font-bold">
+                      <span className={`rounded-full px-2 py-1 ${pump1On ? "bg-blue-500 text-white" : "bg-slate-800 text-slate-400"}`}>P1 {pump1On ? "ON" : "OFF"}</span>
+                      <span className={`rounded-full px-2 py-1 ${pump2On ? "bg-violet-500 text-white" : "bg-slate-800 text-slate-400"}`}>P2 {pump2On ? "ON" : "OFF"}</span>
+                    </div>
+                  </div>
+
+                  <div className="absolute inset-x-4 bottom-4 z-10 grid grid-cols-3 gap-2 sm:gap-3">
+                    <div className="rounded-xl border border-slate-700 bg-slate-900/86 p-3">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">pH</p>
+                      <p className={`mt-1 text-xl font-black ${stablePhOk ? "text-emerald-300" : "text-amber-300"}`}>
+                        {stablePhValue != null ? stablePhValue.toFixed(2) : "--"}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-700 bg-slate-900/86 p-3">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">EC</p>
+                      <p className="mt-1 text-xl font-black text-cyan-300">
+                        {stableEcValue != null ? stableEcValue.toFixed(2) : "--"} <span className="text-xs text-slate-400">mS/cm</span>
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-700 bg-slate-900/86 p-3">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">{language === "TH" ? "อุณหภูมิ" : "Temp"}</p>
+                      <p className="mt-1 text-xl font-black text-sky-300">
+                        {stableTempValue != null ? stableTempValue.toFixed(1) : "--"} <span className="text-xs text-slate-400">C</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <img
+                    src={machineModel}
+                    alt="Water system reference"
+                    className="pointer-events-none absolute bottom-20 left-1/2 z-[1] max-h-[190px] w-auto -translate-x-1/2 object-contain opacity-20 grayscale transition-opacity duration-700 sm:max-h-[250px]"
+                  />
                 </div>
               </CardContent>
             </Card>
