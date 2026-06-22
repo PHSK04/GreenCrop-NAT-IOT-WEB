@@ -2,10 +2,11 @@ import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Thermometer, Droplets, Activity, AlertTriangle, Download, FileText, CloudRain } from "lucide-react";
+import { Thermometer, Droplets, Activity, AlertTriangle, Download, FileText, CloudRain, Database } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
@@ -48,6 +49,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
   const [selectedMonth, setSelectedMonth] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [dismissedEmptyDataKey, setDismissedEmptyDataKey] = useState<string | null>(null);
 
   const filteredTelemetry = useMemo(() => {
     return telemetryHistory.filter((row) => {
@@ -231,8 +233,60 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
     }
   };
 
+  const missingTempData = tempHistoryDevice.length === 0;
+  const missingWaterQualityData = waterQualityHistoryDevice.length === 0;
+  const hasNoTelemetry = telemetryHistory.length === 0;
+  const emptyDataKey = `${telemetryHistory.length}:${selectedMonth}:${startDate}:${endDate}:${tempHistoryDevice.length}:${waterQualityHistoryDevice.length}`;
+  const showEmptyDataDialog = (missingTempData || missingWaterQualityData) && dismissedEmptyDataKey !== emptyDataKey;
+  const missingSections = [
+    missingTempData ? (isTH ? "อุณหภูมิน้ำ (24 ชม.)" : "Water Temperature (24h)") : "",
+    missingWaterQualityData ? (isTH ? "แนวโน้มคุณภาพน้ำ (7 วัน)" : "Water Quality Trends (7 Days)") : "",
+  ].filter(Boolean);
+  const emptyDialogTitle = hasNoTelemetry
+    ? (isTH ? "ยังไม่มีข้อมูลเซ็นเซอร์ในฐานข้อมูล" : "No sensor data in the database yet")
+    : (isTH ? "ไม่พบข้อมูลจริงในช่วงที่เลือก" : "No real data in the selected range");
+  const emptyDialogDescription = hasNoTelemetry
+    ? (isTH
+      ? "ระบบยังไม่ได้รับข้อมูลจาก sensor_data จึงยังวาดกราฟอุณหภูมิน้ำและ pH/EC ไม่ได้"
+      : "No sensor_data rows have been received yet, so the water temperature and pH/EC charts cannot be drawn.")
+    : (isTH
+      ? "มีข้อมูลบางส่วนในระบบ แต่ช่วงเดือน/วันที่เลือกยังไม่มีค่าที่ใช้วาดกราฟนี้"
+      : "Some records exist, but the selected month/date range has no values for these charts.");
+
   return (
     <>
+      <Dialog
+        open={showEmptyDataDialog}
+        onOpenChange={(open) => {
+          if (!open) setDismissedEmptyDataKey(emptyDataKey);
+        }}
+      >
+        <DialogContent className="bg-card border-border text-foreground sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Database className="h-5 w-5 text-blue-500" />
+              {emptyDialogTitle}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {emptyDialogDescription}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-4 text-sm">
+            <p className="font-medium text-foreground">{isTH ? "กราฟที่ยังไม่มีข้อมูล:" : "Charts without data:"}</p>
+            <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+              {missingSections.map((section) => (
+                <li key={section}>{section}</li>
+              ))}
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setDismissedEmptyDataKey(emptyDataKey)}>
+              {isTH ? "รับทราบ" : "OK"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <header className="bg-card/50 border-b border-border px-8 py-6 backdrop-blur-sm">
         <div className="flex items-center justify-between">
           <div>
