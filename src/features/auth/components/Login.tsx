@@ -7,15 +7,18 @@ import {
   Cpu,
   Eye,
   EyeOff,
+  Factory,
   Leaf,
   Loader2,
   Lock,
   Mail,
   Radio,
-  ShieldCheck,
+  Sprout,
+  Wifi,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Form,
@@ -27,14 +30,12 @@ import {
 } from "@/components/ui/form";
 import { ModeToggle } from "@/components/mode-toggle";
 import { useAuth } from "../contexts/AuthContext";
-import appLogoGreen from "@/assets/images/3_transparent_logo_green.png";
-import loginBg from "@/assets/images/login_bg.png";
 
 import { SocialAuth } from "./SocialAuth";
 
 const loginSchema = z.object({
-  email: z.string().email({ message: "Invalid email address" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  email: z.string().email({ message: "กรุณากรอกอีเมลให้ถูกต้อง" }),
+  password: z.string().min(6, { message: "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร" }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -44,26 +45,78 @@ interface LoginProps {
   onLogin?: () => void;
 }
 
-const platformSignals = [
-  {
-    icon: Radio,
-    label: "Sensor Network",
-    value: "Always Connected",
-    detail: "Realtime device telemetry and environmental monitoring",
-  },
-  {
-    icon: Cpu,
-    label: "Operations Core",
-    value: "Centralized Control",
-    detail: "Manage irrigation, tanks, crops, and machine status in one place",
-  },
-  {
-    icon: ShieldCheck,
-    label: "Security Layer",
-    value: "Protected Access",
-    detail: "Verified sign-in for operators, admins, and farm stakeholders",
-  },
+const featureIcons = [
+  { icon: Factory, label: "โรงงาน" },
+  { icon: Wifi, label: "เครือข่าย" },
+  { icon: Sprout, label: "ฟาร์ม" },
 ];
+
+const networkPoints = Array.from({ length: 118 }, (_, index) => {
+  const x = (index * 83 + (index % 7) * 41) % 1440;
+  const y = (index * 59 + (index % 11) * 53) % 900;
+  return {
+    id: index,
+    x: x + ((index % 5) - 2) * 8,
+    y: y + ((index % 3) - 1) * 10,
+  };
+});
+
+const networkLines = networkPoints
+  .flatMap((point, pointIndex) =>
+    networkPoints.slice(pointIndex + 1).flatMap((target) => {
+      const distance = Math.hypot(point.x - target.x, point.y - target.y);
+      if (distance > 128 || (point.id + target.id) % 4 === 0) return [];
+      return [{ x1: point.x, y1: point.y, x2: target.x, y2: target.y, opacity: 0.1 + (128 - distance) / 700 }];
+    }),
+  )
+  .slice(0, 230);
+
+function NetworkBackdrop() {
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      viewBox="0 0 1440 900"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <radialGradient id="login-node-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#10b981" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="1440" height="900" fill="#f8fbfa" />
+      {networkLines.map((line, index) => (
+        <line
+          key={`${line.x1}-${line.y1}-${index}`}
+          className="login-network-line"
+          x1={line.x1}
+          y1={line.y1}
+          x2={line.x2}
+          y2={line.y2}
+          stroke="#10b981"
+          strokeWidth="1"
+          opacity={line.opacity}
+          style={{ animationDelay: `${(index % 14) * 0.16}s` }}
+        />
+      ))}
+      {networkPoints.map((point) => (
+        <g key={point.id}>
+          <circle cx={point.x} cy={point.y} r="7" fill="url(#login-node-glow)" opacity="0.45" />
+          <circle
+            className="login-network-node"
+            cx={point.x}
+            cy={point.y}
+            r="2.1"
+            fill="#34d399"
+            opacity="0.7"
+            style={{ animationDelay: `${(point.id % 16) * 0.2}s` }}
+          />
+        </g>
+      ))}
+    </svg>
+  );
+}
 
 export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   const { login } = useAuth();
@@ -90,322 +143,272 @@ export function Login({ onSwitchToRegister, onLogin }: LoginProps) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-900">
+    <div className="relative min-h-screen overflow-hidden bg-[#f8fbfa] text-slate-900">
       <style>{`
-        @keyframes fadeUp {
+        @keyframes loginFadeUp {
           from { opacity: 0; transform: translateY(18px); }
           to { opacity: 1; transform: translateY(0); }
         }
 
-        @keyframes logoReveal {
-          0% { opacity: 0; transform: translateY(18px) scale(0.86); filter: blur(10px); }
-          58% { opacity: 1; transform: translateY(-4px) scale(1.04); filter: blur(0); }
-          100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        @keyframes loginNetworkDrift {
+          0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+          50% { transform: translate3d(-10px, 8px, 0) scale(1.015); }
         }
 
-        @keyframes logoGlow {
-          0%, 100% { box-shadow: 0 24px 70px rgba(16,185,129,0.20), 0 0 0 rgba(52,211,153,0); }
-          50% { box-shadow: 0 28px 90px rgba(16,185,129,0.34), 0 0 42px rgba(52,211,153,0.28); }
+        @keyframes loginNodePulse {
+          0%, 100% { opacity: 0.36; r: 1.8px; }
+          45% { opacity: 0.95; r: 3px; }
         }
 
-        @keyframes logoSweep {
-          0% { transform: translateX(-160%) rotate(16deg); opacity: 0; }
-          26% { opacity: 0.85; }
-          62% { opacity: 0.35; }
-          100% { transform: translateX(170%) rotate(16deg); opacity: 0; }
+        @keyframes loginLinePulse {
+          0%, 100% { opacity: 0.08; }
+          50% { opacity: 0.28; }
         }
 
-        @keyframes logoFloat {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-7px); }
+        @keyframes loginScan {
+          0% { transform: translateX(-18%) rotate(8deg); opacity: 0; }
+          18% { opacity: 0.42; }
+          58% { opacity: 0.22; }
+          100% { transform: translateX(118%) rotate(8deg); opacity: 0; }
         }
 
-        .fade-up {
-          animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+        @keyframes loginFloatOrb {
+          0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.55; }
+          50% { transform: translate3d(18px, -22px, 0) scale(1.08); opacity: 0.85; }
         }
 
-        .brand-logo-stage {
-          animation: logoReveal 0.9s cubic-bezier(0.16, 1, 0.3, 1) both, logoGlow 4.2s ease-in-out 0.9s infinite;
+        .login-fade-up {
+          animation: loginFadeUp 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
-        .brand-logo-mark {
-          animation: logoFloat 5.6s ease-in-out 1s infinite;
+        .login-network {
+          animation: loginNetworkDrift 13s ease-in-out infinite;
         }
 
-        .brand-logo-stage::after {
-          content: "";
-          position: absolute;
-          inset: -24%;
-          width: 44%;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.72), transparent);
-          animation: logoSweep 1.35s ease-out 0.45s both;
-          pointer-events: none;
+        .login-network-node {
+          animation: loginNodePulse 3.8s ease-in-out infinite;
+        }
+
+        .login-network-line {
+          animation: loginLinePulse 5.6s ease-in-out infinite;
+        }
+
+        .login-scan {
+          animation: loginScan 8.5s ease-in-out infinite;
+        }
+
+        .login-orb {
+          animation: loginFloatOrb 9s ease-in-out infinite;
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .fade-up,
-          .brand-logo-stage,
-          .brand-logo-mark,
-          .brand-logo-stage::after {
+          .login-fade-up,
+          .login-network,
+          .login-network-node,
+          .login-network-line,
+          .login-scan,
+          .login-orb {
             animation: none !important;
           }
         }
       `}</style>
 
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${loginBg})` }}
-      />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.96)_0%,rgba(15,23,42,0.86)_46%,rgba(241,245,249,0.88)_46%,rgba(248,250,252,0.96)_100%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,185,129,0.12),transparent_32%,rgba(37,99,235,0.12))]" />
+      <div className="login-network absolute inset-[-2%] opacity-95">
+        <NetworkBackdrop />
+      </div>
+      <div className="login-scan pointer-events-none absolute inset-y-0 left-0 w-[34%] bg-[linear-gradient(90deg,transparent,rgba(16,185,129,0.14),transparent)] blur-sm" />
+      <div className="login-orb pointer-events-none absolute left-[11%] top-[14%] h-44 w-44 rounded-full bg-emerald-200/30 blur-3xl" />
+      <div className="login-orb pointer-events-none absolute bottom-[12%] right-[18%] h-56 w-56 rounded-full bg-teal-200/24 blur-3xl [animation-delay:2.8s]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_52%_53%,rgba(16,185,129,0.11),transparent_22%),linear-gradient(90deg,rgba(255,255,255,0.5),rgba(255,255,255,0.78))]" />
 
-      <div className="relative z-10 min-h-screen px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-        <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1280px] overflow-hidden rounded-[28px] border border-white/18 bg-white/10 shadow-[0_30px_90px_rgba(2,6,23,0.34)] backdrop-blur-md lg:min-h-[calc(100vh-3rem)]">
-          <section className="relative hidden w-[56%] overflow-hidden lg:flex">
-            <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(2,6,23,0.90)_0%,rgba(15,23,42,0.70)_62%,rgba(15,118,110,0.18)_100%)]" />
-            <div className="relative z-10 flex w-full flex-col justify-between p-8 xl:p-10">
-              <div className="flex items-center justify-between">
-                <div className="inline-flex items-center gap-3 rounded-2xl border border-white/14 bg-white/10 py-2 pl-2 pr-5 backdrop-blur">
-                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-white/95 shadow-sm">
-                    <img src={appLogoGreen} alt="GreenCrop NATIOT logo" className="h-9 w-9 object-contain" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-200/90">
-                      GreenCrop NATIOT
-                    </div>
-                    <div className="text-sm text-slate-300">Smart Farm Control Platform</div>
-                  </div>
-                </div>
+      <main className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-10">
+        <div className="grid w-full max-w-[980px] items-center gap-8 lg:grid-cols-[1.03fr_0.97fr] lg:gap-14 xl:max-w-[1060px]">
+          <section className="login-fade-up mx-auto flex w-full max-w-[430px] flex-col items-center text-center lg:items-start lg:text-left">
+            <div className="inline-flex items-center gap-3 rounded-full border border-emerald-200/80 bg-emerald-50/80 px-5 py-3 text-sm font-medium text-emerald-700 shadow-[0_10px_32px_rgba(16,185,129,0.13)] backdrop-blur-md">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_0_6px_rgba(16,185,129,0.12)]" />
+              System Online
+            </div>
 
-                <div className="rounded-full border border-emerald-300/24 bg-emerald-400/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
-                  Secure Access
-                </div>
+            <div className="mt-9">
+              <h1 className="font-['Montserrat'] text-[3.35rem] font-bold leading-none tracking-[-0.05em] text-slate-950 drop-shadow-[0_8px_18px_rgba(15,23,42,0.13)] sm:text-[4.2rem]">
+                Smart IoT
+              </h1>
+              <div className="mt-1 font-['Montserrat'] text-[2.55rem] font-medium leading-none tracking-[0.19em] text-emerald-600 sm:text-[3.35rem]">
+                PLATFORM
               </div>
+            </div>
 
-              <div className="fade-up flex max-w-2xl flex-col items-start pb-6">
-                <div className="brand-logo-stage relative mb-8 grid h-40 w-40 place-items-center overflow-hidden rounded-[32px] border border-emerald-300/20 bg-white/92 xl:h-48 xl:w-48">
-                  <img
-                    src={appLogoGreen}
-                    alt="GreenCrop NATIOT logo"
-                    className="brand-logo-mark h-32 w-32 object-contain xl:h-40 xl:w-40"
-                  />
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-200">
-                  <Leaf className="h-3.5 w-3.5 text-emerald-300" />
-                  Professional IoT Operations
-                </div>
-                <h1 className="mt-6 max-w-xl font-['Montserrat'] text-5xl font-semibold leading-[1.04] text-white xl:text-6xl">
-                  Command your farm from one secure console.
-                </h1>
-                <p className="mt-6 max-w-xl text-base leading-8 text-slate-300">
-                  Monitor crops, tanks, devices, and machine performance through a focused control room built
-                  for daily operation, not decoration.
-                </p>
-              </div>
+            <div className="mt-7 border-l-2 border-emerald-300/80 pl-6 text-left text-lg leading-8 text-slate-500">
+              ท่องไปในจักรวาลแห่งข้อมูล
+              <br />
+              ควบคุมทุกอุปกรณ์จากทุกมุมโลก
+            </div>
 
-              <div className="grid gap-4 xl:grid-cols-3">
-                {platformSignals.map(({ icon: Icon, label, value, detail }, index) => (
-                  <div
-                    key={label}
-                    className="fade-up rounded-2xl border border-white/12 bg-white/10 p-5 backdrop-blur-sm"
-                    style={{ animationDelay: `${160 + index * 110}ms` }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="rounded-2xl bg-emerald-400/12 p-3">
-                        <Icon className="h-5 w-5 text-emerald-200" />
-                      </div>
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.55)]" />
-                    </div>
-                    <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                      {label}
-                    </div>
-                    <div className="mt-2 text-lg font-semibold text-white">{value}</div>
-                    <p className="mt-3 text-sm leading-6 text-slate-300">{detail}</p>
-                  </div>
-                ))}
-              </div>
+            <div className="mt-9 flex items-center gap-4">
+              {featureIcons.map(({ icon: Icon, label }) => (
+                <div
+                  key={label}
+                  className="grid h-12 w-12 place-items-center rounded-2xl border border-emerald-100 bg-white/90 text-emerald-600 shadow-[0_10px_25px_rgba(15,23,42,0.08)] backdrop-blur-sm"
+                  title={label}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+              ))}
             </div>
           </section>
 
-          <section className="relative flex w-full flex-1 items-center justify-center bg-slate-50/96 px-4 py-8 sm:px-6 lg:w-[44%] lg:px-10 xl:px-12">
-            <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
-              <ModeToggle />
-            </div>
+          <section className="login-fade-up mx-auto w-full max-w-[390px] lg:max-w-[414px]" style={{ animationDelay: "90ms" }}>
+            <div className="relative rounded-[24px] border border-emerald-200/70 bg-emerald-50/70 p-5 shadow-[0_24px_58px_rgba(15,118,110,0.26),0_0_34px_rgba(16,185,129,0.23)] backdrop-blur-xl sm:p-6">
+              <div className="absolute right-5 top-5">
+                <ModeToggle />
+              </div>
 
-            <div className="fade-up relative z-10 w-full max-w-[460px]">
-              <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_22px_60px_rgba(15,23,42,0.12)] sm:p-8">
-                <div className="lg:hidden">
-                  <div className="inline-flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 py-2 pl-2 pr-4">
-                    <div className="grid h-11 w-11 place-items-center rounded-xl bg-white shadow-sm">
-                      <img src={appLogoGreen} alt="GreenCrop NATIOT logo" className="h-8 w-8 object-contain" />
-                    </div>
-                    <div className="text-left">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">
-                        GreenCrop NATIOT
-                      </div>
-                      <div className="text-xs text-slate-500">Smart Farm Control Platform</div>
-                    </div>
-                  </div>
+              <div className="pr-12 text-center">
+                <div className="mx-auto grid h-10 w-10 place-items-center rounded-2xl bg-white/70 text-emerald-600 shadow-sm">
+                  <Leaf className="h-5 w-5" />
                 </div>
+                <h2 className="mt-3 text-2xl font-bold text-slate-800">ยินดีต้อนรับ</h2>
+                <p className="mt-2 text-sm text-slate-500">เข้าสู่ระบบเพื่อจัดการฟาร์มและโรงงานของคุณ</p>
+              </div>
 
-                <div className="mt-4 sm:mt-0">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                    Operator Login
-                  </div>
-                  <h2 className="mt-5 font-['Montserrat'] text-3xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-[2.55rem]">
-                    Sign in
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-slate-500 sm:text-[15px]">
-                    Use your GreenCrop account to enter the operational dashboard and manage your IoT farm
-                    environment securely.
-                  </p>
-                </div>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-4" autoComplete="off">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel className="text-xs font-semibold text-slate-600">ชื่อผู้ใช้ / อีเมล</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Mail
+                              className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${
+                                focusedField === "email" ? "text-emerald-700" : "text-slate-400"
+                              }`}
+                            />
+                            <Input
+                              placeholder="กรอกชื่อผู้ใช้ หรือ อีเมล"
+                              className="h-12 rounded-[13px] border-slate-200 !bg-white/90 pl-11 text-[15px] !text-slate-800 shadow-[0_6px_16px_rgba(15,23,42,0.08)] placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:!bg-white focus-visible:ring-4 focus-visible:ring-emerald-100 dark:!bg-white/90 dark:!text-slate-800"
+                              disabled={isLoading}
+                              autoComplete="off"
+                              autoCorrect="off"
+                              autoCapitalize="none"
+                              spellCheck={false}
+                              onFocus={() => setFocusedField("email")}
+                              onBlur={() => setFocusedField(null)}
+                              {...field}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="mt-8 space-y-4" autoComplete="off">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem className="space-y-2">
-                          <FormLabel className="text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                            Email
-                          </FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Mail
-                                className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${
-                                  focusedField === "email" ? "text-emerald-700" : "text-slate-400"
-                                }`}
-                              />
-                              <Input
-                                placeholder="you@example.com"
-                                className="h-14 rounded-[1.15rem] border-slate-200 bg-slate-50/80 pl-11 text-[15px] text-slate-900 placeholder:text-slate-400 focus-visible:border-emerald-500 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-emerald-100"
-                                disabled={isLoading}
-                                autoComplete="off"
-                                autoCorrect="off"
-                                autoCapitalize="none"
-                                spellCheck={false}
-                                onFocus={() => setFocusedField("email")}
-                                onBlur={() => setFocusedField(null)}
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem className="space-y-2">
-                          <div className="flex items-center justify-between gap-4">
-                            <FormLabel className="text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                              Password
-                            </FormLabel>
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel className="text-xs font-semibold text-slate-600">รหัสผ่าน</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Lock
+                              className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${
+                                focusedField === "password" ? "text-emerald-700" : "text-slate-400"
+                              }`}
+                            />
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="••••••••"
+                              className="h-12 rounded-[13px] border-slate-200 !bg-white/90 pl-11 pr-12 text-[15px] !text-slate-800 shadow-[0_6px_16px_rgba(15,23,42,0.08)] placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:!bg-white focus-visible:ring-4 focus-visible:ring-emerald-100 dark:!bg-white/90 dark:!text-slate-800"
+                              disabled={isLoading}
+                              autoComplete="off"
+                              autoCorrect="off"
+                              autoCapitalize="none"
+                              spellCheck={false}
+                              onFocus={() => setFocusedField("password")}
+                              onBlur={() => setFocusedField(null)}
+                              {...field}
+                            />
                             <button
                               type="button"
-                              className="text-sm font-medium text-slate-500 transition-colors hover:text-emerald-800"
+                              onClick={() => setShowPassword((prev) => !prev)}
+                              disabled={isLoading}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-emerald-700"
+                              aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
                             >
-                              Forgot password?
+                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </button>
                           </div>
-                          <FormControl>
-                            <div className="relative">
-                              <Lock
-                                className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${
-                                  focusedField === "password" ? "text-emerald-700" : "text-slate-400"
-                                }`}
-                              />
-                              <Input
-                                type={showPassword ? "text" : "password"}
-                                placeholder="••••••••"
-                                className="h-14 rounded-[1.15rem] border-slate-200 bg-slate-50/80 pl-11 pr-12 text-[15px] text-slate-900 placeholder:text-slate-400 focus-visible:border-emerald-500 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-emerald-100"
-                                disabled={isLoading}
-                                autoComplete="off"
-                                autoCorrect="off"
-                                autoCapitalize="none"
-                                spellCheck={false}
-                                onFocus={() => setFocusedField("password")}
-                                onBlur={() => setFocusedField(null)}
-                                {...field}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowPassword((prev) => !prev)}
-                                disabled={isLoading}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-emerald-700"
-                                aria-label={showPassword ? "Hide password" : "Show password"}
-                              >
-                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </button>
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                    <Button
-                      type="submit"
-                      disabled={isLoading}
-                      className="mt-2 h-14 w-full rounded-[1.2rem] bg-[linear-gradient(180deg,#1e4535,#173527)] text-[15px] font-semibold text-white shadow-[0_14px_30px_rgba(23,53,39,0.18)] transition-all hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,#255240,#1b3d2e)]"
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Signing in...
-                        </>
-                      ) : (
-                        <>
-                          Sign In
-                          <ArrowRight className="h-4 w-4" />
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                </Form>
-
-                <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50/85 p-5">
-                  <SocialAuth onLoginSuccess={onLogin} actionText="sign in" />
-
-                  <div className="mt-5 text-center text-sm text-slate-500">
-                    Don&apos;t have an account?{" "}
+                  <div className="flex items-center justify-between gap-4 text-sm">
+                    <label className="flex cursor-pointer items-center gap-2 text-slate-500">
+                      <Checkbox className="border-slate-300 !bg-white dark:!bg-white" />
+                      จดจำฉันในระบบ
+                    </label>
                     <button
                       type="button"
-                      onClick={onSwitchToRegister}
-                      className="font-semibold text-emerald-700 underline decoration-emerald-300 underline-offset-4 transition-colors hover:text-emerald-900"
+                      className="font-semibold text-emerald-700 transition-colors hover:text-emerald-900"
                     >
-                      Create Account
+                      ลืมรหัสผ่าน?
                     </button>
                   </div>
-                </div>
 
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
-                    <div className="flex items-center gap-2 font-medium text-slate-700">
-                      <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                      Protected access
-                    </div>
-                    <p className="mt-2 text-xs leading-6 text-slate-500">
-                      Trusted entry point for operators and administrators.
-                    </p>
-                  </div>
+                  <Button
+                    type="submit"
+                    disabled={isLoading}
+                    className="h-12 w-full rounded-[13px] !bg-[#079b78] text-[15px] font-bold !text-white shadow-[0_14px_24px_rgba(5,150,105,0.25)] transition-all hover:-translate-y-0.5 hover:!bg-[#07896e]"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        กำลังเข้าสู่ระบบ...
+                      </>
+                    ) : (
+                      <>
+                        เข้าสู่ระบบ
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </Form>
 
-                  <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
-                    <div className="font-medium text-slate-700">Support Contact</div>
-                    <p className="mt-2 text-xs leading-6 text-slate-500">admin@greencropnatiot.com</p>
-                  </div>
-                </div>
+              <div className="mt-5">
+                <SocialAuth
+                  onLoginSuccess={onLogin}
+                  actionText="sign in"
+                  dividerLabel="หรือ เข้าสู่ระบบด้วย"
+                  providers={["Google", "Microsoft", "LINE", "Facebook"]}
+                  tone="light"
+                />
+              </div>
+
+              <div className="mt-5 border-t border-emerald-100 pt-5 text-center text-sm text-slate-500">
+                ยังไม่มีบัญชีใช่ไหม?{" "}
+                <button
+                  type="button"
+                  onClick={onSwitchToRegister}
+                  className="font-bold text-emerald-700 transition-colors hover:text-emerald-900"
+                >
+                  สมัครสมาชิกใหม่
+                </button>
               </div>
             </div>
           </section>
         </div>
-      </div>
+
+        <div className="pointer-events-none absolute bottom-5 left-1/2 hidden -translate-x-1/2 items-center gap-2 rounded-full border border-emerald-100 bg-white/70 px-4 py-2 text-xs font-medium text-emerald-700 shadow-sm backdrop-blur sm:flex">
+          <Radio className="h-3.5 w-3.5" />
+          GreenCrop NATIOT secure access
+        </div>
+      </main>
     </div>
   );
 }
