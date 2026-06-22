@@ -23,6 +23,38 @@ const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || 'public';
 const SHARED_SENSOR_TENANT = String(process.env.SHARED_SENSOR_TENANT || 'false').toLowerCase() === 'true';
 const SENSOR_DATA_STALE_MS = Math.max(1000, Number(process.env.SENSOR_DATA_STALE_MS || 10000));
 const SENSOR_DUPLICATE_WINDOW_MS = Math.max(1000, Number(process.env.SENSOR_DUPLICATE_WINDOW_MS || 5000));
+const SENSOR_DATA_SELECT_COLUMNS = [
+    'id',
+    'tenant_id',
+    'device_id',
+    'sensor_id',
+    'pressure',
+    'flow_rate',
+    'ec_value',
+    'pumps',
+    'raw_payload',
+    'source',
+    'mqtt_topic',
+    'ph_value',
+    'temp_c',
+    'wls1',
+    'wls2',
+    'float_alarm',
+    'locked',
+    'pump1_on',
+    'pump2_on',
+    'green_on',
+    'red_on',
+    'ph_ok',
+    'start_button',
+    'stop_button',
+    'alarm_muted',
+    'pairing_status',
+    'active_tank',
+    'is_on',
+    'uptime_seconds',
+    'timestamp'
+].join(', ');
 const GOOGLE_CLIENT_IDS = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
     .split(',')
     .map((value) => value.trim())
@@ -215,6 +247,43 @@ function firstDefined(...values) {
     return values.find((value) => value !== undefined && value !== null);
 }
 
+function asOptionalBool(value) {
+    if (value === undefined || value === null || value === '') return null;
+    return asBool(value);
+}
+
+function asOptionalNumber(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function asOptionalText(value) {
+    if (value === undefined || value === null) return null;
+    const text = String(value).trim();
+    return text || null;
+}
+
+function normalizeSensorColumnValues(payload) {
+    return {
+        ph_value: asOptionalNumber(firstDefined(payload.ph_value, payload.phValue, payload.ph)),
+        temp_c: asOptionalNumber(firstDefined(payload.temp_c, payload.tempValue, payload.temperature)),
+        wls1: asOptionalBool(firstDefined(payload.wls1, payload.WLS1)),
+        wls2: asOptionalBool(firstDefined(payload.wls2, payload.WLS2)),
+        float_alarm: asOptionalBool(firstDefined(payload.float_alarm, payload.floatAlarm, payload.float)),
+        locked: asOptionalBool(firstDefined(payload.locked, payload.lock, payload.reed, payload.reed_switch)),
+        pump1_on: asOptionalBool(firstDefined(payload.pump1_on, payload.pump1On)),
+        pump2_on: asOptionalBool(firstDefined(payload.pump2_on, payload.pump2On)),
+        green_on: asOptionalBool(firstDefined(payload.green_on, payload.greenOn)),
+        red_on: asOptionalBool(firstDefined(payload.red_on, payload.redOn)),
+        ph_ok: asOptionalBool(firstDefined(payload.ph_ok, payload.phOk)),
+        start_button: asOptionalBool(firstDefined(payload.start_button, payload.startButton)),
+        stop_button: asOptionalBool(firstDefined(payload.stop_button, payload.stopButton)),
+        alarm_muted: asOptionalBool(firstDefined(payload.alarm_muted, payload.alarmMuted)),
+        pairing_status: asOptionalText(firstDefined(payload.pairing_status, payload.pairingStatus)),
+    };
+}
+
 function hasMeaningfulSensorSignal(body) {
     const numericKeys = ['pressure', 'flow_rate', 'flow', 'ec_value', 'ec', 'ph_value', 'phValue', 'temp_c', 'tempValue'];
     const hasNumericSignal = numericKeys.some((key) => {
@@ -229,9 +298,9 @@ function hasMeaningfulSensorSignal(body) {
         asNumber(activeTank, 0) > 0;
     const eventKeys = ['triggered', 'event', 'detected', 'changed'];
     const hasEventSignal = eventKeys.some((key) => asBool(body[key]));
-    const booleanKeys = ['wls1', 'wls2', 'float_alarm', 'floatAlarm', 'locked', 'pump1_on', 'pump1On', 'pump2_on', 'pump2On', 'green_on', 'greenOn', 'red_on', 'redOn', 'ph_ok', 'phOk'];
+    const booleanKeys = ['wls1', 'wls2', 'float_alarm', 'floatAlarm', 'locked', 'pump1_on', 'pump1On', 'pump2_on', 'pump2On', 'green_on', 'greenOn', 'red_on', 'redOn', 'ph_ok', 'phOk', 'start_button', 'startButton', 'stop_button', 'stopButton', 'alarm_muted', 'alarmMuted'];
     const hasBooleanSignal = booleanKeys.some((key) => body[key] !== undefined && body[key] !== null && body[key] !== '');
-    return hasNumericSignal || hasPumpSignal || hasTankSignal || hasEventSignal || hasBooleanSignal;
+    return hasNumericSignal || hasPumpSignal || hasTankSignal || hasEventSignal || hasBooleanSignal || Boolean(asOptionalText(body.pairing_status || body.pairingStatus));
 }
 
 function sensorSignature(row) {
@@ -254,7 +323,11 @@ function sensorSignature(row) {
         pump2_on: asBool(enriched.pump2_on),
         green_on: asBool(enriched.green_on),
         red_on: asBool(enriched.red_on),
-        ph_ok: asBool(enriched.ph_ok)
+        ph_ok: asBool(enriched.ph_ok),
+        start_button: asBool(enriched.start_button),
+        stop_button: asBool(enriched.stop_button),
+        alarm_muted: asBool(enriched.alarm_muted),
+        pairing_status: String(enriched.pairing_status || '')
     });
 }
 
@@ -265,17 +338,21 @@ function enrichSensorRow(row) {
         if (!raw || typeof raw !== 'object') return row;
         return {
             ...row,
-            ph_value: firstDefined(raw.ph_value, raw.phValue, raw.ph, row.ph_value),
-            temp_c: firstDefined(raw.temp_c, raw.tempValue, raw.temperature, row.temp_c),
-            wls1: firstDefined(raw.wls1, raw.WLS1, row.wls1),
-            wls2: firstDefined(raw.wls2, raw.WLS2, row.wls2),
-            float_alarm: firstDefined(raw.float_alarm, raw.floatAlarm, raw.float, row.float_alarm),
-            locked: firstDefined(raw.locked, raw.lock, raw.reed, raw.reed_switch, row.locked),
-            pump1_on: firstDefined(raw.pump1_on, raw.pump1On, row.pump1_on),
-            pump2_on: firstDefined(raw.pump2_on, raw.pump2On, row.pump2_on),
-            green_on: firstDefined(raw.green_on, raw.greenOn, row.green_on),
-            red_on: firstDefined(raw.red_on, raw.redOn, row.red_on),
-            ph_ok: firstDefined(raw.ph_ok, raw.phOk, row.ph_ok),
+            ph_value: firstDefined(row.ph_value, raw.ph_value, raw.phValue, raw.ph),
+            temp_c: firstDefined(row.temp_c, raw.temp_c, raw.tempValue, raw.temperature),
+            wls1: firstDefined(row.wls1, raw.wls1, raw.WLS1),
+            wls2: firstDefined(row.wls2, raw.wls2, raw.WLS2),
+            float_alarm: firstDefined(row.float_alarm, raw.float_alarm, raw.floatAlarm, raw.float),
+            locked: firstDefined(row.locked, raw.locked, raw.lock, raw.reed, raw.reed_switch),
+            pump1_on: firstDefined(row.pump1_on, raw.pump1_on, raw.pump1On),
+            pump2_on: firstDefined(row.pump2_on, raw.pump2_on, raw.pump2On),
+            green_on: firstDefined(row.green_on, raw.green_on, raw.greenOn),
+            red_on: firstDefined(row.red_on, raw.red_on, raw.redOn),
+            ph_ok: firstDefined(row.ph_ok, raw.ph_ok, raw.phOk),
+            start_button: firstDefined(row.start_button, raw.start_button, raw.startButton),
+            stop_button: firstDefined(row.stop_button, raw.stop_button, raw.stopButton),
+            alarm_muted: firstDefined(row.alarm_muted, raw.alarm_muted, raw.alarmMuted),
+            pairing_status: firstDefined(row.pairing_status, raw.pairing_status, raw.pairingStatus),
             is_on: firstDefined(raw.is_on, raw.isOn, row.is_on),
             uptime_seconds: firstDefined(raw.uptime_seconds, raw.uptimeSeconds, row.uptime_seconds),
             source: firstDefined(row.source, raw.source),
@@ -519,14 +596,14 @@ async function loadLatestSensorRows(tenantIds, deviceId) {
     for (const tenantId of tenantIds) {
         const params = [tenantId];
         let query = `
-            SELECT TOP 25 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank, is_on, uptime_seconds, timestamp
+            SELECT TOP 25 ${SENSOR_DATA_SELECT_COLUMNS}
             FROM sensor_data
             WHERE tenant_id = ? AND raw_payload IS NOT NULL
             ORDER BY id DESC
         `;
         if (deviceId) {
             query = `
-                SELECT TOP 25 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank, is_on, uptime_seconds, timestamp
+                SELECT TOP 25 ${SENSOR_DATA_SELECT_COLUMNS}
                 FROM sensor_data
                 WHERE tenant_id = ? AND device_id = ? AND raw_payload IS NOT NULL
                 ORDER BY id DESC
@@ -566,7 +643,7 @@ async function loadSensorHistoryRows(tenantIds, deviceId, options = {}) {
 
         const history = await db.all(
             `
-            SELECT TOP ${limit} id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank, is_on, uptime_seconds, timestamp
+            SELECT TOP ${limit} ${SENSOR_DATA_SELECT_COLUMNS}
             FROM sensor_data 
             WHERE ${where.join(' AND ')}
             ORDER BY id DESC
@@ -2417,7 +2494,7 @@ app.get('/api/admin/db/users/:id/details', requireAdmin, async (req, res) => {
                 ORDER BY login_time DESC
             `, sessionParams),
             db.all(`
-                SELECT TOP ${limit} id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, active_tank, is_on, uptime_seconds, timestamp
+                SELECT TOP ${limit} ${SENSOR_DATA_SELECT_COLUMNS}
                 FROM sensor_data
                 WHERE ${sensorWhere.join(' AND ')}
                 ORDER BY id DESC
@@ -2546,7 +2623,7 @@ app.get('/api/admin/db/sensor-data', requireAdmin, async (req, res) => {
         }
 
         const rows = await db.all(`
-            SELECT TOP ${limit} id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, active_tank, is_on, uptime_seconds, timestamp
+            SELECT TOP ${limit} ${SENSOR_DATA_SELECT_COLUMNS}
             FROM sensor_data
             ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
             ORDER BY id DESC
@@ -2927,6 +3004,7 @@ app.post('/api/sensor-data', async (req, res) => {
         const { device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp } = req.body;
         const deviceId = device_id ? String(device_id).trim().toUpperCase() : null;
         const normalizedSource = source.trim().toLowerCase();
+        const sensorColumns = normalizeSensorColumnValues(req.body);
         const rawPayload = JSON.stringify({
             ...req.body,
             tenant_id: tenant,
@@ -2940,7 +3018,7 @@ app.post('/api/sensor-data', async (req, res) => {
             uptime_seconds: Math.max(0, Math.floor(asNumber(uptime_seconds, 0))),
         });
         const latest = await db.get(
-            `SELECT TOP 1 is_on, uptime_seconds, timestamp, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank
+            `SELECT TOP 1 ${SENSOR_DATA_SELECT_COLUMNS}
              FROM sensor_data
              WHERE tenant_id = ?${deviceId ? ' AND device_id = ?' : ''}
              ORDER BY id DESC`,
@@ -2978,7 +3056,8 @@ app.post('/api/sensor-data', async (req, res) => {
             pumps: pumpsJson,
             active_tank: active_tank ?? null,
             is_on: normalizedIsOn,
-            raw_payload: rawPayload
+            raw_payload: rawPayload,
+            ...sensorColumns
         };
         if (latest && sensorSignature(latest) === sensorSignature(nextRow)) {
             const duplicateWindowMs = isTrustedControlSource ? 2000 : SENSOR_DUPLICATE_WINDOW_MS;
@@ -2993,8 +3072,8 @@ app.post('/api/sensor-data', async (req, res) => {
         const safeTimestamp = (clientTsSkewMs <= 5 * 60 * 1000) ? new Date(parsedTsMs) : new Date(nowMs);
 
         const result = await db.run(
-            `INSERT INTO sensor_data (tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank, is_on, uptime_seconds, timestamp)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO sensor_data (tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, ph_value, temp_c, wls1, wls2, float_alarm, locked, pump1_on, pump2_on, green_on, red_on, ph_ok, start_button, stop_button, alarm_muted, pairing_status, active_tank, is_on, uptime_seconds, timestamp)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 tenant,
                 deviceId,
@@ -3006,6 +3085,21 @@ app.post('/api/sensor-data', async (req, res) => {
                 rawPayload,
                 normalizedSource,
                 null,
+                sensorColumns.ph_value,
+                sensorColumns.temp_c,
+                sensorColumns.wls1,
+                sensorColumns.wls2,
+                sensorColumns.float_alarm,
+                sensorColumns.locked,
+                sensorColumns.pump1_on,
+                sensorColumns.pump2_on,
+                sensorColumns.green_on,
+                sensorColumns.red_on,
+                sensorColumns.ph_ok,
+                sensorColumns.start_button,
+                sensorColumns.stop_button,
+                sensorColumns.alarm_muted,
+                sensorColumns.pairing_status,
                 nextRow.active_tank,
                 normalizedIsOn,
                 parsedIncomingUptime,
