@@ -22,6 +22,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret';
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || 'public';
 const SHARED_SENSOR_TENANT = String(process.env.SHARED_SENSOR_TENANT || 'false').toLowerCase() === 'true';
 const SENSOR_DATA_STALE_MS = Math.max(1000, Number(process.env.SENSOR_DATA_STALE_MS || 10000));
+const SENSOR_DUPLICATE_WINDOW_MS = Math.max(1000, Number(process.env.SENSOR_DUPLICATE_WINDOW_MS || 5000));
 const GOOGLE_CLIENT_IDS = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
     .split(',')
     .map((value) => value.trim())
@@ -542,17 +543,35 @@ async function loadLatestSensorRows(tenantIds, deviceId) {
     }).slice(0, 1);
 }
 
-async function loadSensorHistoryRows(tenantIds, deviceId) {
+async function loadSensorHistoryRows(tenantIds, deviceId, options = {}) {
+    const limit = parsePositiveInt(options.limit, 20000, 1, 50000);
+    const startDate = normalizeDateTime(options.startDate, false);
+    const endDate = normalizeDateTime(options.endDate, true);
     const rows = [];
     for (const tenantId of tenantIds) {
+        const where = ['tenant_id = ?'];
+        const params = [tenantId];
+        if (deviceId) {
+            where.push('device_id = ?');
+            params.push(deviceId);
+        }
+        if (startDate) {
+            where.push('timestamp >= ?');
+            params.push(startDate);
+        }
+        if (endDate) {
+            where.push('timestamp <= ?');
+            params.push(endDate);
+        }
+
         const history = await db.all(
             `
-            SELECT TOP 2000 id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank, is_on, uptime_seconds, timestamp
+            SELECT TOP ${limit} id, tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, active_tank, is_on, uptime_seconds, timestamp
             FROM sensor_data 
-            WHERE tenant_id = ?${deviceId ? ' AND device_id = ?' : ''}
+            WHERE ${where.join(' AND ')}
             ORDER BY id DESC
           `,
-          deviceId ? [tenantId, deviceId] : [tenantId]
+          params
         );
         rows.push(...history);
     }
@@ -571,7 +590,7 @@ async function loadSensorHistoryRows(tenantIds, deviceId) {
             const bTime = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
             return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0) || Number(b.id || 0) - Number(a.id || 0);
         })
-        .slice(0, 2000);
+        .slice(0, limit);
 }
 
 function httpsGetJson(url) {
@@ -2851,7 +2870,11 @@ app.get('/api/sensor-data', async (req, res) => {
 
         // History mode for charts (optional)
         if (req.query.history === 'true') {
-             const history = await loadSensorHistoryRows(tenantCandidates, deviceId);
+            const history = await loadSensorHistoryRows(tenantCandidates, deviceId, {
+                limit: req.query.limit,
+                startDate: req.query.startDate,
+                endDate: req.query.endDate
+            });
             for (const row of history) {
                 Object.assign(row, enrichSensorRow(row));
                 row.server_now = serverNowIso;
@@ -2958,7 +2981,7 @@ app.post('/api/sensor-data', async (req, res) => {
             raw_payload: rawPayload
         };
         if (latest && sensorSignature(latest) === sensorSignature(nextRow)) {
-            const duplicateWindowMs = isTrustedControlSource ? 2000 : 30000;
+            const duplicateWindowMs = isTrustedControlSource ? 2000 : SENSOR_DUPLICATE_WINDOW_MS;
             if (Number.isFinite(latestTsMs) && latestTsMs > 0 && (nowMs - latestTsMs) <= duplicateWindowMs) {
                 console.log(`[DATA SYNC] Suppressed duplicate row for tenant=${tenant} source=${source}`);
                 return res.json({ ok: true, suppressed: true, reason: 'duplicate-sensor-state' });
