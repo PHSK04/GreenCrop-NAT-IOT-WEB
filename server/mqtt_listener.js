@@ -8,7 +8,6 @@ const MQTT_PASSWORD = process.env.MQTT_PASSWORD || 'GreenCropnat123456';
 const TOPIC_LEGACY = 'smartfarm/sensors';
 const TOPIC_TENANT_PATTERN = 'tenants/+/devices/+/sensors';
 const ACCEPT_LEGACY_SENSOR_TOPIC = String(process.env.ACCEPT_LEGACY_SENSOR_TOPIC || 'false').toLowerCase() === 'true';
-const SENSOR_DUPLICATE_WINDOW_MS = Math.max(1000, Number(process.env.SENSOR_DUPLICATE_WINDOW_MS || 1000));
 const SENSOR_DATA_SELECT_COLUMNS = [
     'id',
     'tenant_id',
@@ -131,6 +130,17 @@ function hasMeaningfulSensorSignal(payload) {
     const booleanKeys = ['wls1', 'wls2', 'float_alarm', 'floatAlarm', 'locked', 'lock', 'reed', 'reed_switch', 'pump1_on', 'pump1On', 'pump2_on', 'pump2On', 'green_on', 'greenOn', 'red_on', 'redOn', 'ph_ok', 'phOk', 'start_button', 'startButton', 'stop_button', 'stopButton', 'alarm_muted', 'alarmMuted'];
     const hasBooleanSignal = booleanKeys.some((key) => payload[key] !== undefined && payload[key] !== null && payload[key] !== '');
     return hasNumericSignal || hasTankSignal || hasPumpSignal || hasEventSignal || hasBooleanSignal || Boolean(asOptionalText(payload.pairing_status || payload.pairingStatus));
+}
+
+function isSensorTimestampUniqueError(error) {
+    const message = String(error?.message || '').toLowerCase();
+    const constraint = String(error?.constraint || '').toLowerCase();
+    return (
+        constraint.includes('uq_tenant_device_sensor_ts') ||
+        message.includes('uq_tenant_device_sensor_ts') ||
+        (message.includes('sensor_data.tenant_id') && message.includes('sensor_data.timestamp')) ||
+        message.includes('tenant_id, device_id, sensor_id, timestamp')
+    );
 }
 
 function sensorSignature(row) {
@@ -286,55 +296,54 @@ function startMqttListener() {
                     is_on,
                     ...sensorColumns
                 };
-                const latestForCompare = enrichSensorLikeRow(latest);
-                const latestTsMs = latest?.timestamp ? new Date(latest.timestamp).getTime() : 0;
-                if (
-                    latest &&
-                    sensorSignature(latestForCompare) === sensorSignature({ ...nextRow, ...rawPayload }) &&
-                    Number.isFinite(latestTsMs) &&
-                    latestTsMs > 0 &&
-                    (Date.now() - latestTsMs) <= SENSOR_DUPLICATE_WINDOW_MS
-                ) {
-                    console.log(`[MQTT] Suppressed duplicate sensor state for tenant=${finalTenant} device=${payloadDeviceId || 'none'}`);
-                    return;
-                }
-
-                await db.run(
+                const insertSql =
                     `INSERT INTO sensor_data 
                     (tenant_id, device_id, sensor_id, msg_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, ph_value, temp_c, wls1, wls2, float_alarm, locked, pump1_on, pump2_on, green_on, red_on, ph_ok, start_button, stop_button, alarm_muted, pairing_status, active_tank, is_on, uptime_seconds, timestamp) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-                    [
-                        finalTenant,
-                        payloadDeviceId,
-                        payloadSensorId,
-                        msgId,
-                        pressure,
-                        flow_rate,
-                        ec_value,
-                        pumpsJson,
-                        raw,
-                        'mqtt',
-                        topic,
-                        sensorColumns.ph_value,
-                        sensorColumns.temp_c,
-                        sensorColumns.wls1,
-                        sensorColumns.wls2,
-                        sensorColumns.float_alarm,
-                        sensorColumns.locked,
-                        sensorColumns.pump1_on,
-                        sensorColumns.pump2_on,
-                        sensorColumns.green_on,
-                        sensorColumns.red_on,
-                        sensorColumns.ph_ok,
-                        sensorColumns.start_button,
-                        sensorColumns.stop_button,
-                        sensorColumns.alarm_muted,
-                        sensorColumns.pairing_status,
-                        active_tank,
-                        is_on,
-                        Number.isFinite(uptime_seconds) ? uptime_seconds : 0
-                    ]
-                );
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                const nowMs = Date.now();
+                const insertParams = [
+                    finalTenant,
+                    payloadDeviceId,
+                    payloadSensorId,
+                    msgId,
+                    pressure,
+                    flow_rate,
+                    ec_value,
+                    pumpsJson,
+                    raw,
+                    'mqtt',
+                    topic,
+                    sensorColumns.ph_value,
+                    sensorColumns.temp_c,
+                    sensorColumns.wls1,
+                    sensorColumns.wls2,
+                    sensorColumns.float_alarm,
+                    sensorColumns.locked,
+                    sensorColumns.pump1_on,
+                    sensorColumns.pump2_on,
+                    sensorColumns.green_on,
+                    sensorColumns.red_on,
+                    sensorColumns.ph_ok,
+                    sensorColumns.start_button,
+                    sensorColumns.stop_button,
+                    sensorColumns.alarm_muted,
+                    sensorColumns.pairing_status,
+                    active_tank,
+                    is_on,
+                    Number.isFinite(uptime_seconds) ? uptime_seconds : 0,
+                    new Date(nowMs),
+                ];
+
+                for (let attempt = 0; attempt < 5; attempt += 1) {
+                    try {
+                        insertParams[29] = new Date(nowMs + attempt);
+                        await db.run(insertSql, insertParams);
+                        break;
+                    } catch (insertErr) {
+                        if (attempt < 4 && isSensorTimestampUniqueError(insertErr)) continue;
+                        throw insertErr;
+                    }
+                }
                 console.log(`[DB] Saved sensor data for tenant=${finalTenant} device=${payloadDeviceId} msg_id=${msgId || 'none'}`);
             } catch (dbErr) {
                 console.error('[DB] Failed to save sensor data:', dbErr);
