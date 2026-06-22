@@ -865,9 +865,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
 
             {historyForSelectedDate.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border p-8 text-center">
-                <p className="font-medium text-foreground">{isTH ? "รอข้อมูลจาก ESP32" : "Waiting for ESP32 telemetry"}</p>
+                <p className="font-medium text-foreground">{isTH ? "ไม่พบข้อมูลย้อนหลังในบัญชี/อุปกรณ์นี้" : "No saved telemetry for this account/device"}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {isTH ? "เมื่อบอร์ดส่ง MQTT เข้ามา ตารางนี้จะเพิ่มข้อมูลอัตโนมัติ" : "Rows will appear automatically when MQTT messages arrive."}
+                  {isTH ? "ถ้ามีข้อมูลเก่าในฐาน ตารางจะแสดงได้แม้บอร์ดไม่ได้ออนไลน์" : "Saved rows can be shown even when the board is offline."}
                 </p>
               </div>
             ) : (
