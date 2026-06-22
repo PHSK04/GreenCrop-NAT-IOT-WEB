@@ -580,7 +580,7 @@ async function userCanUseDevice(user, deviceId) {
 }
 
 async function getSensorTenantCandidates(req, requestedTenantId, deviceId) {
-    const candidates = [requestedTenantId];
+    const candidates = [requestedTenantId, DEFAULT_TENANT_ID];
     const normalizedDeviceId = String(deviceId || '').trim().toUpperCase();
     const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
 

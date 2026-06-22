@@ -347,6 +347,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       const next = Array.from(merged.values())
         .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
         .slice(0, HISTORY_LIMIT);
+      writeCachedTelemetryHistory(next);
       return next;
     });
   }, []);
@@ -359,6 +360,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       const next = Array.from(merged.values())
         .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
         .slice(0, HISTORY_LIMIT);
+      writeCachedTelemetryHistory(next);
       return next;
     });
   }, []);
