@@ -8,6 +8,7 @@ const MQTT_PASSWORD = process.env.MQTT_PASSWORD || 'GreenCropnat123456';
 const TOPIC_LEGACY = 'smartfarm/sensors';
 const TOPIC_TENANT_PATTERN = 'tenants/+/devices/+/sensors';
 const ACCEPT_LEGACY_SENSOR_TOPIC = String(process.env.ACCEPT_LEGACY_SENSOR_TOPIC || 'false').toLowerCase() === 'true';
+const SENSOR_DUPLICATE_WINDOW_MS = Math.max(1000, Number(process.env.SENSOR_DUPLICATE_WINDOW_MS || 5000));
 
 let client;
 
@@ -213,7 +214,7 @@ function startMqttListener() {
                     sensorSignature(latestForCompare) === sensorSignature({ ...nextRow, ...rawPayload }) &&
                     Number.isFinite(latestTsMs) &&
                     latestTsMs > 0 &&
-                    (Date.now() - latestTsMs) <= 30000
+                    (Date.now() - latestTsMs) <= SENSOR_DUPLICATE_WINDOW_MS
                 ) {
                     console.log(`[MQTT] Suppressed duplicate sensor state for tenant=${finalTenant} device=${payloadDeviceId || 'none'}`);
                     return;
