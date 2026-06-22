@@ -598,14 +598,14 @@ async function loadLatestSensorRows(tenantIds, deviceId) {
         let query = `
             SELECT TOP 25 ${SENSOR_DATA_SELECT_COLUMNS}
             FROM sensor_data
-            WHERE tenant_id = ? AND raw_payload IS NOT NULL
+            WHERE tenant_id = ?
             ORDER BY id DESC
         `;
         if (deviceId) {
             query = `
                 SELECT TOP 25 ${SENSOR_DATA_SELECT_COLUMNS}
                 FROM sensor_data
-                WHERE tenant_id = ? AND device_id = ? AND raw_payload IS NOT NULL
+                WHERE tenant_id = ? AND (device_id = ? OR device_id IS NULL)
                 ORDER BY id DESC
             `;
             params.push(deviceId);
@@ -629,7 +629,7 @@ async function loadSensorHistoryRows(tenantIds, deviceId, options = {}) {
         const where = ['tenant_id = ?'];
         const params = [tenantId];
         if (deviceId) {
-            where.push('device_id = ?');
+            where.push('(device_id = ? OR device_id IS NULL)');
             params.push(deviceId);
         }
         if (startDate) {
