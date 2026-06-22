@@ -15,5 +15,7 @@ services:
         value: 0.0.0.0
       - key: ENABLE_DEV_TOKEN
         value: "false"
+      - key: ACCEPT_LEGACY_SENSOR_TOPIC
+        value: "true"
       # Set these values in Render dashboard before first production run:
       # DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, JWT_SECRET, CORS_ORIGINS

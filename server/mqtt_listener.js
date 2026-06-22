@@ -7,7 +7,7 @@ const MQTT_PASSWORD = process.env.MQTT_PASSWORD || 'GreenCropnat123456';
 // Support both legacy topic and tenant-based topics
 const TOPIC_LEGACY = 'smartfarm/sensors';
 const TOPIC_TENANT_PATTERN = 'tenants/+/devices/+/sensors';
-const ACCEPT_LEGACY_SENSOR_TOPIC = String(process.env.ACCEPT_LEGACY_SENSOR_TOPIC || 'false').toLowerCase() === 'true';
+const ACCEPT_LEGACY_SENSOR_TOPIC = String(process.env.ACCEPT_LEGACY_SENSOR_TOPIC || 'true').toLowerCase() === 'true';
 const SENSOR_DATA_SELECT_COLUMNS = [
     'id',
     'tenant_id',
@@ -246,6 +246,12 @@ function startMqttListener() {
                 return;
             }
 
+            const payloadTenantId = payload.tenant_id || payload.tenant || null;
+            if (topic === TOPIC_LEGACY && payloadTenantId && payloadTenantId !== 'public') {
+                console.log(`[MQTT] Skipped legacy duplicate for tenant=${payloadTenantId}; tenant topic will be stored.`);
+                return;
+            }
+
             // Extract data
             const pressure = asNumber(payload.pressure, 0);
             const flow_rate = asNumber(payload.flow ?? payload.flow_rate, 0);
@@ -261,7 +267,7 @@ function startMqttListener() {
             // Obtain device_id and sensor_id from payload if not from topic
             const payloadDeviceId = payload.device_id || payload.device || deviceId || null;
             const payloadSensorId = payload.sensor_id || payload.sensor || null;
-            const finalTenant = tenantId || payload.tenant_id || payload.tenant || 'public';
+            const finalTenant = tenantId || payloadTenantId || 'public';
 
             // Insert into Database (include tenant/device/sensor, raw payload and optional msg_id for idempotency)
             try {
