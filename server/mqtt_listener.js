@@ -42,6 +42,21 @@ const SENSOR_DATA_SELECT_COLUMNS = [
 ].join(', ');
 
 let client;
+const mqttStatus = {
+    connected: false,
+    subscribedTopics: [],
+    lastConnectedAt: null,
+    lastMessageAt: null,
+    lastSavedAt: null,
+    lastError: null,
+};
+
+function getMqttListenerStatus() {
+    return {
+        ...mqttStatus,
+        clientConnected: Boolean(client?.connected),
+    };
+}
 
 function asBool(value) {
     if (typeof value === 'boolean') return value;
@@ -208,6 +223,9 @@ function startMqttListener() {
 
     client.on('connect', () => {
         console.log('[MQTT] Connected to Broker');
+        mqttStatus.connected = true;
+        mqttStatus.lastConnectedAt = new Date().toISOString();
+        mqttStatus.lastError = null;
 
         const subscriptions = ACCEPT_LEGACY_SENSOR_TOPIC
             ? [TOPIC_LEGACY, TOPIC_TENANT_PATTERN]
@@ -215,14 +233,17 @@ function startMqttListener() {
 
         client.subscribe(subscriptions, (err, granted) => {
             if (!err) {
+                mqttStatus.subscribedTopics = (granted || []).map((item) => item.topic).filter(Boolean);
                 console.log(`[MQTT] Subscribed to ${subscriptions.join(', ')}`);
             } else {
+                mqttStatus.lastError = err?.message || String(err);
                 console.error('[MQTT] Subscription error:', err);
             }
         });
     });
 
     client.on('message', async (topic, message) => {
+        mqttStatus.lastMessageAt = new Date().toISOString();
         // Normalize topic parsing: tenant-based topics: tenants/{tenant}/devices/{device}/sensors
         try {
             if (topic === TOPIC_LEGACY && !ACCEPT_LEGACY_SENSOR_TOPIC) {
@@ -350,19 +371,27 @@ function startMqttListener() {
                         throw insertErr;
                     }
                 }
+                mqttStatus.lastSavedAt = new Date().toISOString();
                 console.log(`[DB] Saved sensor data for tenant=${finalTenant} device=${payloadDeviceId} msg_id=${msgId || 'none'}`);
             } catch (dbErr) {
+                mqttStatus.lastError = dbErr?.message || String(dbErr);
                 console.error('[DB] Failed to save sensor data:', dbErr);
             }
 
         } catch (err) {
+            mqttStatus.lastError = err?.message || String(err);
             console.error('[MQTT] Failed to process message:', err);
         }
     });
 
     client.on('error', (err) => {
+        mqttStatus.lastError = err?.message || String(err);
         console.error('[MQTT] Connection error:', err);
+    });
+
+    client.on('close', () => {
+        mqttStatus.connected = false;
     });
 }
 
-module.exports = { startMqttListener };
+module.exports = { startMqttListener, getMqttListenerStatus };

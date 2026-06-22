@@ -8,7 +8,7 @@ const db = require('./database');
 const jwt = require('jsonwebtoken');
 const https = require('https');
 const crypto = require('crypto');
-const { startMqttListener } = require('./mqtt_listener');
+const { startMqttListener, getMqttListenerStatus } = require('./mqtt_listener');
 const { parseUserAgent, getClientIP } = require('./deviceDetector');
 
 // Start MQTT Listener for IoT Data Recording
@@ -126,6 +126,7 @@ app.get('/api/health', (req, res) => {
         host: HOST,
         port: PORT,
         db: typeof db.getStatus === 'function' ? db.getStatus() : undefined,
+        mqtt: getMqttListenerStatus(),
         timestamp: new Date().toISOString()
     });
 });
