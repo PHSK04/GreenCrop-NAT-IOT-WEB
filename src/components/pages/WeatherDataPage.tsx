@@ -16,6 +16,7 @@ import {
   formatLocalDateKey,
   formatTelemetryDateTime,
   formatTelemetryDateLabel,
+  getLocalDateKeyOffset,
   parseTelemetryDate,
 } from "@/utils/telemetryDate";
 import { MinimalDatePicker } from "../ui/minimal-date-picker";
@@ -53,9 +54,12 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
   const [dismissedEmptyDataKey, setDismissedEmptyDataKey] = useState<string | null>(null);
 
   const filteredTelemetry = useMemo(() => {
+    const defaultStartDate = getLocalDateKeyOffset(-6);
+    const hasManualDateFilter = Boolean(selectedMonth || startDate || endDate);
     return telemetryHistory.filter((row) => {
       const day = formatLocalDateKey(row.timestamp);
       if (!day) return false;
+      if (!hasManualDateFilter && day < defaultStartDate) return false;
       if (selectedMonth && !day.startsWith(selectedMonth)) return false;
       if (startDate && day < startDate) return false;
       if (endDate && day > endDate) return false;

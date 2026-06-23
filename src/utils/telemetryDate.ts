@@ -4,13 +4,24 @@ export const parseTelemetryDate = (value: string | null | undefined) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-export const formatLocalDateKey = (value: string | null | undefined) => {
-  const date = parseTelemetryDate(value);
-  if (!date) return "";
+const formatDateObjectKey = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+};
+
+export const formatLocalDateKey = (value: string | null | undefined) => {
+  const date = parseTelemetryDate(value);
+  if (!date) return "";
+  return formatDateObjectKey(date);
+};
+
+export const getLocalDateKeyOffset = (daysOffset: number) => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + daysOffset);
+  return formatDateObjectKey(date);
 };
 
 export const formatTelemetryDateTime = (value: string | null | undefined, locale: string) => {

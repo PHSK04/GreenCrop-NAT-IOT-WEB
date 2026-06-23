@@ -10,6 +10,7 @@ import {
   formatTelemetryDateTime,
   formatTelemetryMinuteKey,
   formatTelemetryTime,
+  getLocalDateKeyOffset,
 } from "@/utils/telemetryDate";
 import { useMachine } from "../../contexts/MachineContext";
 import { Badge } from "../ui/badge";
@@ -91,7 +92,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   const [exportStartTime, setExportStartTime] = useState("");
   const [exportEndTime, setExportEndTime] = useState("");
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>(["Sensor", "Actuator", "System"]);
-  const [historyDateMode, setHistoryDateMode] = useState<"latest" | "all" | string>("all");
+  const [historyDateMode, setHistoryDateMode] = useState<"recent" | "latest" | "all" | string>("recent");
   const [dismissedCabinetAlarm, setDismissedCabinetAlarm] = useState(false);
 
   const lastUpdate = formatTelemetryDateTime(lastTelemetryAt, locale);
@@ -314,6 +315,13 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
 
   const activeHistoryDate = historyDateMode === "latest" ? historyDates[0] || "" : historyDateMode;
   const historyForSelectedDate = useMemo(() => {
+    if (activeHistoryDate === "recent") {
+      const defaultStartDate = getLocalDateKeyOffset(-1);
+      return telemetryHistory.filter((row) => {
+        const day = formatLocalDateKey(row.timestamp);
+        return Boolean(day && day >= defaultStartDate);
+      });
+    }
     if (activeHistoryDate === "all") return telemetryHistory;
     if (!activeHistoryDate) return [];
     return telemetryHistory.filter((row) => formatLocalDateKey(row.timestamp) === activeHistoryDate);
@@ -797,6 +805,14 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 <Button
                   type="button"
                   size="sm"
+                  variant={historyDateMode === "recent" ? "default" : "outline"}
+                  onClick={() => setHistoryDateMode("recent")}
+                >
+                  {isTH ? "วันนี้/เมื่อวาน" : "Today/Yesterday"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
                   variant={historyDateMode === "all" ? "default" : "outline"}
                   onClick={() => setHistoryDateMode("all")}
                 >
@@ -811,7 +827,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                   {isTH ? "วันล่าสุด" : "Latest Day"}
                 </Button>
                 <MinimalDatePicker
-                  value={activeHistoryDate === "all" ? "" : activeHistoryDate}
+                  value={activeHistoryDate === "all" || activeHistoryDate === "recent" ? "" : activeHistoryDate}
                   onChange={(value) => setHistoryDateMode(value || "all")}
                   ariaLabel={isTH ? "เลือกวันที่ประวัติ" : "Select history date"}
                   locale={isTH ? "TH" : "EN"}
@@ -825,7 +841,11 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
               <div className="rounded-xl border border-border bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">{isTH ? "รอบข้อมูล" : "Data Cycle"}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">
-                  {activeHistoryDate === "all" ? (isTH ? "ทุกวันที่บันทึก" : "All saved days") : formatTelemetryDateLabel(activeHistoryDate, locale)}
+                  {activeHistoryDate === "recent"
+                    ? (isTH ? "วันนี้และเมื่อวาน" : "Today and yesterday")
+                    : activeHistoryDate === "all"
+                      ? (isTH ? "ทุกวันที่บันทึก" : "All saved days")
+                      : formatTelemetryDateLabel(activeHistoryDate, locale)}
                 </p>
               </div>
               <div className="rounded-xl border border-border bg-muted/30 p-3">

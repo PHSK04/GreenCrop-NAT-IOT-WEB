@@ -7,7 +7,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { MinimalDatePicker } from "./ui/minimal-date-picker";
 import { MinimalMonthPicker } from "./ui/minimal-month-picker";
 import { useMachine } from "@/contexts/MachineContext";
-import { formatLocalDateKey, formatTelemetryDateLabel } from "@/utils/telemetryDate";
+import { formatLocalDateKey, formatTelemetryDateLabel, getLocalDateKeyOffset } from "@/utils/telemetryDate";
 import { AlertCircle, CalendarSearch, Database } from "lucide-react";
 
 const average = (values: number[]) =>
@@ -22,9 +22,12 @@ export function MetricsChart() {
 
   const waterMetricsData = useMemo(() => {
     const groups = new Map<string, typeof telemetryHistory>();
+    const defaultStartDate = getLocalDateKeyOffset(-13);
+    const hasManualDateFilter = Boolean(selectedMonth || startDate || endDate);
     telemetryHistory.forEach((row) => {
       const day = formatLocalDateKey(row.timestamp);
       if (!day) return;
+      if (!hasManualDateFilter && day < defaultStartDate) return;
       if (selectedMonth && !day.startsWith(selectedMonth)) return;
       if (startDate && day < startDate) return;
       if (endDate && day > endDate) return;
@@ -34,7 +37,7 @@ export function MetricsChart() {
     });
 
     const sortedGroups = Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
-    const visibleGroups = selectedMonth || startDate || endDate ? sortedGroups : sortedGroups.slice(-14);
+    const visibleGroups = hasManualDateFilter ? sortedGroups : sortedGroups.slice(-14);
 
     return visibleGroups.map(([day, rows]) => {
       const validPh = rows.map((row) => row.phValue).filter((value) => value > 0);

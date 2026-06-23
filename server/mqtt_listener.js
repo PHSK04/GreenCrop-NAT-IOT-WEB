@@ -158,6 +158,17 @@ function isSensorTimestampUniqueError(error) {
     );
 }
 
+function isSensorMsgIdUniqueError(error) {
+    const message = String(error?.message || '').toLowerCase();
+    const constraint = String(error?.constraint || '').toLowerCase();
+    return (
+        constraint.includes('uq_sensor_data_msg_id') ||
+        message.includes('uq_sensor_data_msg_id') ||
+        (message.includes('sensor_data.tenant_id') && message.includes('sensor_data.msg_id')) ||
+        message.includes('duplicate key value violates unique constraint')
+    );
+}
+
 function sensorSignature(row) {
     if (!row) return '';
     return JSON.stringify({
@@ -365,14 +376,21 @@ function startMqttListener() {
                     try {
                         insertParams[29] = new Date(nowMs + attempt);
                         await db.run(insertSql, insertParams);
+                        mqttStatus.lastSavedAt = new Date().toISOString();
+                        mqttStatus.lastError = null;
+                        console.log(`[DB] Saved sensor data for tenant=${finalTenant} device=${payloadDeviceId} msg_id=${msgId || 'none'}`);
                         break;
                     } catch (insertErr) {
+                        if (msgId && isSensorMsgIdUniqueError(insertErr)) {
+                            mqttStatus.lastSavedAt = new Date().toISOString();
+                            mqttStatus.lastError = null;
+                            console.log(`[DB] Duplicate MQTT msg_id ignored for tenant=${finalTenant} msg_id=${msgId}`);
+                            break;
+                        }
                         if (attempt < 4 && isSensorTimestampUniqueError(insertErr)) continue;
                         throw insertErr;
                     }
                 }
-                mqttStatus.lastSavedAt = new Date().toISOString();
-                console.log(`[DB] Saved sensor data for tenant=${finalTenant} device=${payloadDeviceId} msg_id=${msgId || 'none'}`);
             } catch (dbErr) {
                 mqttStatus.lastError = dbErr?.message || String(dbErr);
                 console.error('[DB] Failed to save sensor data:', dbErr);
