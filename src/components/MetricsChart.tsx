@@ -7,16 +7,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { MinimalDatePicker } from "./ui/minimal-date-picker";
 import { MinimalMonthPicker } from "./ui/minimal-month-picker";
 import { useMachine } from "@/contexts/MachineContext";
+import { formatLocalDateKey, formatTelemetryDateLabel } from "@/utils/telemetryDate";
 import { AlertCircle, CalendarSearch, Database } from "lucide-react";
-
-const formatDateKey = (value: string) => {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 const average = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
@@ -31,7 +23,7 @@ export function MetricsChart() {
   const waterMetricsData = useMemo(() => {
     const groups = new Map<string, typeof telemetryHistory>();
     telemetryHistory.forEach((row) => {
-      const day = formatDateKey(row.timestamp);
+      const day = formatLocalDateKey(row.timestamp);
       if (!day) return;
       if (selectedMonth && !day.startsWith(selectedMonth)) return;
       if (startDate && day < startDate) return;
@@ -49,7 +41,7 @@ export function MetricsChart() {
       const validEc = rows.map((row) => row.ecValue).filter((value) => value > 0);
       const validTemp = rows.map((row) => row.tempValue).filter((value) => value > 0);
       return {
-        date: new Date(`${day}T00:00:00`).toLocaleDateString([], { month: "short", day: "numeric" }),
+        date: formatTelemetryDateLabel(day, "th-TH"),
         ph: Number(average(validPh).toFixed(2)),
         oxygen: Number((average(validPh) > 0 ? Math.max(0, 14 - average(validPh)) : 0).toFixed(2)),
         ec: Number(average(validEc).toFixed(2)),
