@@ -4,14 +4,6 @@ import { toast } from "sonner";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
-import {
-  formatLocalDateKey,
-  formatTelemetryDateLabel,
-  formatTelemetryDateTime,
-  formatTelemetryMinuteKey,
-  formatTelemetryTime,
-  getLocalDateKeyOffset,
-} from "@/utils/telemetryDate";
 import { useMachine } from "../../contexts/MachineContext";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -36,10 +28,43 @@ type LiveDeviceRow = {
   icon: typeof Activity;
 };
 
+const formatTimestamp = (value: string | null) => {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
+};
+
 const statusClass = (status: LiveDeviceRow["status"]) => {
   if (status === "Alarm") return "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400";
   if (status === "Active") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
   return "border-border bg-muted text-muted-foreground";
+};
+
+const formatCompactTime = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value || "-";
+  return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+};
+
+const formatDateKey = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatDateLabel = (value: string, isTH: boolean) => {
+  if (!value) return "-";
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString(isTH ? "th-TH" : "en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 };
 
 const boolText = (value: boolean, isTH: boolean) => {
@@ -82,7 +107,6 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   } = useMachine();
 
   const isTH = language === "TH";
-  const locale = isTH ? "th-TH" : "en-GB";
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : isTH ? "ทุกอุปกรณ์" : "All Devices";
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDevice, setSelectedDevice] = useState<LiveDeviceRow | null>(null);
@@ -92,10 +116,10 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   const [exportStartTime, setExportStartTime] = useState("");
   const [exportEndTime, setExportEndTime] = useState("");
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>(["Sensor", "Actuator", "System"]);
-  const [historyDateMode, setHistoryDateMode] = useState<"recent" | "latest" | "all" | string>("recent");
+  const [historyDateMode, setHistoryDateMode] = useState<"latest" | "all" | string>("all");
   const [dismissedCabinetAlarm, setDismissedCabinetAlarm] = useState(false);
 
-  const lastUpdate = formatTelemetryDateTime(lastTelemetryAt, locale);
+  const lastUpdate = formatTimestamp(lastTelemetryAt);
   const liveLastUpdate = boardConnected ? lastUpdate : "-";
   const cabinetAlarmActive = boardConnected && redOn;
 
@@ -309,28 +333,21 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   );
 
   const historyDates = useMemo(() => {
-    const dates = telemetryHistory.map((row) => formatLocalDateKey(row.timestamp)).filter(Boolean);
+    const dates = telemetryHistory.map((row) => formatDateKey(row.timestamp)).filter(Boolean);
     return Array.from(new Set(dates));
   }, [telemetryHistory]);
 
   const activeHistoryDate = historyDateMode === "latest" ? historyDates[0] || "" : historyDateMode;
   const historyForSelectedDate = useMemo(() => {
-    if (activeHistoryDate === "recent") {
-      const defaultStartDate = getLocalDateKeyOffset(-1);
-      return telemetryHistory.filter((row) => {
-        const day = formatLocalDateKey(row.timestamp);
-        return Boolean(day && day >= defaultStartDate);
-      });
-    }
     if (activeHistoryDate === "all") return telemetryHistory;
     if (!activeHistoryDate) return [];
-    return telemetryHistory.filter((row) => formatLocalDateKey(row.timestamp) === activeHistoryDate);
+    return telemetryHistory.filter((row) => formatDateKey(row.timestamp) === activeHistoryDate);
   }, [activeHistoryDate, telemetryHistory]);
 
   const groupedHistory = useMemo(() => {
     const groups: { date: string; rows: typeof telemetryHistory }[] = [];
     historyForSelectedDate.forEach((row) => {
-      const date = formatLocalDateKey(row.timestamp);
+      const date = formatDateKey(row.timestamp);
       const lastGroup = groups[groups.length - 1];
       if (!lastGroup || lastGroup.date !== date) {
         groups.push({ date, rows: [row] });
@@ -353,13 +370,13 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
 
   const exportHistoryRows = useMemo(() => {
     return telemetryHistory.filter((row) => {
-      const day = formatLocalDateKey(row.timestamp);
+      const day = formatDateKey(row.timestamp);
       if (!day) return false;
       if (exportMonth && !day.startsWith(exportMonth)) return false;
       if (exportStart && day < exportStart) return false;
       if (exportEnd && day > exportEnd) return false;
 
-      const time = formatTelemetryMinuteKey(row.timestamp);
+      const time = formatCompactTime(row.timestamp).slice(0, 5);
       if (exportStartTime && time < exportStartTime) return false;
       if (exportEndTime && time > exportEndTime) return false;
       return true;
@@ -761,7 +778,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                     <div key={metric.key}>
                       <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
                         <span>{metric.label}</span>
-                        <span>{formatTelemetryTime(trendHistory[trendHistory.length - 1]?.timestamp || "", locale)}</span>
+                        <span>{formatCompactTime(trendHistory[trendHistory.length - 1]?.timestamp || "")}</span>
                       </div>
                       <div className="flex h-20 items-end gap-2 rounded-xl border border-border bg-muted/30 p-3">
                         {trendHistory.map((row) => {
@@ -772,7 +789,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                               <div
                                 className={`w-full rounded-t-md ${metric.color}`}
                                 style={{ height: `${height}%` }}
-                                title={`${metric.label}: ${value.toFixed(2)} (${formatTelemetryTime(row.timestamp, locale)})`}
+                                title={`${metric.label}: ${value.toFixed(2)} (${formatCompactTime(row.timestamp)})`}
                               />
                             </div>
                           );
@@ -805,14 +822,6 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 <Button
                   type="button"
                   size="sm"
-                  variant={historyDateMode === "recent" ? "default" : "outline"}
-                  onClick={() => setHistoryDateMode("recent")}
-                >
-                  {isTH ? "วันนี้/เมื่อวาน" : "Today/Yesterday"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
                   variant={historyDateMode === "all" ? "default" : "outline"}
                   onClick={() => setHistoryDateMode("all")}
                 >
@@ -827,7 +836,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                   {isTH ? "วันล่าสุด" : "Latest Day"}
                 </Button>
                 <MinimalDatePicker
-                  value={activeHistoryDate === "all" || activeHistoryDate === "recent" ? "" : activeHistoryDate}
+                  value={activeHistoryDate === "all" ? "" : activeHistoryDate}
                   onChange={(value) => setHistoryDateMode(value || "all")}
                   ariaLabel={isTH ? "เลือกวันที่ประวัติ" : "Select history date"}
                   locale={isTH ? "TH" : "EN"}
@@ -841,20 +850,16 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
               <div className="rounded-xl border border-border bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">{isTH ? "รอบข้อมูล" : "Data Cycle"}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">
-                  {activeHistoryDate === "recent"
-                    ? (isTH ? "วันนี้และเมื่อวาน" : "Today and yesterday")
-                    : activeHistoryDate === "all"
-                      ? (isTH ? "ทุกวันที่บันทึก" : "All saved days")
-                      : formatTelemetryDateLabel(activeHistoryDate, locale)}
+                  {activeHistoryDate === "all" ? (isTH ? "ทุกวันที่บันทึก" : "All saved days") : formatDateLabel(activeHistoryDate, isTH)}
                 </p>
               </div>
               <div className="rounded-xl border border-border bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">{isTH ? "ข้อมูลใหม่สุด" : "Newest Record"}</p>
-                <p className="mt-1 font-mono text-sm font-semibold text-foreground">{newestHistoryAt ? formatTelemetryDateTime(newestHistoryAt, locale) : "-"}</p>
+                <p className="mt-1 font-mono text-sm font-semibold text-foreground">{newestHistoryAt ? formatTimestamp(newestHistoryAt) : "-"}</p>
               </div>
               <div className="rounded-xl border border-border bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">{isTH ? "ข้อมูลเก่าสุดที่เก็บไว้" : "Oldest Saved Record"}</p>
-                <p className="mt-1 font-mono text-sm font-semibold text-foreground">{oldestHistoryAt ? formatTelemetryDateTime(oldestHistoryAt, locale) : "-"}</p>
+                <p className="mt-1 font-mono text-sm font-semibold text-foreground">{oldestHistoryAt ? formatTimestamp(oldestHistoryAt) : "-"}</p>
               </div>
             </div>
 
@@ -887,12 +892,12 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                       <Fragment key={group.date}>
                         <TableRow key={`day-${group.date}`} className="bg-emerald-50/80 hover:bg-emerald-50/80 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/30">
                           <TableCell colSpan={10} className="font-semibold text-emerald-700 dark:text-emerald-300">
-                            {isTH ? "รอบวันที่" : "Daily Cycle"} {formatTelemetryDateLabel(group.date, locale)} · {group.rows.length} {isTH ? "รายการ" : "records"}
+                            {isTH ? "รอบวันที่" : "Daily Cycle"} {formatDateLabel(group.date, isTH)} · {group.rows.length} {isTH ? "รายการ" : "records"}
                           </TableCell>
                         </TableRow>
                         {group.rows.map((row) => (
                           <TableRow key={`${row.timestamp}-${row.phValue}-${row.ecValue}`}>
-                            <TableCell className="font-mono text-xs text-muted-foreground">{formatTelemetryTime(row.timestamp, locale)}</TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground">{formatCompactTime(row.timestamp)}</TableCell>
                             <TableCell className="font-mono">{row.phValue.toFixed(2)}</TableCell>
                             <TableCell className="font-mono">{row.ecValue.toFixed(2)}</TableCell>
                             <TableCell className="font-mono">{row.tempValue.toFixed(1)} °C</TableCell>

@@ -71,7 +71,6 @@ const ACCEPT_LEGACY_MQTT = import.meta.env.VITE_ACCEPT_LEGACY_MQTT === 'true';
 const HISTORY_LIMIT = 50000;
 const HISTORY_FETCH_LIMIT = 50000;
 const HISTORY_CACHE_LIMIT = 5000;
-const HISTORY_CACHE_FRESH_MS = 48 * 60 * 60 * 1000;
 const HISTORY_CACHE_KEY_PREFIX = 'smart_iot_telemetry_history';
 const API_POLL_INTERVAL_MS = 2000;
 const BOARD_TELEMETRY_STALE_MS = 10000;
@@ -127,16 +126,10 @@ const readCachedTelemetryHistory = () => {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    const history = parsed
+    return parsed
       .map(normalizeTelemetrySnapshot)
       .filter((snapshot): snapshot is TelemetrySnapshot => Boolean(snapshot))
-      .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
       .slice(0, HISTORY_CACHE_LIMIT);
-    const newestMs = history[0]?.timestamp ? Date.parse(history[0].timestamp) : NaN;
-    if (!Number.isFinite(newestMs) || Date.now() - newestMs > HISTORY_CACHE_FRESH_MS) {
-      return [];
-    }
-    return history;
   } catch (err) {
     console.error('Failed to load cached telemetry history:', err);
     return [];
@@ -370,17 +363,6 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       writeCachedTelemetryHistory(next);
       return next;
     });
-  }, []);
-
-  const replaceTelemetrySnapshots = useCallback((snapshots: TelemetrySnapshot[]) => {
-    if (!snapshots.length) return;
-    const merged = new Map<string, TelemetrySnapshot>();
-    snapshots.forEach((row) => merged.set(telemetryFingerprint(row), row));
-    const next = Array.from(merged.values())
-      .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
-      .slice(0, HISTORY_LIMIT);
-    writeCachedTelemetryHistory(next);
-    setTelemetryHistory(next);
   }, []);
 
   const applyTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
@@ -650,11 +632,11 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       const apiHistory = dataList
         .map(normalizeTelemetrySnapshot)
         .filter((snapshot): snapshot is TelemetrySnapshot => Boolean(snapshot));
-      replaceTelemetrySnapshots(apiHistory);
+      persistTelemetrySnapshots(apiHistory);
     } catch (err) {
       console.error('API History Error:', err);
     }
-  }, [replaceTelemetrySnapshots]);
+  }, [persistTelemetrySnapshots]);
 
   useEffect(() => {
     const cachedHistory = readCachedTelemetryHistory();

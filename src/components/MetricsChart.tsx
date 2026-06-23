@@ -7,8 +7,16 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { MinimalDatePicker } from "./ui/minimal-date-picker";
 import { MinimalMonthPicker } from "./ui/minimal-month-picker";
 import { useMachine } from "@/contexts/MachineContext";
-import { formatLocalDateKey, formatTelemetryDateLabel, getLocalDateKeyOffset } from "@/utils/telemetryDate";
 import { AlertCircle, CalendarSearch, Database } from "lucide-react";
+
+const formatDateKey = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const average = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
@@ -22,12 +30,9 @@ export function MetricsChart() {
 
   const waterMetricsData = useMemo(() => {
     const groups = new Map<string, typeof telemetryHistory>();
-    const defaultStartDate = getLocalDateKeyOffset(-13);
-    const hasManualDateFilter = Boolean(selectedMonth || startDate || endDate);
     telemetryHistory.forEach((row) => {
-      const day = formatLocalDateKey(row.timestamp);
+      const day = formatDateKey(row.timestamp);
       if (!day) return;
-      if (!hasManualDateFilter && day < defaultStartDate) return;
       if (selectedMonth && !day.startsWith(selectedMonth)) return;
       if (startDate && day < startDate) return;
       if (endDate && day > endDate) return;
@@ -37,14 +42,14 @@ export function MetricsChart() {
     });
 
     const sortedGroups = Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
-    const visibleGroups = hasManualDateFilter ? sortedGroups : sortedGroups.slice(-14);
+    const visibleGroups = selectedMonth || startDate || endDate ? sortedGroups : sortedGroups.slice(-14);
 
     return visibleGroups.map(([day, rows]) => {
       const validPh = rows.map((row) => row.phValue).filter((value) => value > 0);
       const validEc = rows.map((row) => row.ecValue).filter((value) => value > 0);
       const validTemp = rows.map((row) => row.tempValue).filter((value) => value > 0);
       return {
-        date: formatTelemetryDateLabel(day, "th-TH"),
+        date: new Date(`${day}T00:00:00`).toLocaleDateString([], { month: "short", day: "numeric" }),
         ph: Number(average(validPh).toFixed(2)),
         oxygen: Number((average(validPh) > 0 ? Math.max(0, 14 - average(validPh)) : 0).toFixed(2)),
         ec: Number(average(validEc).toFixed(2)),

@@ -12,13 +12,6 @@ import { toast } from "sonner";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { useMachine } from "@/contexts/MachineContext";
-import {
-  formatLocalDateKey,
-  formatTelemetryDateTime,
-  formatTelemetryDateLabel,
-  getLocalDateKeyOffset,
-  parseTelemetryDate,
-} from "@/utils/telemetryDate";
 import { MinimalDatePicker } from "../ui/minimal-date-picker";
 import { MinimalMonthPicker } from "../ui/minimal-month-picker";
 
@@ -29,6 +22,12 @@ type WeatherDataPageProps = {
 const csvCell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
 const average = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+
+const formatTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value || "-";
+  return date.toLocaleString();
+};
 
 const sensorStatusClass = (status: string) => {
   if (status === "Normal" || status === "Optimal") {
@@ -46,7 +45,6 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
   const { deviceId } = useDeviceSeed();
   const { telemetryHistory } = useMachine();
   const isTH = language === "TH";
-  const locale = isTH ? "th-TH" : "en-GB";
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -54,12 +52,10 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
   const [dismissedEmptyDataKey, setDismissedEmptyDataKey] = useState<string | null>(null);
 
   const filteredTelemetry = useMemo(() => {
-    const defaultStartDate = getLocalDateKeyOffset(-6);
-    const hasManualDateFilter = Boolean(selectedMonth || startDate || endDate);
     return telemetryHistory.filter((row) => {
-      const day = formatLocalDateKey(row.timestamp);
-      if (!day) return false;
-      if (!hasManualDateFilter && day < defaultStartDate) return false;
+      const date = new Date(row.timestamp);
+      if (Number.isNaN(date.getTime())) return false;
+      const day = date.toISOString().slice(0, 10);
       if (selectedMonth && !day.startsWith(selectedMonth)) return false;
       if (startDate && day < startDate) return false;
       if (endDate && day > endDate) return false;
@@ -76,8 +72,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
         const hour = Number(time.slice(0, 2));
         const values = filteredTelemetry
           .filter((row) => {
-            const parsed = parseTelemetryDate(row.timestamp);
-            if (!parsed) return false;
+            const parsed = new Date(row.timestamp);
             return Math.abs(parsed.getHours() - hour) <= 2 && row.tempValue > 0;
           })
           .map((row) => row.tempValue);
@@ -90,8 +85,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
   const waterQualityHistoryDevice = useMemo(() => {
     const groups = new Map<string, typeof filteredTelemetry>();
     filteredTelemetry.forEach((row) => {
-      const day = formatLocalDateKey(row.timestamp);
-      if (!day) return;
+      const day = new Date(row.timestamp).toISOString().slice(0, 10);
       const rows = groups.get(day) ?? [];
       rows.push(row);
       groups.set(day, rows);
@@ -104,7 +98,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
         const ph = average(rows.map((row) => row.phValue).filter((value) => value > 0));
         const ec = average(rows.map((row) => row.ecValue).filter((value) => value > 0));
         return {
-          time: formatTelemetryDateLabel(day, locale),
+          time: new Date(`${day}T00:00:00`).toLocaleDateString([], { weekday: "short" }),
           ph: Number(ph.toFixed(2)),
           ec: Number(ec.toFixed(2)),
           oxygen: Number((ph > 0 ? Math.max(0, 14 - ph) : 0).toFixed(2)),
@@ -115,7 +109,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
 
   const currentSensorReadingsDevice = useMemo(() => {
     if (!latestTelemetry) return [];
-    const lastUpdate = formatTelemetryDateTime(latestTelemetry.timestamp, locale);
+    const lastUpdate = formatTime(latestTelemetry.timestamp);
     const phStatus = latestTelemetry.phValue > 0 && latestTelemetry.phValue >= 6.5 && latestTelemetry.phValue <= 7.5 ? "Normal" : "Warning";
     const tempStatus = latestTelemetry.tempValue > 0 && latestTelemetry.tempValue >= 20 && latestTelemetry.tempValue <= 32 ? "Normal" : "Warning";
     const ecStatus = latestTelemetry.ecValue > 0 ? "Normal" : "Warning";
@@ -163,7 +157,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
         lastUpdate,
       },
     ];
-  }, [isTH, latestTelemetry, locale]);
+  }, [isTH, latestTelemetry]);
 
   const alertRows = useMemo(() => {
     return filteredTelemetry
@@ -495,7 +489,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
                   <TableBody>
                     {filteredTelemetry.filter((row) => row.tempValue > 0).slice(0, 200).map((row) => (
                       <TableRow key={`weather-${row.timestamp}`}>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{formatTelemetryDateTime(row.timestamp, locale)}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{formatTime(row.timestamp)}</TableCell>
                         <TableCell className="font-semibold">{row.tempValue.toFixed(1)} °C</TableCell>
                       </TableRow>
                     ))}
@@ -535,7 +529,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
                    <TableBody>
                      {filteredTelemetry.slice(0, 500).map((row) => (
                        <TableRow key={`water-${row.timestamp}`}>
-                         <TableCell className="font-mono text-xs text-muted-foreground">{formatTelemetryDateTime(row.timestamp, locale)}</TableCell>
+                         <TableCell className="font-mono text-xs text-muted-foreground">{formatTime(row.timestamp)}</TableCell>
                          <TableCell>{row.phValue > 0 ? row.phValue.toFixed(2) : "-"}</TableCell>
                          <TableCell>{row.ecValue > 0 ? row.ecValue.toFixed(2) : "-"}</TableCell>
                          <TableCell>{row.tempValue > 0 ? `${row.tempValue.toFixed(1)} °C` : "-"}</TableCell>
@@ -576,7 +570,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
                    <TableBody>
                      {alertRows.map((row) => (
                        <TableRow key={`alert-${row.timestamp}-${row.type}`}>
-                         <TableCell className="font-mono text-xs text-muted-foreground">{formatTelemetryDateTime(row.timestamp, locale)}</TableCell>
+                         <TableCell className="font-mono text-xs text-muted-foreground">{formatTime(row.timestamp)}</TableCell>
                          <TableCell>
                            <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400">
                              {row.type}
