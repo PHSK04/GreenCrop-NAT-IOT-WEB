@@ -5,7 +5,6 @@ import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { MinimalDatePicker } from "./ui/minimal-date-picker";
-import { MinimalMonthPicker } from "./ui/minimal-month-picker";
 import { useMachine } from "@/contexts/MachineContext";
 import { AlertCircle, CalendarSearch, Database } from "lucide-react";
 
@@ -32,8 +31,6 @@ const getDateKeyOffset = (offsetDays: number) => {
   return formatDateKeyFromDate(date);
 };
 
-const getCurrentMonthKey = () => getDateKeyOffset(0).slice(0, 7);
-
 const addDaysToDateKey = (dateKey: string, offsetDays: number) => {
   const date = new Date(`${dateKey}T00:00:00`);
   if (Number.isNaN(date.getTime())) return dateKey;
@@ -53,87 +50,64 @@ const enumerateDateKeys = (startKey: string, endKey: string) => {
   return keys;
 };
 
-const getMonthEndKey = (monthKey: string) => {
-  const [year, month] = monthKey.split("-").map(Number);
-  if (!year || !month) return "";
-  return formatDateKeyFromDate(new Date(year, month, 0));
-};
-
 const average = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 
+type ChartRangeMode = "today" | "7d" | "14d" | "month" | "custom";
+
 export function MetricsChart() {
   const { telemetryHistory } = useMachine();
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey);
+  const [rangeMode, setRangeMode] = useState<ChartRangeMode>("7d");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [dismissedEmptyKey, setDismissedEmptyKey] = useState<string | null>(null);
 
-  const handleMonthChange = (value: string) => {
-    setSelectedMonth(value);
-    setStartDate("");
-    setEndDate("");
+  const handleRangeModeChange = (value: ChartRangeMode) => {
+    setRangeMode(value);
+    if (value !== "custom") {
+      setStartDate("");
+      setEndDate("");
+    }
   };
 
   const handleStartDateChange = (value: string) => {
+    setRangeMode("custom");
     setStartDate(value);
-    if (value) setSelectedMonth("");
   };
 
   const handleEndDateChange = (value: string) => {
+    setRangeMode("custom");
     setEndDate(value);
-    if (value) setSelectedMonth("");
-  };
-
-  const resetToCurrentMonth = () => {
-    setSelectedMonth(getCurrentMonthKey());
-    setStartDate("");
-    setEndDate("");
-  };
-
-  const selectToday = () => {
-    const todayKey = getDateKeyOffset(0);
-    setSelectedMonth("");
-    setStartDate(todayKey);
-    setEndDate(todayKey);
-  };
-
-  const clearFilters = () => {
-    setSelectedMonth("");
-    setStartDate("");
-    setEndDate("");
   };
 
   const waterMetricsData = useMemo(() => {
+    const todayKey = getDateKeyOffset(0);
+    let visibleDays: string[];
+
+    if (rangeMode === "today") {
+      visibleDays = [todayKey];
+    } else if (rangeMode === "7d") {
+      visibleDays = enumerateDateKeys(getDateKeyOffset(-6), todayKey);
+    } else if (rangeMode === "14d") {
+      visibleDays = enumerateDateKeys(getDateKeyOffset(-13), todayKey);
+    } else if (rangeMode === "month") {
+      visibleDays = enumerateDateKeys(`${todayKey.slice(0, 7)}-01`, todayKey);
+    } else {
+      const endKey = endDate || todayKey;
+      const startKey = startDate || endKey;
+      visibleDays = enumerateDateKeys(startKey, endKey);
+    }
+
+    const visibleDaySet = new Set(visibleDays);
     const groups = new Map<string, typeof telemetryHistory>();
     telemetryHistory.forEach((row) => {
       const day = formatDateKey(row.timestamp);
       if (!day) return;
-      if (selectedMonth && !day.startsWith(selectedMonth)) return;
-      if (startDate && day < startDate) return;
-      if (endDate && day > endDate) return;
+      if (!visibleDaySet.has(day)) return;
       const rows = groups.get(day) ?? [];
       rows.push(row);
       groups.set(day, rows);
     });
-
-    const sortedGroups = Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
-    const groupedDays = sortedGroups.map(([day]) => day);
-    const todayKey = getDateKeyOffset(0);
-    let visibleDays: string[];
-
-    if (selectedMonth) {
-      const monthStart = `${selectedMonth}-01`;
-      const monthEnd = getMonthEndKey(selectedMonth);
-      const boundedEnd = selectedMonth === todayKey.slice(0, 7) ? todayKey : monthEnd;
-      visibleDays = enumerateDateKeys(monthStart, boundedEnd);
-    } else if (startDate || endDate) {
-      const endKey = endDate || todayKey;
-      const startKey = startDate || groupedDays[0] || addDaysToDateKey(endKey, -13);
-      visibleDays = enumerateDateKeys(startKey, endKey);
-    } else {
-      visibleDays = enumerateDateKeys(getDateKeyOffset(-13), todayKey);
-    }
 
     return visibleDays.map((day) => {
       const rows = groups.get(day) ?? [];
@@ -152,7 +126,7 @@ export function MetricsChart() {
         cost: rows.length,
       };
     });
-  }, [endDate, selectedMonth, startDate, telemetryHistory]);
+  }, [endDate, rangeMode, startDate, telemetryHistory]);
 
   const chemicalData = useMemo(
     () =>
@@ -164,7 +138,7 @@ export function MetricsChart() {
     [waterMetricsData],
   );
 
-  const emptyKey = `${telemetryHistory.length}:${selectedMonth}:${startDate}:${endDate}`;
+  const emptyKey = `${telemetryHistory.length}:${rangeMode}:${startDate}:${endDate}`;
   const hasNoTelemetry = telemetryHistory.length === 0;
   const hasNoChartData = waterMetricsData.length === 0;
   const hasNoRecordsInRange = waterMetricsData.length > 0 && waterMetricsData.every((row) => row.cost === 0);
@@ -227,22 +201,26 @@ export function MetricsChart() {
                 ค่าเฉลี่ยรายวันจากข้อมูลจริง เลือกช่วงวัน/เดือนได้
               </CardDescription>
             </div>
-            <div className="space-y-2 lg:w-[720px]">
-              <div className="grid gap-2 sm:grid-cols-3">
-                <MinimalMonthPicker ariaLabel="Chart month" value={selectedMonth} onChange={handleMonthChange} />
-                <MinimalDatePicker ariaLabel="Chart start date" value={startDate} onChange={handleStartDateChange} />
-                <MinimalDatePicker ariaLabel="Chart end date" value={endDate} onChange={handleEndDateChange} />
-              </div>
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button type="button" size="sm" variant="default" onClick={selectToday}>
-                  วันนี้
-                </Button>
-                <Button type="button" size="sm" variant="outline" onClick={resetToCurrentMonth}>
-                  เดือนนี้
-                </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={clearFilters}>
-                  14 วันล่าสุด
-                </Button>
+            <div className="space-y-2 lg:w-[620px]">
+              <div className={`grid gap-2 ${rangeMode === "custom" ? "sm:grid-cols-3" : "sm:grid-cols-[1fr_auto_auto]"}`}>
+                <select
+                  aria-label="Chart range"
+                  value={rangeMode}
+                  onChange={(event) => handleRangeModeChange(event.target.value as ChartRangeMode)}
+                  className="h-10 w-full rounded-full border border-border bg-background/90 px-4 text-sm font-medium text-foreground shadow-sm outline-none transition hover:border-emerald-300 focus:ring-2 focus:ring-emerald-300/60"
+                >
+                  <option value="today">วันนี้</option>
+                  <option value="7d">7 วันล่าสุด</option>
+                  <option value="14d">14 วันล่าสุด</option>
+                  <option value="month">เดือนนี้</option>
+                  <option value="custom">กำหนดเอง</option>
+                </select>
+                {rangeMode === "custom" && (
+                  <>
+                    <MinimalDatePicker ariaLabel="Chart start date" value={startDate} onChange={handleStartDateChange} />
+                    <MinimalDatePicker ariaLabel="Chart end date" value={endDate} onChange={handleEndDateChange} />
+                  </>
+                )}
               </div>
             </div>
           </div>

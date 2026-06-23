@@ -952,9 +952,9 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 </p>
               </div>
             ) : (
-              <div className="max-h-[620px] overflow-auto rounded-xl border border-border">
+              <div className="rounded-xl border border-border [&_[data-slot=table-container]]:max-h-[620px] [&_[data-slot=table-container]]:overflow-auto">
                 <Table>
-                  <TableHeader className="sticky top-0 z-20 bg-emerald-600 text-white shadow-sm">
+                  <TableHeader className="sticky top-0 z-30 bg-emerald-600 text-white shadow-sm [&_th]:sticky [&_th]:top-0 [&_th]:z-30 [&_th]:bg-emerald-600">
                     <TableRow>
                       <TableHead className="min-w-36 text-white">{isTH ? "เวลา" : "Time"}</TableHead>
                       <TableHead className="min-w-24 text-white">pH</TableHead>
