@@ -145,10 +145,10 @@ export function MetricsChart() {
       const avgTemp = average(validTemp);
       return {
         date: new Date(`${day}T00:00:00`).toLocaleDateString([], { month: "short", day: "numeric" }),
-        ph: validPh.length ? Number(avgPh.toFixed(2)) : null,
-        oxygen: validPh.length ? Number(Math.max(0, 14 - avgPh).toFixed(2)) : null,
-        ec: validEc.length ? Number(avgEc.toFixed(2)) : null,
-        temperature: validTemp.length ? Number(avgTemp.toFixed(1)) : null,
+        ph: validPh.length ? Number(avgPh.toFixed(2)) : 0,
+        oxygen: validPh.length ? Number(Math.max(0, 14 - avgPh).toFixed(2)) : 0,
+        ec: validEc.length ? Number(avgEc.toFixed(2)) : 0,
+        temperature: validTemp.length ? Number(avgTemp.toFixed(1)) : 0,
         cost: rows.length,
       };
     });
@@ -158,8 +158,8 @@ export function MetricsChart() {
     () =>
       waterMetricsData.map((row) => ({
         date: row.date,
-        nitrogen: row.ec == null ? null : Number((row.ec * 8).toFixed(2)),
-        phosphorus: row.ec == null ? null : Number((row.ec * 5).toFixed(2)),
+        nitrogen: Number((row.ec * 8).toFixed(2)),
+        phosphorus: Number((row.ec * 5).toFixed(2)),
       })),
     [waterMetricsData],
   );
