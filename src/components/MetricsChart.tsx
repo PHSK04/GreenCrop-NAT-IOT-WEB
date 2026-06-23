@@ -32,6 +32,8 @@ const getDateKeyOffset = (offsetDays: number) => {
   return formatDateKeyFromDate(date);
 };
 
+const getCurrentMonthKey = () => getDateKeyOffset(0).slice(0, 7);
+
 const addDaysToDateKey = (dateKey: string, offsetDays: number) => {
   const date = new Date(`${dateKey}T00:00:00`);
   if (Number.isNaN(date.getTime())) return dateKey;
@@ -62,10 +64,45 @@ const average = (values: number[]) =>
 
 export function MetricsChart() {
   const { telemetryHistory } = useMachine();
-  const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [dismissedEmptyKey, setDismissedEmptyKey] = useState<string | null>(null);
+
+  const handleMonthChange = (value: string) => {
+    setSelectedMonth(value);
+    setStartDate("");
+    setEndDate("");
+  };
+
+  const handleStartDateChange = (value: string) => {
+    setStartDate(value);
+    if (value) setSelectedMonth("");
+  };
+
+  const handleEndDateChange = (value: string) => {
+    setEndDate(value);
+    if (value) setSelectedMonth("");
+  };
+
+  const resetToCurrentMonth = () => {
+    setSelectedMonth(getCurrentMonthKey());
+    setStartDate("");
+    setEndDate("");
+  };
+
+  const selectToday = () => {
+    const todayKey = getDateKeyOffset(0);
+    setSelectedMonth("");
+    setStartDate(todayKey);
+    setEndDate(todayKey);
+  };
+
+  const clearFilters = () => {
+    setSelectedMonth("");
+    setStartDate("");
+    setEndDate("");
+  };
 
   const waterMetricsData = useMemo(() => {
     const groups = new Map<string, typeof telemetryHistory>();
@@ -190,10 +227,23 @@ export function MetricsChart() {
                 ค่าเฉลี่ยรายวันจากข้อมูลจริง เลือกช่วงวัน/เดือนได้
               </CardDescription>
             </div>
-            <div className="grid gap-2 sm:grid-cols-3 lg:w-[620px]">
-              <MinimalMonthPicker ariaLabel="Chart month" value={selectedMonth} onChange={setSelectedMonth} />
-              <MinimalDatePicker ariaLabel="Chart start date" value={startDate} onChange={setStartDate} />
-              <MinimalDatePicker ariaLabel="Chart end date" value={endDate} onChange={setEndDate} />
+            <div className="space-y-2 lg:w-[720px]">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <MinimalMonthPicker ariaLabel="Chart month" value={selectedMonth} onChange={handleMonthChange} />
+                <MinimalDatePicker ariaLabel="Chart start date" value={startDate} onChange={handleStartDateChange} />
+                <MinimalDatePicker ariaLabel="Chart end date" value={endDate} onChange={handleEndDateChange} />
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button type="button" size="sm" variant="default" onClick={selectToday}>
+                  วันนี้
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={resetToCurrentMonth}>
+                  เดือนนี้
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={clearFilters}>
+                  14 วันล่าสุด
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>

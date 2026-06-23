@@ -890,10 +890,18 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 <Button
                   type="button"
                   size="sm"
+                  variant={activeHistoryDate === todayKey ? "default" : "outline"}
+                  onClick={() => setHistoryDateMode(todayKey)}
+                >
+                  {isTH ? "วันนี้" : "Today"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
                   variant={historyDateMode === "latest" ? "default" : "outline"}
                   onClick={() => setHistoryDateMode("latest")}
                 >
-                  {isTH ? "วันล่าสุด" : "Latest Day"}
+                  {isTH ? "วันที่ล่าสุดที่มีข้อมูล" : "Latest Data Day"}
                 </Button>
                 <MinimalDatePicker
                   value={activeHistoryDate === "all" || activeHistoryDate === "recent" ? "" : activeHistoryDate}
@@ -914,6 +922,8 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                     ? (isTH ? "ทุกวันตามปฏิทิน" : "All calendar days")
                     : activeHistoryDate === "recent"
                       ? (isTH ? "14 วันล่าสุด" : "Last 14 calendar days")
+                      : activeHistoryDate === todayKey
+                        ? (isTH ? "วันนี้" : "Today")
                       : formatDateLabel(activeHistoryDate, isTH)}
                 </p>
               </div>
