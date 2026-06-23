@@ -56,6 +56,39 @@ const formatDateKey = (value: string) => {
   return `${year}-${month}-${day}`;
 };
 
+const formatDateKeyFromDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getDateKeyOffset = (offsetDays: number) => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + offsetDays);
+  return formatDateKeyFromDate(date);
+};
+
+const addDaysToDateKey = (dateKey: string, offsetDays: number) => {
+  const date = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateKey;
+  date.setDate(date.getDate() + offsetDays);
+  return formatDateKeyFromDate(date);
+};
+
+const enumerateDateKeys = (startKey: string, endKey: string) => {
+  const keys: string[] = [];
+  if (!startKey || !endKey || startKey > endKey) return keys;
+
+  let cursor = startKey;
+  while (cursor <= endKey && keys.length < 370) {
+    keys.push(cursor);
+    cursor = addDaysToDateKey(cursor, 1);
+  }
+  return keys;
+};
+
 const formatDateLabel = (value: string, isTH: boolean) => {
   if (!value) return "-";
   const parsed = new Date(`${value}T00:00:00`);
@@ -116,7 +149,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
   const [exportStartTime, setExportStartTime] = useState("");
   const [exportEndTime, setExportEndTime] = useState("");
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>(["Sensor", "Actuator", "System"]);
-  const [historyDateMode, setHistoryDateMode] = useState<"latest" | "all" | string>("all");
+  const [historyDateMode, setHistoryDateMode] = useState<"recent" | "latest" | "all" | string>("recent");
   const [dismissedCabinetAlarm, setDismissedCabinetAlarm] = useState(false);
 
   const lastUpdate = formatTimestamp(lastTelemetryAt);
@@ -334,33 +367,52 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
 
   const historyDates = useMemo(() => {
     const dates = telemetryHistory.map((row) => formatDateKey(row.timestamp)).filter(Boolean);
-    return Array.from(new Set(dates));
+    return Array.from(new Set(dates)).sort((a, b) => b.localeCompare(a));
   }, [telemetryHistory]);
 
-  const activeHistoryDate = historyDateMode === "latest" ? historyDates[0] || "" : historyDateMode;
+  const todayKey = getDateKeyOffset(0);
+  const recentStartKey = getDateKeyOffset(-13);
+  const activeHistoryDate = historyDateMode === "latest" ? historyDates[0] || todayKey : historyDateMode;
   const historyForSelectedDate = useMemo(() => {
     if (activeHistoryDate === "all") return telemetryHistory;
+    if (activeHistoryDate === "recent") {
+      return telemetryHistory.filter((row) => {
+        const day = formatDateKey(row.timestamp);
+        return day >= recentStartKey && day <= todayKey;
+      });
+    }
     if (!activeHistoryDate) return [];
     return telemetryHistory.filter((row) => formatDateKey(row.timestamp) === activeHistoryDate);
-  }, [activeHistoryDate, telemetryHistory]);
+  }, [activeHistoryDate, recentStartKey, telemetryHistory, todayKey]);
 
   const groupedHistory = useMemo(() => {
-    const groups: { date: string; rows: typeof telemetryHistory }[] = [];
-    historyForSelectedDate.forEach((row) => {
+    const rowsByDate = new Map<string, typeof telemetryHistory>();
+    telemetryHistory.forEach((row) => {
       const date = formatDateKey(row.timestamp);
-      const lastGroup = groups[groups.length - 1];
-      if (!lastGroup || lastGroup.date !== date) {
-        groups.push({ date, rows: [row] });
-      } else {
-        lastGroup.rows.push(row);
-      }
+      if (!date) return;
+      const rows = rowsByDate.get(date) ?? [];
+      rows.push(row);
+      rowsByDate.set(date, rows);
     });
-    return groups;
-  }, [historyForSelectedDate]);
+
+    let days: string[] = [];
+    if (activeHistoryDate === "recent") {
+      days = enumerateDateKeys(recentStartKey, todayKey).reverse();
+    } else if (activeHistoryDate === "all") {
+      const oldestDay = historyDates[historyDates.length - 1] || recentStartKey;
+      days = enumerateDateKeys(oldestDay, todayKey).reverse();
+    } else if (activeHistoryDate) {
+      days = [activeHistoryDate];
+    }
+
+    return days.map((date) => ({ date, rows: rowsByDate.get(date) ?? [] }));
+  }, [activeHistoryDate, historyDates, recentStartKey, telemetryHistory, todayKey]);
 
   const oldestHistoryAt = historyForSelectedDate[historyForSelectedDate.length - 1]?.timestamp || "";
   const newestHistoryAt = historyForSelectedDate[0]?.timestamp || "";
   const trendHistory = telemetryHistory.slice(0, 12).reverse();
+  const visibleHistoryDayCount = groupedHistory.length;
+  const emptyHistoryDayCount = groupedHistory.filter((group) => group.rows.length === 0).length;
 
   const cardToneClass = (tone: string) => {
     if (tone === "danger") return "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400";
@@ -813,12 +865,20 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 </CardTitle>
                 <CardDescription>
                   {isTH
-                    ? `แสดง log ทุก packet ที่รับจากเซ็นเซอร์ ตอนนี้พบ ${historyForSelectedDate.length} รายการ จากทั้งหมด ${historyDates.length} วัน`
-                    : `Shows every received sensor packet. Showing ${historyForSelectedDate.length} records across ${historyDates.length} days.`}
+                    ? `แสดง log ตามปฏิทินเพื่อเทียบว่าเซ็นเซอร์/เซิร์ฟเวอร์ขาดช่วงไหม ตอนนี้พบ ${historyForSelectedDate.length} รายการ ใน ${visibleHistoryDayCount} วัน`
+                    : `Calendar log for checking sensor/server gaps. Showing ${historyForSelectedDate.length} records across ${visibleHistoryDayCount} days.`}
                 </CardDescription>
               </div>
 
               <div className="flex flex-col gap-2 rounded-xl border border-border bg-background/70 p-3 sm:flex-row sm:items-center">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={historyDateMode === "recent" ? "default" : "outline"}
+                  onClick={() => setHistoryDateMode("recent")}
+                >
+                  {isTH ? "14 วันล่าสุด" : "Last 14 Days"}
+                </Button>
                 <Button
                   type="button"
                   size="sm"
@@ -836,8 +896,8 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                   {isTH ? "วันล่าสุด" : "Latest Day"}
                 </Button>
                 <MinimalDatePicker
-                  value={activeHistoryDate === "all" ? "" : activeHistoryDate}
-                  onChange={(value) => setHistoryDateMode(value || "all")}
+                  value={activeHistoryDate === "all" || activeHistoryDate === "recent" ? "" : activeHistoryDate}
+                  onChange={(value) => setHistoryDateMode(value || "recent")}
                   ariaLabel={isTH ? "เลือกวันที่ประวัติ" : "Select history date"}
                   locale={isTH ? "TH" : "EN"}
                   className="w-full sm:w-44"
@@ -850,7 +910,11 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
               <div className="rounded-xl border border-border bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">{isTH ? "รอบข้อมูล" : "Data Cycle"}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">
-                  {activeHistoryDate === "all" ? (isTH ? "ทุกวันที่บันทึก" : "All saved days") : formatDateLabel(activeHistoryDate, isTH)}
+                  {activeHistoryDate === "all"
+                    ? (isTH ? "ทุกวันตามปฏิทิน" : "All calendar days")
+                    : activeHistoryDate === "recent"
+                      ? (isTH ? "14 วันล่าสุด" : "Last 14 calendar days")
+                      : formatDateLabel(activeHistoryDate, isTH)}
                 </p>
               </div>
               <div className="rounded-xl border border-border bg-muted/30 p-3">
@@ -862,8 +926,15 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                 <p className="mt-1 font-mono text-sm font-semibold text-foreground">{oldestHistoryAt ? formatTimestamp(oldestHistoryAt) : "-"}</p>
               </div>
             </div>
+            {emptyHistoryDayCount > 0 && (
+              <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-700 dark:text-amber-300">
+                {isTH
+                  ? `มี ${emptyHistoryDayCount} วันที่ไม่มี packet จากเซ็นเซอร์ในช่วงนี้ ใช้จุดนี้ตรวจได้ว่า sensor, Wi-Fi, MQTT หรือ server ขาดช่วง`
+                  : `${emptyHistoryDayCount} day(s) have no sensor packets in this range. Use this to spot sensor, Wi-Fi, MQTT, or server gaps.`}
+              </div>
+            )}
 
-            {historyForSelectedDate.length === 0 ? (
+            {groupedHistory.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border p-8 text-center">
                 <p className="font-medium text-foreground">{isTH ? "ไม่พบข้อมูลย้อนหลังในบัญชี/อุปกรณ์นี้" : "No saved telemetry for this account/device"}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -895,6 +966,15 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
                             {isTH ? "รอบวันที่" : "Daily Cycle"} {formatDateLabel(group.date, isTH)} · {group.rows.length} {isTH ? "รายการ" : "records"}
                           </TableCell>
                         </TableRow>
+                        {group.rows.length === 0 && (
+                          <TableRow key={`empty-${group.date}`} className="bg-amber-50/60 hover:bg-amber-50/60 dark:bg-amber-950/20 dark:hover:bg-amber-950/20">
+                            <TableCell colSpan={10} className="py-4 text-sm font-medium text-amber-700 dark:text-amber-300">
+                              {isTH
+                                ? "ไม่มีข้อมูลจากเซ็นเซอร์วันนี้ (0 packet) - ควรตรวจ sensor / Wi-Fi / MQTT / server"
+                                : "No sensor data for this day (0 packets) - check sensor / Wi-Fi / MQTT / server"}
+                            </TableCell>
+                          </TableRow>
+                        )}
                         {group.rows.map((row) => (
                           <TableRow key={`${row.timestamp}-${row.phValue}-${row.ecValue}`}>
                             <TableCell className="font-mono text-xs text-muted-foreground">{formatCompactTime(row.timestamp)}</TableCell>

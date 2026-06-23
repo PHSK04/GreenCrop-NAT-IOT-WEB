@@ -18,6 +18,45 @@ const formatDateKey = (value: string) => {
   return `${year}-${month}-${day}`;
 };
 
+const formatDateKeyFromDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getDateKeyOffset = (offsetDays: number) => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + offsetDays);
+  return formatDateKeyFromDate(date);
+};
+
+const addDaysToDateKey = (dateKey: string, offsetDays: number) => {
+  const date = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateKey;
+  date.setDate(date.getDate() + offsetDays);
+  return formatDateKeyFromDate(date);
+};
+
+const enumerateDateKeys = (startKey: string, endKey: string) => {
+  const keys: string[] = [];
+  if (!startKey || !endKey || startKey > endKey) return keys;
+
+  let cursor = startKey;
+  while (cursor <= endKey && keys.length < 370) {
+    keys.push(cursor);
+    cursor = addDaysToDateKey(cursor, 1);
+  }
+  return keys;
+};
+
+const getMonthEndKey = (monthKey: string) => {
+  const [year, month] = monthKey.split("-").map(Number);
+  if (!year || !month) return "";
+  return formatDateKeyFromDate(new Date(year, month, 0));
+};
+
 const average = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 
@@ -42,18 +81,37 @@ export function MetricsChart() {
     });
 
     const sortedGroups = Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
-    const visibleGroups = selectedMonth || startDate || endDate ? sortedGroups : sortedGroups.slice(-14);
+    const groupedDays = sortedGroups.map(([day]) => day);
+    const todayKey = getDateKeyOffset(0);
+    let visibleDays: string[];
 
-    return visibleGroups.map(([day, rows]) => {
+    if (selectedMonth) {
+      const monthStart = `${selectedMonth}-01`;
+      const monthEnd = getMonthEndKey(selectedMonth);
+      const boundedEnd = selectedMonth === todayKey.slice(0, 7) ? todayKey : monthEnd;
+      visibleDays = enumerateDateKeys(monthStart, boundedEnd);
+    } else if (startDate || endDate) {
+      const endKey = endDate || todayKey;
+      const startKey = startDate || groupedDays[0] || addDaysToDateKey(endKey, -13);
+      visibleDays = enumerateDateKeys(startKey, endKey);
+    } else {
+      visibleDays = enumerateDateKeys(getDateKeyOffset(-13), todayKey);
+    }
+
+    return visibleDays.map((day) => {
+      const rows = groups.get(day) ?? [];
       const validPh = rows.map((row) => row.phValue).filter((value) => value > 0);
       const validEc = rows.map((row) => row.ecValue).filter((value) => value > 0);
       const validTemp = rows.map((row) => row.tempValue).filter((value) => value > 0);
+      const avgPh = average(validPh);
+      const avgEc = average(validEc);
+      const avgTemp = average(validTemp);
       return {
         date: new Date(`${day}T00:00:00`).toLocaleDateString([], { month: "short", day: "numeric" }),
-        ph: Number(average(validPh).toFixed(2)),
-        oxygen: Number((average(validPh) > 0 ? Math.max(0, 14 - average(validPh)) : 0).toFixed(2)),
-        ec: Number(average(validEc).toFixed(2)),
-        temperature: Number(average(validTemp).toFixed(1)),
+        ph: validPh.length ? Number(avgPh.toFixed(2)) : null,
+        oxygen: validPh.length ? Number(Math.max(0, 14 - avgPh).toFixed(2)) : null,
+        ec: validEc.length ? Number(avgEc.toFixed(2)) : null,
+        temperature: validTemp.length ? Number(avgTemp.toFixed(1)) : null,
         cost: rows.length,
       };
     });
@@ -63,8 +121,8 @@ export function MetricsChart() {
     () =>
       waterMetricsData.map((row) => ({
         date: row.date,
-        nitrogen: Number((row.ec * 8).toFixed(2)),
-        phosphorus: Number((row.ec * 5).toFixed(2)),
+        nitrogen: row.ec == null ? null : Number((row.ec * 8).toFixed(2)),
+        phosphorus: row.ec == null ? null : Number((row.ec * 5).toFixed(2)),
       })),
     [waterMetricsData],
   );
@@ -72,6 +130,7 @@ export function MetricsChart() {
   const emptyKey = `${telemetryHistory.length}:${selectedMonth}:${startDate}:${endDate}`;
   const hasNoTelemetry = telemetryHistory.length === 0;
   const hasNoChartData = waterMetricsData.length === 0;
+  const hasNoRecordsInRange = waterMetricsData.length > 0 && waterMetricsData.every((row) => row.cost === 0);
   const showEmptyDialog = hasNoChartData && dismissedEmptyKey !== emptyKey;
   const emptyTitle = hasNoTelemetry
     ? "ยังไม่มีข้อมูลคุณภาพน้ำในฐานข้อมูล"
@@ -114,7 +173,7 @@ export function MetricsChart() {
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-            กราฟจะกลับมาแสดงอัตโนมัติเมื่อมีข้อมูลจริงจากอุปกรณ์หรือเมื่อเลือกช่วงวันที่ที่มีข้อมูล
+            กราฟจะกลับมาแสดงอัตโนมัติเมื่อมีข้อมูลจริงจากอุปกรณ์ หรือจะแสดง Records/day = 0 ในวันที่ไม่มี packet เพื่อช่วยตรวจจับอุปกรณ์/เซิร์ฟเวอร์ขาดช่วง
           </div>
           <DialogFooter>
             <Button onClick={() => setDismissedEmptyKey(emptyKey)}>รับทราบ</Button>
@@ -156,6 +215,11 @@ export function MetricsChart() {
             </TabsList>
 
             <TabsContent value="quality" className="space-y-4">
+              {hasNoRecordsInRange && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-700 dark:text-amber-300">
+                  ไม่มี packet จากเซ็นเซอร์ในช่วงวันที่นี้ กราฟจึงแสดง Records/day = 0 ทุกวันเพื่อใช้ตรวจจับปัญหา sensor/server
+                </div>
+              )}
               <div className="h-80">
                 {hasNoChartData ? (
                   renderEmptyPanel()
