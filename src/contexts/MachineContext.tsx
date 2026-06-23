@@ -365,6 +365,17 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const replaceTelemetrySnapshots = useCallback((snapshots: TelemetrySnapshot[]) => {
+    if (!snapshots.length) return;
+    const merged = new Map<string, TelemetrySnapshot>();
+    snapshots.forEach((row) => merged.set(telemetryFingerprint(row), row));
+    const next = Array.from(merged.values())
+      .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+      .slice(0, HISTORY_LIMIT);
+    writeCachedTelemetryHistory(next);
+    setTelemetryHistory(next);
+  }, []);
+
   const applyTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
     setPhValue(snapshot.phValue);
     setEcValue(snapshot.ecValue);
@@ -632,11 +643,11 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       const apiHistory = dataList
         .map(normalizeTelemetrySnapshot)
         .filter((snapshot): snapshot is TelemetrySnapshot => Boolean(snapshot));
-      persistTelemetrySnapshots(apiHistory);
+      replaceTelemetrySnapshots(apiHistory);
     } catch (err) {
       console.error('API History Error:', err);
     }
-  }, [persistTelemetrySnapshots]);
+  }, [replaceTelemetrySnapshots]);
 
   useEffect(() => {
     const cachedHistory = readCachedTelemetryHistory();
