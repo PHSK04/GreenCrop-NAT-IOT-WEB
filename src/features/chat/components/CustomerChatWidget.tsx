@@ -16,6 +16,7 @@ import {
   UserRoundX,
   X,
 } from "lucide-react";
+import supportIcon from "@/assets/images/icon_support.png";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -92,8 +93,8 @@ const createAssistantWelcome = (isTH = true): AssistantMessage => ({
   id: "assistant-welcome",
   sender: "ai",
   text: isTH
-    ? "สวัสดีครับ ผมคือ NAT AI ผู้ช่วยของเครื่องนี้ เลือกให้ผมตรวจสถานะหรือช่วยไล่ปัญหาก่อนได้ ถ้ายังไม่หายค่อยส่งต่อเจ้าหน้าที่ในหน้าต่างเดียวกันครับ"
-    : "Hi, I am NAT AI for this machine. I can check status or guide basic troubleshooting first, then hand off to support in the same chat.",
+    ? "สวัสดีครับ ผมคือ NAT AI ผู้ช่วยประจำระบบ GreenCropNAT ผมช่วยตรวจสถานะเครื่อง วิเคราะห์อาการเบื้องต้น และส่งต่อเจ้าหน้าที่ได้ในหน้าต่างเดียวครับ"
+    : "Hi, I am NAT AI for GreenCropNAT. I can check machine status, guide troubleshooting, and hand off to support in one place.",
   actions: [
     { id: "status", label: isTH ? "ตรวจสถานะเครื่อง" : "Check machine status", next: "status" },
     { id: "offline", label: "อุปกรณ์ไม่ออนไลน์", next: "offline" },
@@ -217,25 +218,28 @@ function NatAssistantAvatar({
 }) {
   return (
     <div
-      className={`nat-assistant-avatar relative shrink-0 ${compact ? "h-12 w-12" : "h-14 w-14 sm:h-16 sm:w-16"}`}
+      className={`nat-assistant-avatar relative shrink-0 ${compact ? "h-12 w-12" : "h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]"}`}
       aria-hidden="true"
     >
-      <div className="absolute inset-0 rounded-full bg-emerald-200/45 blur-md" />
-      <div className="absolute inset-[2px] rounded-full border border-emerald-200 bg-white shadow-[0_12px_30px_rgba(15,118,110,0.18)]" />
-      <div className="absolute left-1/2 top-[10%] h-[12%] w-[6%] -translate-x-1/2 rounded-full bg-emerald-300" />
-      <div className="absolute left-1/2 top-[17%] h-[42%] w-[58%] -translate-x-1/2 rounded-[1.1rem] bg-gradient-to-br from-emerald-300 to-emerald-700 shadow-inner">
-        <div className="absolute inset-x-[18%] top-[24%] h-[42%] rounded-full bg-emerald-950/72">
-          <div className="absolute left-[20%] top-[32%] h-[28%] w-[16%] rounded-full bg-emerald-50 shadow-[0_0_10px_rgba(209,250,229,0.95)]" />
-          <div className="absolute right-[20%] top-[32%] h-[28%] w-[16%] rounded-full bg-emerald-50 shadow-[0_0_10px_rgba(209,250,229,0.95)]" />
+      <div className="absolute inset-[-10%] rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.28),rgba(34,211,238,0.12)_48%,transparent_72%)] blur-md" />
+      <div className="absolute inset-0 rounded-full border border-emerald-100 bg-white shadow-[0_16px_38px_rgba(15,118,110,0.20)]" />
+      <div className="absolute inset-[8%] overflow-hidden rounded-full bg-white">
+        <img
+          src={supportIcon}
+          alt=""
+          className="h-full w-full scale-[1.18] object-cover"
+          draggable={false}
+        />
+      </div>
+      {!compact && (
+        <div className="absolute -bottom-1 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-0.5 text-[10px] font-black tracking-wide text-emerald-700 shadow-sm">
+          <Sparkles className="h-3 w-3" />
+          NAT
         </div>
-        <div className="absolute bottom-[18%] left-1/2 h-[7%] w-[28%] -translate-x-1/2 rounded-full bg-emerald-950/80" />
+      )}
+      <div className="absolute -right-0.5 top-0.5 rounded-full bg-white p-0.5 shadow-sm">
+        <span className={`block h-3 w-3 rounded-full ${statusClass}`} />
       </div>
-      <div className="absolute left-[20%] top-[32%] h-[18%] w-[10%] rounded-full bg-slate-800" />
-      <div className="absolute right-[20%] top-[32%] h-[18%] w-[10%] rounded-full bg-slate-800" />
-      <div className="absolute bottom-[16%] left-1/2 h-[26%] w-[36%] -translate-x-1/2 rounded-[1rem] bg-gradient-to-b from-emerald-300 to-emerald-700">
-        <Sparkles className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 text-white" />
-      </div>
-      <span className={`absolute right-1 top-1 h-3 w-3 rounded-full ${statusClass} ring-2 ring-white`} />
     </div>
   );
 }
