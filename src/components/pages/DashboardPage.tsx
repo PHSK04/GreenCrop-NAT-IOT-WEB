@@ -20,7 +20,6 @@ import {
 import machineModel from "@/assets/images/machine_model.png";
 import { MetricsChart } from "../MetricsChart";
 import type { AdminDbDeviceRow } from "@/features/auth/services/authService";
-import { NatAIAssistantPanel } from "@/components/NatAIAssistantPanel";
 
 
 interface DashboardPageProps {
@@ -622,23 +621,6 @@ export function DashboardPage({
 
           {/* Right Column: Controls & Pumps */}
           <div className="lg:col-span-5 space-y-6">
-            <NatAIAssistantPanel
-              language={language}
-              activeDeviceName={activeDeviceName}
-              liveSignal={liveSignal}
-              mqttConnected={mqttStatus === "connected"}
-              boardConnected={boardConnected}
-              pump1On={pump1On}
-              pump2On={pump2On}
-              locked={locked}
-              redOn={redOn}
-              floatAlarm={floatAlarm}
-              phValue={stablePhValue}
-              ecValue={stableEcValue}
-              tempValue={stableTempValue}
-              phOk={stablePhOk}
-            />
-            
             {/* Master Control */}
             <Card className="rounded-2xl border-border/70 bg-card/80 shadow-xl backdrop-blur-md">
               <CardHeader className="pb-2">

@@ -10,12 +10,12 @@ import {
   Reply,
   RotateCcw,
   Send,
+  Sparkles,
   Trash2,
   UserCheck,
   UserRoundX,
   X,
 } from "lucide-react";
-import supportIcon from "@/assets/images/icon_support.png";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,6 +30,8 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { chatService, ChatMessage, ChatThread } from "@/features/chat/services/chatService";
 import { toast } from "sonner";
+import { useActiveDeviceId } from "@/hooks/useActiveDeviceId";
+import { useMachine } from "@/contexts/MachineContext";
 
 type CustomerChatWidgetProps = {
   language?: string;
@@ -86,11 +88,14 @@ const assistantFlows = {
   },
 } as const;
 
-const createAssistantWelcome = (): AssistantMessage => ({
+const createAssistantWelcome = (isTH = true): AssistantMessage => ({
   id: "assistant-welcome",
   sender: "ai",
-  text: "สวัสดีครับ ผมช่วยคัดกรองปัญหาเบื้องต้นให้ก่อนได้ เลือกหัวข้อที่ใกล้เคียงกับปัญหาของคุณ แล้วถ้ายังไม่หายค่อยกดคุยกับเจ้าหน้าที่ครับ",
+  text: isTH
+    ? "สวัสดีครับ ผมคือ NAT AI ผู้ช่วยของเครื่องนี้ เลือกให้ผมตรวจสถานะหรือช่วยไล่ปัญหาก่อนได้ ถ้ายังไม่หายค่อยส่งต่อเจ้าหน้าที่ในหน้าต่างเดียวกันครับ"
+    : "Hi, I am NAT AI for this machine. I can check status or guide basic troubleshooting first, then hand off to support in the same chat.",
   actions: [
+    { id: "status", label: isTH ? "ตรวจสถานะเครื่อง" : "Check machine status", next: "status" },
     { id: "offline", label: "อุปกรณ์ไม่ออนไลน์", next: "offline" },
     { id: "login", label: "เข้าสู่ระบบไม่ได้", next: "login" },
     { id: "sensor", label: "ข้อมูลไม่อัปเดต", next: "sensor" },
@@ -203,11 +208,57 @@ function exportTranscriptTxt(thread: ChatThread | null, messages: ChatMessage[])
   downloadBlob(new Blob([content], { type: "text/plain;charset=utf-8" }), `chat-thread-${thread?.id || "support"}.txt`);
 }
 
+function NatAssistantAvatar({
+  compact = false,
+  statusClass = "bg-emerald-500",
+}: {
+  compact?: boolean;
+  statusClass?: string;
+}) {
+  return (
+    <div
+      className={`nat-assistant-avatar relative shrink-0 ${compact ? "h-12 w-12" : "h-14 w-14 sm:h-16 sm:w-16"}`}
+      aria-hidden="true"
+    >
+      <div className="absolute inset-0 rounded-full bg-emerald-200/45 blur-md" />
+      <div className="absolute inset-[2px] rounded-full border border-emerald-200 bg-white shadow-[0_12px_30px_rgba(15,118,110,0.18)]" />
+      <div className="absolute left-1/2 top-[10%] h-[12%] w-[6%] -translate-x-1/2 rounded-full bg-emerald-300" />
+      <div className="absolute left-1/2 top-[17%] h-[42%] w-[58%] -translate-x-1/2 rounded-[1.1rem] bg-gradient-to-br from-emerald-300 to-emerald-700 shadow-inner">
+        <div className="absolute inset-x-[18%] top-[24%] h-[42%] rounded-full bg-emerald-950/72">
+          <div className="absolute left-[20%] top-[32%] h-[28%] w-[16%] rounded-full bg-emerald-50 shadow-[0_0_10px_rgba(209,250,229,0.95)]" />
+          <div className="absolute right-[20%] top-[32%] h-[28%] w-[16%] rounded-full bg-emerald-50 shadow-[0_0_10px_rgba(209,250,229,0.95)]" />
+        </div>
+        <div className="absolute bottom-[18%] left-1/2 h-[7%] w-[28%] -translate-x-1/2 rounded-full bg-emerald-950/80" />
+      </div>
+      <div className="absolute left-[20%] top-[32%] h-[18%] w-[10%] rounded-full bg-slate-800" />
+      <div className="absolute right-[20%] top-[32%] h-[18%] w-[10%] rounded-full bg-slate-800" />
+      <div className="absolute bottom-[16%] left-1/2 h-[26%] w-[36%] -translate-x-1/2 rounded-[1rem] bg-gradient-to-b from-emerald-300 to-emerald-700">
+        <Sparkles className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 text-white" />
+      </div>
+      <span className={`absolute right-1 top-1 h-3 w-3 rounded-full ${statusClass} ring-2 ring-white`} />
+    </div>
+  );
+}
+
 export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps) {
   const isTH = language === "TH";
+  const activeDeviceId = useActiveDeviceId();
+  const {
+    mqttStatus,
+    boardConnected,
+    pump1On,
+    pump2On,
+    locked,
+    redOn,
+    floatAlarm,
+    phValue,
+    ecValue,
+    tempValue,
+    phOk,
+  } = useMachine();
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<AssistantMode>("assistant");
-  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([createAssistantWelcome()]);
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([createAssistantWelcome(isTH)]);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
   const [thread, setThread] = useState<ChatThread | null>(null);
@@ -487,7 +538,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
   const resetAssistant = () => {
     setMode("assistant");
-    setAssistantMessages([createAssistantWelcome()]);
+    setAssistantMessages([createAssistantWelcome(isTH)]);
     setError("");
   };
 
@@ -502,6 +553,20 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   };
 
   const handleAssistantAction = async (actionKey: string) => {
+    if (actionKey === "status") {
+      setAssistantMessages((current) => [
+        ...current,
+        { id: `user-${Date.now()}-status`, sender: "user", text: isTH ? "ตรวจสถานะเครื่อง" : "Check machine status" },
+        {
+          id: `ai-${Date.now()}-status`,
+          sender: "ai",
+          text: buildMachineStatusAnswer(),
+          canEscalate: machineNeedsAttention || !liveSignal,
+        },
+      ]);
+      return;
+    }
+
     const flow = assistantFlows[actionKey as keyof typeof assistantFlows];
     if (!flow) return;
     setAssistantMessages((current) => [
@@ -613,6 +678,46 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const isClosedForCustomer = mode === "human" && (selectedThread || thread)?.status === "closed";
   const hasHistoryFilter = Boolean(historyStart || historyEnd);
   const assignedAdminName = (selectedThread || thread)?.assigned_admin_name?.trim();
+  const liveSignal = mqttStatus === "connected" && boardConnected;
+  const machineNeedsAttention = boardConnected && (locked || redOn || floatAlarm || !phOk);
+  const activePumpCount = [pump1On, pump2On].filter(Boolean).length;
+  const natStatusText = machineNeedsAttention
+    ? isTH ? "พบสัญญาณเตือน" : "Needs attention"
+    : liveSignal
+      ? isTH ? "เฝ้าเครื่องอยู่" : "Monitoring"
+      : isTH ? "รอสัญญาณเครื่อง" : "Waiting for signal";
+  const natStatusTone = machineNeedsAttention
+    ? "bg-amber-500"
+    : liveSignal
+      ? "bg-emerald-500"
+      : "bg-slate-400";
+  const formatTelemetryValue = (value: number, digits: number) =>
+    Number.isFinite(value) && value > 0 ? value.toFixed(digits) : "--";
+  const buildMachineStatusAnswer = () => {
+    const lines = [
+      isTH ? `สถานะเครื่อง${activeDeviceId ? ` ${activeDeviceId}` : ""}: ${natStatusText}` : `Machine${activeDeviceId ? ` ${activeDeviceId}` : ""}: ${natStatusText}`,
+      isTH ? `MQTT: ${mqttStatus === "connected" ? "เชื่อมต่อ" : "ยังไม่เชื่อมต่อ"}` : `MQTT: ${mqttStatus}`,
+      isTH ? `บอร์ด: ${boardConnected ? "ออนไลน์" : "ยังไม่มีสัญญาณ"}` : `Board: ${boardConnected ? "online" : "no signal"}`,
+      isTH ? `ปั๊มทำงาน: ${activePumpCount}/2 ตัว` : `Running pumps: ${activePumpCount}/2`,
+      `pH ${formatTelemetryValue(phValue, 2)} | EC ${formatTelemetryValue(ecValue, 2)} | Temp ${formatTelemetryValue(tempValue, 1)}`,
+    ];
+
+    if (machineNeedsAttention) {
+      lines.push(isTH
+        ? "คำแนะนำ: ตรวจ alarm น้ำ, lock, และค่า pH ก่อนสั่งงานต่อ ถ้าไม่แน่ใจกดคุยกับเจ้าหน้าที่ได้เลยครับ"
+        : "Suggestion: check water alarm, lock state, and pH before sending more commands. Escalate to support if unsure.");
+    } else if (liveSignal) {
+      lines.push(isTH
+        ? "คำแนะนำ: ระบบดูปกติ ผมจะช่วยเฝ้าดูสัญญาณและแจ้งเมื่อมีค่าที่ควรตรวจสอบครับ"
+        : "Suggestion: the system looks normal. I will keep watching for values that need attention.");
+    } else {
+      lines.push(isTH
+        ? "คำแนะนำ: ถ้าเพิ่งเปิดเครื่องให้รอ sync สักครู่ ถ้ายังไม่มาให้ตรวจ Wi-Fi, ไฟเลี้ยง และ MQTT ครับ"
+        : "Suggestion: if the device just started, wait for sync. Otherwise check Wi-Fi, power, and MQTT.");
+    }
+
+    return lines.join("\n");
+  };
   const statusToneClass =
     (selectedThread || thread)?.status === "closed"
       ? "bg-slate-400"
@@ -640,13 +745,13 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     <>
       <div
         ref={assistantListRef}
-        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain touch-pan-y bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:24px_24px] px-4 py-4"
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain touch-pan-y bg-[radial-gradient(circle_at_top_left,rgba(110,231,183,0.22),transparent_35%),linear-gradient(to_right,rgba(16,185,129,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(16,185,129,0.06)_1px,transparent_1px)] bg-[size:auto,24px_24px,24px_24px] px-4 py-4"
       >
         {assistantMessages.map((message) => (
           <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
-            <div className={`max-w-[88%] rounded-[1.6rem] px-4 py-3 shadow-sm ${message.sender === "user" ? "bg-emerald-600 text-white" : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"}`}>
+            <div className={`max-w-[88%] rounded-[1.35rem] px-4 py-3 shadow-sm ${message.sender === "user" ? "bg-emerald-600 text-white" : "border border-emerald-100 bg-white text-slate-900 dark:border-emerald-950 dark:bg-slate-900 dark:text-slate-100"}`}>
               <div className={`mb-1 text-[11px] ${message.sender === "user" ? "text-emerald-100" : "text-slate-500 dark:text-slate-400"}`}>
-                {message.sender === "user" ? "คุณ" : "AI Support"}
+                {message.sender === "user" ? "คุณ" : "NAT AI"}
               </div>
               <div className="whitespace-pre-wrap text-sm leading-6">{message.text}</div>
 
@@ -680,6 +785,13 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
       <div className="border-t border-slate-200/80 bg-white/96 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/96">
         <div className="mb-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => handleAssistantAction("status").catch(() => {})}
+            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
+          >
+            {isTH ? "ตรวจสถานะเครื่อง" : "Check machine status"}
+          </button>
           {Object.entries(assistantFlows).map(([key, flow]) => (
             <button
               key={key}
@@ -843,21 +955,57 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
   return (
     <div className="pointer-events-none fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 sm:bottom-8 sm:right-8">
+      <style>{`
+        @keyframes natAssistantFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
+        }
+
+        @keyframes natAssistantGlow {
+          0%, 100% { opacity: 0.45; transform: scale(0.96); }
+          50% { opacity: 0.9; transform: scale(1.06); }
+        }
+
+        .nat-assistant-avatar {
+          animation: natAssistantFloat 3.2s ease-in-out infinite;
+        }
+
+        .nat-assistant-avatar::before {
+          content: "";
+          position: absolute;
+          inset: -8px;
+          border-radius: 9999px;
+          background: radial-gradient(circle, rgba(16, 185, 129, 0.22), transparent 66%);
+          animation: natAssistantGlow 2.8s ease-in-out infinite;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .nat-assistant-avatar,
+          .nat-assistant-avatar::before {
+            animation: none !important;
+          }
+        }
+      `}</style>
       {isOpen && (
-        <div className="pointer-events-auto fixed inset-x-0 bottom-0 top-0 flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-none border border-slate-200/80 bg-white/96 shadow-[0_30px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:inset-x-auto sm:bottom-8 sm:right-8 sm:top-auto sm:h-[min(78vh,720px)] sm:w-[min(440px,calc(100vw-1.5rem))] sm:rounded-[2rem] dark:border-slate-800 dark:bg-slate-950/96">
-          <div className="flex items-start justify-between border-b border-slate-200/80 px-3 py-3 sm:items-center sm:px-5 sm:py-4 dark:border-slate-800">
+        <div className="pointer-events-auto fixed inset-x-0 bottom-0 top-0 flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-none border border-emerald-100 bg-white/98 shadow-[0_26px_70px_rgba(15,118,110,0.18)] backdrop-blur-xl sm:inset-x-auto sm:bottom-8 sm:right-8 sm:top-auto sm:h-[min(74vh,680px)] sm:w-[min(410px,calc(100vw-1.5rem))] sm:rounded-[1.75rem] dark:border-emerald-950 dark:bg-slate-950/98">
+          <div className="flex items-start justify-between border-b border-emerald-100 bg-gradient-to-r from-white via-emerald-50 to-cyan-50 px-3 py-3 sm:items-center sm:px-5 sm:py-4 dark:border-emerald-950 dark:from-slate-950 dark:via-emerald-950/30 dark:to-cyan-950/20">
             <div className="min-w-0 flex items-start gap-3">
-              <img src={supportIcon} alt="Support" className="h-10 w-10 rounded-full object-cover sm:h-11 sm:w-11" draggable={false} />
+              <NatAssistantAvatar compact statusClass={natStatusTone} />
               <div className="min-w-0 flex-1">
                 <div className="line-clamp-2 text-base font-semibold leading-5 text-slate-900 sm:truncate sm:text-base dark:text-slate-100">
-                  {mode === "assistant" ? (isTH ? "AI ช่วยตอบปัญหาเบื้องต้น" : "AI support assistant") : isTH ? "แชทคุยกับเจ้าหน้าที่" : "Chat with support"}
+                  {mode === "assistant" ? (isTH ? "NAT AI ช่วยเหลือ" : "NAT AI assistant") : isTH ? "แชทคุยกับเจ้าหน้าที่" : "Chat with support"}
                 </div>
                 <div className="line-clamp-2 pr-2 text-[12px] leading-5 text-slate-500 sm:text-xs dark:text-slate-400">
                   {mode === "assistant"
-                    ? isTH ? "เลือกปัญหาที่พบ แล้วให้ AI ช่วยตอบก่อน" : "Pick an issue and let AI guide you first"
+                    ? isTH ? "ตรวจสถานะเครื่อง + ช่วยไล่ปัญหาในปุ่มเดียว" : "Machine status and troubleshooting in one place"
                     : humanHeaderMeta}
                 </div>
-                {mode === "human" && (
+                {mode === "assistant" ? (
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                    <span className={`h-2 w-2 rounded-full ${natStatusTone}`} />
+                    <span className="truncate">{natStatusText}</span>
+                  </div>
+                ) : (
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
                     <span className={`h-2 w-2 rounded-full ${statusToneClass}`} />
                     <span className="truncate">{humanHeaderStatus}</span>
@@ -1093,15 +1241,14 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="pointer-events-auto fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-40 relative transition hover:-translate-y-0.5 sm:static"
+          className="pointer-events-auto fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 relative inline-flex items-center gap-3 rounded-full border border-emerald-100 bg-white/95 px-2.5 py-2 pr-4 text-left shadow-[0_18px_45px_rgba(15,118,110,0.22)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_22px_55px_rgba(15,118,110,0.26)] sm:static"
           aria-label={isTH ? "เปิดแชทช่วยเหลือ" : "Open support chat"}
         >
-          <img
-            src={supportIcon}
-            alt="Support"
-            className="h-14 w-14 rounded-full object-cover shadow-[0_18px_40px_rgba(15,23,42,0.2)] sm:h-24 sm:w-24"
-            draggable={false}
-          />
+          <NatAssistantAvatar statusClass={natStatusTone} />
+          <span className="hidden min-w-0 sm:block">
+            <span className="block text-sm font-black leading-tight text-slate-900 dark:text-slate-950">NAT AI</span>
+            <span className="block max-w-32 truncate text-[11px] font-medium text-emerald-700">{natStatusText}</span>
+          </span>
           {unreadCount > 0 && (
             <span className="absolute -right-1 -top-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[11px] font-semibold text-white shadow-lg ring-2 ring-white dark:ring-slate-950">
               {unreadCount > 99 ? "99+" : unreadCount}
