@@ -1,22 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   Bot,
   CalendarRange,
   Download,
   FileText,
+  Minus,
   MessageCircleMore,
   Pencil,
+  Plus,
   Reply,
   RotateCcw,
   Send,
-  Sparkles,
   Trash2,
   UserCheck,
   UserRoundX,
   X,
 } from "lucide-react";
-import natAssistantImage from "@/assets/images/generated/nat_ai_assistant.png";
+import natAssistantImage from "@/assets/images/generated/nat_ai_assistant_full.png";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -53,6 +54,17 @@ type AssistantMessage = {
 };
 
 const POLL_MS = 4000;
+const LAUNCHER_POSITION_KEY = "nat_assistant_launcher_position";
+const LAUNCHER_SCALE_KEY = "nat_assistant_launcher_scale";
+const LAUNCHER_BASE_WIDTH = 144;
+const LAUNCHER_BASE_HEIGHT = 184;
+const LAUNCHER_MIN_SCALE = 0.85;
+const LAUNCHER_MAX_SCALE = 1.35;
+
+type LauncherPosition = {
+  x: number;
+  y: number;
+};
 
 const safeSenderLabel = (message: Pick<ChatMessage, "sender_name" | "sender_role">, isTH: boolean) => {
   if (message.sender_role === "admin") {
@@ -149,6 +161,29 @@ const compareThreads = (left: ChatThread, right: ChatThread) => {
   return right.id - left.id;
 };
 
+const clampLauncherScale = (value: number) =>
+  Math.min(LAUNCHER_MAX_SCALE, Math.max(LAUNCHER_MIN_SCALE, Number(value.toFixed(2))));
+
+const getDefaultLauncherPosition = (scale = 1): LauncherPosition => {
+  if (typeof window === "undefined") return { x: 16, y: 360 };
+  const margin = 12;
+  return {
+    x: Math.max(margin, window.innerWidth - LAUNCHER_BASE_WIDTH * scale - margin),
+    y: Math.max(margin, window.innerHeight - LAUNCHER_BASE_HEIGHT * scale - 78),
+  };
+};
+
+const clampLauncherPosition = (position: LauncherPosition, scale = 1): LauncherPosition => {
+  if (typeof window === "undefined") return position;
+  const margin = 8;
+  const maxX = Math.max(margin, window.innerWidth - LAUNCHER_BASE_WIDTH * scale - margin);
+  const maxY = Math.max(margin, window.innerHeight - LAUNCHER_BASE_HEIGHT * scale - margin);
+  return {
+    x: Math.min(maxX, Math.max(margin, position.x)),
+    y: Math.min(maxY, Math.max(margin, position.y)),
+  };
+};
+
 const downloadBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -218,27 +253,21 @@ function NatAssistantAvatar({
 }) {
   return (
     <div
-      className={`nat-assistant-avatar relative shrink-0 ${compact ? "h-14 w-14" : "h-24 w-20 sm:h-28 sm:w-24"}`}
+      className={`nat-assistant-avatar relative shrink-0 ${compact ? "h-16 w-14" : "h-36 w-28 sm:h-40 sm:w-32"}`}
       aria-hidden="true"
     >
-      <div className="nat-assistant-halo absolute inset-x-0 bottom-0 h-2/3 rounded-full bg-[radial-gradient(circle,rgba(110,231,183,0.46),rgba(125,211,252,0.24)_46%,rgba(251,207,232,0.18)_64%,transparent_78%)] blur-xl" />
-      <span className="nat-assistant-sparkle absolute left-0 top-3 z-20 h-2 w-2 rounded-full bg-pink-200 shadow-[0_0_14px_rgba(251,207,232,0.95)]" />
-      <span className="nat-assistant-sparkle nat-assistant-sparkle-delay absolute right-1 top-8 z-20 h-2.5 w-2.5 rounded-full bg-cyan-200 shadow-[0_0_14px_rgba(165,243,252,0.95)]" />
-      <span className="nat-assistant-sparkle nat-assistant-sparkle-late absolute bottom-6 left-2 z-20 h-1.5 w-1.5 rounded-full bg-emerald-200 shadow-[0_0_12px_rgba(167,243,208,0.95)]" />
+      <div className="nat-assistant-halo absolute inset-x-0 bottom-0 h-3/5 rounded-full bg-[radial-gradient(circle,rgba(110,231,183,0.38),rgba(125,211,252,0.2)_48%,rgba(251,207,232,0.12)_68%,transparent_82%)] blur-xl" />
+      <span className="nat-assistant-sparkle absolute left-1 top-8 z-20 h-1.5 w-1.5 rounded-full bg-pink-200 shadow-[0_0_12px_rgba(251,207,232,0.88)]" />
+      <span className="nat-assistant-sparkle nat-assistant-sparkle-delay absolute right-0 top-14 z-20 h-2 w-2 rounded-full bg-cyan-200 shadow-[0_0_12px_rgba(165,243,252,0.88)]" />
+      <span className="nat-assistant-sparkle nat-assistant-sparkle-late absolute bottom-10 left-2 z-20 h-1.5 w-1.5 rounded-full bg-emerald-200 shadow-[0_0_10px_rgba(167,243,208,0.88)]" />
       <img
         src={natAssistantImage}
         alt=""
-        className={`nat-assistant-robot-image relative z-10 h-full w-full object-contain ${compact ? "scale-[1.35]" : "scale-[1.18]"}`}
+        className={`nat-assistant-robot-image relative z-10 h-full w-full object-contain ${compact ? "[--nat-scale:1.45]" : "[--nat-scale:1.08]"}`}
         draggable={false}
       />
-      {!compact && (
-        <div className="absolute -bottom-0.5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[10px] font-black tracking-wide text-emerald-700 shadow-[0_8px_18px_rgba(15,118,110,0.16)] backdrop-blur">
-          <Sparkles className="h-3 w-3" />
-          NAT
-        </div>
-      )}
-      <div className="absolute right-1 top-2 z-20 rounded-full bg-white p-0.5 shadow-sm">
-        <span className={`block h-3 w-3 rounded-full ${statusClass}`} />
+      <div className="absolute right-2 top-5 z-20 rounded-full bg-white/90 p-0.5 shadow-[0_4px_10px_rgba(15,118,110,0.16)]">
+        <span className={`block ${compact ? "h-2.5 w-2.5" : "h-3 w-3"} rounded-full ${statusClass}`} />
       </div>
     </div>
   );
@@ -280,8 +309,20 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const [isHistoryFilterOpen, setIsHistoryFilterOpen] = useState(false);
   const [isAdminTyping, setIsAdminTyping] = useState(false);
   const [typingAdminName, setTypingAdminName] = useState("");
+  const [launcherPosition, setLauncherPosition] = useState<LauncherPosition | null>(null);
+  const [launcherScale, setLauncherScale] = useState(1);
+  const [isDraggingLauncher, setIsDraggingLauncher] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
   const assistantListRef = useRef<HTMLDivElement | null>(null);
+  const launcherDragRef = useRef<{
+    pointerId: number;
+    offsetX: number;
+    offsetY: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressLauncherClickRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
   const previousMessageCountRef = useRef(0);
   const latestAdminMessageIdRef = useRef<number | null>(null);
@@ -478,6 +519,47 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       }
     };
   }, []);
+
+  useEffect(() => {
+    const savedScale = Number(localStorage.getItem(LAUNCHER_SCALE_KEY) || "1");
+    const nextScale = Number.isFinite(savedScale) ? clampLauncherScale(savedScale) : 1;
+    setLauncherScale(nextScale);
+
+    try {
+      const rawPosition = localStorage.getItem(LAUNCHER_POSITION_KEY);
+      const parsedPosition = rawPosition ? JSON.parse(rawPosition) as LauncherPosition : null;
+      if (
+        parsedPosition &&
+        Number.isFinite(parsedPosition.x) &&
+        Number.isFinite(parsedPosition.y)
+      ) {
+        setLauncherPosition(clampLauncherPosition(parsedPosition, nextScale));
+        return;
+      }
+    } catch {
+      localStorage.removeItem(LAUNCHER_POSITION_KEY);
+    }
+
+    setLauncherPosition(getDefaultLauncherPosition(nextScale));
+  }, []);
+
+  useEffect(() => {
+    if (!launcherPosition) return;
+    localStorage.setItem(LAUNCHER_POSITION_KEY, JSON.stringify(launcherPosition));
+  }, [launcherPosition]);
+
+  useEffect(() => {
+    localStorage.setItem(LAUNCHER_SCALE_KEY, String(launcherScale));
+    setLauncherPosition((current) => current ? clampLauncherPosition(current, launcherScale) : current);
+  }, [launcherScale]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setLauncherPosition((current) => clampLauncherPosition(current || getDefaultLauncherPosition(launcherScale), launcherScale));
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [launcherScale]);
 
   useEffect(() => {
     if (isOpen && mode === "human" && thread) return;
@@ -744,6 +826,76 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       : unreadCount > 0
         ? (isTH ? `มีข้อความใหม่ ${unreadCount} ข้อความ` : `${unreadCount} new message${unreadCount > 1 ? "s" : ""}`)
         : (isTH ? "ตอบกลับแบบเรียลไทม์" : "Realtime replies");
+  const launcherSpeech = unreadCount > 0
+    ? (isTH ? `มีข้อความใหม่ ${unreadCount} ข้อความครับ` : `${unreadCount} new support message${unreadCount > 1 ? "s" : ""}.`)
+    : machineNeedsAttention
+      ? (isTH ? "ผมพบสัญญาณเตือน กดให้ผมช่วยตรวจได้ครับ" : "I found an alert. Tap me to inspect it.")
+      : liveSignal
+        ? (isTH ? "เครื่องออนไลน์ ผมเฝ้าดูให้อยู่ครับ" : "Device is online. I am watching it.")
+        : (isTH ? "ผมรอสัญญาณเครื่องอยู่ครับ" : "I am waiting for the device signal.");
+  const launcherSpeechSideClass = launcherPosition && launcherPosition.x < 210
+    ? "left-[78%] origin-left"
+    : "right-[78%] origin-right";
+  const launcherStyle = launcherPosition
+    ? {
+        left: `${launcherPosition.x}px`,
+        top: `${launcherPosition.y}px`,
+        transform: `scale(${launcherScale})`,
+      }
+    : {
+        right: "0.5rem",
+        bottom: "calc(4.5rem + env(safe-area-inset-bottom))",
+        transform: `scale(${launcherScale})`,
+      };
+
+  const updateLauncherScale = (delta: number) => {
+    setLauncherScale((current) => clampLauncherScale(current + delta));
+  };
+
+  const handleLauncherPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    launcherDragRef.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsDraggingLauncher(true);
+  };
+
+  const handleLauncherPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = launcherDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const movedDistance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+    if (movedDistance > 4) {
+      drag.moved = true;
+    }
+    setLauncherPosition(clampLauncherPosition({
+      x: event.clientX - drag.offsetX,
+      y: event.clientY - drag.offsetY,
+    }, launcherScale));
+  };
+
+  const handleLauncherPointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = launcherDragRef.current;
+    if (drag?.pointerId === event.pointerId) {
+      suppressLauncherClickRef.current = drag.moved;
+      launcherDragRef.current = null;
+      window.setTimeout(() => {
+        suppressLauncherClickRef.current = false;
+      }, 0);
+    }
+    setIsDraggingLauncher(false);
+  };
+
+  const handleLauncherClick = () => {
+    if (suppressLauncherClickRef.current) return;
+    setIsOpen(true);
+  };
 
   const assistantView = (
     <>
@@ -958,33 +1110,33 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   );
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 sm:bottom-8 sm:right-8">
+    <div className="pointer-events-none fixed inset-0 z-40">
       <style>{`
         @keyframes natAssistantFloat {
-          0%, 100% { transform: translateY(0) rotate(-1.5deg); }
-          50% { transform: translateY(-7px) rotate(1.8deg); }
+          0%, 100% { transform: translateY(0) rotate(-1.5deg) scale(var(--nat-scale, 1)); }
+          50% { transform: translateY(-8px) rotate(1.8deg) scale(var(--nat-scale, 1)); }
         }
 
         @keyframes natAssistantGlow {
-          0%, 100% { opacity: 0.45; transform: scale(0.96); }
-          50% { opacity: 0.9; transform: scale(1.06); }
+          0%, 100% { opacity: 0.38; transform: scale(0.94); }
+          50% { opacity: 0.78; transform: scale(1.04); }
         }
 
         @keyframes natAssistantSparkle {
-          0%, 100% { opacity: 0.28; transform: translateY(0) scale(0.82); }
-          48% { opacity: 1; transform: translateY(-8px) scale(1.18); }
+          0%, 100% { opacity: 0.18; transform: translateY(0) scale(0.78); }
+          48% { opacity: 0.9; transform: translateY(-8px) scale(1.12); }
         }
 
         @keyframes natAssistantNudge {
-          0%, 100% { transform: translateX(0); }
-          45% { transform: translateX(-2px); }
-          55% { transform: translateX(2px); }
+          0%, 100% { transform: translateX(0) rotate(-1.5deg) scale(var(--nat-scale, 1)); }
+          45% { transform: translateX(-2px) rotate(-3deg) scale(var(--nat-scale, 1)); }
+          55% { transform: translateX(2px) rotate(2.5deg) scale(var(--nat-scale, 1)); }
         }
 
         .nat-assistant-robot-image {
-          animation: natAssistantFloat 3.2s ease-in-out infinite;
+          animation: natAssistantFloat 3.4s ease-in-out infinite;
           transform-origin: 50% 82%;
-          filter: drop-shadow(0 18px 20px rgba(6, 78, 59, 0.26));
+          filter: drop-shadow(0 18px 20px rgba(6, 78, 59, 0.22)) drop-shadow(0 0 12px rgba(110, 231, 183, 0.2));
         }
 
         .nat-assistant-halo {
@@ -1004,7 +1156,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         }
 
         .nat-assistant-launch:hover .nat-assistant-robot-image {
-          animation: natAssistantFloat 1.7s ease-in-out infinite, natAssistantNudge 0.32s ease-in-out 1;
+          animation: natAssistantFloat 1.8s ease-in-out infinite, natAssistantNudge 0.36s ease-in-out 1;
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -1269,20 +1421,65 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       </Dialog>
 
       {!isOpen && (
-        <button
-          type="button"
-          onClick={() => setIsOpen(true)}
-          className="nat-assistant-launch pointer-events-auto fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-40 relative grid h-28 w-24 place-items-center bg-transparent p-0 text-left transition hover:-translate-y-1 sm:static sm:h-32 sm:w-28"
-          aria-label={isTH ? "เปิดแชทช่วยเหลือ" : "Open support chat"}
-          title={isTH ? "เปิด NAT AI ช่วยเหลือ" : "Open NAT AI assistant"}
+        <div
+          className="pointer-events-auto fixed z-40 h-44 w-36 transition-transform duration-150"
+          style={launcherStyle}
         >
-          <NatAssistantAvatar statusClass={natStatusTone} />
-          {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[11px] font-semibold text-white shadow-lg ring-2 ring-white dark:ring-slate-950">
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
-          )}
-        </button>
+          <div
+            className={`nat-assistant-speech absolute top-4 z-30 max-w-[190px] rounded-[1.15rem] border border-emerald-100 bg-white/94 px-3 py-2 text-[11px] font-semibold leading-4 text-emerald-900 shadow-[0_14px_34px_rgba(15,118,110,0.16)] backdrop-blur transition ${launcherSpeechSideClass} ${isDraggingLauncher ? "scale-95 opacity-65" : "opacity-100"}`}
+          >
+            <div className="flex items-start gap-2">
+              <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${natStatusTone}`} />
+              <span>{isDraggingLauncher ? (isTH ? "วางตรงนี้ได้เลยครับ" : "Drop me here.") : launcherSpeech}</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleLauncherClick}
+            onPointerDown={handleLauncherPointerDown}
+            onPointerMove={handleLauncherPointerMove}
+            onPointerUp={handleLauncherPointerUp}
+            onPointerCancel={handleLauncherPointerUp}
+            className={`nat-assistant-launch relative grid h-full w-full touch-none place-items-center bg-transparent p-0 text-left transition hover:-translate-y-1 ${isDraggingLauncher ? "cursor-grabbing" : "cursor-grab"}`}
+            aria-label={isTH ? "ลากหรือเปิด NAT AI ช่วยเหลือ" : "Drag or open NAT AI assistant"}
+            title={isTH ? "ลากเพื่อย้าย หรือคลิกเพื่อเปิด NAT AI" : "Drag to move, or click to open NAT AI"}
+          >
+            <NatAssistantAvatar statusClass={natStatusTone} />
+            {unreadCount > 0 && (
+              <span className="absolute right-2 top-4 inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[11px] font-semibold text-white shadow-lg ring-2 ring-white dark:ring-slate-950">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </button>
+
+          <div className="absolute -right-1 bottom-9 z-30 flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                updateLauncherScale(0.1);
+              }}
+              className="grid h-7 w-7 place-items-center rounded-full border border-emerald-100 bg-white/92 text-emerald-700 shadow-[0_8px_18px_rgba(15,118,110,0.14)] backdrop-blur transition hover:bg-emerald-50"
+              aria-label={isTH ? "ขยาย NAT AI" : "Enlarge NAT AI"}
+              title={isTH ? "ขยายตัว NAT" : "Enlarge NAT"}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                updateLauncherScale(-0.1);
+              }}
+              className="grid h-7 w-7 place-items-center rounded-full border border-emerald-100 bg-white/92 text-emerald-700 shadow-[0_8px_18px_rgba(15,118,110,0.14)] backdrop-blur transition hover:bg-emerald-50"
+              aria-label={isTH ? "ย่อ NAT AI" : "Shrink NAT AI"}
+              title={isTH ? "ย่อตัว NAT" : "Shrink NAT"}
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
