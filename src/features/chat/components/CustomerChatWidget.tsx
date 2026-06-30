@@ -16,7 +16,7 @@ import {
   UserRoundX,
   X,
 } from "lucide-react";
-import supportIcon from "@/assets/images/icon_support.png";
+import natAssistantImage from "@/assets/images/generated/nat_ai_assistant.png";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -218,26 +218,26 @@ function NatAssistantAvatar({
 }) {
   return (
     <div
-      className={`nat-assistant-avatar relative shrink-0 ${compact ? "h-12 w-12" : "h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]"}`}
+      className={`nat-assistant-avatar relative shrink-0 ${compact ? "h-14 w-14" : "h-24 w-20 sm:h-28 sm:w-24"}`}
       aria-hidden="true"
     >
-      <div className="absolute inset-[-10%] rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.28),rgba(34,211,238,0.12)_48%,transparent_72%)] blur-md" />
-      <div className="absolute inset-0 rounded-full border border-emerald-100 bg-white shadow-[0_16px_38px_rgba(15,118,110,0.20)]" />
-      <div className="absolute inset-[8%] overflow-hidden rounded-full bg-white">
-        <img
-          src={supportIcon}
-          alt=""
-          className="h-full w-full scale-[1.18] object-cover"
-          draggable={false}
-        />
-      </div>
+      <div className="nat-assistant-halo absolute inset-x-0 bottom-0 h-2/3 rounded-full bg-[radial-gradient(circle,rgba(110,231,183,0.46),rgba(125,211,252,0.24)_46%,rgba(251,207,232,0.18)_64%,transparent_78%)] blur-xl" />
+      <span className="nat-assistant-sparkle absolute left-0 top-3 z-20 h-2 w-2 rounded-full bg-pink-200 shadow-[0_0_14px_rgba(251,207,232,0.95)]" />
+      <span className="nat-assistant-sparkle nat-assistant-sparkle-delay absolute right-1 top-8 z-20 h-2.5 w-2.5 rounded-full bg-cyan-200 shadow-[0_0_14px_rgba(165,243,252,0.95)]" />
+      <span className="nat-assistant-sparkle nat-assistant-sparkle-late absolute bottom-6 left-2 z-20 h-1.5 w-1.5 rounded-full bg-emerald-200 shadow-[0_0_12px_rgba(167,243,208,0.95)]" />
+      <img
+        src={natAssistantImage}
+        alt=""
+        className={`nat-assistant-robot-image relative z-10 h-full w-full object-contain ${compact ? "scale-[1.35]" : "scale-[1.18]"}`}
+        draggable={false}
+      />
       {!compact && (
-        <div className="absolute -bottom-1 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-0.5 text-[10px] font-black tracking-wide text-emerald-700 shadow-sm">
+        <div className="absolute -bottom-0.5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[10px] font-black tracking-wide text-emerald-700 shadow-[0_8px_18px_rgba(15,118,110,0.16)] backdrop-blur">
           <Sparkles className="h-3 w-3" />
           NAT
         </div>
       )}
-      <div className="absolute -right-0.5 top-0.5 rounded-full bg-white p-0.5 shadow-sm">
+      <div className="absolute right-1 top-2 z-20 rounded-full bg-white p-0.5 shadow-sm">
         <span className={`block h-3 w-3 rounded-full ${statusClass}`} />
       </div>
     </div>
@@ -961,8 +961,8 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     <div className="pointer-events-none fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 sm:bottom-8 sm:right-8">
       <style>{`
         @keyframes natAssistantFloat {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-4px); }
+          0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+          50% { transform: translateY(-7px) rotate(1.8deg); }
         }
 
         @keyframes natAssistantGlow {
@@ -970,33 +970,60 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
           50% { opacity: 0.9; transform: scale(1.06); }
         }
 
-        .nat-assistant-avatar {
-          animation: natAssistantFloat 3.2s ease-in-out infinite;
+        @keyframes natAssistantSparkle {
+          0%, 100% { opacity: 0.28; transform: translateY(0) scale(0.82); }
+          48% { opacity: 1; transform: translateY(-8px) scale(1.18); }
         }
 
-        .nat-assistant-avatar::before {
-          content: "";
-          position: absolute;
-          inset: -8px;
-          border-radius: 9999px;
-          background: radial-gradient(circle, rgba(16, 185, 129, 0.22), transparent 66%);
+        @keyframes natAssistantNudge {
+          0%, 100% { transform: translateX(0); }
+          45% { transform: translateX(-2px); }
+          55% { transform: translateX(2px); }
+        }
+
+        .nat-assistant-robot-image {
+          animation: natAssistantFloat 3.2s ease-in-out infinite;
+          transform-origin: 50% 82%;
+          filter: drop-shadow(0 18px 20px rgba(6, 78, 59, 0.26));
+        }
+
+        .nat-assistant-halo {
           animation: natAssistantGlow 2.8s ease-in-out infinite;
         }
 
+        .nat-assistant-sparkle {
+          animation: natAssistantSparkle 2.5s ease-in-out infinite;
+        }
+
+        .nat-assistant-sparkle-delay {
+          animation-delay: 0.55s;
+        }
+
+        .nat-assistant-sparkle-late {
+          animation-delay: 1.1s;
+        }
+
+        .nat-assistant-launch:hover .nat-assistant-robot-image {
+          animation: natAssistantFloat 1.7s ease-in-out infinite, natAssistantNudge 0.32s ease-in-out 1;
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .nat-assistant-avatar,
-          .nat-assistant-avatar::before {
+          .nat-assistant-robot-image,
+          .nat-assistant-halo,
+          .nat-assistant-sparkle,
+          .nat-assistant-launch:hover .nat-assistant-robot-image {
             animation: none !important;
           }
         }
       `}</style>
       {isOpen && (
         <div className="pointer-events-auto fixed inset-x-0 bottom-0 top-0 flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-none border border-emerald-100 bg-white/98 shadow-[0_26px_70px_rgba(15,118,110,0.18)] backdrop-blur-xl sm:inset-x-auto sm:bottom-8 sm:right-8 sm:top-auto sm:h-[min(74vh,680px)] sm:w-[min(410px,calc(100vw-1.5rem))] sm:rounded-[1.75rem] dark:border-emerald-950 dark:bg-slate-950/98">
-          <div className="flex items-start justify-between border-b border-emerald-100 bg-gradient-to-r from-white via-emerald-50 to-cyan-50 px-3 py-3 sm:items-center sm:px-5 sm:py-4 dark:border-emerald-950 dark:from-slate-950 dark:via-emerald-950/30 dark:to-cyan-950/20">
+          <div className="relative flex items-start justify-between overflow-hidden border-b border-emerald-100 bg-gradient-to-r from-white via-emerald-50 to-cyan-50 px-3 py-3 sm:items-center sm:px-5 sm:py-4 dark:border-emerald-950 dark:from-slate-950 dark:via-emerald-950/30 dark:to-cyan-950/20">
+            <div className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-emerald-200/35 blur-3xl dark:bg-emerald-500/10" />
             <div className="min-w-0 flex items-start gap-3">
               <NatAssistantAvatar compact statusClass={natStatusTone} />
               <div className="min-w-0 flex-1">
-                <div className="line-clamp-2 text-base font-semibold leading-5 text-slate-900 sm:truncate sm:text-base dark:text-slate-100">
+                <div className="line-clamp-2 text-base font-black leading-5 text-slate-900 sm:truncate sm:text-base dark:text-slate-100">
                   {mode === "assistant" ? (isTH ? "NAT AI ช่วยเหลือ" : "NAT AI assistant") : isTH ? "แชทคุยกับเจ้าหน้าที่" : "Chat with support"}
                 </div>
                 <div className="line-clamp-2 pr-2 text-[12px] leading-5 text-slate-500 sm:text-xs dark:text-slate-400">
@@ -1245,14 +1272,11 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="pointer-events-auto fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 relative inline-flex items-center gap-3 rounded-full border border-emerald-100 bg-white/95 px-2.5 py-2 pr-4 text-left shadow-[0_18px_45px_rgba(15,118,110,0.22)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_22px_55px_rgba(15,118,110,0.26)] sm:static"
+          className="nat-assistant-launch pointer-events-auto fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-40 relative grid h-28 w-24 place-items-center bg-transparent p-0 text-left transition hover:-translate-y-1 sm:static sm:h-32 sm:w-28"
           aria-label={isTH ? "เปิดแชทช่วยเหลือ" : "Open support chat"}
+          title={isTH ? "เปิด NAT AI ช่วยเหลือ" : "Open NAT AI assistant"}
         >
           <NatAssistantAvatar statusClass={natStatusTone} />
-          <span className="hidden min-w-0 sm:block">
-            <span className="block text-sm font-black leading-tight text-slate-900 dark:text-slate-950">NAT AI</span>
-            <span className="block max-w-32 truncate text-[11px] font-medium text-emerald-700">{natStatusText}</span>
-          </span>
           {unreadCount > 0 && (
             <span className="absolute -right-1 -top-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[11px] font-semibold text-white shadow-lg ring-2 ring-white dark:ring-slate-950">
               {unreadCount > 99 ? "99+" : unreadCount}
