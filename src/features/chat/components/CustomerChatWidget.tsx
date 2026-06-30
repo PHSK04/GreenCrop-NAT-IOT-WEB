@@ -5,10 +5,8 @@ import {
   CalendarRange,
   Download,
   FileText,
-  Minus,
   MessageCircleMore,
   Pencil,
-  Plus,
   Reply,
   RotateCcw,
   Send,
@@ -37,6 +35,7 @@ import { useMachine } from "@/contexts/MachineContext";
 
 type CustomerChatWidgetProps = {
   language?: string;
+  currentPage?: string;
 };
 
 type AssistantMode = "assistant" | "human";
@@ -55,11 +54,8 @@ type AssistantMessage = {
 
 const POLL_MS = 4000;
 const LAUNCHER_POSITION_KEY = "nat_assistant_launcher_position";
-const LAUNCHER_SCALE_KEY = "nat_assistant_launcher_scale";
 const LAUNCHER_BASE_WIDTH = 144;
 const LAUNCHER_BASE_HEIGHT = 184;
-const LAUNCHER_MIN_SCALE = 0.85;
-const LAUNCHER_MAX_SCALE = 1.35;
 
 type LauncherPosition = {
   x: number;
@@ -161,23 +157,20 @@ const compareThreads = (left: ChatThread, right: ChatThread) => {
   return right.id - left.id;
 };
 
-const clampLauncherScale = (value: number) =>
-  Math.min(LAUNCHER_MAX_SCALE, Math.max(LAUNCHER_MIN_SCALE, Number(value.toFixed(2))));
-
-const getDefaultLauncherPosition = (scale = 1): LauncherPosition => {
+const getDefaultLauncherPosition = (): LauncherPosition => {
   if (typeof window === "undefined") return { x: 16, y: 360 };
   const margin = 12;
   return {
-    x: Math.max(margin, window.innerWidth - LAUNCHER_BASE_WIDTH * scale - margin),
-    y: Math.max(margin, window.innerHeight - LAUNCHER_BASE_HEIGHT * scale - 78),
+    x: Math.max(margin, window.innerWidth - LAUNCHER_BASE_WIDTH - margin),
+    y: Math.max(margin, window.innerHeight - LAUNCHER_BASE_HEIGHT - 78),
   };
 };
 
-const clampLauncherPosition = (position: LauncherPosition, scale = 1): LauncherPosition => {
+const clampLauncherPosition = (position: LauncherPosition): LauncherPosition => {
   if (typeof window === "undefined") return position;
   const margin = 8;
-  const maxX = Math.max(margin, window.innerWidth - LAUNCHER_BASE_WIDTH * scale - margin);
-  const maxY = Math.max(margin, window.innerHeight - LAUNCHER_BASE_HEIGHT * scale - margin);
+  const maxX = Math.max(margin, window.innerWidth - LAUNCHER_BASE_WIDTH - margin);
+  const maxY = Math.max(margin, window.innerHeight - LAUNCHER_BASE_HEIGHT - margin);
   return {
     x: Math.min(maxX, Math.max(margin, position.x)),
     y: Math.min(maxY, Math.max(margin, position.y)),
@@ -273,7 +266,7 @@ function NatAssistantAvatar({
   );
 }
 
-export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps) {
+export function CustomerChatWidget({ language = "TH", currentPage = "Dashboard" }: CustomerChatWidgetProps) {
   const isTH = language === "TH";
   const activeDeviceId = useActiveDeviceId();
   const {
@@ -310,7 +303,6 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   const [isAdminTyping, setIsAdminTyping] = useState(false);
   const [typingAdminName, setTypingAdminName] = useState("");
   const [launcherPosition, setLauncherPosition] = useState<LauncherPosition | null>(null);
-  const [launcherScale, setLauncherScale] = useState(1);
   const [isDraggingLauncher, setIsDraggingLauncher] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
   const assistantListRef = useRef<HTMLDivElement | null>(null);
@@ -521,10 +513,6 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   }, []);
 
   useEffect(() => {
-    const savedScale = Number(localStorage.getItem(LAUNCHER_SCALE_KEY) || "1");
-    const nextScale = Number.isFinite(savedScale) ? clampLauncherScale(savedScale) : 1;
-    setLauncherScale(nextScale);
-
     try {
       const rawPosition = localStorage.getItem(LAUNCHER_POSITION_KEY);
       const parsedPosition = rawPosition ? JSON.parse(rawPosition) as LauncherPosition : null;
@@ -533,14 +521,14 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
         Number.isFinite(parsedPosition.x) &&
         Number.isFinite(parsedPosition.y)
       ) {
-        setLauncherPosition(clampLauncherPosition(parsedPosition, nextScale));
+        setLauncherPosition(clampLauncherPosition(parsedPosition));
         return;
       }
     } catch {
       localStorage.removeItem(LAUNCHER_POSITION_KEY);
     }
 
-    setLauncherPosition(getDefaultLauncherPosition(nextScale));
+    setLauncherPosition(getDefaultLauncherPosition());
   }, []);
 
   useEffect(() => {
@@ -549,17 +537,12 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
   }, [launcherPosition]);
 
   useEffect(() => {
-    localStorage.setItem(LAUNCHER_SCALE_KEY, String(launcherScale));
-    setLauncherPosition((current) => current ? clampLauncherPosition(current, launcherScale) : current);
-  }, [launcherScale]);
-
-  useEffect(() => {
     const handleResize = () => {
-      setLauncherPosition((current) => clampLauncherPosition(current || getDefaultLauncherPosition(launcherScale), launcherScale));
+      setLauncherPosition((current) => clampLauncherPosition(current || getDefaultLauncherPosition()));
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [launcherScale]);
+  }, []);
 
   useEffect(() => {
     if (isOpen && mode === "human" && thread) return;
@@ -676,7 +659,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
       {
         id: `ai-free-${Date.now()}`,
         sender: "ai",
-        text: "ผมแนะนำให้เริ่มจากตรวจอุปกรณ์, เครือข่าย, และลองรีเฟรชระบบก่อนครับ ถ้ายังไม่หาย สามารถกดคุยกับเจ้าหน้าที่เพื่อส่งต่อเคสได้ทันที",
+        text: buildAssistantFreeAnswer(body),
         canEscalate: true,
       },
     ]);
@@ -804,6 +787,35 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
 
     return lines.join("\n");
   };
+  const buildAssistantFreeAnswer = (body: string) => {
+    const normalizedBody = body.toLowerCase();
+    const pageContext = isTH
+      ? `ตอนนี้คุณอยู่หน้า ${currentPage} และสถานะเครื่องคือ "${natStatusText}"`
+      : `You are on ${currentPage}, and the machine status is "${natStatusText}".`;
+
+    if (/status|สถานะ|เครื่อง|online|offline|mqtt|บอร์ด|สัญญาณ/.test(normalizedBody)) {
+      return `${pageContext}\n\n${buildMachineStatusAnswer()}`;
+    }
+
+    const matchedFlowKey = Object.entries(assistantFlows).find(([key, flow]) => {
+      const title = flow.title.toLowerCase();
+      return normalizedBody.includes(key) || normalizedBody.includes(title);
+    })?.[0] as keyof typeof assistantFlows | undefined;
+
+    if (matchedFlowKey) {
+      return `${pageContext}\n\n${assistantFlows[matchedFlowKey].answer}`;
+    }
+
+    if (/alarm|alert|เตือน|แดง|lock|ล็อก|น้ำ|float|ph|ec/.test(normalizedBody)) {
+      return isTH
+        ? `${pageContext}\n\nผมแนะนำให้ตรวจค่าที่เกี่ยวข้องก่อนครับ: lock, ไฟเตือน, float alarm, pH/EC และสถานะปั๊ม ถ้าค่ายังผิดปกติให้กดตรวจสถานะเครื่อง หรือส่งต่อเจ้าหน้าที่ได้ทันที`
+        : `${pageContext}\n\nCheck lock, warning light, float alarm, pH/EC, and pump state first. If values remain abnormal, run machine status or hand off to support.`;
+    }
+
+    return isTH
+      ? `${pageContext}\n\nผมช่วยไล่ปัญหาให้ได้ครับ บอกอาการที่เห็น เช่น เครื่องไม่ออนไลน์, ข้อมูลไม่อัปเดต, เชื่อมต่อไม่ได้, หรือมีสัญญาณเตือน แล้วผมจะสรุปขั้นตอนถัดไปให้`
+      : `${pageContext}\n\nTell me what you see, such as offline device, stale data, pairing issue, or alert signal, and I will suggest the next steps.`;
+  };
   const statusToneClass =
     (selectedThread || thread)?.status === "closed"
       ? "bg-slate-400"
@@ -840,17 +852,11 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     ? {
         left: `${launcherPosition.x}px`,
         top: `${launcherPosition.y}px`,
-        transform: `scale(${launcherScale})`,
       }
     : {
         right: "0.5rem",
         bottom: "calc(4.5rem + env(safe-area-inset-bottom))",
-        transform: `scale(${launcherScale})`,
       };
-
-  const updateLauncherScale = (delta: number) => {
-    setLauncherScale((current) => clampLauncherScale(current + delta));
-  };
 
   const handleLauncherPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
@@ -877,7 +883,7 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
     setLauncherPosition(clampLauncherPosition({
       x: event.clientX - drag.offsetX,
       y: event.clientY - drag.offsetY,
-    }, launcherScale));
+    }));
   };
 
   const handleLauncherPointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -1452,33 +1458,6 @@ export function CustomerChatWidget({ language = "TH" }: CustomerChatWidgetProps)
               </span>
             )}
           </button>
-
-          <div className="absolute -right-1 bottom-9 z-30 flex flex-col gap-1">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                updateLauncherScale(0.1);
-              }}
-              className="grid h-7 w-7 place-items-center rounded-full border border-emerald-100 bg-white/92 text-emerald-700 shadow-[0_8px_18px_rgba(15,118,110,0.14)] backdrop-blur transition hover:bg-emerald-50"
-              aria-label={isTH ? "ขยาย NAT AI" : "Enlarge NAT AI"}
-              title={isTH ? "ขยายตัว NAT" : "Enlarge NAT"}
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                updateLauncherScale(-0.1);
-              }}
-              className="grid h-7 w-7 place-items-center rounded-full border border-emerald-100 bg-white/92 text-emerald-700 shadow-[0_8px_18px_rgba(15,118,110,0.14)] backdrop-blur transition hover:bg-emerald-50"
-              aria-label={isTH ? "ย่อ NAT AI" : "Shrink NAT AI"}
-              title={isTH ? "ย่อตัว NAT" : "Shrink NAT"}
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </button>
-          </div>
         </div>
       )}
     </div>
