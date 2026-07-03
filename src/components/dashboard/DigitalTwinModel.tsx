@@ -138,16 +138,16 @@ export function DigitalTwinModel({
           <Pipe on={false} vertical color={C.green} height={14} />
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "nowrap", gap: 0, overflow: "visible" }}>
           <TankCard pct={tank1Level} markOn={liveSignal && wls1} name={isTH ? "ถัง 1" : "Tank 1"} sub="Raw Water" color={C.cyan} />
-          <div style={{ display: "flex", flex: "0 0 118px", flexDirection: "column", alignItems: "center", gap: 8, marginTop: -70 }}>
-            <Pipe on={p1On} horizontal color={C.cyan} />
+          <div style={{ display: "flex", flex: "1 1 210px", minWidth: 180, maxWidth: 260, flexDirection: "column", alignItems: "center", gap: 8, marginTop: -70, overflow: "visible" }}>
+            <Pipe on={p1On} horizontal color={C.cyan} extend />
             <PumpUnit size={70} on={p1On} color={C.cyan} label="P1 - Auto" />
           </div>
           <TankCard pct={tank2Level} markOn={liveSignal && wls2} name={isTH ? "ถัง 2" : "Tank 2"} sub="Preparation" color="#38bdf8" />
-          <div style={{ display: "flex", flex: "0 0 118px", flexDirection: "column", alignItems: "center", gap: 8, marginTop: -70 }}>
+          <div style={{ display: "flex", flex: "1 1 210px", minWidth: 180, maxWidth: 260, flexDirection: "column", alignItems: "center", gap: 8, marginTop: -70, overflow: "visible" }}>
             <Pipe on={p2On} vertical color={C.green} height={24} />
-            <Pipe on={p2On} horizontal color={C.green} />
+            <Pipe on={p2On} horizontal color={C.green} extend />
             <PumpUnit size={70} on={p2On} color={C.green} label="P2 - Manual" />
           </div>
         </div>
@@ -511,15 +511,77 @@ function ControlButton({ color, label, disabled }: { color: "green" | "red"; lab
   );
 }
 
-function Pipe({ on, color, horizontal, vertical, height }: { on: boolean; color: string; horizontal?: boolean; vertical?: boolean; height?: number }) {
+function Pipe({ on, color, horizontal, vertical, height, extend }: { on: boolean; color: string; horizontal?: boolean; vertical?: boolean; height?: number; extend?: boolean }) {
+  const pipeShell = {
+    background:
+      "linear-gradient(180deg,#f8fafc 0%,#cbd5e1 32%,#94a3b8 52%,#e2e8f0 100%)",
+    border: "1px solid rgba(100,116,139,.55)",
+    boxShadow:
+      "inset 0 1px 2px rgba(255,255,255,.85), inset 0 -2px 3px rgba(15,23,42,.18), 0 4px 10px rgba(15,23,42,.12)",
+    overflow: "hidden",
+    position: "relative" as const,
+  };
+
   if (vertical) {
     return (
-      <div style={{ background: on ? `linear-gradient(180deg,${color},transparent)` : "repeating-linear-gradient(180deg,rgba(15,23,42,.1) 0 5px,transparent 5px 10px)", borderRadius: 2, boxShadow: on ? `0 0 8px ${color}88` : "none", height: height || 14, width: 3 }} />
+      <div
+        style={{
+          ...pipeShell,
+          borderRadius: 999,
+          height: height || 28,
+          width: 14,
+        }}
+      >
+        <div
+          style={{
+            animation: on ? "dtSlide 1s linear infinite" : "none",
+            background: on
+              ? `linear-gradient(180deg,transparent 0%,${color} 22%,${color} 78%,transparent 100%)`
+              : "linear-gradient(180deg,rgba(148,163,184,.18),rgba(226,232,240,.22))",
+            backgroundSize: on ? "100% 42px" : undefined,
+            borderRadius: 999,
+            bottom: 3,
+            boxShadow: on ? `0 0 10px ${color}88` : "none",
+            left: "50%",
+            position: "absolute",
+            top: 3,
+            transform: "translateX(-50%)",
+            width: 6,
+          }}
+        />
+      </div>
     );
   }
 
   return (
-    <div style={{ animation: on ? "dtSlide 1s linear infinite" : "none", background: on ? `linear-gradient(90deg,transparent,${color},transparent)` : "repeating-linear-gradient(90deg,rgba(15,23,42,.1) 0 7px,transparent 7px 14px)", backgroundSize: on ? "55% 100%" : undefined, borderRadius: 2, height: 3, width: horizontal ? "100%" : 72 }} />
+    <div
+      style={{
+        ...pipeShell,
+        borderRadius: 999,
+        height: 14,
+        marginLeft: extend ? -24 : 0,
+        marginRight: extend ? -24 : 0,
+        width: horizontal ? (extend ? "calc(100% + 48px)" : "100%") : 90,
+      }}
+    >
+      <div
+        style={{
+          animation: on ? "dtSlide 1s linear infinite" : "none",
+          background: on
+            ? `linear-gradient(90deg,transparent 0%,${color} 22%,${color} 78%,transparent 100%)`
+            : "linear-gradient(90deg,rgba(148,163,184,.18),rgba(226,232,240,.22))",
+          backgroundSize: on ? "56px 100%" : undefined,
+          borderRadius: 999,
+          boxShadow: on ? `0 0 10px ${color}88` : "none",
+          height: 6,
+          left: 3,
+          position: "absolute",
+          right: 3,
+          top: "50%",
+          transform: "translateY(-50%)",
+        }}
+      />
+    </div>
   );
 }
 
@@ -538,7 +600,7 @@ function PumpUnit({ size, on, color, label }: { size: number; on: boolean; color
             <stop offset="1" stopColor="#334155" />
           </linearGradient>
         </defs>
-        <rect x="6" y="34" width="14" height="9" rx="2.5" fill="url(#dtMGd)" stroke="#94a3b8" strokeWidth=".8" />
+        <rect x="44" y="34" width="14" height="9" rx="2.5" fill="url(#dtMGd)" stroke="#94a3b8" strokeWidth=".8" />
         <rect x="14" y="17" width="36" height="32" rx="11" fill="url(#dtMG)" stroke="#cbd5e1" strokeWidth="1.1" />
         <rect x="22" y="5" width="20" height="14" rx="5" fill="url(#dtMG)" stroke="#cbd5e1" strokeWidth="1" />
         <circle cx="32" cy="35" r="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.3" />
