@@ -528,6 +528,132 @@ async function initDb() {
         `);
         console.log('✅ Chat messages table ready');
 
+        // Create NAT AI Chat Session Tables
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ai_chat_sessions' and xtype='U')
+            BEGIN
+                CREATE TABLE ai_chat_sessions (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    user_name NVARCHAR(100) NULL,
+                    user_email NVARCHAR(100) NULL,
+                    device_id NVARCHAR(64) NULL,
+                    title NVARCHAR(200) NULL,
+                    status NVARCHAR(30) DEFAULT 'active',
+                    escalated_thread_id INT NULL,
+                    last_message_at DATETIME DEFAULT GETDATE(),
+                    last_message_preview NVARCHAR(500) NULL,
+                    created_at DATETIME DEFAULT GETDATE(),
+                    updated_at DATETIME DEFAULT GETDATE()
+                );
+                CREATE INDEX ix_ai_chat_sessions_user_device ON ai_chat_sessions(user_id, device_id, status, updated_at);
+                CREATE INDEX ix_ai_chat_sessions_escalated ON ai_chat_sessions(escalated_thread_id);
+            END
+            ELSE
+            BEGIN
+                IF COL_LENGTH('ai_chat_sessions', 'user_name') IS NULL
+                    ALTER TABLE ai_chat_sessions ADD user_name NVARCHAR(100) NULL;
+                IF COL_LENGTH('ai_chat_sessions', 'user_email') IS NULL
+                    ALTER TABLE ai_chat_sessions ADD user_email NVARCHAR(100) NULL;
+                IF COL_LENGTH('ai_chat_sessions', 'device_id') IS NULL
+                    ALTER TABLE ai_chat_sessions ADD device_id NVARCHAR(64) NULL;
+                IF COL_LENGTH('ai_chat_sessions', 'title') IS NULL
+                    ALTER TABLE ai_chat_sessions ADD title NVARCHAR(200) NULL;
+                IF COL_LENGTH('ai_chat_sessions', 'status') IS NULL
+                    ALTER TABLE ai_chat_sessions ADD status NVARCHAR(30) DEFAULT 'active';
+                IF COL_LENGTH('ai_chat_sessions', 'escalated_thread_id') IS NULL
+                    ALTER TABLE ai_chat_sessions ADD escalated_thread_id INT NULL;
+                IF COL_LENGTH('ai_chat_sessions', 'last_message_at') IS NULL
+                    ALTER TABLE ai_chat_sessions ADD last_message_at DATETIME DEFAULT GETDATE();
+                IF COL_LENGTH('ai_chat_sessions', 'last_message_preview') IS NULL
+                    ALTER TABLE ai_chat_sessions ADD last_message_preview NVARCHAR(500) NULL;
+                IF COL_LENGTH('ai_chat_sessions', 'created_at') IS NULL
+                    ALTER TABLE ai_chat_sessions ADD created_at DATETIME DEFAULT GETDATE();
+                IF COL_LENGTH('ai_chat_sessions', 'updated_at') IS NULL
+                    ALTER TABLE ai_chat_sessions ADD updated_at DATETIME DEFAULT GETDATE();
+            END
+
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ai_chat_messages' and xtype='U')
+            BEGIN
+                CREATE TABLE ai_chat_messages (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    session_id INT NOT NULL,
+                    sender_role NVARCHAR(20) NOT NULL,
+                    body NVARCHAR(MAX) NOT NULL,
+                    intent NVARCHAR(80) NULL,
+                    page_context NVARCHAR(120) NULL,
+                    machine_status NVARCHAR(120) NULL,
+                    should_escalate BIT DEFAULT 0,
+                    created_at DATETIME DEFAULT GETDATE()
+                );
+                CREATE INDEX ix_ai_chat_messages_session_created ON ai_chat_messages(session_id, created_at, id);
+            END
+            ELSE
+            BEGIN
+                IF COL_LENGTH('ai_chat_messages', 'intent') IS NULL
+                    ALTER TABLE ai_chat_messages ADD intent NVARCHAR(80) NULL;
+                IF COL_LENGTH('ai_chat_messages', 'page_context') IS NULL
+                    ALTER TABLE ai_chat_messages ADD page_context NVARCHAR(120) NULL;
+                IF COL_LENGTH('ai_chat_messages', 'machine_status') IS NULL
+                    ALTER TABLE ai_chat_messages ADD machine_status NVARCHAR(120) NULL;
+                IF COL_LENGTH('ai_chat_messages', 'should_escalate') IS NULL
+                    ALTER TABLE ai_chat_messages ADD should_escalate BIT DEFAULT 0;
+                IF COL_LENGTH('ai_chat_messages', 'created_at') IS NULL
+                    ALTER TABLE ai_chat_messages ADD created_at DATETIME DEFAULT GETDATE();
+            END
+        `);
+        console.log('✅ NAT AI chat tables ready');
+
+        // Create per-tenant AI/ML learning samples table.
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ai_sensor_samples' and xtype='U')
+            BEGIN
+                CREATE TABLE ai_sensor_samples (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    tenant_id NVARCHAR(64) NOT NULL,
+                    user_id INT NULL,
+                    device_id NVARCHAR(64) NULL,
+                    sensor_data_id INT NULL,
+                    sample_source NVARCHAR(32) DEFAULT 'sensor',
+                    feature_json NVARCHAR(MAX) NOT NULL,
+                    label NVARCHAR(40) NOT NULL,
+                    risk_score FLOAT DEFAULT 0,
+                    action_hint NVARCHAR(80) NULL,
+                    captured_at DATETIME DEFAULT GETDATE(),
+                    created_at DATETIME DEFAULT GETDATE()
+                );
+                CREATE INDEX ix_ai_sensor_samples_tenant_device_time ON ai_sensor_samples(tenant_id, device_id, captured_at);
+                CREATE INDEX ix_ai_sensor_samples_user_time ON ai_sensor_samples(user_id, captured_at);
+                CREATE UNIQUE INDEX ux_ai_sensor_samples_sensor_data_id ON ai_sensor_samples(sensor_data_id) WHERE sensor_data_id IS NOT NULL;
+            END
+            ELSE
+            BEGIN
+                IF COL_LENGTH('ai_sensor_samples', 'tenant_id') IS NULL
+                    ALTER TABLE ai_sensor_samples ADD tenant_id NVARCHAR(64) NULL;
+                IF COL_LENGTH('ai_sensor_samples', 'user_id') IS NULL
+                    ALTER TABLE ai_sensor_samples ADD user_id INT NULL;
+                IF COL_LENGTH('ai_sensor_samples', 'device_id') IS NULL
+                    ALTER TABLE ai_sensor_samples ADD device_id NVARCHAR(64) NULL;
+                IF COL_LENGTH('ai_sensor_samples', 'sensor_data_id') IS NULL
+                    ALTER TABLE ai_sensor_samples ADD sensor_data_id INT NULL;
+                IF COL_LENGTH('ai_sensor_samples', 'sample_source') IS NULL
+                    ALTER TABLE ai_sensor_samples ADD sample_source NVARCHAR(32) DEFAULT 'sensor';
+                IF COL_LENGTH('ai_sensor_samples', 'feature_json') IS NULL
+                    ALTER TABLE ai_sensor_samples ADD feature_json NVARCHAR(MAX) NULL;
+                IF COL_LENGTH('ai_sensor_samples', 'label') IS NULL
+                    ALTER TABLE ai_sensor_samples ADD label NVARCHAR(40) NULL;
+                IF COL_LENGTH('ai_sensor_samples', 'risk_score') IS NULL
+                    ALTER TABLE ai_sensor_samples ADD risk_score FLOAT DEFAULT 0;
+                IF COL_LENGTH('ai_sensor_samples', 'action_hint') IS NULL
+                    ALTER TABLE ai_sensor_samples ADD action_hint NVARCHAR(80) NULL;
+                IF COL_LENGTH('ai_sensor_samples', 'captured_at') IS NULL
+                    ALTER TABLE ai_sensor_samples ADD captured_at DATETIME DEFAULT GETDATE();
+                IF COL_LENGTH('ai_sensor_samples', 'created_at') IS NULL
+                    ALTER TABLE ai_sensor_samples ADD created_at DATETIME DEFAULT GETDATE();
+            END
+        `);
+        console.log('✅ NAT AI sensor learning table ready');
+
 
     } catch (err) {
         console.error('❌ Error initializing database tables:', err);

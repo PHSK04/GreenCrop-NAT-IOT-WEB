@@ -10,6 +10,8 @@ const https = require('https');
 const crypto = require('crypto');
 const { startMqttListener, getMqttListenerStatus } = require('./mqtt_listener');
 const { parseUserAgent, getClientIP } = require('./deviceDetector');
+const { backfillTenantSensorSamples, getTenantLearningSummary, recordAiSensorSample } = require('./services/ai_training');
+const { OPENAI_MAX_OUTPUT_TOKENS, buildNatAiContext, generateNatAiReply, saveAiExchange } = require('./services/nat_ai_chat');
 
 // Start MQTT Listener for IoT Data Recording
 startMqttListener();
@@ -1443,6 +1445,84 @@ function mapChatMessage(row) {
     };
 }
 
+function mapAiChatSession(row) {
+    if (!row) return null;
+    return {
+        id: row.id,
+        user_id: row.user_id,
+        user_name: row.user_name,
+        user_email: row.user_email,
+        device_id: row.device_id,
+        title: row.title,
+        status: row.status,
+        escalated_thread_id: row.escalated_thread_id,
+        last_message_at: row.last_message_at,
+        last_message_preview: row.last_message_preview,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+    };
+}
+
+function mapAiChatMessage(row) {
+    if (!row) return null;
+    return {
+        id: row.id,
+        session_id: row.session_id,
+        sender_role: row.sender_role,
+        body: row.body,
+        intent: row.intent,
+        page_context: row.page_context,
+        machine_status: row.machine_status,
+        should_escalate: Boolean(row.should_escalate),
+        created_at: row.created_at,
+    };
+}
+
+async function ensureAiChatSessionForUser(user, deviceId = null) {
+    const userId = Number(user?.id || 0);
+    if (!userId) throw new Error('User id is required for NAT AI chat');
+
+    const normalizedDeviceId = String(deviceId || '').trim() || null;
+    const existing = await db.get(
+        `SELECT TOP 1 *
+         FROM ai_chat_sessions
+         WHERE user_id = ?
+           AND COALESCE(device_id, '') = COALESCE(?, '')
+           AND status = 'active'
+         ORDER BY updated_at DESC, id DESC`,
+        [userId, normalizedDeviceId]
+    );
+
+    if (existing) return mapAiChatSession(existing);
+
+    const now = new Date();
+    const userName = String(user?.name || user?.email || `User ${userId}`).trim();
+    const userEmail = String(user?.email || '').trim().toLowerCase() || null;
+    const title = normalizedDeviceId ? `NAT AI for ${normalizedDeviceId}` : 'NAT AI Assistant';
+    const created = await db.run(
+        `INSERT INTO ai_chat_sessions (
+            user_id, user_name, user_email, device_id, title, status,
+            last_message_at, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
+        [userId, userName, userEmail, normalizedDeviceId, title, now, now, now]
+    );
+
+    const session = await db.get("SELECT * FROM ai_chat_sessions WHERE id = ?", [created.id]);
+    return mapAiChatSession(session);
+}
+
+async function loadAiChatMessages(sessionId, limit = 80) {
+    const safeLimit = Math.max(1, Math.min(200, Number(limit) || 80));
+    const rows = await db.all(
+        `SELECT TOP ${safeLimit} *
+         FROM ai_chat_messages
+         WHERE session_id = ?
+         ORDER BY created_at DESC, id DESC`,
+        [sessionId]
+    );
+    return rows.reverse().map(mapAiChatMessage);
+}
+
 function getChatViewerRole(req) {
     return String(req?.user?.role || '').toLowerCase() === 'admin' ? 'admin' : 'user';
 }
@@ -1748,6 +1828,273 @@ async function loadChatMessagesForThreadIds(threadIds, viewerRole, limit = 500, 
 
     return rows.reverse().map(mapChatMessage);
 }
+
+// --- NAT AI Chat APIs ---
+app.get('/api/ai-chat/session/me', async (req, res) => {
+    try {
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const session = await ensureAiChatSessionForUser(req.user, req.query.deviceId);
+        const messages = await loadAiChatMessages(session.id, req.query.limit);
+        res.json({ session, messages });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to load NAT AI chat' });
+    }
+});
+
+app.post('/api/ai-chat/session/me/messages', async (req, res) => {
+    try {
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const {
+            deviceId,
+            userMessage,
+            aiMessage,
+            currentPage,
+            machineStatus,
+            intent,
+            shouldEscalate,
+        } = req.body || {};
+
+        const userText = String(userMessage || '').trim();
+        const aiText = String(aiMessage || '').trim();
+        if (!userText || !aiText) {
+            return res.status(400).json({ error: 'userMessage and aiMessage are required' });
+        }
+
+        const session = await ensureAiChatSessionForUser(req.user, deviceId);
+        const now = new Date();
+        await db.run(
+            `INSERT INTO ai_chat_messages (
+                session_id, sender_role, body, intent, page_context, machine_status,
+                should_escalate, created_at
+             ) VALUES (?, 'user', ?, ?, ?, ?, ?, ?)`,
+            [
+                session.id,
+                userText,
+                intent || null,
+                currentPage || null,
+                machineStatus || null,
+                false,
+                now,
+            ]
+        );
+        await db.run(
+            `INSERT INTO ai_chat_messages (
+                session_id, sender_role, body, intent, page_context, machine_status,
+                should_escalate, created_at
+             ) VALUES (?, 'ai', ?, ?, ?, ?, ?, ?)`,
+            [
+                session.id,
+                aiText,
+                intent || null,
+                currentPage || null,
+                machineStatus || null,
+                shouldEscalate ? 1 : 0,
+                new Date(now.getTime() + 1),
+            ]
+        );
+        await db.run(
+            `UPDATE ai_chat_sessions
+             SET last_message_at = ?,
+                 last_message_preview = ?,
+                 updated_at = ?
+             WHERE id = ?`,
+            [now, aiText.slice(0, 400), now, session.id]
+        );
+
+        const updatedSession = await db.get("SELECT * FROM ai_chat_sessions WHERE id = ?", [session.id]);
+        const messages = await loadAiChatMessages(session.id, 80);
+        res.json({ session: mapAiChatSession(updatedSession), messages });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to save NAT AI chat' });
+    }
+});
+
+app.post('/api/ai-chat/session/me/respond', async (req, res) => {
+    try {
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const {
+            deviceId,
+            userMessage,
+            fallbackAiMessage,
+            currentPage,
+            machineStatus,
+            intent,
+            shouldEscalate,
+        } = req.body || {};
+
+        const userText = String(userMessage || '').trim();
+        const fallbackText = String(fallbackAiMessage || '').trim() ||
+            (String(req.user?.language || '').toUpperCase() === 'EN'
+                ? 'I need a little more information. What symptom do you see on the machine right now?'
+                : 'ขอข้อมูลเพิ่มนิดหนึ่งครับ ตอนนี้อาการที่เห็นบนเครื่องคืออะไร');
+
+        if (!userText) {
+            return res.status(400).json({ error: 'userMessage is required' });
+        }
+
+        const session = await ensureAiChatSessionForUser(req.user, deviceId);
+        const context = await buildNatAiContext({
+            req,
+            db,
+            session,
+            userMessage: userText,
+            options: {
+                deviceId,
+                currentPage,
+                machineStatus,
+            },
+            defaultTenantId: DEFAULT_TENANT_ID,
+            getSensorTenantCandidates,
+            loadLatestSensorRows,
+            loadSensorHistoryRows,
+            loadAiChatMessages,
+            getTenantLearningSummary,
+        });
+        const generated = await generateNatAiReply(context, fallbackText);
+        const aiText = generated.text;
+
+        await saveAiExchange(db, {
+            sessionId: session.id,
+            userText,
+            aiText,
+            intent,
+            currentPage,
+            machineStatus,
+            shouldEscalate,
+        });
+
+        const updatedSession = await db.get("SELECT * FROM ai_chat_sessions WHERE id = ?", [session.id]);
+        const messages = await loadAiChatMessages(session.id, 80);
+        res.json({
+            session: mapAiChatSession(updatedSession),
+            messages,
+            provider: generated.provider,
+            controller_intent: generated.intent,
+            controller_risk: generated.risk,
+            controller_actions: generated.actions,
+            max_output_tokens: OPENAI_MAX_OUTPUT_TOKENS,
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to generate NAT AI reply' });
+    }
+});
+
+app.delete('/api/ai-chat/session/me/messages', async (req, res) => {
+    try {
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const session = await ensureAiChatSessionForUser(req.user, req.query.deviceId);
+        const now = new Date();
+        await db.run("DELETE FROM ai_chat_messages WHERE session_id = ?", [session.id]);
+        await db.run(
+            `UPDATE ai_chat_sessions
+             SET last_message_at = ?, last_message_preview = NULL, updated_at = ?
+             WHERE id = ?`,
+            [now, now, session.id]
+        );
+        const updatedSession = await db.get("SELECT * FROM ai_chat_sessions WHERE id = ?", [session.id]);
+        res.json({ session: mapAiChatSession(updatedSession), messages: [] });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to reset NAT AI chat' });
+    }
+});
+
+app.get('/api/ai/sensor-learning/me', async (req, res) => {
+    try {
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const tenantId = String(req.tenant || req.user.tenant_id || req.user.id);
+        const deviceId = req.query.deviceId ? String(req.query.deviceId).trim().toUpperCase() : '';
+        const limit = parsePositiveInt(req.query.limit, 200, 1, 1000);
+
+        let summary = await getTenantLearningSummary(db, { tenantId, deviceId, limit });
+        let backfill = { scanned: 0, captured: 0 };
+        const shouldBackfill =
+            String(req.query.backfill || 'auto').toLowerCase() !== 'false' &&
+            Number(summary.total_samples || 0) === 0;
+
+        if (shouldBackfill) {
+            backfill = await backfillTenantSensorSamples(db, {
+                tenantId,
+                userId: req.user.id,
+                deviceId,
+                limit: parsePositiveInt(req.query.backfillLimit, 1000, 1, 5000),
+            });
+            summary = await getTenantLearningSummary(db, { tenantId, deviceId, limit });
+        }
+
+        res.json({
+            ...summary,
+            backfill,
+            isolation: {
+                mode: 'tenant-user-bound',
+                tenant_id: tenantId,
+                user_id: req.user.id,
+                note: 'This endpoint only reads samples where tenant_id matches the authenticated user context.',
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to load AI learning data' });
+    }
+});
+
+app.post('/api/ai/sensor-learning/me/backfill', async (req, res) => {
+    try {
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const tenantId = String(req.tenant || req.user.tenant_id || req.user.id);
+        const deviceId = req.body?.deviceId ? String(req.body.deviceId).trim().toUpperCase() : '';
+        const limit = parsePositiveInt(req.body?.limit, 1000, 1, 5000);
+        const backfill = await backfillTenantSensorSamples(db, {
+            tenantId,
+            userId: req.user.id,
+            deviceId,
+            limit,
+        });
+        const summary = await getTenantLearningSummary(db, { tenantId, deviceId, limit: 200 });
+        res.json({
+            ...summary,
+            backfill,
+            isolation: {
+                mode: 'tenant-user-bound',
+                tenant_id: tenantId,
+                user_id: req.user.id,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to backfill AI learning data' });
+    }
+});
+
+app.get('/api/admin/ai-chat/sessions', requireAdmin, async (req, res) => {
+    try {
+        const userId = Number(req.query.userId || 0);
+        const params = [];
+        const where = [];
+        if (userId > 0) {
+            where.push('user_id = ?');
+            params.push(userId);
+        }
+        const rows = await db.all(
+            `SELECT TOP 100 *
+             FROM ai_chat_sessions
+             ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+             ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, id DESC`,
+            params
+        );
+        res.json({ sessions: rows.map(mapAiChatSession) });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to load NAT AI sessions' });
+    }
+});
+
+app.get('/api/admin/ai-chat/sessions/:sessionId/messages', requireAdmin, async (req, res) => {
+    try {
+        const session = await db.get("SELECT * FROM ai_chat_sessions WHERE id = ?", [req.params.sessionId]);
+        if (!session) return res.status(404).json({ error: 'NAT AI session not found' });
+        const messages = await loadAiChatMessages(session.id, req.query.limit || 200);
+        res.json({ session: mapAiChatSession(session), messages });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to load NAT AI messages' });
+    }
+});
 
 // --- Chat APIs ---
 app.get('/api/chat/thread/me', async (req, res) => {
@@ -3125,6 +3472,33 @@ app.post('/api/sensor-data', async (req, res) => {
                 throw insertErr;
             }
         }
+
+        recordAiSensorSample(db, {
+            tenantId: tenant,
+            userId: req.user?.id,
+            deviceId,
+            sensorDataId: result.id,
+            source: normalizedSource,
+            sensorRow: {
+                id: result.id,
+                tenant_id: tenant,
+                device_id: deviceId,
+                sensor_id: sensor_id || null,
+                pressure: nextRow.pressure,
+                flow_rate: nextRow.flow_rate,
+                ec_value: nextRow.ec_value,
+                pumps: pumpsJson,
+                raw_payload: rawPayload,
+                source: normalizedSource,
+                ...sensorColumns,
+                active_tank: nextRow.active_tank,
+                is_on: normalizedIsOn,
+                uptime_seconds: parsedIncomingUptime,
+                timestamp: insertParams[28],
+            },
+        }).catch((sampleErr) => {
+            console.warn('[AI] Sensor sample capture failed:', sampleErr.message);
+        });
 
         res.json({ ok: true, id: result.id });
     } catch (err) {

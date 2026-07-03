@@ -17,6 +17,7 @@ This project keeps non-runtime documents under `docs/` to keep the repository ro
 - `docs/guides/INSTALLATION_COMMANDS.md`
 - `docs/guides/IOT_GUIDE.md`
 - `docs/guides/MSSQL_GUIDE.md`
+- `docs/guides/PROJECT_STRUCTURE.md`
 
 ### operations
 - `docs/operations/DB_CUTOVER_PLAN.md`
@@ -24,7 +25,11 @@ This project keeps non-runtime documents under `docs/` to keep the repository ro
 
 ### notes
 - `docs/notes/NOTES.md`
+- `docs/notes/social_login_summary.md`
 - `docs/notes/archive/Note/` (legacy notes folder)
+- `docs/notes/archive/misc/` (miscellaneous legacy notes)
+- `docs/notes/archive/root-placeholders/` (empty root placeholders moved out of the repository root)
 
 ### reference
+- `docs/reference/API.md`
 - `docs/reference/Attributions.md`

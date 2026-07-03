@@ -1,5 +1,6 @@
 const mqtt = require('mqtt');
 const db = require('./database');
+const { recordAiSensorSample } = require('./services/ai_training');
 
 const MQTT_BROKER = process.env.MQTT_BROKER_URL || process.env.MQTT_BROKER || 'mqtts://862ddab18768410486982f71e1ac75bb.s1.eu.hivemq.cloud:8883';
 const MQTT_USERNAME = process.env.MQTT_USERNAME || 'GreenCropnat';
@@ -361,16 +362,44 @@ function startMqttListener() {
                     new Date(nowMs),
                 ];
 
+                let insertResult = null;
+                let insertedTimestamp = new Date(nowMs);
                 for (let attempt = 0; attempt < 5; attempt += 1) {
                     try {
                         insertParams[29] = new Date(nowMs + attempt);
-                        await db.run(insertSql, insertParams);
+                        insertedTimestamp = insertParams[29];
+                        insertResult = await db.run(insertSql, insertParams);
                         break;
                     } catch (insertErr) {
                         if (attempt < 4 && isSensorTimestampUniqueError(insertErr)) continue;
                         throw insertErr;
                     }
                 }
+                recordAiSensorSample(db, {
+                    tenantId: finalTenant,
+                    deviceId: payloadDeviceId,
+                    sensorDataId: insertResult?.id || null,
+                    source: 'mqtt',
+                    sensorRow: {
+                        id: insertResult?.id || null,
+                        tenant_id: finalTenant,
+                        device_id: payloadDeviceId,
+                        sensor_id: payloadSensorId,
+                        pressure,
+                        flow_rate,
+                        ec_value,
+                        pumps: pumpsJson,
+                        raw_payload: raw,
+                        source: 'mqtt',
+                        ...sensorColumns,
+                        active_tank,
+                        is_on,
+                        uptime_seconds: Number.isFinite(uptime_seconds) ? uptime_seconds : 0,
+                        timestamp: insertedTimestamp,
+                    },
+                }).catch((sampleErr) => {
+                    console.warn('[AI] MQTT sample capture failed:', sampleErr.message);
+                });
                 mqttStatus.lastSavedAt = new Date().toISOString();
                 console.log(`[DB] Saved sensor data for tenant=${finalTenant} device=${payloadDeviceId} msg_id=${msgId || 'none'}`);
             } catch (dbErr) {

@@ -59,6 +59,66 @@ export interface ChatTypingStatus {
   user_name?: string | null;
 }
 
+export interface AiChatSession {
+  id: number;
+  user_id: number;
+  user_name?: string | null;
+  user_email?: string | null;
+  device_id?: string | null;
+  title?: string | null;
+  status: string;
+  escalated_thread_id?: number | null;
+  last_message_at?: string | null;
+  last_message_preview?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface AiChatMessage {
+  id: number;
+  session_id: number;
+  sender_role: "user" | "ai" | "system";
+  body: string;
+  intent?: string | null;
+  page_context?: string | null;
+  machine_status?: string | null;
+  should_escalate?: boolean;
+  created_at: string;
+}
+
+export interface AiSensorLearningSample {
+  id: number;
+  tenant_id: string;
+  user_id?: number | null;
+  device_id?: string | null;
+  sensor_data_id?: number | null;
+  sample_source?: string | null;
+  feature_json: string;
+  label: string;
+  risk_score: number;
+  action_hint?: string | null;
+  captured_at?: string | null;
+  created_at?: string | null;
+}
+
+export interface AiSensorLearningSummary {
+  tenant_id: string;
+  device_id?: string | null;
+  total_samples: number;
+  labels: Record<string, number>;
+  samples: AiSensorLearningSample[];
+  backfill?: {
+    scanned: number;
+    captured: number;
+  };
+  isolation?: {
+    mode: string;
+    tenant_id: string;
+    user_id: number | string;
+    note?: string;
+  };
+}
+
 type ChatThreadListQuery = {
   mine?: boolean;
   unread?: boolean;
@@ -74,6 +134,25 @@ type ChatMessageQuery = {
   endDate?: string;
   limit?: number;
   includeRelated?: boolean;
+};
+
+type AiChatQuery = {
+  deviceId?: string;
+  limit?: number;
+};
+
+type AiChatExchangePayload = {
+  deviceId?: string;
+  userMessage: string;
+  aiMessage: string;
+  currentPage?: string;
+  machineStatus?: string;
+  intent?: string;
+  shouldEscalate?: boolean;
+};
+
+type AiChatRespondPayload = Omit<AiChatExchangePayload, "aiMessage"> & {
+  fallbackAiMessage?: string;
 };
 
 const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
@@ -118,6 +197,63 @@ const parseJson = async <T>(response: Response, fallback: string): Promise<T> =>
 };
 
 export const chatService = {
+  async getMyAiSession(query?: AiChatQuery): Promise<{ session: AiChatSession; messages: AiChatMessage[] }> {
+    const response = await fetch(buildApiUrl(`/ai-chat/session/me${toQueryString(query)}`), {
+      headers: getAuthHeaders(),
+    });
+    return parseJson(response, "Failed to load NAT AI chat");
+  },
+
+  async appendAiExchange(payload: AiChatExchangePayload): Promise<{ session: AiChatSession; messages: AiChatMessage[] }> {
+    const response = await fetch(buildApiUrl("/ai-chat/session/me/messages"), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return parseJson(response, "Failed to save NAT AI chat");
+  },
+
+  async generateAiReply(payload: AiChatRespondPayload): Promise<{
+    session: AiChatSession;
+    messages: AiChatMessage[];
+    provider?: string;
+    controller_intent?: string;
+    controller_risk?: unknown;
+    controller_actions?: unknown[];
+    max_output_tokens?: number;
+  }> {
+    const response = await fetch(buildApiUrl("/ai-chat/session/me/respond"), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return parseJson(response, "Failed to generate NAT AI reply");
+  },
+
+  async clearMyAiSession(query?: Pick<AiChatQuery, "deviceId">): Promise<{ session: AiChatSession; messages: AiChatMessage[] }> {
+    const response = await fetch(buildApiUrl(`/ai-chat/session/me/messages${toQueryString(query)}`), {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+    return parseJson(response, "Failed to reset NAT AI chat");
+  },
+
+  async getMySensorLearning(query?: { deviceId?: string; limit?: number; backfill?: "auto" | "true" | "false" }): Promise<AiSensorLearningSummary> {
+    const response = await fetch(buildApiUrl(`/ai/sensor-learning/me${toQueryString(query)}`), {
+      headers: getAuthHeaders(),
+    });
+    return parseJson(response, "Failed to load AI learning data");
+  },
+
+  async backfillMySensorLearning(payload?: { deviceId?: string; limit?: number }): Promise<AiSensorLearningSummary> {
+    const response = await fetch(buildApiUrl("/ai/sensor-learning/me/backfill"), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload || {}),
+    });
+    return parseJson(response, "Failed to backfill AI learning data");
+  },
+
   async getMyThread(query?: ChatMessageQuery): Promise<{ thread: ChatThread; messages: ChatMessage[] }> {
     const response = await fetch(buildApiUrl(`/chat/thread/me${toQueryString(query)}`), {
       headers: getAuthHeaders(),

@@ -8,11 +8,53 @@ const connectionString = String(rawConnectionString)
     .trim()
     .replace(/^['"]|['"]$/g, '');
 
+function isLocalPostgresHost(host) {
+    return ['localhost', '127.0.0.1', '::1'].includes(String(host || '').toLowerCase());
+}
+
+function normalizeSslMode(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function getSslConfig({ sslMode, host, hasConnectionString }) {
+    const mode = normalizeSslMode(process.env.DB_SSL_MODE || process.env.PGSSLMODE || sslMode);
+    const rejectUnauthorized = String(process.env.DB_SSL_REJECT_UNAUTHORIZED || '').toLowerCase() === 'true';
+
+    if (mode === 'disable' || mode === 'false' || mode === 'off') return false;
+    if (!hasConnectionString && process.env.NODE_ENV !== 'production') return false;
+    if (!hasConnectionString && isLocalPostgresHost(host)) return false;
+
+    // Keep hosted database compatibility by default, but make strict verification opt-in.
+    return { rejectUnauthorized };
+}
+
+function parseConnectionString(raw) {
+    if (!raw) return { connectionString: '', sslMode: '', host: '' };
+    try {
+        const parsed = new URL(raw);
+        const sslMode = parsed.searchParams.get('sslmode') || '';
+        parsed.searchParams.delete('sslmode');
+        return {
+            connectionString: parsed.toString(),
+            sslMode,
+            host: parsed.hostname,
+        };
+    } catch {
+        return { connectionString: raw, sslMode: '', host: '' };
+    }
+}
+
+const parsedConnection = parseConnectionString(connectionString);
+
 const pool = new Pool(
     connectionString
         ? {
-              connectionString,
-              ssl: { rejectUnauthorized: false },
+              connectionString: parsedConnection.connectionString,
+              ssl: getSslConfig({
+                  sslMode: parsedConnection.sslMode,
+                  host: parsedConnection.host,
+                  hasConnectionString: true,
+              }),
           }
         : {
               user: process.env.DB_USER || 'postgres',
@@ -20,7 +62,11 @@ const pool = new Pool(
               database: process.env.DB_NAME || process.env.PGDATABASE || 'postgres',
               password: process.env.DB_PASSWORD || process.env.PGPASSWORD || '',
               port: Number(process.env.DB_PORT || process.env.PGPORT || 5432),
-              ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+              ssl: getSslConfig({
+                  sslMode: '',
+                  host: process.env.DB_HOST || process.env.PGHOST || 'localhost',
+                  hasConnectionString: false,
+              }),
           }
 );
 
@@ -307,6 +353,66 @@ async function initDb() {
 
         CREATE INDEX IF NOT EXISTS ix_chat_messages_thread_id_created_at
         ON chat_messages(thread_id, created_at, id);
+
+        CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            user_name VARCHAR(100),
+            user_email VARCHAR(100),
+            device_id VARCHAR(64),
+            title VARCHAR(200),
+            status VARCHAR(30) DEFAULT 'active',
+            escalated_thread_id INTEGER,
+            last_message_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            last_message_preview VARCHAR(500),
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_ai_chat_sessions_user_device
+        ON ai_chat_sessions(user_id, device_id, status, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS ix_ai_chat_sessions_escalated
+        ON ai_chat_sessions(escalated_thread_id);
+
+        CREATE TABLE IF NOT EXISTS ai_chat_messages (
+            id SERIAL PRIMARY KEY,
+            session_id INTEGER NOT NULL,
+            sender_role VARCHAR(20) NOT NULL,
+            body TEXT NOT NULL,
+            intent VARCHAR(80),
+            page_context VARCHAR(120),
+            machine_status VARCHAR(120),
+            should_escalate BOOLEAN DEFAULT false,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_ai_chat_messages_session_created
+        ON ai_chat_messages(session_id, created_at, id);
+
+        CREATE TABLE IF NOT EXISTS ai_sensor_samples (
+            id SERIAL PRIMARY KEY,
+            tenant_id VARCHAR(64) NOT NULL,
+            user_id INTEGER,
+            device_id VARCHAR(64),
+            sensor_data_id INTEGER,
+            sample_source VARCHAR(32) DEFAULT 'sensor',
+            feature_json TEXT NOT NULL,
+            label VARCHAR(40) NOT NULL,
+            risk_score DOUBLE PRECISION DEFAULT 0,
+            action_hint VARCHAR(80),
+            captured_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_ai_sensor_samples_sensor_data_id
+        ON ai_sensor_samples(sensor_data_id)
+        WHERE sensor_data_id IS NOT NULL;
+
+        CREATE INDEX IF NOT EXISTS ix_ai_sensor_samples_tenant_device_time
+        ON ai_sensor_samples(tenant_id, device_id, captured_at DESC);
+
+        CREATE INDEX IF NOT EXISTS ix_ai_sensor_samples_user_time
+        ON ai_sensor_samples(user_id, captured_at DESC);
     `);
 
     const adminCheck = await pool.query('SELECT * FROM users WHERE email = $1', ['admin@smartiot.com']);

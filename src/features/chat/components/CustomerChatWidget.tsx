@@ -28,14 +28,23 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { chatService, ChatMessage, ChatThread } from "@/features/chat/services/chatService";
+import { chatService, AiChatMessage, AiSensorLearningSummary, ChatMessage, ChatThread } from "@/features/chat/services/chatService";
 import { toast } from "sonner";
 import { useActiveDeviceId } from "@/hooks/useActiveDeviceId";
 import { useMachine } from "@/contexts/MachineContext";
+import { analyzeSensorIntelligence, formatSensorAiAnswer } from "@/features/ai/services/sensorIntelligence";
+import { CropYieldEntry, readCropYieldEntries, subscribeCropYieldEntries } from "@/utils/cropYieldStore";
 
 type CustomerChatWidgetProps = {
   language?: string;
   currentPage?: string;
+  userContext?: {
+    id?: string | number;
+    name?: string;
+    email?: string;
+    role?: string;
+  };
+  deviceCount?: number;
 };
 
 type AssistantMode = "assistant" | "human";
@@ -44,16 +53,14 @@ type AssistantMessage = {
   id: string;
   sender: "ai" | "user";
   text: string;
-  actions?: Array<{
-    id: string;
-    label: string;
-    next: string;
-  }>;
+  createdAt?: string;
   canEscalate?: boolean;
 };
 
 const POLL_MS = 4000;
 const LAUNCHER_POSITION_KEY = "nat_assistant_launcher_position";
+const ASSISTANT_CONTEXT_VERSION = "contextual-live-v3";
+const ASSISTANT_HISTORY_PREFIX = `nat_ai_assistant_history_${ASSISTANT_CONTEXT_VERSION}`;
 const LAUNCHER_BASE_WIDTH = 144;
 const LAUNCHER_BASE_HEIGHT = 184;
 
@@ -71,7 +78,7 @@ const safeSenderLabel = (message: Pick<ChatMessage, "sender_name" | "sender_role
 
 const assistantFlows = {
   offline: {
-    title: "อุปกรณ์ไม่ออนไลน์",
+    title: "AI ตรวจออฟไลน์จากข้อมูลจริง",
     answer:
       "ลองตรวจไฟเลี้ยงอุปกรณ์, อินเทอร์เน็ต, และรีสตาร์ตอุปกรณ์ 1 ครั้งก่อนนะครับ ถ้ายัง offline เกิน 30 นาที แนะนำให้ส่งต่อเจ้าหน้าที่ทันที",
   },
@@ -81,36 +88,53 @@ const assistantFlows = {
       "ตรวจสอบอีเมลให้ถูกต้อง, ลองเข้าในเบราว์เซอร์อื่น หรือโหมดไม่ระบุตัวตน หากยังไม่ได้ให้คุยกับเจ้าหน้าที่เพื่อเช็กบัญชีและ log ระบบ",
   },
   sensor: {
-    title: "ข้อมูลเซนเซอร์ไม่อัปเดต",
+    title: "AI ตรวจ sensor และ history",
     answer:
       "ลองรีเฟรชหน้า dashboard, ตรวจว่าเลือก active device ถูกตัว และรออีก 1 รอบการ sync ถ้ายังค้างต่อเนื่องให้ส่งต่อเจ้าหน้าที่พร้อมเวลาที่พบปัญหา",
   },
   pairing: {
-    title: "เชื่อมต่ออุปกรณ์ไม่สำเร็จ",
+    title: "AI ตรวจอุปกรณ์ที่ผูกกับ user นี้",
     answer:
       "ยืนยัน device id และ pairing code ให้ถูกต้อง แล้วลองอีกครั้งบนอินเทอร์เน็ตที่เสถียร หากระบบบอกว่าอุปกรณ์ถูกใช้งานแล้ว ให้คุยกับเจ้าหน้าที่เพื่อปลดผูกบัญชี",
   },
   urgent: {
-    title: "แจ้งปัญหาเร่งด่วน",
+    title: "AI ประเมินความเร่งด่วน",
     answer:
       "กรณีนี้แนะนำให้ส่งต่อเจ้าหน้าที่ทันที พร้อมแนบชื่ออุปกรณ์ เวลาเกิดเหตุ และภาพหน้าจอถ้ามี เพื่อให้ทีมตรวจสอบได้เร็วที่สุด",
   },
 } as const;
 
 const createAssistantWelcome = (isTH = true): AssistantMessage => ({
-  id: "assistant-welcome",
+  id: `assistant-welcome-${ASSISTANT_CONTEXT_VERSION}`,
   sender: "ai",
+  createdAt: new Date().toISOString(),
   text: isTH
-    ? "สวัสดีครับ ผมคือ NAT AI ผู้ช่วยประจำระบบ GreenCropNAT ผมช่วยตรวจสถานะเครื่อง วิเคราะห์อาการเบื้องต้น และส่งต่อเจ้าหน้าที่ได้ในหน้าต่างเดียวครับ"
-    : "Hi, I am NAT AI for GreenCropNAT. I can check machine status, guide troubleshooting, and hand off to support in one place.",
-  actions: [
-    { id: "status", label: isTH ? "ตรวจสถานะเครื่อง" : "Check machine status", next: "status" },
-    { id: "offline", label: "อุปกรณ์ไม่ออนไลน์", next: "offline" },
-    { id: "login", label: "เข้าสู่ระบบไม่ได้", next: "login" },
-    { id: "sensor", label: "ข้อมูลไม่อัปเดต", next: "sensor" },
-    { id: "pairing", label: "เชื่อมต่ออุปกรณ์ไม่ได้", next: "pairing" },
-    { id: "urgent", label: "ปัญหาเร่งด่วน", next: "urgent" },
-  ],
+    ? "สวัสดีครับ ผมคือ NAT AI เล่าอาการหรือคำถามมาได้เลยครับ ผมจะดูสถานะเครื่อง ข้อมูล sensor ล่าสุด และ history ของบัญชีนี้ประกอบก่อนตอบ"
+    : "Hi, I am NAT AI. Tell me what is happening, and I will answer using this account's machine status, latest sensor data, and telemetry history.",
+});
+
+const hasCurrentAssistantContext = (messages: AssistantMessage[]) =>
+  messages.some((message) => (
+    message.id.includes(ASSISTANT_CONTEXT_VERSION) ||
+    /ML data|telemetry history|sensor_data|ข้อมูลจริง|ML sample|เฉพาะ user|logged-in user/i.test(message.text)
+  ));
+
+const isAssistantMessage = (value: unknown): value is AssistantMessage => {
+  if (!value || typeof value !== "object") return false;
+  const message = value as Partial<AssistantMessage>;
+  return (
+    typeof message.id === "string" &&
+    (message.sender === "ai" || message.sender === "user") &&
+    typeof message.text === "string"
+  );
+};
+
+const mapAiMessageToAssistantMessage = (message: AiChatMessage): AssistantMessage => ({
+  id: `db-ai-${message.id}`,
+  sender: message.sender_role === "user" ? "user" : "ai",
+  text: message.body,
+  createdAt: message.created_at,
+  canEscalate: message.sender_role === "ai" ? Boolean(message.should_escalate) : false,
 });
 
 const formatTime = (value?: string | null) => {
@@ -266,15 +290,28 @@ function NatAssistantAvatar({
   );
 }
 
-export function CustomerChatWidget({ language = "TH", currentPage = "Dashboard" }: CustomerChatWidgetProps) {
+export function CustomerChatWidget({
+  language = "TH",
+  currentPage = "Dashboard",
+  userContext,
+  deviceCount = 0,
+}: CustomerChatWidgetProps) {
   const isTH = language === "TH";
+  const hasThaiText = (value: string) => /[\u0E00-\u0E7F]/.test(value);
+  const shouldReplyThai = (value: string) => isTH || hasThaiText(value);
   const activeDeviceId = useActiveDeviceId();
   const {
+    isOn,
     mqttStatus,
     boardConnected,
+    lastTelemetryAt,
+    telemetryHistory,
     pump1On,
     pump2On,
     locked,
+    wls1,
+    wls2,
+    greenOn,
     redOn,
     floatAlarm,
     phValue,
@@ -302,6 +339,8 @@ export function CustomerChatWidget({ language = "TH", currentPage = "Dashboard" 
   const [isHistoryFilterOpen, setIsHistoryFilterOpen] = useState(false);
   const [isAdminTyping, setIsAdminTyping] = useState(false);
   const [typingAdminName, setTypingAdminName] = useState("");
+  const [learningSummary, setLearningSummary] = useState<AiSensorLearningSummary | null>(null);
+  const [cropYieldEntries, setCropYieldEntries] = useState<CropYieldEntry[]>(() => readCropYieldEntries(activeDeviceId || "default"));
   const [launcherPosition, setLauncherPosition] = useState<LauncherPosition | null>(null);
   const [isDraggingLauncher, setIsDraggingLauncher] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -319,10 +358,16 @@ export function CustomerChatWidget({ language = "TH", currentPage = "Dashboard" 
   const previousMessageCountRef = useRef(0);
   const latestAdminMessageIdRef = useRef<number | null>(null);
   const hasPrimedAdminMessageRef = useRef(false);
+  const hasLoadedAssistantHistoryRef = useRef(false);
+  const skipAssistantHistoryPersistRef = useRef(false);
   const previousAssistantMessageCountRef = useRef(assistantMessages.length);
   const typingTimeoutRef = useRef<number | null>(null);
 
   const draftKey = useMemo(() => `chat_draft_${selectedThreadId || thread?.id || "pending"}`, [selectedThreadId, thread?.id]);
+  const assistantHistoryKey = useMemo(
+    () => `${ASSISTANT_HISTORY_PREFIX}_${language}_${activeDeviceId || "no_device"}`,
+    [activeDeviceId, language],
+  );
   const humanListRef = listRef;
   const locale = isTH ? "th-TH" : "en-US";
   const selectedThread = useMemo(
@@ -605,9 +650,127 @@ export function CustomerChatWidget({ language = "TH", currentPage = "Dashboard" 
     previousAssistantMessageCountRef.current = assistantMessages.length;
   }, [assistantMessages, isOpen, mode]);
 
+  useEffect(() => {
+    let isMounted = true;
+    hasLoadedAssistantHistoryRef.current = false;
+
+    const loadStoredHistory = () => {
+      try {
+        const rawHistory = localStorage.getItem(assistantHistoryKey);
+        const parsedHistory = rawHistory ? JSON.parse(rawHistory) : null;
+        if (Array.isArray(parsedHistory)) {
+          const validMessages = parsedHistory.filter(isAssistantMessage).slice(-80);
+          if (validMessages.length > 0 && hasCurrentAssistantContext(validMessages)) {
+            skipAssistantHistoryPersistRef.current = true;
+            setAssistantMessages(validMessages);
+            previousAssistantMessageCountRef.current = validMessages.length;
+            hasLoadedAssistantHistoryRef.current = true;
+            return;
+          }
+        }
+      } catch {
+        localStorage.removeItem(assistantHistoryKey);
+      }
+
+      const welcome = createAssistantWelcome(isTH);
+      skipAssistantHistoryPersistRef.current = true;
+      setAssistantMessages([welcome]);
+      previousAssistantMessageCountRef.current = 1;
+      hasLoadedAssistantHistoryRef.current = true;
+    };
+
+    chatService.getMyAiSession({ deviceId: activeDeviceId || undefined, limit: 80 })
+      .then(({ messages }) => {
+        if (!isMounted) return;
+        const nextMessages = messages.map(mapAiMessageToAssistantMessage);
+        if (nextMessages.length > 0 && hasCurrentAssistantContext(nextMessages)) {
+          skipAssistantHistoryPersistRef.current = true;
+          setAssistantMessages(nextMessages);
+          previousAssistantMessageCountRef.current = nextMessages.length;
+          hasLoadedAssistantHistoryRef.current = true;
+          return;
+        }
+        if (nextMessages.length > 0) {
+          chatService.clearMyAiSession({ deviceId: activeDeviceId || undefined }).catch(() => {});
+        }
+        loadStoredHistory();
+      })
+      .catch(() => {
+        if (isMounted) loadStoredHistory();
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeDeviceId, assistantHistoryKey, isTH]);
+
+  useEffect(() => {
+    if (!hasLoadedAssistantHistoryRef.current) return;
+    if (skipAssistantHistoryPersistRef.current) {
+      skipAssistantHistoryPersistRef.current = false;
+      return;
+    }
+    localStorage.setItem(assistantHistoryKey, JSON.stringify(assistantMessages.slice(-80)));
+  }, [assistantHistoryKey, assistantMessages]);
+
+  useEffect(() => {
+    let isMounted = true;
+    chatService.getMySensorLearning({
+      deviceId: activeDeviceId || undefined,
+      limit: 40,
+      backfill: "auto",
+    })
+      .then((summary) => {
+        if (isMounted) setLearningSummary(summary);
+      })
+      .catch(() => {
+        if (isMounted) setLearningSummary(null);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [activeDeviceId]);
+
+  useEffect(() => {
+    const yieldDeviceId = activeDeviceId || "default";
+    const refresh = () => setCropYieldEntries(readCropYieldEntries(yieldDeviceId));
+    refresh();
+    return subscribeCropYieldEntries(refresh);
+  }, [activeDeviceId]);
+
+  const persistAssistantExchange = (payload: {
+    userMessage: string;
+    aiMessage: string;
+    intent?: string;
+    shouldEscalate?: boolean;
+  }) => {
+    chatService.appendAiExchange({
+      deviceId: activeDeviceId || undefined,
+      userMessage: payload.userMessage,
+      aiMessage: payload.aiMessage,
+      currentPage,
+      machineStatus: natStatusText,
+      intent: payload.intent,
+      shouldEscalate: payload.shouldEscalate,
+    })
+      .then(({ messages }) => {
+        const nextMessages = messages.map(mapAiMessageToAssistantMessage);
+        if (nextMessages.length > 0) {
+          skipAssistantHistoryPersistRef.current = true;
+          setAssistantMessages(nextMessages);
+          previousAssistantMessageCountRef.current = nextMessages.length;
+        }
+      })
+      .catch(() => {
+        // Keep the local transcript as an offline fallback if the API is unavailable.
+      });
+  };
+
   const resetAssistant = () => {
     setMode("assistant");
-    setAssistantMessages([createAssistantWelcome(isTH)]);
+    const welcome = createAssistantWelcome(isTH);
+    setAssistantMessages([welcome]);
+    chatService.clearMyAiSession({ deviceId: activeDeviceId || undefined }).catch(() => {});
     setError("");
   };
 
@@ -621,49 +784,84 @@ export function CustomerChatWidget({ language = "TH", currentPage = "Dashboard" 
     setSelectedThreadId((current) => current ?? items[0]?.id ?? null);
   };
 
-  const handleAssistantAction = async (actionKey: string) => {
-    if (actionKey === "status") {
+  const submitAssistantMessage = async () => {
+    const body = draft.trim();
+    if (!body || isSending) return;
+    const now = Date.now();
+    const shouldEscalate = shouldEscalateAssistantRequest(body);
+    const intent = inferAssistantIntent(body);
+    const localAiText = buildLocalAssistantAnswer(body);
+    const fallbackAiText = localAiText || buildAssistantFreeAnswer(body);
+    setIsSending(true);
+    setDraft("");
+    setAssistantMessages((current) => [
+      ...current,
+      { id: `user-free-${now}`, sender: "user", text: body, createdAt: new Date(now).toISOString() },
+      {
+        id: `ai-thinking-${now}`,
+        sender: "ai",
+        text: shouldReplyThai(body) ? "กำลังดูข้อมูลเครื่องและคิดคำตอบให้ครับ..." : "Checking machine data and thinking...",
+        createdAt: new Date(now + 1).toISOString(),
+      },
+    ]);
+
+    if (localAiText) {
       setAssistantMessages((current) => [
-        ...current,
-        { id: `user-${Date.now()}-status`, sender: "user", text: isTH ? "ตรวจสถานะเครื่อง" : "Check machine status" },
+        ...current.filter((message) => message.id !== `ai-thinking-${now}`),
         {
-          id: `ai-${Date.now()}-status`,
+          id: `ai-local-${now}`,
           sender: "ai",
-          text: buildMachineStatusAnswer(),
-          canEscalate: machineNeedsAttention || !liveSignal,
+          text: localAiText,
+          createdAt: new Date(now + 1).toISOString(),
+          canEscalate: false,
         },
       ]);
+      persistAssistantExchange({
+        userMessage: body,
+        aiMessage: localAiText,
+        intent,
+        shouldEscalate: false,
+      });
+      setIsSending(false);
       return;
     }
 
-    const flow = assistantFlows[actionKey as keyof typeof assistantFlows];
-    if (!flow) return;
-    setAssistantMessages((current) => [
-      ...current,
-      { id: `user-${Date.now()}-${actionKey}`, sender: "user", text: flow.title },
-      {
-        id: `ai-${Date.now()}-${actionKey}`,
-        sender: "ai",
-        text: flow.answer,
-        canEscalate: true,
-      },
-    ]);
-  };
-
-  const submitAssistantMessage = async () => {
-    const body = draft.trim();
-    if (!body) return;
-    setAssistantMessages((current) => [
-      ...current,
-      { id: `user-free-${Date.now()}`, sender: "user", text: body },
-      {
-        id: `ai-free-${Date.now()}`,
-        sender: "ai",
-        text: buildAssistantFreeAnswer(body),
-        canEscalate: true,
-      },
-    ]);
-    setDraft("");
+    try {
+      const { messages } = await chatService.generateAiReply({
+        deviceId: activeDeviceId || undefined,
+        userMessage: body,
+        fallbackAiMessage: fallbackAiText,
+        currentPage,
+        machineStatus: natStatusText,
+        intent,
+        shouldEscalate,
+      });
+      const nextMessages = messages.map(mapAiMessageToAssistantMessage);
+      if (nextMessages.length > 0) {
+        skipAssistantHistoryPersistRef.current = true;
+        setAssistantMessages(nextMessages);
+        previousAssistantMessageCountRef.current = nextMessages.length;
+      }
+    } catch {
+      setAssistantMessages((current) => [
+        ...current.filter((message) => message.id !== `ai-thinking-${now}`),
+        {
+          id: `ai-free-${now}`,
+          sender: "ai",
+          text: fallbackAiText,
+          createdAt: new Date(now + 1).toISOString(),
+          canEscalate: shouldEscalate,
+        },
+      ]);
+      persistAssistantExchange({
+        userMessage: body,
+        aiMessage: fallbackAiText,
+        intent,
+        shouldEscalate,
+      });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const submitMessage = async () => {
@@ -748,53 +946,430 @@ export function CustomerChatWidget({ language = "TH", currentPage = "Dashboard" 
   const hasHistoryFilter = Boolean(historyStart || historyEnd);
   const assignedAdminName = (selectedThread || thread)?.assigned_admin_name?.trim();
   const liveSignal = mqttStatus === "connected" && boardConnected;
-  const machineNeedsAttention = boardConnected && (locked || redOn || floatAlarm || !phOk);
   const activePumpCount = [pump1On, pump2On].filter(Boolean).length;
-  const natStatusText = machineNeedsAttention
-    ? isTH ? "พบสัญญาณเตือน" : "Needs attention"
-    : liveSignal
-      ? isTH ? "เฝ้าเครื่องอยู่" : "Monitoring"
-      : isTH ? "รอสัญญาณเครื่อง" : "Waiting for signal";
-  const natStatusTone = machineNeedsAttention
-    ? "bg-amber-500"
-    : liveSignal
-      ? "bg-emerald-500"
-      : "bg-slate-400";
+  const sensorAiReport = useMemo(
+    () =>
+      analyzeSensorIntelligence({
+        language,
+        deviceId: activeDeviceId,
+        mqttStatus,
+        boardConnected,
+        lastTelemetryAt,
+        current: {
+          timestamp: lastTelemetryAt,
+          deviceId: activeDeviceId,
+          phValue,
+          ecValue,
+          tempValue,
+          wls1,
+          wls2,
+          floatAlarm,
+          locked,
+          pump1On,
+          pump2On,
+          greenOn,
+          redOn,
+          isOn,
+        },
+        history: telemetryHistory,
+      }),
+    [
+      activeDeviceId,
+      boardConnected,
+      ecValue,
+      floatAlarm,
+      greenOn,
+      isOn,
+      language,
+      lastTelemetryAt,
+      locked,
+      mqttStatus,
+      phValue,
+      pump1On,
+      pump2On,
+      redOn,
+      telemetryHistory,
+      tempValue,
+      wls1,
+      wls2,
+    ],
+  );
+  const machineNeedsAttention = ["critical", "warning"].includes(sensorAiReport.severity) || (boardConnected && !phOk);
+  const natStatusText = sensorAiReport.statusText;
+  const natStatusTone = sensorAiReport.severity === "critical"
+    ? "bg-red-500"
+    : sensorAiReport.severity === "warning"
+      ? "bg-amber-500"
+      : sensorAiReport.severity === "offline"
+        ? "bg-slate-400"
+        : liveSignal
+          ? "bg-emerald-500"
+          : "bg-slate-400";
+  const sensorAiCardClass = sensorAiReport.severity === "critical"
+    ? "border-red-200 bg-red-50 text-red-950 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-100"
+    : sensorAiReport.severity === "warning"
+      ? "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100"
+      : sensorAiReport.severity === "offline"
+        ? "border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-100"
+        : "border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-100";
   const formatTelemetryValue = (value: number, digits: number) =>
     Number.isFinite(value) && value > 0 ? value.toFixed(digits) : "--";
-  const buildMachineStatusAnswer = () => {
-    const lines = [
-      isTH ? `สถานะเครื่อง${activeDeviceId ? ` ${activeDeviceId}` : ""}: ${natStatusText}` : `Machine${activeDeviceId ? ` ${activeDeviceId}` : ""}: ${natStatusText}`,
-      isTH ? `MQTT: ${mqttStatus === "connected" ? "เชื่อมต่อ" : "ยังไม่เชื่อมต่อ"}` : `MQTT: ${mqttStatus}`,
-      isTH ? `บอร์ด: ${boardConnected ? "ออนไลน์" : "ยังไม่มีสัญญาณ"}` : `Board: ${boardConnected ? "online" : "no signal"}`,
-      isTH ? `ปั๊มทำงาน: ${activePumpCount}/2 ตัว` : `Running pumps: ${activePumpCount}/2`,
-      `pH ${formatTelemetryValue(phValue, 2)} | EC ${formatTelemetryValue(ecValue, 2)} | Temp ${formatTelemetryValue(tempValue, 1)}`,
-    ];
+  const formatSensorDateTime = (value?: string | null) => {
+    if (!value) return isTH ? "ยังไม่มีข้อมูล" : "No data yet";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString(isTH ? "th-TH" : "en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+  const latestTelemetrySnapshot = useMemo(() => {
+    const sorted = [...telemetryHistory]
+      .filter((item) => item.timestamp && Number.isFinite(Date.parse(item.timestamp)))
+      .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
+    return sorted[0] || null;
+  }, [telemetryHistory]);
+  const latestSensorTimestamp = lastTelemetryAt || latestTelemetrySnapshot?.timestamp || "";
+  const latestSensorDeviceId = activeDeviceId || latestTelemetrySnapshot?.deviceId || (isTH ? "ยังไม่ได้เลือกอุปกรณ์" : "No active device");
+  const latestSensorValues = [
+    `pH ${formatTelemetryValue(phValue || latestTelemetrySnapshot?.phValue || 0, 2)}`,
+    `EC ${formatTelemetryValue(ecValue || latestTelemetrySnapshot?.ecValue || 0, 2)}`,
+    `Temp ${formatTelemetryValue(tempValue || latestTelemetrySnapshot?.tempValue || 0, 1)}`,
+  ].join(" | ");
+  const formatDateKey = (value?: string | null) => {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "";
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+  };
+  const parseRequestedDateKey = (body: string) => {
+    const normalized = body.toLowerCase();
+    const thaiMonths: Record<string, number> = {
+      "ม.ค.": 1, "มกราคม": 1,
+      "ก.พ.": 2, "กุมภาพันธ์": 2,
+      "มี.ค.": 3, "มีนาคม": 3,
+      "เม.ย.": 4, "เมษายน": 4,
+      "พ.ค.": 5, "พฤษภาคม": 5,
+      "มิ.ย.": 6, "มิถุนายน": 6,
+      "ก.ค.": 7, "กรกฎาคม": 7,
+      "ส.ค.": 8, "สิงหาคม": 8,
+      "ก.ย.": 9, "กันยายน": 9,
+      "ต.ค.": 10, "ตุลาคม": 10,
+      "พ.ย.": 11, "พฤศจิกายน": 11,
+      "ธ.ค.": 12, "ธันวาคม": 12,
+    };
 
-    if (machineNeedsAttention) {
-      lines.push(isTH
-        ? "คำแนะนำ: ตรวจ alarm น้ำ, lock, และค่า pH ก่อนสั่งงานต่อ ถ้าไม่แน่ใจกดคุยกับเจ้าหน้าที่ได้เลยครับ"
-        : "Suggestion: check water alarm, lock state, and pH before sending more commands. Escalate to support if unsure.");
-    } else if (liveSignal) {
-      lines.push(isTH
-        ? "คำแนะนำ: ระบบดูปกติ ผมจะช่วยเฝ้าดูสัญญาณและแจ้งเมื่อมีค่าที่ควรตรวจสอบครับ"
-        : "Suggestion: the system looks normal. I will keep watching for values that need attention.");
-    } else {
-      lines.push(isTH
-        ? "คำแนะนำ: ถ้าเพิ่งเปิดเครื่องให้รอ sync สักครู่ ถ้ายังไม่มาให้ตรวจ Wi-Fi, ไฟเลี้ยง และ MQTT ครับ"
-        : "Suggestion: if the device just started, wait for sync. Otherwise check Wi-Fi, power, and MQTT.");
+    for (const [label, month] of Object.entries(thaiMonths)) {
+      const match = normalized.match(new RegExp(`(\\d{1,2})\\s*${label.replace(".", "\\.")}\\s*(\\d{4})`));
+      if (match) {
+        let year = Number(match[2]);
+        if (year > 2400) year -= 543;
+        return `${year}-${String(month).padStart(2, "0")}-${String(Number(match[1])).padStart(2, "0")}`;
+      }
     }
 
-    return lines.join("\n");
+    const numeric = normalized.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+    if (numeric) {
+      let year = Number(numeric[3]);
+      if (year > 2400) year -= 543;
+      return `${year}-${String(Number(numeric[2])).padStart(2, "0")}-${String(Number(numeric[1])).padStart(2, "0")}`;
+    }
+
+    return "";
+  };
+  const formatDateLabel = (dateKey: string) => {
+    const parsed = new Date(`${dateKey}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return dateKey;
+    return parsed.toLocaleDateString(isTH ? "th-TH" : "en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+  const formatDateLabelFor = (dateKey: string, replyThai: boolean) => {
+    const parsed = new Date(`${dateKey}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return dateKey;
+    return parsed.toLocaleDateString(replyThai ? "th-TH" : "en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+  const formatTelemetryRowValues = (row: typeof telemetryHistory[number]) =>
+    `pH ${formatTelemetryValue(row.phValue, 2)} | EC ${formatTelemetryValue(row.ecValue, 2)} | Temp ${formatTelemetryValue(row.tempValue, 1)} | ปั๊ม1 ${row.pump1On ? "ON" : "OFF"} | ปั๊ม2 ${row.pump2On ? "ON" : "OFF"}`;
+  const buildDateHistoryAnswer = (dateKey: string) => {
+    const rows = telemetryHistory
+      .filter((row) => formatDateKey(row.timestamp) === dateKey)
+      .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
+    const label = formatDateLabel(dateKey);
+
+    if (rows.length === 0) {
+      return isTH
+        ? `รอบวันที่ ${label} ผมยังไม่เจอข้อมูลใน history ของเครื่องนี้ครับ\nข้อมูลล่าสุดที่ระบบมีคือ ${formatSensorDateTime(latestSensorTimestamp)}\n${latestSensorValues}`
+        : `I do not see telemetry for ${label} in this device history yet.\nLatest available data is ${formatSensorDateTime(latestSensorTimestamp)}\n${latestSensorValues}`;
+    }
+
+    const newest = rows[0];
+    const oldest = rows[rows.length - 1];
+    const average = (pick: (row: typeof newest) => number, digits: number) => {
+      const values = rows.map(pick).filter((value) => Number.isFinite(value) && value > 0);
+      if (values.length === 0) return "--";
+      return (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(digits);
+    };
+
+    return isTH
+      ? `รอบวันที่ ${label} มีข้อมูล ${rows.length} รายการครับ\nใหม่สุด: ${formatSensorDateTime(newest.timestamp)}\n${formatTelemetryRowValues(newest)}\nค่าเฉลี่ยวันนั้น: pH ${average((row) => row.phValue, 2)} | EC ${average((row) => row.ecValue, 2)} | Temp ${average((row) => row.tempValue, 1)}\nช่วงข้อมูล: ${formatSensorDateTime(oldest.timestamp)} ถึง ${formatSensorDateTime(newest.timestamp)}`
+      : `${label} has ${rows.length} telemetry record${rows.length === 1 ? "" : "s"}.\nNewest: ${formatSensorDateTime(newest.timestamp)}\n${formatTelemetryRowValues(newest)}\nDaily average: pH ${average((row) => row.phValue, 2)} | EC ${average((row) => row.ecValue, 2)} | Temp ${average((row) => row.tempValue, 1)}\nRange: ${formatSensorDateTime(oldest.timestamp)} to ${formatSensorDateTime(newest.timestamp)}`;
+  };
+  const isCropYieldQuestion = (body: string) =>
+    /(ผลผลิต|ผลิตได้|เก็บเกี่ยว|harvest|yield|production output|production)/i.test(body);
+  const formatYieldNumber = (value: number, replyThai = isTH) =>
+    Number.isFinite(value)
+      ? value.toLocaleString(replyThai ? "th-TH" : "en-US", { maximumFractionDigits: 2 })
+      : "--";
+  const buildCropYieldAnswer = (dateKey?: string, userText = "") => {
+    const replyThai = shouldReplyThai(userText);
+    const sortedEntries = [...cropYieldEntries].sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
+    const targetRows = dateKey
+      ? sortedEntries.filter((entry) => entry.date === dateKey)
+      : sortedEntries.slice(0, 1);
+    const label = dateKey ? formatDateLabelFor(dateKey, replyThai) : (replyThai ? "รายการล่าสุด" : "latest entry");
+
+    if (targetRows.length === 0) {
+      const latest = sortedEntries[0];
+      if (!latest) {
+        return replyThai
+          ? `ยังไม่มีข้อมูลผลผลิตที่บันทึกไว้ในหน้า รายงานผลผลิต ครับ\nถ้าต้องการให้ผมตอบยอดวันที่ ${label} ให้เพิ่มรายการผลผลิตของวันนั้นก่อน`
+          : `There is no saved crop yield data in Crop Reports yet.\nAdd a harvest entry for ${label}, then I can answer the total.`;
+      }
+
+      return replyThai
+        ? `วันที่ ${label} ยังไม่พบรายการผลผลิตที่บันทึกไว้ครับ\nรายการล่าสุดที่มีคือ ${formatDateLabelFor(latest.date, replyThai)} เวลา ${latest.time}: ${formatYieldNumber(latest.yield, replyThai)} กรัม`
+        : `I do not see a saved yield entry for ${label}.\nLatest saved entry: ${formatDateLabelFor(latest.date, replyThai)} at ${latest.time}: ${formatYieldNumber(latest.yield, replyThai)} g.`;
+    }
+
+    const totalYield = targetRows.reduce((sum, entry) => sum + entry.yield, 0);
+    const averageYield = totalYield / targetRows.length;
+    const detailLines = targetRows
+      .map((entry, index) => (
+        replyThai
+          ? `${index + 1}. เวลา ${entry.time || "--"} | ${formatYieldNumber(entry.yield, replyThai)} กรัม`
+          : `${index + 1}. ${entry.time || "--"} | ${formatYieldNumber(entry.yield, replyThai)} g`
+      ))
+      .join("\n");
+    const qualityRows = targetRows.filter((entry) => entry.ph > 0 || entry.ec > 0 || entry.temp > 0);
+    const qualityLine = qualityRows.length
+      ? (() => {
+          const avg = (pick: (entry: CropYieldEntry) => number, digits: number) => {
+            const values = targetRows.map(pick).filter((value) => Number.isFinite(value) && value > 0);
+            if (!values.length) return "--";
+            return (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(digits);
+          };
+          return replyThai
+            ? `ค่าน้ำเฉลี่ย\npH: ${avg((entry) => entry.ph, 2)}\nEC: ${avg((entry) => entry.ec, 2)} mS/cm\nอุณหภูมิ: ${avg((entry) => entry.temp, 1)} C`
+            : `Average water values\npH: ${avg((entry) => entry.ph, 2)}\nEC: ${avg((entry) => entry.ec, 2)} mS/cm\nTemp: ${avg((entry) => entry.temp, 1)} C`;
+        })()
+      : "";
+
+    return replyThai
+      ? [
+          "สรุปผลผลิต",
+          `วันที่: ${label}`,
+          `ผลผลิตรวม: ${formatYieldNumber(totalYield, replyThai)} กรัม`,
+          `จำนวนบันทึก: ${targetRows.length} รายการ`,
+          ...(targetRows.length > 1 ? [`เฉลี่ยต่อรายการ: ${formatYieldNumber(averageYield, replyThai)} กรัม`] : []),
+          "",
+          "รายละเอียดบันทึก",
+          detailLines,
+          ...(qualityLine ? ["", qualityLine] : []),
+        ].join("\n")
+      : [
+          "Yield summary",
+          `Date: ${label}`,
+          `Total yield: ${formatYieldNumber(totalYield, replyThai)} g`,
+          `Records: ${targetRows.length}`,
+          ...(targetRows.length > 1 ? [`Average per record: ${formatYieldNumber(averageYield, replyThai)} g`] : []),
+          "",
+          "Record details",
+          detailLines,
+          ...(qualityLine ? ["", qualityLine] : []),
+        ].join("\n");
+  };
+  const buildLocalAssistantAnswer = (body: string) => {
+    const requestedDateKey = parseRequestedDateKey(body);
+    if (isCropYieldQuestion(body)) {
+      return buildCropYieldAnswer(requestedDateKey || undefined, body);
+    }
+    return "";
+  };
+  const buildPumpTroubleAnswer = () => {
+    const latestRow = latestTelemetrySnapshot;
+    const pump1Active = pump1On || Boolean(latestRow?.pump1On);
+    const pump2Active = pump2On || Boolean(latestRow?.pump2On);
+    const latestLine = latestRow
+      ? `${formatSensorDateTime(latestRow.timestamp)}: ${formatTelemetryRowValues(latestRow)}`
+      : `${formatSensorDateTime(latestSensorTimestamp)}: ${latestSensorValues}`;
+
+    if (pump1Active || pump2Active) {
+      const active = [pump1Active ? "ปั๊ม 1" : "", pump2Active ? "ปั๊ม 2" : ""].filter(Boolean).join(", ");
+      return isTH
+        ? `จากข้อมูลล่าสุด ${active} ยังเป็น ON ครับ\n${latestLine}\nให้กดหยุด/ปุ่มฉุกเฉินก่อน แล้วดูว่าสถานะเปลี่ยนเป็น OFF ไหม\nถ้าหน้างานยังหมุนทั้งที่ระบบสั่ง OFF แล้ว น่าจะต้องตรวจ relay/contactor หรือวงจรควบคุม`
+        : `Latest data shows ${active} is still ON.\n${latestLine}\nPress stop/emergency stop first and check whether status changes to OFF.\nIf the pump still runs while the system says OFF, inspect the relay/contactor or control circuit.`;
+    }
+
+    return isTH
+      ? `ข้อมูลล่าสุดในระบบบอกว่าปั๊ม 1 และปั๊ม 2 เป็น OFF ครับ\n${latestLine}\nถ้าที่หน้างานปั๊มยังไม่หยุด แปลว่าสถานะในระบบกับไฟจริงไม่ตรงกัน ให้ตัดไฟ/ตรวจ relay หรือ contactor ก่อน`
+      : `Latest system data says Pump 1 and Pump 2 are OFF.\n${latestLine}\nIf the physical pump is still running, the real wiring state does not match the app. Cut power and inspect the relay or contactor first.`;
+  };
+  const formatLearningSummaryText = () => {
+    const totalSamples = Number(learningSummary?.total_samples || 0);
+    const labels = Object.entries(learningSummary?.labels || {})
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .slice(0, 4)
+      .map(([label, total]) => `${label}:${Number(total).toLocaleString()}`)
+      .join(", ");
+
+    if (!learningSummary) {
+      return isTH
+        ? "ML data: กำลังโหลด/ยังอ่านข้อมูลสะสมไม่ได้"
+        : "ML data: loading or unavailable";
+    }
+
+    if (totalSamples === 0) {
+      return isTH
+        ? "ML data: ยังไม่มี sample ของบัญชีนี้พอ ระบบจะเก็บจาก sensor_data ไปเรื่อย ๆ อัตโนมัติ"
+        : "ML data: no samples for this account yet. The system will keep collecting from sensor_data automatically.";
+    }
+
+    return isTH
+      ? `ML data ของบัญชีนี้: ${totalSamples.toLocaleString()} sample${labels ? ` (${labels})` : ""}`
+      : `ML data for this account: ${totalSamples.toLocaleString()} sample${totalSamples === 1 ? "" : "s"}${labels ? ` (${labels})` : ""}`;
+  };
+  const buildLiveContextLines = () => [
+    isTH ? `MQTT: ${mqttStatus === "connected" ? "เชื่อมต่อ" : "ยังไม่เชื่อมต่อ"}` : `MQTT: ${mqttStatus}`,
+    isTH ? `บอร์ด: ${boardConnected ? "ออนไลน์" : "ยังไม่มีสัญญาณ"}` : `Board: ${boardConnected ? "online" : "no signal"}`,
+    isTH ? `ปั๊มทำงาน: ${activePumpCount}/2 ตัว` : `Running pumps: ${activePumpCount}/2`,
+    `pH ${formatTelemetryValue(phValue, 2)} | EC ${formatTelemetryValue(ecValue, 2)} | Temp ${formatTelemetryValue(tempValue, 1)}`,
+    formatLearningSummaryText(),
+    isTH
+      ? `ข้อมูลแยกตาม user: tenant ${learningSummary?.tenant_id || "ตาม token ที่ login"}`
+      : `User data isolation: tenant ${learningSummary?.tenant_id || "from the logged-in token"}`,
+  ];
+  const buildMachineStatusAnswer = () => {
+    const liveSnapshot = buildLiveContextLines().join("\n");
+
+    return `${formatSensorAiAnswer(sensorAiReport, language, activeDeviceId)}\n\n${liveSnapshot}`;
+  };
+  const buildLatestSensorAnswer = () => {
+    const sampleLine = formatLearningSummaryText();
+
+    if (!latestSensorTimestamp) {
+      return isTH
+        ? `ข้อมูลล่าสุดของเซ็นเซอร์: ยังไม่มีข้อมูล sensor_data ของ user นี้ในเครื่องที่เลือก\n\nอุปกรณ์: ${latestSensorDeviceId}\n${sampleLine}\n\nข้อมูลนี้กรองตาม user/tenant ที่ login อยู่เท่านั้น ไม่ดึงข้อมูลของ user อื่น`
+        : `Latest sensor data: no sensor_data has been loaded for this user on the selected device.\n\nDevice: ${latestSensorDeviceId}\n${sampleLine}\n\nThis is scoped to the logged-in user/tenant only.`;
+    }
+
+    return isTH
+      ? `ข้อมูลล่าสุดของเซ็นเซอร์ของ user นี้คือ:\n\nวันที่/เวลา: ${formatSensorDateTime(latestSensorTimestamp)}\nอุปกรณ์: ${latestSensorDeviceId}\nค่า: ${latestSensorValues}\nสถานะ AI: ${sensorAiReport.statusText}\n${sampleLine}\n\nข้อมูลนี้เป็นของ tenant ${learningSummary?.tenant_id || "ตาม token ที่ login"} เท่านั้น`
+      : `Latest sensor data for this user:\n\nDate/time: ${formatSensorDateTime(latestSensorTimestamp)}\nDevice: ${latestSensorDeviceId}\nValues: ${latestSensorValues}\nAI status: ${sensorAiReport.statusText}\n${sampleLine}\n\nThis belongs only to tenant ${learningSummary?.tenant_id || "from the logged-in token"}.`;
+  };
+  const buildProjectUserAnswer = () => {
+    const userName = String(userContext?.name || "").trim() || (isTH ? "ผู้ใช้" : "User");
+    const userEmail = String(userContext?.email || "").trim() || "--";
+    const userRole = String(userContext?.role || "user").trim();
+    return isTH
+      ? `ข้อมูลโปรเจคของ user ที่ login อยู่ตอนนี้:\n\nUser: ${userName}\nEmail: ${userEmail}\nRole: ${userRole}\nActive device: ${activeDeviceId || "ยังไม่ได้เลือก"}\nอุปกรณ์ที่ระบบโหลดได้: ${deviceCount} เครื่อง\nข้อมูล sensor ล่าสุด: ${formatSensorDateTime(lastTelemetryAt || latestTelemetrySnapshot?.timestamp)}\n${formatLearningSummaryText()}\n\nผมจะตอบจากข้อมูลของ user/tenant นี้เท่านั้น ไม่เอาข้อมูลของ user อื่นมาปน`
+      : `Project data for the logged-in user:\n\nUser: ${userName}\nEmail: ${userEmail}\nRole: ${userRole}\nActive device: ${activeDeviceId || "none"}\nLoaded devices: ${deviceCount}\nLatest sensor data: ${formatSensorDateTime(lastTelemetryAt || latestTelemetrySnapshot?.timestamp)}\n${formatLearningSummaryText()}\n\nI answer only from this user/tenant context, not from another user's data.`;
+  };
+  const buildContextualFlowAnswer = (actionKey: string, baseAnswer: string) => {
+    const flowContext = buildLiveContextLines().join("\n");
+    const extraAdvice = (() => {
+      if (actionKey === "offline") {
+        return liveSignal
+          ? (isTH ? "ตอนนี้ระบบเห็นสัญญาณสดแล้ว ถ้ายังเจอปัญหา ให้ดูว่าเลือกอุปกรณ์ถูกตัวหรือไม่" : "A live signal is currently present. If the issue remains, confirm the selected device.")
+          : (isTH ? "จากข้อมูลล่าสุดยังไม่มีสัญญาณสด ให้เริ่มจากไฟเลี้ยง, Wi-Fi, MQTT และ device id" : "Latest data still has no live signal. Start with power, Wi-Fi, MQTT, and device id.");
+      }
+      if (actionKey === "sensor") {
+        return sensorAiReport.sampleCount > 0
+          ? (isTH ? `มี telemetry history ${sensorAiReport.sampleCount.toLocaleString()} จุด ผมใช้แนวโน้มนี้ช่วยดูความผิดปกติแล้ว` : `There are ${sensorAiReport.sampleCount.toLocaleString()} telemetry points, and I used that trend for this check.`)
+          : (isTH ? "ยังไม่มี history เพียงพอ ระบบจะเก็บต่อเพื่อให้วิเคราะห์ดีขึ้น" : "There is not enough history yet. The system will keep collecting for better analysis.");
+      }
+      if (actionKey === "urgent") {
+        return machineNeedsAttention
+          ? (isTH ? "เคสนี้ควรส่งต่อเจ้าหน้าที่ เพราะ AI เห็นระดับ warning/critical จากข้อมูลจริง" : "This should be handed off because AI sees warning/critical status from live data.")
+          : (isTH ? "ตอนนี้ AI ยังไม่เห็น critical จาก sensor แต่ถ้าไซต์งานมีอันตรายจริงให้หยุดเครื่องก่อน" : "AI does not see a critical sensor state right now, but stop the machine first if the site is unsafe.");
+      }
+      return isTH
+        ? "ผมแนบสถานะเครื่องและข้อมูล ML ล่าสุดของบัญชีนี้ไว้ด้านล่าง เพื่อไม่ตอบลอย ๆ"
+        : "I included the latest machine and ML context for this account below.";
+    })();
+
+    return `${baseAnswer}\n\n${extraAdvice}\n\n${flowContext}`;
   };
   const buildAssistantFreeAnswer = (body: string) => {
     const normalizedBody = body.toLowerCase();
     const pageContext = isTH
       ? `ตอนนี้คุณอยู่หน้า ${currentPage} และสถานะเครื่องคือ "${natStatusText}"`
       : `You are on ${currentPage}, and the machine status is "${natStatusText}".`;
+    const compactBody = normalizedBody.replace(/\s+/g, "");
+    const requestedDateKey = parseRequestedDateKey(body);
+    const asksDateHistory = Boolean(requestedDateKey) && /(รอบ|วันที่|ข้อมูล|ค่า|history|ย้อนหลัง|record|cycle|data)/i.test(normalizedBody);
+    const asksPumpTrouble = /(ปั๊ม|pump).*(ไม่หยุด|ไม่ดับ|ค้าง|ยังทำงาน|หยุดไม่ได้|not stop|stuck|still running)|(ไม่หยุด|ไม่ดับ|ค้าง|หยุดไม่ได้).*(ปั๊ม|pump)/i.test(normalizedBody);
+    const asksDownloadData =
+      /(โหลด|ดาวน์โหลด|download|export|ส่งออก|เอาออก|ดึง).*(ข้อมูล|data|รายงาน|report|ไฟล์|file|csv|excel|pdf)|((ข้อมูล|data|รายงาน|report|ไฟล์|file|csv|excel|pdf).*(โหลด|ดาวน์โหลด|download|export|ส่งออก|เอาออก|ดึง))/i.test(normalizedBody);
+    const asksCropYieldData = isCropYieldQuestion(body);
+    const asksLatestSensorData =
+      /(ล่าสุด|วันไหน|เมื่อไหร่|เวลาไหน|last|latest|recent).*(เซ็นเซอร์|sensor|ข้อมูล|data)|((เซ็นเซอร์|sensor|ข้อมูล|data).*(ล่าสุด|วันไหน|เมื่อไหร่|last|latest|recent))/i.test(normalizedBody) ||
+      /(ข้อมูลล่าสุด|latestdata|recentdata).*(เซ็นเซอร์|sensor)|((เซ็นเซอร์|sensor).*(ข้อมูลล่าสุด|วันไหน|ล่าสุด))/i.test(compactBody);
+    const asksProjectOrUserData = /(ข้อมูลทั้งหมด|ข้อมูลโปรเจค|โปรเจค|project|ข้อมูล user|ข้อมูลผู้ใช้|user data|account data|ของ user|ของบัญชี)/i.test(normalizedBody);
+    const asksConversationMeta = /(ตอบ|คุย|แชท|chat|conversation|template|แม่แบบ|ซ้ำ|ไม่ตรง|มั่ว|ไม่เข้าใจ|natural|ธรรมชาติ|robot)/i.test(normalizedBody);
+
+    if (asksCropYieldData) {
+      return buildCropYieldAnswer(requestedDateKey || undefined, body);
+    }
+
+    if (asksDateHistory && requestedDateKey) {
+      return buildDateHistoryAnswer(requestedDateKey);
+    }
+
+    if (asksPumpTrouble) {
+      return buildPumpTroubleAnswer();
+    }
+
+    if (asksDownloadData) {
+      const deviceLine = activeDeviceId
+        ? (isTH ? `เครื่องที่เลือกอยู่คือ ${activeDeviceId}` : `The selected device is ${activeDeviceId}.`)
+        : (isTH ? "ตอนนี้ยังไม่ได้เลือก active device ชัดเจน" : "There is no clear active device selected yet.");
+
+      return isTH
+        ? `ได้ครับ ถ้าต้องการโหลดข้อมูล ผมช่วยไล่ให้ได้เลย\n${deviceLine}\nคุณอยากโหลดข้อมูลแบบไหนครับ: ข้อมูล sensor ตามช่วงวันที่, รายงานการปลูก, หรือ transcript แชทนี้?\nถ้าหมายถึง sensor บอกช่วงวันที่มาได้เลย เช่น "วันนี้", "เดือนนี้", หรือ "1/7/2026"`
+        : `Sure. I can help you narrow down the export.\n${deviceLine}\nWhich data do you want to download: sensor history by date range, crop reports, or this chat transcript?\nIf you mean sensor data, send a range like "today", "this month", or "2026-07-01".`;
+    }
+
+    if (asksLatestSensorData) {
+      return buildLatestSensorAnswer();
+    }
+
+    if (asksProjectOrUserData) {
+      return buildProjectUserAnswer();
+    }
 
     if (/status|สถานะ|เครื่อง|online|offline|mqtt|บอร์ด|สัญญาณ/.test(normalizedBody)) {
       return `${pageContext}\n\n${buildMachineStatusAnswer()}`;
+    }
+
+    if (/user|profile|account|บัญชี|โปรไฟล์|ข้อมูลฉัน|ข้อมูลผู้ใช้|อีเมล|email|role|สิทธิ์|ชื่อ/.test(normalizedBody)) {
+      return `${pageContext}\n\n${buildProjectUserAnswer()}`;
+    }
+
+    if (/device|อุปกรณ์|เครื่องที่ผูก|pair|จับคู่|active device|เครื่องหลัก/.test(normalizedBody)) {
+      return isTH
+        ? `${pageContext}\n\nตอนนี้บัญชีนี้มีอุปกรณ์ที่ระบบโหลดได้ ${deviceCount} เครื่อง${activeDeviceId ? ` และกำลังเลือก ${activeDeviceId}` : ""} ถ้าต้องการเพิ่ม/เปลี่ยนเครื่อง ให้ไปที่ Farm Settings หรือ Device Pairing ครับ`
+        : `${pageContext}\n\nThis account currently has ${deviceCount} loaded device${deviceCount === 1 ? "" : "s"}${activeDeviceId ? `, with ${activeDeviceId} selected` : ""}. To add or change a device, open Farm Settings or Device Pairing.`;
     }
 
     const matchedFlowKey = Object.entries(assistantFlows).find(([key, flow]) => {
@@ -803,18 +1378,125 @@ export function CustomerChatWidget({ language = "TH", currentPage = "Dashboard" 
     })?.[0] as keyof typeof assistantFlows | undefined;
 
     if (matchedFlowKey) {
-      return `${pageContext}\n\n${assistantFlows[matchedFlowKey].answer}`;
+      return `${pageContext}\n\n${buildContextualFlowAnswer(matchedFlowKey, assistantFlows[matchedFlowKey].answer)}`;
     }
 
     if (/alarm|alert|เตือน|แดง|lock|ล็อก|น้ำ|float|ph|ec/.test(normalizedBody)) {
+      return `${pageContext}\n\n${formatSensorAiAnswer(sensorAiReport, language, activeDeviceId)}`;
+    }
+
+    if (asksConversationMeta) {
       return isTH
-        ? `${pageContext}\n\nผมแนะนำให้ตรวจค่าที่เกี่ยวข้องก่อนครับ: lock, ไฟเตือน, float alarm, pH/EC และสถานะปั๊ม ถ้าค่ายังผิดปกติให้กดตรวจสถานะเครื่อง หรือส่งต่อเจ้าหน้าที่ได้ทันที`
-        : `${pageContext}\n\nCheck lock, warning light, float alarm, pH/EC, and pump state first. If values remain abnormal, run machine status or hand off to support.`;
+        ? `เข้าใจครับ เมื่อกี้ผมตอบแข็งเกินไปเหมือนดึงแม่แบบมาใช้\nลองพิมพ์แบบที่คุณคุยปกติได้เลย เช่น "อยากโหลดข้อมูลวันนี้" หรือ "ปั๊มยังไม่หยุด" แล้วผมจะตอบให้ตรงประโยคก่อน ค่อยเสริมข้อมูลเครื่องเท่าที่จำเป็น`
+        : `You are right, that sounded too much like a template.\nYou can talk normally, for example "download today's data" or "the pump still will not stop", and I will answer the actual sentence first before adding machine context.`;
     }
 
     return isTH
-      ? `${pageContext}\n\nผมช่วยไล่ปัญหาให้ได้ครับ บอกอาการที่เห็น เช่น เครื่องไม่ออนไลน์, ข้อมูลไม่อัปเดต, เชื่อมต่อไม่ได้, หรือมีสัญญาณเตือน แล้วผมจะสรุปขั้นตอนถัดไปให้`
-      : `${pageContext}\n\nTell me what you see, such as offline device, stale data, pairing issue, or alert signal, and I will suggest the next steps.`;
+      ? `ได้ครับ ผมอยู่หน้านี้กับคุณอยู่\nถ้าจะให้ช่วยต่อ บอกมาแบบภาษาคุยได้เลย เช่น อยากโหลดข้อมูลช่วงไหน, เครื่องมีอาการอะไร, หรืออยากให้ดูหน้าจอส่วนไหน\n${pageContext}`
+      : `Got it. I am here with this page.\nTell me naturally what you want next, such as which data range to download, what the machine is doing, or which screen you want checked.\n${pageContext}`;
+  };
+  const inferAssistantIntent = (body: string) => {
+    const normalizedBody = body.toLowerCase();
+    if (/status|สถานะ|เครื่อง|online|offline|mqtt|บอร์ด|สัญญาณ/.test(normalizedBody)) return "status";
+    if (/alarm|alert|เตือน|แดง|lock|ล็อก|น้ำ|float|ph|ec/.test(normalizedBody)) return "alert";
+    if (isCropYieldQuestion(body)) return "crop_yield";
+    if (/(โหลด|ดาวน์โหลด|download|export|ส่งออก|เอาออก|ดึง).*(ข้อมูล|data|รายงาน|report|ไฟล์|file|csv|excel|pdf)|((ข้อมูล|data|รายงาน|report|ไฟล์|file|csv|excel|pdf).*(โหลด|ดาวน์โหลด|download|export|ส่งออก|เอาออก|ดึง))/.test(normalizedBody)) return "download";
+    if (/sensor|เซ็นเซอร์|ข้อมูล sensor|sensor data|ข้อมูลล่าสุด|history|ย้อนหลัง|อัปเดต|update|ค้าง|frozen/.test(normalizedBody)) return "sensor";
+    if (/pair|เชื่อมต่อ|จับคู่|device id|code/.test(normalizedBody)) return "pairing";
+    if (/login|เข้าสู่ระบบ|รหัส|password/.test(normalizedBody)) return "login";
+    if (/เจ้าหน้าที่|แอดมิน|support|staff|admin|human/.test(normalizedBody)) return "human_request";
+    return "general";
+  };
+  const shouldEscalateAssistantRequest = (body: string) => {
+    const normalizedBody = body.toLowerCase();
+    const asksForHuman = /เจ้าหน้าที่|แอดมิน|คนจริง|support|staff|admin|human/.test(normalizedBody);
+    const urgentIssue = /ด่วน|ฉุกเฉิน|เสีย|พัง|หยุดทำงาน|น้ำล้น|ไฟแดง|alarm|alert|critical|urgent/.test(normalizedBody);
+    const signalIssue = /ไม่ออนไลน์|offline|ไม่มีสัญญาณ|mqtt|เชื่อมต่อไม่ได้|pairing|จับคู่/.test(normalizedBody);
+
+    return asksForHuman || urgentIssue || machineNeedsAttention || (signalIssue && !liveSignal);
+  };
+  const renderAssistantMessageText = (text: string) => {
+    if (!text.startsWith("สรุปผลผลิต\n") && !text.startsWith("Yield summary\n")) {
+      return <div className="whitespace-pre-wrap text-sm leading-6">{text}</div>;
+    }
+
+    const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+    const isThaiSummary = lines[0] === "สรุปผลผลิต";
+    const valueOf = (prefix: string) => lines.find((line) => line.startsWith(prefix))?.slice(prefix.length).trim() || "--";
+    const date = valueOf(isThaiSummary ? "วันที่:" : "Date:");
+    const total = valueOf(isThaiSummary ? "ผลผลิตรวม:" : "Total yield:");
+    const records = valueOf(isThaiSummary ? "จำนวนบันทึก:" : "Records:");
+    const average = valueOf(isThaiSummary ? "เฉลี่ยต่อรายการ:" : "Average per record:");
+    const detailStart = lines.findIndex((line) => line === (isThaiSummary ? "รายละเอียดบันทึก" : "Record details"));
+    const qualityStart = lines.findIndex((line) => line === (isThaiSummary ? "ค่าน้ำเฉลี่ย" : "Average water values"));
+    const detailLines = detailStart >= 0
+      ? lines.slice(detailStart + 1, qualityStart >= 0 ? qualityStart : undefined).filter((line) => /^\d+\./.test(line))
+      : [];
+    const qualityLines = qualityStart >= 0 ? lines.slice(qualityStart + 1) : [];
+
+    return (
+      <div className="min-w-[240px] overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50/70 text-slate-900 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/25 dark:text-slate-100">
+        <div className="border-b border-emerald-100 bg-white/75 px-4 py-3 dark:border-emerald-900/50 dark:bg-slate-950/35">
+          <div className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+            {isThaiSummary ? "รายงานผลผลิต" : "Yield report"}
+          </div>
+          <div className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">{date}</div>
+        </div>
+
+        <div className="px-4 py-4">
+          <div className="rounded-xl bg-white px-3 py-3 shadow-sm dark:bg-slate-950/45">
+            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              {isThaiSummary ? "ผลผลิตรวม" : "Total yield"}
+            </div>
+            <div className="mt-1 text-3xl font-black leading-none text-emerald-600 dark:text-emerald-300">{total}</div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-white px-3 py-2 shadow-sm dark:bg-slate-950/45">
+              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                {isThaiSummary ? "จำนวนบันทึก" : "Records"}
+              </div>
+              <div className="mt-1 text-sm font-bold">{records}</div>
+            </div>
+            <div className="rounded-xl bg-white px-3 py-2 shadow-sm dark:bg-slate-950/45">
+              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                {isThaiSummary ? "เฉลี่ย/รายการ" : "Average"}
+              </div>
+              <div className="mt-1 text-sm font-bold">{average || "-"}</div>
+            </div>
+          </div>
+
+          {detailLines.length > 0 && (
+            <div className="mt-3 rounded-xl border border-emerald-100 bg-white px-3 py-3 text-xs shadow-sm dark:border-emerald-900/45 dark:bg-slate-950/45">
+              <div className="mb-2 font-bold text-slate-700 dark:text-slate-200">
+                {isThaiSummary ? "รายละเอียดบันทึก" : "Record details"}
+              </div>
+              <div className="space-y-1.5">
+                {detailLines.map((line) => (
+                  <div key={line} className="rounded-lg bg-slate-50 px-2 py-1.5 font-medium text-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                    {line}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {qualityLines.length > 0 && (
+            <div className="mt-3 grid grid-cols-1 gap-1.5 rounded-xl border border-cyan-100 bg-cyan-50/70 px-3 py-3 text-xs dark:border-cyan-900/45 dark:bg-cyan-950/20">
+              <div className="mb-1 font-bold text-cyan-800 dark:text-cyan-200">
+                {isThaiSummary ? "ค่าน้ำเฉลี่ย" : "Average water values"}
+              </div>
+              {qualityLines.map((line) => (
+                <div key={line} className="flex justify-between gap-3">
+                  <span className="text-slate-500 dark:text-slate-400">{line.split(":")[0]}</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-100">{line.split(":").slice(1).join(":").trim()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
   const statusToneClass =
     (selectedThread || thread)?.status === "closed"
@@ -909,28 +1591,54 @@ export function CustomerChatWidget({ language = "TH", currentPage = "Dashboard" 
         ref={assistantListRef}
         className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain touch-pan-y bg-[radial-gradient(circle_at_top_left,rgba(110,231,183,0.22),transparent_35%),linear-gradient(to_right,rgba(16,185,129,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(16,185,129,0.06)_1px,transparent_1px)] bg-[size:auto,24px_24px,24px_24px] px-4 py-4"
       >
+        <div className={`rounded-[1.35rem] border px-4 py-4 shadow-sm ${sensorAiCardClass}`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] opacity-80">
+                <Bot className="h-4 w-4" />
+                {isTH ? "AI วิเคราะห์เครื่อง" : "AI machine analysis"}
+              </div>
+              <div className="mt-1 text-lg font-black leading-6">
+                {sensorAiReport.statusText}
+              </div>
+            </div>
+            <div className="shrink-0 rounded-2xl bg-white/75 px-3 py-2 text-center shadow-sm dark:bg-slate-950/55">
+              <div className="text-2xl font-black leading-none">{sensorAiReport.healthScore}</div>
+              <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">score</div>
+            </div>
+          </div>
+
+          <p className="mt-3 text-sm leading-6 opacity-90">{sensorAiReport.summary}</p>
+
+          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+            {sensorAiReport.metrics
+              .filter((metric) => ["ph", "ec", "temp"].includes(metric.id))
+              .map((metric) => (
+                <div key={metric.id} className="rounded-xl bg-white/70 px-2 py-2 shadow-sm dark:bg-slate-950/45">
+                  <div className="font-semibold opacity-70">{metric.label}</div>
+                  <div className="mt-0.5 truncate font-black">{metric.value}</div>
+                </div>
+              ))}
+          </div>
+
+          <div className="mt-3 space-y-1.5 text-xs leading-5">
+            {sensorAiReport.recommendations.slice(0, 2).map((item) => (
+              <div key={item} className="flex gap-2">
+                <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${natStatusTone}`} />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+
+        </div>
+
         {assistantMessages.map((message) => (
           <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
             <div className={`max-w-[88%] rounded-[1.35rem] px-4 py-3 shadow-sm ${message.sender === "user" ? "bg-emerald-600 text-white" : "border border-emerald-100 bg-white text-slate-900 dark:border-emerald-950 dark:bg-slate-900 dark:text-slate-100"}`}>
               <div className={`mb-1 text-[11px] ${message.sender === "user" ? "text-emerald-100" : "text-slate-500 dark:text-slate-400"}`}>
                 {message.sender === "user" ? "คุณ" : "NAT AI"}
               </div>
-              <div className="whitespace-pre-wrap text-sm leading-6">{message.text}</div>
-
-              {message.actions && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {message.actions.map((action) => (
-                    <button
-                      key={action.id}
-                      type="button"
-                      onClick={() => handleAssistantAction(action.next).catch(() => {})}
-                      className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
-                    >
-                      {action.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {renderAssistantMessageText(message.text)}
 
               {message.canEscalate && (
                 <div className="mt-3">
@@ -946,32 +1654,13 @@ export function CustomerChatWidget({ language = "TH", currentPage = "Dashboard" 
       </div>
 
       <div className="border-t border-slate-200/80 bg-white/96 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/96">
-        <div className="mb-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => handleAssistantAction("status").catch(() => {})}
-            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
-          >
-            {isTH ? "ตรวจสถานะเครื่อง" : "Check machine status"}
-          </button>
-          {Object.entries(assistantFlows).map(([key, flow]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => handleAssistantAction(key).catch(() => {})}
-              className="rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground transition hover:border-emerald-300 hover:text-foreground"
-            >
-              {flow.title}
-            </button>
-          ))}
-        </div>
-
         <div className="flex items-end gap-2">
           <Input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder={isTH ? "พิมพ์ปัญหาให้ AI ช่วยวิเคราะห์..." : "Describe your issue for AI support..."}
             className="h-12 rounded-2xl"
+            disabled={isSending}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
@@ -979,9 +1668,9 @@ export function CustomerChatWidget({ language = "TH", currentPage = "Dashboard" 
               }
             }}
           />
-          <Button className="h-12 rounded-2xl px-4" onClick={() => submitAssistantMessage().catch(() => {})} disabled={!draft.trim()}>
+          <Button className="h-12 rounded-2xl px-4" onClick={() => submitAssistantMessage().catch(() => {})} disabled={isSending || !draft.trim()}>
             <Send className="mr-2 h-4 w-4" />
-            {isTH ? "ถาม AI" : "Ask AI"}
+            {isSending ? (isTH ? "กำลังคิด" : "Thinking") : isTH ? "ถาม AI" : "Ask AI"}
           </Button>
         </div>
       </div>

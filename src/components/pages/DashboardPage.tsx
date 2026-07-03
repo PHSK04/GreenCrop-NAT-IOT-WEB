@@ -462,10 +462,10 @@ export function DashboardPage({
           {/* Left Column: Visual Model */}
           <div className="lg:col-span-7 space-y-6">
             <Card className="h-full min-h-[320px] overflow-hidden rounded-2xl border-border/70 bg-card/65 shadow-lg backdrop-blur-xl sm:min-h-[420px] lg:min-h-[500px]">
-              <CardHeader>
+              {/* <CardHeader> */}
                 <CardTitle className="text-foreground">{t.visualizer}</CardTitle>
                 <CardDescription className="text-muted-foreground">{t.visualizerDesc}</CardDescription>
-              </CardHeader>
+              {/* </CardHeader> */}
               <CardContent className="rounded-b-2xl bg-gradient-to-b from-transparent to-background/30 p-4 sm:p-6 lg:p-8">
                 <div className="relative min-h-[600px] overflow-hidden rounded-2xl border border-emerald-500/20 bg-slate-950 text-slate-100 shadow-inner sm:min-h-[460px]">
                   <div
@@ -476,26 +476,6 @@ export function DashboardPage({
                       backgroundSize: "46px 46px",
                     }}
                   />
-                  <div className="absolute inset-x-4 top-4 z-10 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-300">
-                        {language === "TH" ? "แผนผังการทำงานจริง" : "Live System Topology"}
-                      </p>
-                      <p className="mt-1 text-[11px] text-slate-400">
-                        {language === "TH" ? "ปั๊ม น้ำ เซนเซอร์ และ alarm อิงจาก telemetry ล่าสุด" : "Pumps, water, sensors, and alarms follow the latest telemetry"}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge className={`${liveSignal ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-200"} hover:bg-emerald-500`}>
-                        <span className={`mr-2 h-2 w-2 rounded-full ${liveSignal ? "dashboard-node-active bg-white" : "bg-slate-400"}`} />
-                        {liveSignal ? "ONLINE" : "OFFLINE"}
-                      </Badge>
-                      <Badge className={`${redOn || floatAlarm || locked ? "bg-red-500 text-white" : "bg-cyan-500 text-white"} hover:bg-cyan-500`}>
-                        {safetyStatusLabel}
-                      </Badge>
-                    </div>
-                  </div>
-
                   <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1000 560" aria-hidden="true">
                     <defs>
                       <linearGradient id="dashboardWaterLine" x1="0%" x2="100%" y1="0%" y2="0%">
@@ -720,43 +700,6 @@ export function DashboardPage({
                       );
                     })}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Tank Status Visualizer */}
-            <Card className="rounded-2xl border-border/70 bg-card/55 shadow-lg">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-                  <span>{t.tankLevels}</span>
-                  <Badge variant="outline" className="border-border text-muted-foreground text-[10px]">
-                    {isOn && activeTank ? `${t.filling} ${activeTank}` : t.idle}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-2 pt-2">
-                  {[1, 2, 3].map((tankId) => {
-                    const isFilled = isOn && !!activeTank && activeTank >= tankId;
-                    const isCurrent = isOn && activeTank === tankId;
-                    return (
-                      <div key={tankId} className="flex flex-col items-center gap-2 group w-full">
-                        <div className={`
-                          relative w-full h-20 sm:h-24 rounded-lg border-2 flex items-end justify-center overflow-hidden transition-all duration-500
-                          ${isCurrent ? "border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)]" : "border-border bg-muted/30"}
-                        `}>
-                          {/* Water Level Animation */}
-                          <div className={`
-                            absolute bottom-0 left-0 right-0 bg-cyan-500/20 transition-all duration-1000
-                            ${(isFilled || isCurrent) ? (isCurrent ? "h-3/4 animate-pulse" : "h-full") : "h-1/4"}
-                          `}></div>
-                          
-                          <Database className={`relative z-10 w-5 h-5 sm:w-6 sm:h-6 mb-6 sm:mb-8 transition-colors ${(isFilled || isCurrent) ? "text-cyan-600 dark:text-cyan-200" : "text-muted-foreground"}`} />
-                          <span className="absolute bottom-1 sm:bottom-2 text-[10px] sm:text-xs font-bold text-muted-foreground">T{tankId}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
               </CardContent>
             </Card>

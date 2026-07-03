@@ -26,6 +26,9 @@ pnpm-debug.log*
 # Misc
 coverage/
 .runtime/
+ai/.venv/
+ai/exports/
+ai/models/
 node_modules
 node_modules
 node_modules

@@ -26,6 +26,7 @@ import { CropReportsPage } from "./pages/CropReportsPage";
 import { DeviceMonitorPage } from "./pages/DeviceMonitorPage";
 import { FarmSettingsPage } from "./pages/FarmSettingsPage";
 import { WeatherDataPage } from "./pages/WeatherDataPage";
+import { SensorIntelligencePage } from "@/features/ai/pages/SensorIntelligencePage";
 import { MachinePerformancePage } from "./pages/MachinePerformancePage";
 import { WolffiaAnalyticsPage } from "./pages/WolffiaAnalyticsPage";
 import { MaintenancePage } from "./pages/MaintenancePage";
@@ -402,7 +403,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       case "Crop Reports":
         return <CropReportsPage language={language} />;
       case "Sensor Intelligence":
-        return <WeatherDataPage language={language} />;
+        return <SensorIntelligencePage language={language} activeDeviceId={activeDeviceId} />;
       case "Device Monitor":
         return <DeviceMonitorPage language={language} />;
       case "Farm Settings":
@@ -576,7 +577,14 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
           {renderContent()}
         </div>
 
-        {showDashboardChatWidget && <CustomerChatWidget language={language} currentPage={t[activePage] || activePage} />}
+        {showDashboardChatWidget && (
+          <CustomerChatWidget
+            language={language}
+            currentPage={t[activePage] || activePage}
+            userContext={user}
+            deviceCount={devices.length}
+          />
+        )}
       </div>
     </div>
   );
