@@ -251,8 +251,13 @@ def answer_control(intent: str, context: dict[str, Any], th: bool) -> dict[str, 
 
 def answer_general(context: dict[str, Any], th: bool) -> dict[str, Any]:
     status = answer_status(context, th)
-    prefix = "ผมเป็น AI controller ของโปรเจกต์นี้แล้วครับ" if th else "I am now acting as this project's AI controller."
-    text = f"{prefix}\nถามได้เรื่องสถานะเครื่อง, ปั๊ม, sensor history, หรือให้ผมเตรียม action ที่ต้องยืนยันก่อนควบคุมเครื่อง\n\n{status['text']}"
+    prefix = "ผมคือ NAT AI ผู้ช่วยเดียวของโปรเจกต์นี้ครับ" if th else "I am NAT AI, this project's unified assistant."
+    scope_line = (
+        "ถามได้หมดในช่องนี้ ทั้งสถานะเครื่อง ปั๊ม sensor history รายงาน การโหลดข้อมูล หรือให้ผมเตรียม action ที่ต้องยืนยันก่อนควบคุมเครื่อง"
+        if th
+        else "You can ask everything here: machine status, pumps, sensor history, reports, data export, or action preparation that requires confirmation before machine control."
+    )
+    text = f"{prefix}\n{scope_line}\n\n{status['text']}"
     return {**status, "text": text, "confidence": 0.68}
 
 

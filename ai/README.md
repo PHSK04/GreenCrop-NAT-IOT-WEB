@@ -48,18 +48,19 @@ If `OPENAI_API_KEY` is empty, NAT AI falls back to the local controller and
 offline helper text. Project data must remain scoped to the authenticated
 user/tenant; do not train or answer by mixing data from other accounts.
 
-## Assistant Modes
+## Assistant Experience
 
-The customer widget separates four roles:
+The customer widget presents one primary assistant:
 
-- `NAT AI` — AI assistant for agriculture-first analysis using this account's
-  GreenCrop context.
-- `Chatbot` — rule/flow-based support bot for common issues. It does not call
-  the AI model.
-- `AI Agent` — action planner for safe next steps such as inspection, export
-  preparation, handoff, or machine-control preparation. Any action that can
-  affect hardware must require explicit confirmation before execution.
-- `Staff` — human support chat.
+- `NAT AI` — unified AI assistant for GreenCrop questions, support-style issues,
+  sensor/machine analysis, reports, exports, and safe action planning using this
+  account's GreenCrop context.
+- `Staff` — optional human support chat when the user asks for a person or when
+  NAT AI sees a case that should be handed off.
+
+NAT AI should answer the user's request directly first instead of asking the user
+to choose between separate Chatbot or Agent modes. Any action that can affect
+hardware must still require explicit confirmation before execution.
 
 ## Data Scope
 

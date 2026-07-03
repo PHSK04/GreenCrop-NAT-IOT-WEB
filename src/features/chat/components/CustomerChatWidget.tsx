@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Send,
   ShieldCheck,
+  Sparkles,
   Trash2,
   UserCheck,
   UserRoundX,
@@ -124,8 +125,8 @@ const createAssistantWelcome = (isTH = true): AssistantMessage => ({
   sender: "ai",
   createdAt: new Date().toISOString(),
   text: isTH
-    ? "สวัสดีครับ ผมคือ NAT AI ถามอะไรก็ได้ในมุมเกษตรและ GreenCrop ได้เลยครับ ถ้าเป็นข้อมูลโปรเจกต์ ผมจะใช้เฉพาะข้อมูลของบัญชีนี้เท่านั้น"
-    : "Hi, I am NAT AI. Ask me anything through an agriculture and GreenCrop lens. For project data, I only use this account's own context.",
+    ? "สวัสดีครับ ผมคือ NAT AI ผู้ช่วยเดียวของโปรเจกต์นี้ ถามได้หมดเลยครับ ทั้งสถานะเครื่อง sensor ปั๊ม รายงาน การโหลดข้อมูล การวางแผน action หรือปัญหาในหน้าเว็บ ถ้าเป็นข้อมูลโปรเจกต์ ผมจะตอบจากข้อมูลของบัญชีนี้เท่านั้น"
+    : "Hi, I am NAT AI, the single assistant for this project. Ask me about machine status, sensors, pumps, reports, data export, action planning, or web app issues. For project data, I only use this account's own context.",
 });
 
 const createChatbotWelcome = (isTH = true): AssistantMessage => ({
@@ -133,8 +134,8 @@ const createChatbotWelcome = (isTH = true): AssistantMessage => ({
   sender: "ai",
   createdAt: new Date().toISOString(),
   text: isTH
-    ? "สวัสดีครับ ผมคือ Chatbot ของ GreenCrop ตอบตาม flow ช่วยเหลือเบื้องต้น เช่น offline, login, sensor, pairing, export และส่งต่อเจ้าหน้าที่ได้ แต่ผมไม่ใช่ NAT AI วิเคราะห์เชิงลึกครับ"
-    : "Hi, I am the GreenCrop Chatbot. I follow support flows for offline, login, sensor, pairing, export, and staff handoff. I am separate from NAT AI deep analysis.",
+    ? "สวัสดีครับ ผมคือ NAT AI ถามปัญหาพื้นฐานหรือเรื่องลึกของ GreenCrop ได้ในช่องเดียวเลยครับ ถ้าควรให้เจ้าหน้าที่ช่วยต่อ ผมจะเสนอส่งต่อให้"
+    : "Hi, I am NAT AI. You can ask common support questions or deeper GreenCrop questions in one place. If staff should help next, I will offer a handoff.",
 });
 
 const createAgentWelcome = (isTH = true): AssistantMessage => ({
@@ -142,8 +143,8 @@ const createAgentWelcome = (isTH = true): AssistantMessage => ({
   sender: "ai",
   createdAt: new Date().toISOString(),
   text: isTH
-    ? "สวัสดีครับ ผมคือ AI Agent ของ GreenCrop ผมช่วยวางแผน action จากข้อมูลบัญชีนี้ได้ เช่น ตรวจระบบ, เตรียมหยุดฉุกเฉิน, เตรียม export, หรือส่งต่อเจ้าหน้าที่ แต่ action ที่กระทบเครื่องจริงต้องกดยืนยันก่อนเสมอ"
-    : "Hi, I am the GreenCrop AI Agent. I can plan actions from this account's context, such as inspection, emergency stop preparation, export preparation, or staff handoff. Any real machine-impacting action requires confirmation first.",
+    ? "สวัสดีครับ ผมคือ NAT AI ผมช่วยวางแผน action จากข้อมูลบัญชีนี้ได้ เช่น ตรวจระบบ เตรียมหยุดฉุกเฉิน เตรียม export หรือส่งต่อเจ้าหน้าที่ โดย action ที่กระทบเครื่องจริงต้องกดยืนยันก่อนเสมอ"
+    : "Hi, I am NAT AI. I can plan actions from this account's context, such as inspection, emergency stop preparation, export preparation, or staff handoff. Any real machine-impacting action requires confirmation first.",
 });
 
 const hasCurrentAssistantContext = (messages: AssistantMessage[]) =>
@@ -1808,9 +1809,90 @@ export function CustomerChatWidget({
 
     return asksForHuman || urgentIssue || machineNeedsAttention || (signalIssue && !liveSignal);
   };
+  const cleanListPrefix = (line: string) => line.replace(/^(\d+\.|[-*•])\s*/, "").trim();
+  const splitKeyValueLine = (line: string) => {
+    const [label, ...valueParts] = line.split(":");
+    return {
+      label: label.trim(),
+      value: valueParts.join(":").trim(),
+    };
+  };
+  const isListLine = (line: string) => /^(\d+\.|[-*•])\s+/.test(line.trim());
+  const isKeyValueLine = (line: string) => {
+    const parts = splitKeyValueLine(line);
+    return Boolean(parts.label && parts.value && parts.label.length <= 34);
+  };
+  const renderRichAssistantBlock = (block: string, index: number) => {
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+    if (lines.length === 0) return null;
+
+    const titleCandidate = lines.length > 1 && !isListLine(lines[0]) && !isKeyValueLine(lines[0]) && lines[0].length <= 70
+      ? lines[0].replace(/[:：]$/, "")
+      : "";
+    const bodyLines = titleCandidate ? lines.slice(1) : lines;
+    const keyValueLines = bodyLines.filter(isKeyValueLine);
+    const listLines = bodyLines.filter(isListLine);
+
+    if (bodyLines.length > 0 && keyValueLines.length >= Math.max(2, bodyLines.length - 1)) {
+      return (
+        <div key={`${index}-${block}`} className="overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50/70 shadow-sm dark:border-emerald-900/55 dark:bg-emerald-950/20">
+          {titleCandidate && (
+            <div className="flex items-center gap-2 border-b border-emerald-100 bg-white/80 px-3 py-2 text-xs font-black text-emerald-700 dark:border-emerald-900/50 dark:bg-slate-950/35 dark:text-emerald-300">
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>{titleCandidate}</span>
+            </div>
+          )}
+          <div className="grid gap-1.5 px-3 py-3 text-xs">
+            {bodyLines.map((line) => {
+              if (!isKeyValueLine(line)) {
+                return <div key={line} className="leading-5 text-slate-700 dark:text-slate-200">{line}</div>;
+              }
+              const item = splitKeyValueLine(line);
+              return (
+                <div key={line} className="grid grid-cols-[minmax(72px,0.48fr)_minmax(0,1fr)] gap-3 rounded-xl bg-white/85 px-3 py-2 dark:bg-slate-950/45">
+                  <span className="min-w-0 break-words font-semibold text-slate-500 dark:text-slate-400">{item.label}</span>
+                  <span className="min-w-0 break-words text-right font-bold text-slate-900 dark:text-slate-100">{item.value}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    if (bodyLines.length > 1 && listLines.length >= Math.max(2, bodyLines.length - 1)) {
+      return (
+        <div key={`${index}-${block}`} className="rounded-2xl border border-cyan-100 bg-cyan-50/60 px-3 py-3 shadow-sm dark:border-cyan-900/45 dark:bg-cyan-950/20">
+          {titleCandidate && <div className="mb-2 text-xs font-black text-cyan-800 dark:text-cyan-200">{titleCandidate}</div>}
+          <div className="space-y-2">
+            {bodyLines.map((line) => (
+              <div key={line} className="flex gap-2 text-sm leading-6 text-slate-800 dark:text-slate-100">
+                <span className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-500" />
+                <span className="min-w-0 break-words">{cleanListPrefix(line)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div key={`${index}-${block}`} className="rounded-2xl bg-slate-50/80 px-3 py-3 text-sm leading-6 text-slate-800 dark:bg-slate-950/40 dark:text-slate-100">
+        {titleCandidate && <div className="mb-1 text-xs font-black text-emerald-700 dark:text-emerald-300">{titleCandidate}</div>}
+        <div className="whitespace-pre-wrap break-words">{bodyLines.join("\n")}</div>
+      </div>
+    );
+  };
   const renderAssistantMessageText = (text: string) => {
     if (!text.startsWith("สรุปผลผลิต\n") && !text.startsWith("Yield summary\n")) {
-      return <div className="whitespace-pre-wrap text-sm leading-6">{text}</div>;
+      const blocks = text.trim().split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
+      return (
+        <div className="space-y-3">
+          {blocks.length > 0
+            ? blocks.map((block, index) => renderRichAssistantBlock(block, index))
+            : <div className="whitespace-pre-wrap break-words text-sm leading-6">{text}</div>}
+        </div>
+      );
     }
 
     const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
@@ -1933,26 +2015,26 @@ export function CustomerChatWidget({
         bottom: "calc(4.5rem + env(safe-area-inset-bottom))",
       };
   const headerTitle = mode === "assistant"
-    ? (isTH ? "NAT AI วิเคราะห์เกษตร" : "NAT AI analysis")
+    ? (isTH ? "NAT AI ผู้ช่วยโปรเจกต์" : "NAT AI project assistant")
     : mode === "chatbot"
-      ? (isTH ? "Chatbot ช่วยเหลือ" : "Support chatbot")
+      ? (isTH ? "NAT AI ผู้ช่วยโปรเจกต์" : "NAT AI project assistant")
       : mode === "agent"
-        ? (isTH ? "AI Agent ปฏิบัติการ" : "AI Agent actions")
+        ? (isTH ? "NAT AI ผู้ช่วยโปรเจกต์" : "NAT AI project assistant")
       : isTH ? "แชทคุยกับเจ้าหน้าที่" : "Chat with support";
   const headerMeta = mode === "assistant"
-    ? (isTH ? "AI วิเคราะห์ข้อมูลบัญชีนี้และบริบท GreenCrop" : "AI analyzes this account's GreenCrop context")
+    ? (isTH ? "ถามได้ทุกเรื่องของ GreenCrop และข้อมูลบัญชีนี้" : "Ask anything about GreenCrop and this account's data")
     : mode === "chatbot"
-      ? (isTH ? "บอท flow พื้นฐาน แยกจาก NAT AI" : "Rule-based bot, separate from NAT AI")
+      ? (isTH ? "ถามได้ทุกเรื่องของ GreenCrop และข้อมูลบัญชีนี้" : "Ask anything about GreenCrop and this account's data")
       : mode === "agent"
-        ? (isTH ? "เสนอ action และต้องยืนยันก่อนเสมอ" : "Proposes actions and requires confirmation")
+        ? (isTH ? "ช่วยตอบ วิเคราะห์ และวางแผน action ในช่องเดียว" : "Answers, analyzes, and plans actions in one place")
       : humanHeaderMeta;
   const headerStatusClass = mode === "human" ? statusToneClass : natStatusTone;
   const headerStatusText = mode === "assistant"
     ? natStatusText
     : mode === "chatbot"
-      ? (isTH ? "ตอบจาก flow ไม่ใช่ AI" : "Flow bot, not AI")
+      ? natStatusText
       : mode === "agent"
-        ? (isTH ? "Agent ไม่สั่งเครื่องเอง" : "Agent never auto-controls")
+        ? (isTH ? "action เครื่องจริงต้องยืนยันก่อน" : "Real machine actions require confirmation")
       : humanHeaderStatus;
 
   const handleLauncherPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -2053,7 +2135,9 @@ export function CustomerChatWidget({
               <div className={`mb-1 text-[11px] ${message.sender === "user" ? "text-emerald-100" : "text-slate-500 dark:text-slate-400"}`}>
                 {message.sender === "user" ? "คุณ" : "NAT AI"}
               </div>
-              {renderAssistantMessageText(message.text)}
+              {message.sender === "user"
+                ? <div className="whitespace-pre-wrap break-words text-sm leading-6">{message.text}</div>
+                : renderAssistantMessageText(message.text)}
 
               {message.canEscalate && (
                 <div className="mt-3">
@@ -2073,7 +2157,7 @@ export function CustomerChatWidget({
           <Input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder={isTH ? "ถาม NAT AI เรื่องเกษตรหรือ GreenCrop..." : "Ask NAT AI about farming or GreenCrop..."}
+            placeholder={isTH ? "ถาม NAT AI ได้ทุกเรื่องของโปรเจกต์..." : "Ask NAT AI anything about this project..."}
             className="h-12 rounded-2xl"
             disabled={isSending}
             onKeyDown={(event) => {
@@ -2085,7 +2169,7 @@ export function CustomerChatWidget({
           />
           <Button className="h-12 rounded-2xl px-4" onClick={() => submitAssistantMessage().catch(() => {})} disabled={isSending || !draft.trim()}>
             <Send className="mr-2 h-4 w-4" />
-            {isSending ? (isTH ? "กำลังคิด" : "Thinking") : isTH ? "ถาม AI" : "Ask AI"}
+            {isSending ? (isTH ? "กำลังคิด" : "Thinking") : isTH ? "ส่ง" : "Send"}
           </Button>
         </div>
       </div>
@@ -2448,7 +2532,7 @@ export function CustomerChatWidget({
                 <>
                   <Button
                     size="icon"
-                    variant={mode === "assistant" ? "secondary" : "ghost"}
+                    variant="secondary"
                     onClick={() => setMode("assistant")}
                     title={isTH ? "ไป NAT AI" : "Open NAT AI"}
                     aria-label={isTH ? "ไป NAT AI" : "Open NAT AI"}
@@ -2457,26 +2541,17 @@ export function CustomerChatWidget({
                   </Button>
                   <Button
                     size="icon"
-                    variant={mode === "chatbot" ? "secondary" : "ghost"}
-                    onClick={() => setMode("chatbot")}
-                    title={isTH ? "ไป Chatbot" : "Open chatbot"}
-                    aria-label={isTH ? "ไป Chatbot" : "Open chatbot"}
+                    variant="ghost"
+                    onClick={() => openHumanChat().catch(() => setMode("human"))}
+                    title={isTH ? "คุยกับเจ้าหน้าที่" : "Chat with staff"}
+                    aria-label={isTH ? "คุยกับเจ้าหน้าที่" : "Chat with staff"}
                   >
                     <MessageCircleMore className="h-4 w-4" />
                   </Button>
                   <Button
                     size="icon"
-                    variant={mode === "agent" ? "secondary" : "ghost"}
-                    onClick={() => setMode("agent")}
-                    title={isTH ? "ไป AI Agent" : "Open AI Agent"}
-                    aria-label={isTH ? "ไป AI Agent" : "Open AI Agent"}
-                  >
-                    <ShieldCheck className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="icon"
                     variant="ghost"
-                    onClick={mode === "assistant" ? resetAssistant : mode === "chatbot" ? resetChatbot : resetAgent}
+                    onClick={resetAssistant}
                     title="Reset"
                   >
                     <RotateCcw className="h-4 w-4" />
@@ -2634,7 +2709,7 @@ export function CustomerChatWidget({
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={resetAssistant}
+                    onClick={() => setMode("assistant")}
                     title={isTH ? "กลับไปหน้า AI" : "Back to AI"}
                     aria-label={isTH ? "กลับไปหน้า AI" : "Back to AI"}
                   >
@@ -2654,27 +2729,13 @@ export function CustomerChatWidget({
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-1 border-b border-emerald-100 bg-white/90 px-3 py-2 text-[11px] font-semibold dark:border-emerald-950 dark:bg-slate-950/90">
+          <div className="grid grid-cols-2 gap-1 border-b border-emerald-100 bg-white/90 px-3 py-2 text-[11px] font-semibold dark:border-emerald-950 dark:bg-slate-950/90">
             <button
               type="button"
               onClick={() => setMode("assistant")}
-              className={`rounded-xl px-2 py-2 transition ${mode === "assistant" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:bg-emerald-50 dark:text-slate-300 dark:hover:bg-emerald-950/30"}`}
+              className={`rounded-xl px-2 py-2 transition ${mode !== "human" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:bg-emerald-50 dark:text-slate-300 dark:hover:bg-emerald-950/30"}`}
             >
               NAT AI
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("chatbot")}
-              className={`rounded-xl px-2 py-2 transition ${mode === "chatbot" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 hover:bg-teal-50 dark:text-slate-300 dark:hover:bg-teal-950/30"}`}
-            >
-              Chatbot
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("agent")}
-              className={`rounded-xl px-2 py-2 transition ${mode === "agent" ? "bg-amber-600 text-white shadow-sm" : "text-slate-600 hover:bg-amber-50 dark:text-slate-300 dark:hover:bg-amber-950/30"}`}
-            >
-              Agent
             </button>
             <button
               type="button"
@@ -2685,7 +2746,7 @@ export function CustomerChatWidget({
             </button>
           </div>
 
-          {mode === "assistant" ? assistantView : mode === "chatbot" ? chatbotView : mode === "agent" ? agentView : humanView}
+          {mode === "human" ? humanView : assistantView}
         </div>
       )}
 
