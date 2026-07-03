@@ -1850,6 +1850,7 @@ app.post('/api/ai-chat/session/me/messages', async (req, res) => {
             aiMessage,
             currentPage,
             machineStatus,
+            projectSnapshot,
             intent,
             shouldEscalate,
         } = req.body || {};
@@ -1942,6 +1943,7 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
                 deviceId,
                 currentPage,
                 machineStatus,
+                projectSnapshot,
             },
             defaultTenantId: DEFAULT_TENANT_ID,
             getSensorTenantCandidates,
@@ -1949,6 +1951,7 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
             loadSensorHistoryRows,
             loadAiChatMessages,
             getTenantLearningSummary,
+            getDevicesForUser,
         });
         const generated = await generateNatAiReply(context, fallbackText);
         const aiText = generated.text;

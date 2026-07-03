@@ -153,6 +153,7 @@ type AiChatExchangePayload = {
 
 type AiChatRespondPayload = Omit<AiChatExchangePayload, "aiMessage"> & {
   fallbackAiMessage?: string;
+  projectSnapshot?: Record<string, unknown>;
 };
 
 const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");

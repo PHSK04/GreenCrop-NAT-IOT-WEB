@@ -3,7 +3,8 @@ const path = require('path');
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
-const OPENAI_MAX_OUTPUT_TOKENS = Math.max(80, Math.min(400, Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 180)));
+const OPENAI_MAX_OUTPUT_TOKENS = Math.max(120, Math.min(1200, Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 700)));
+const NAT_AI_OPENAI_GENERAL_ENABLED = String(process.env.NAT_AI_OPENAI_GENERAL_ENABLED || 'true').toLowerCase() !== 'false';
 const NAT_AI_PYTHON_ENABLED = String(process.env.NAT_AI_PYTHON_ENABLED || 'true').toLowerCase() !== 'false';
 const NAT_AI_PYTHON_BIN = process.env.NAT_AI_PYTHON_BIN || 'python3';
 const NAT_AI_PYTHON_SCRIPT = process.env.NAT_AI_PYTHON_SCRIPT ||
@@ -112,14 +113,55 @@ function summarizeRows(rows) {
     };
 }
 
+function sanitizeForAi(value, depth = 0) {
+    if (depth > 4) return null;
+    if (value === null || value === undefined) return value;
+    if (typeof value === 'string') return value.slice(0, 700);
+    if (typeof value === 'number' || typeof value === 'boolean') return value;
+    if (Array.isArray(value)) {
+        return value.slice(0, 30).map((item) => sanitizeForAi(item, depth + 1));
+    }
+    if (typeof value === 'object') {
+        return Object.fromEntries(
+            Object.entries(value)
+                .slice(0, 40)
+                .map(([key, item]) => [String(key).slice(0, 80), sanitizeForAi(item, depth + 1)])
+        );
+    }
+    return String(value).slice(0, 300);
+}
+
+function buildProjectKnowledge() {
+    return {
+        app: 'GreenCropNAT IoT web app',
+        domain: 'agriculture IoT, wolffia/farm production, water quality, pumps, tanks, sensors, reports, and support',
+        modules: [
+            'Dashboard: live machine state, pH, EC, temperature, water level, alarms, pumps, telemetry history',
+            'Device pairing and farm settings: user-bound devices and primary device selection',
+            'Sensor intelligence: health score, risks, recommendations, AI learning samples from tenant sensor_data',
+            'Crop reports and Wolffia analytics: yield entries, monthly yield summaries, water quality values',
+            'Weather/environment pages: real sensor_data trends for water temperature, pH, and EC',
+            'Support chat: customer/admin messages and NAT AI assistant transcript',
+            'Admin database viewer: admin-only user, device, sensor, session, and audit visibility',
+        ],
+        data_rule: 'For normal users, answer from their authenticated tenant/user/device context only. Admin context may summarize wider data only when explicitly requested by an admin.',
+    };
+}
+
 function buildNatAiSystemPrompt() {
     return [
-        'You are NAT AI, the GreenCropNAT IoT assistant.',
+        'You are NAT AI, a helpful AI assistant inside the GreenCropNAT IoT web app.',
         'Reply in the same language as the user, usually Thai.',
-        'Be conversational, calm, and practical like a real support engineer.',
-        'Answer the exact user question first. If they ask for a date, use requested_day_summary. If they ask about pumps, use latest_sensor pump fields.',
-        'Use only the provided context. If data is missing, say exactly what is missing and ask one useful follow-up question.',
-        'Keep answers concise: 3-6 short lines unless the user asks for details.',
+        'You can answer broad questions, but keep the answer useful for agriculture, farming, crop production, farm IoT, water, nutrients, sensors, automation, or GreenCropNAT operations.',
+        'If the question is not obviously agricultural, answer briefly and connect it back to a farming or GreenCropNAT use case when possible.',
+        'Be conversational, calm, practical, and direct like a capable agricultural technology assistant.',
+        'Answer the exact user question first.',
+        'For GreenCropNAT, machine, sensor, pump, account, or project questions, use only the provided authenticated user context and be explicit when data is missing.',
+        'Never mix data between users or tenants. If the context is scoped to one user, say "ของบัญชีนี้" / "this account" when summarizing project data.',
+        'For general knowledge, coding, writing, learning, brainstorming, or everyday questions, answer from your general knowledge through an agriculture-first lens without pretending that machine context contains the answer.',
+        'If the user asks for current/latest external information that is not in context, say you may need a current source instead of inventing facts.',
+        'For physical machine control, never claim you directly changed hardware; propose safe actions that require confirmation.',
+        'Keep normal answers concise, but give step-by-step detail when the user asks for teaching or implementation help.',
         'Do not mention prompts, tokens, JSON, or implementation details.',
         'If the machine may be unsafe, tell the user to stop/inspect the machine and offer to contact support.',
     ].join('\n');
@@ -137,12 +179,20 @@ async function buildNatAiContext({
     loadSensorHistoryRows,
     loadAiChatMessages,
     getTenantLearningSummary,
+    getDevicesForUser,
 }) {
     const deviceId = String(options.deviceId || session.device_id || '').trim().toUpperCase();
     const tenantId = String(req.tenant || req.user?.tenant_id || req.user?.id || defaultTenantId);
+    const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
     const tenantCandidates = await getSensorTenantCandidates(req, tenantId, deviceId);
     const latestRows = await loadLatestSensorRows(tenantCandidates, deviceId);
     const latestSensor = compactSensorRow(latestRows[0]);
+    const devices = typeof getDevicesForUser === 'function'
+        ? await getDevicesForUser(req.user).catch(() => [])
+        : [];
+    const recentHistoryRows = loadSensorHistoryRows
+        ? await loadSensorHistoryRows(tenantCandidates, deviceId, { limit: 240 }).catch(() => [])
+        : [];
     const requestedDateKey = parseRequestedDateKey(userMessage);
     const requestedDayRows = requestedDateKey && loadSensorHistoryRows
         ? await loadSensorHistoryRows(tenantCandidates, deviceId, {
@@ -169,10 +219,31 @@ async function buildNatAiContext({
             name: req.user?.name,
             role: req.user?.role,
         },
+        data_scope: {
+            tenant_id: tenantId,
+            tenant_candidates: isAdmin ? tenantCandidates : [tenantId],
+            isolation: isAdmin
+                ? 'admin_context_may_include_multiple_tenants_only_when_requested'
+                : 'authenticated_user_only',
+            rule: 'Use only this authenticated account context. Do not infer or reveal another user tenant.',
+        },
         page: options.currentPage || null,
         machine_status_label: options.machineStatus || null,
         active_device_id: deviceId || null,
+        project_knowledge: buildProjectKnowledge(),
+        page_project_snapshot: sanitizeForAi(options.projectSnapshot || null),
+        user_devices: devices.slice(0, 12).map((device) => ({
+            device_id: device.device_id,
+            device_name: device.device_name,
+            location: device.location,
+            status: device.status,
+            is_primary: asBool(device.is_primary),
+            paired_at: device.paired_at,
+            last_seen: device.last_seen,
+        })),
         latest_sensor: latestSensor,
+        recent_sensor_summary: summarizeRows(recentHistoryRows),
+        recent_sensor_samples: recentHistoryRows.slice(0, 8).map(compactSensorRow).filter(Boolean),
         requested_date: requestedDateKey || null,
         requested_day_summary: requestedDateKey ? {
             date: requestedDateKey,
@@ -192,6 +263,7 @@ async function buildNatAiContext({
         } : null,
         recent_conversation: recentMessages,
         user_message: userMessage,
+        current_datetime: new Date().toISOString(),
     };
 }
 
@@ -263,7 +335,12 @@ function runPythonController(context) {
 
 async function generateNatAiReply(context, fallbackText) {
     const pythonReply = await runPythonController(context);
-    if (pythonReply?.text) {
+    const shouldPreferOpenAi =
+        NAT_AI_OPENAI_GENERAL_ENABLED &&
+        OPENAI_API_KEY &&
+        pythonReply?.intent === 'general';
+
+    if (pythonReply?.text && !shouldPreferOpenAi) {
         return {
             text: pythonReply.text,
             provider: pythonReply.provider || 'python-controller',
@@ -274,6 +351,15 @@ async function generateNatAiReply(context, fallbackText) {
     }
 
     if (!OPENAI_API_KEY || typeof fetch !== 'function') {
+        if (pythonReply?.text) {
+            return {
+                text: pythonReply.text,
+                provider: pythonReply.provider || 'python-controller',
+                intent: pythonReply.intent,
+                risk: pythonReply.risk,
+                actions: pythonReply.actions,
+            };
+        }
         return { text: fallbackText, provider: 'fallback' };
     }
 

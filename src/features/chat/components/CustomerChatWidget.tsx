@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   Bot,
   CalendarRange,
+  ClipboardCheck,
   Download,
   FileText,
   MessageCircleMore,
@@ -10,6 +11,7 @@ import {
   Reply,
   RotateCcw,
   Send,
+  ShieldCheck,
   Trash2,
   UserCheck,
   UserRoundX,
@@ -33,7 +35,7 @@ import { toast } from "sonner";
 import { useActiveDeviceId } from "@/hooks/useActiveDeviceId";
 import { useMachine } from "@/contexts/MachineContext";
 import { analyzeSensorIntelligence, formatSensorAiAnswer } from "@/features/ai/services/sensorIntelligence";
-import { CropYieldEntry, readCropYieldEntries, subscribeCropYieldEntries } from "@/utils/cropYieldStore";
+import { CropYieldEntry, getMonthlyYieldSummaries, readCropYieldEntries, subscribeCropYieldEntries } from "@/utils/cropYieldStore";
 
 type CustomerChatWidgetProps = {
   language?: string;
@@ -47,7 +49,17 @@ type CustomerChatWidgetProps = {
   deviceCount?: number;
 };
 
-type AssistantMode = "assistant" | "human";
+type AssistantMode = "assistant" | "chatbot" | "agent" | "human";
+
+type AgentActionType = "machine_control" | "inspect" | "export" | "handoff" | "monitor";
+
+type AgentProposal = {
+  type: AgentActionType;
+  label: string;
+  command?: string;
+  requiresConfirmation: boolean;
+  description: string;
+};
 
 type AssistantMessage = {
   id: string;
@@ -55,12 +67,15 @@ type AssistantMessage = {
   text: string;
   createdAt?: string;
   canEscalate?: boolean;
+  agentProposal?: AgentProposal;
 };
 
 const POLL_MS = 4000;
 const LAUNCHER_POSITION_KEY = "nat_assistant_launcher_position";
 const ASSISTANT_CONTEXT_VERSION = "contextual-live-v3";
 const ASSISTANT_HISTORY_PREFIX = `nat_ai_assistant_history_${ASSISTANT_CONTEXT_VERSION}`;
+const CHATBOT_HISTORY_PREFIX = `nat_chatbot_history_${ASSISTANT_CONTEXT_VERSION}`;
+const AGENT_HISTORY_PREFIX = `nat_ai_agent_history_${ASSISTANT_CONTEXT_VERSION}`;
 const LAUNCHER_BASE_WIDTH = 144;
 const LAUNCHER_BASE_HEIGHT = 184;
 
@@ -109,8 +124,26 @@ const createAssistantWelcome = (isTH = true): AssistantMessage => ({
   sender: "ai",
   createdAt: new Date().toISOString(),
   text: isTH
-    ? "สวัสดีครับ ผมคือ NAT AI เล่าอาการหรือคำถามมาได้เลยครับ ผมจะดูสถานะเครื่อง ข้อมูล sensor ล่าสุด และ history ของบัญชีนี้ประกอบก่อนตอบ"
-    : "Hi, I am NAT AI. Tell me what is happening, and I will answer using this account's machine status, latest sensor data, and telemetry history.",
+    ? "สวัสดีครับ ผมคือ NAT AI ถามอะไรก็ได้ในมุมเกษตรและ GreenCrop ได้เลยครับ ถ้าเป็นข้อมูลโปรเจกต์ ผมจะใช้เฉพาะข้อมูลของบัญชีนี้เท่านั้น"
+    : "Hi, I am NAT AI. Ask me anything through an agriculture and GreenCrop lens. For project data, I only use this account's own context.",
+});
+
+const createChatbotWelcome = (isTH = true): AssistantMessage => ({
+  id: `chatbot-welcome-${ASSISTANT_CONTEXT_VERSION}`,
+  sender: "ai",
+  createdAt: new Date().toISOString(),
+  text: isTH
+    ? "สวัสดีครับ ผมคือ Chatbot ของ GreenCrop ตอบตาม flow ช่วยเหลือเบื้องต้น เช่น offline, login, sensor, pairing, export และส่งต่อเจ้าหน้าที่ได้ แต่ผมไม่ใช่ NAT AI วิเคราะห์เชิงลึกครับ"
+    : "Hi, I am the GreenCrop Chatbot. I follow support flows for offline, login, sensor, pairing, export, and staff handoff. I am separate from NAT AI deep analysis.",
+});
+
+const createAgentWelcome = (isTH = true): AssistantMessage => ({
+  id: `agent-welcome-${ASSISTANT_CONTEXT_VERSION}`,
+  sender: "ai",
+  createdAt: new Date().toISOString(),
+  text: isTH
+    ? "สวัสดีครับ ผมคือ AI Agent ของ GreenCrop ผมช่วยวางแผน action จากข้อมูลบัญชีนี้ได้ เช่น ตรวจระบบ, เตรียมหยุดฉุกเฉิน, เตรียม export, หรือส่งต่อเจ้าหน้าที่ แต่ action ที่กระทบเครื่องจริงต้องกดยืนยันก่อนเสมอ"
+    : "Hi, I am the GreenCrop AI Agent. I can plan actions from this account's context, such as inspection, emergency stop preparation, export preparation, or staff handoff. Any real machine-impacting action requires confirmation first.",
 });
 
 const hasCurrentAssistantContext = (messages: AssistantMessage[]) =>
@@ -322,6 +355,8 @@ export function CustomerChatWidget({
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<AssistantMode>("assistant");
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([createAssistantWelcome(isTH)]);
+  const [chatbotMessages, setChatbotMessages] = useState<AssistantMessage[]>([createChatbotWelcome(isTH)]);
+  const [agentMessages, setAgentMessages] = useState<AssistantMessage[]>([createAgentWelcome(isTH)]);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
   const [thread, setThread] = useState<ChatThread | null>(null);
@@ -345,6 +380,8 @@ export function CustomerChatWidget({
   const [isDraggingLauncher, setIsDraggingLauncher] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
   const assistantListRef = useRef<HTMLDivElement | null>(null);
+  const chatbotListRef = useRef<HTMLDivElement | null>(null);
+  const agentListRef = useRef<HTMLDivElement | null>(null);
   const launcherDragRef = useRef<{
     pointerId: number;
     offsetX: number;
@@ -359,13 +396,27 @@ export function CustomerChatWidget({
   const latestAdminMessageIdRef = useRef<number | null>(null);
   const hasPrimedAdminMessageRef = useRef(false);
   const hasLoadedAssistantHistoryRef = useRef(false);
+  const hasLoadedChatbotHistoryRef = useRef(false);
+  const hasLoadedAgentHistoryRef = useRef(false);
   const skipAssistantHistoryPersistRef = useRef(false);
+  const skipChatbotHistoryPersistRef = useRef(false);
+  const skipAgentHistoryPersistRef = useRef(false);
   const previousAssistantMessageCountRef = useRef(assistantMessages.length);
+  const previousChatbotMessageCountRef = useRef(chatbotMessages.length);
+  const previousAgentMessageCountRef = useRef(agentMessages.length);
   const typingTimeoutRef = useRef<number | null>(null);
 
   const draftKey = useMemo(() => `chat_draft_${selectedThreadId || thread?.id || "pending"}`, [selectedThreadId, thread?.id]);
   const assistantHistoryKey = useMemo(
     () => `${ASSISTANT_HISTORY_PREFIX}_${language}_${activeDeviceId || "no_device"}`,
+    [activeDeviceId, language],
+  );
+  const chatbotHistoryKey = useMemo(
+    () => `${CHATBOT_HISTORY_PREFIX}_${language}_${activeDeviceId || "no_device"}`,
+    [activeDeviceId, language],
+  );
+  const agentHistoryKey = useMemo(
+    () => `${AGENT_HISTORY_PREFIX}_${language}_${activeDeviceId || "no_device"}`,
     [activeDeviceId, language],
   );
   const humanListRef = listRef;
@@ -393,6 +444,24 @@ export function CustomerChatWidget({
 
   const scrollAssistantToBottom = (behavior: ScrollBehavior = "smooth") => {
     const node = assistantListRef.current;
+    if (!node) return;
+    node.scrollTo({
+      top: node.scrollHeight,
+      behavior,
+    });
+  };
+
+  const scrollChatbotToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const node = chatbotListRef.current;
+    if (!node) return;
+    node.scrollTo({
+      top: node.scrollHeight,
+      behavior,
+    });
+  };
+
+  const scrollAgentToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const node = agentListRef.current;
     if (!node) return;
     node.scrollTo({
       top: node.scrollHeight,
@@ -651,6 +720,24 @@ export function CustomerChatWidget({
   }, [assistantMessages, isOpen, mode]);
 
   useEffect(() => {
+    if (!isOpen || mode !== "chatbot") return;
+    const hasNewChatbotMessages = chatbotMessages.length > previousChatbotMessageCountRef.current;
+    window.requestAnimationFrame(() => {
+      scrollChatbotToBottom(hasNewChatbotMessages ? "smooth" : "auto");
+    });
+    previousChatbotMessageCountRef.current = chatbotMessages.length;
+  }, [chatbotMessages, isOpen, mode]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== "agent") return;
+    const hasNewAgentMessages = agentMessages.length > previousAgentMessageCountRef.current;
+    window.requestAnimationFrame(() => {
+      scrollAgentToBottom(hasNewAgentMessages ? "smooth" : "auto");
+    });
+    previousAgentMessageCountRef.current = agentMessages.length;
+  }, [agentMessages, isOpen, mode]);
+
+  useEffect(() => {
     let isMounted = true;
     hasLoadedAssistantHistoryRef.current = false;
 
@@ -714,6 +801,76 @@ export function CustomerChatWidget({
   }, [assistantHistoryKey, assistantMessages]);
 
   useEffect(() => {
+    hasLoadedChatbotHistoryRef.current = false;
+    try {
+      const rawHistory = localStorage.getItem(chatbotHistoryKey);
+      const parsedHistory = rawHistory ? JSON.parse(rawHistory) : null;
+      if (Array.isArray(parsedHistory)) {
+        const validMessages = parsedHistory.filter(isAssistantMessage).slice(-80);
+        if (validMessages.length > 0) {
+          skipChatbotHistoryPersistRef.current = true;
+          setChatbotMessages(validMessages);
+          previousChatbotMessageCountRef.current = validMessages.length;
+          hasLoadedChatbotHistoryRef.current = true;
+          return;
+        }
+      }
+    } catch {
+      localStorage.removeItem(chatbotHistoryKey);
+    }
+
+    const welcome = createChatbotWelcome(isTH);
+    skipChatbotHistoryPersistRef.current = true;
+    setChatbotMessages([welcome]);
+    previousChatbotMessageCountRef.current = 1;
+    hasLoadedChatbotHistoryRef.current = true;
+  }, [chatbotHistoryKey, isTH]);
+
+  useEffect(() => {
+    if (!hasLoadedChatbotHistoryRef.current) return;
+    if (skipChatbotHistoryPersistRef.current) {
+      skipChatbotHistoryPersistRef.current = false;
+      return;
+    }
+    localStorage.setItem(chatbotHistoryKey, JSON.stringify(chatbotMessages.slice(-80)));
+  }, [chatbotHistoryKey, chatbotMessages]);
+
+  useEffect(() => {
+    hasLoadedAgentHistoryRef.current = false;
+    try {
+      const rawHistory = localStorage.getItem(agentHistoryKey);
+      const parsedHistory = rawHistory ? JSON.parse(rawHistory) : null;
+      if (Array.isArray(parsedHistory)) {
+        const validMessages = parsedHistory.filter(isAssistantMessage).slice(-80);
+        if (validMessages.length > 0) {
+          skipAgentHistoryPersistRef.current = true;
+          setAgentMessages(validMessages);
+          previousAgentMessageCountRef.current = validMessages.length;
+          hasLoadedAgentHistoryRef.current = true;
+          return;
+        }
+      }
+    } catch {
+      localStorage.removeItem(agentHistoryKey);
+    }
+
+    const welcome = createAgentWelcome(isTH);
+    skipAgentHistoryPersistRef.current = true;
+    setAgentMessages([welcome]);
+    previousAgentMessageCountRef.current = 1;
+    hasLoadedAgentHistoryRef.current = true;
+  }, [agentHistoryKey, isTH]);
+
+  useEffect(() => {
+    if (!hasLoadedAgentHistoryRef.current) return;
+    if (skipAgentHistoryPersistRef.current) {
+      skipAgentHistoryPersistRef.current = false;
+      return;
+    }
+    localStorage.setItem(agentHistoryKey, JSON.stringify(agentMessages.slice(-80)));
+  }, [agentHistoryKey, agentMessages]);
+
+  useEffect(() => {
     let isMounted = true;
     chatService.getMySensorLearning({
       deviceId: activeDeviceId || undefined,
@@ -774,6 +931,22 @@ export function CustomerChatWidget({
     setError("");
   };
 
+  const resetChatbot = () => {
+    setMode("chatbot");
+    const welcome = createChatbotWelcome(isTH);
+    setChatbotMessages([welcome]);
+    localStorage.removeItem(chatbotHistoryKey);
+    setError("");
+  };
+
+  const resetAgent = () => {
+    setMode("agent");
+    const welcome = createAgentWelcome(isTH);
+    setAgentMessages([welcome]);
+    localStorage.removeItem(agentHistoryKey);
+    setError("");
+  };
+
   const openHumanChat = async () => {
     setMode("human");
     const items = await loadThreads().catch(() => []);
@@ -790,8 +963,7 @@ export function CustomerChatWidget({
     const now = Date.now();
     const shouldEscalate = shouldEscalateAssistantRequest(body);
     const intent = inferAssistantIntent(body);
-    const localAiText = buildLocalAssistantAnswer(body);
-    const fallbackAiText = localAiText || buildAssistantFreeAnswer(body);
+    const fallbackAiText = buildAssistantFreeAnswer(body);
     setIsSending(true);
     setDraft("");
     setAssistantMessages((current) => [
@@ -805,27 +977,6 @@ export function CustomerChatWidget({
       },
     ]);
 
-    if (localAiText) {
-      setAssistantMessages((current) => [
-        ...current.filter((message) => message.id !== `ai-thinking-${now}`),
-        {
-          id: `ai-local-${now}`,
-          sender: "ai",
-          text: localAiText,
-          createdAt: new Date(now + 1).toISOString(),
-          canEscalate: false,
-        },
-      ]);
-      persistAssistantExchange({
-        userMessage: body,
-        aiMessage: localAiText,
-        intent,
-        shouldEscalate: false,
-      });
-      setIsSending(false);
-      return;
-    }
-
     try {
       const { messages } = await chatService.generateAiReply({
         deviceId: activeDeviceId || undefined,
@@ -833,6 +984,7 @@ export function CustomerChatWidget({
         fallbackAiMessage: fallbackAiText,
         currentPage,
         machineStatus: natStatusText,
+        projectSnapshot: buildAssistantProjectSnapshot(),
         intent,
         shouldEscalate,
       });
@@ -862,6 +1014,157 @@ export function CustomerChatWidget({
     } finally {
       setIsSending(false);
     }
+  };
+
+  const submitChatbotMessage = async () => {
+    const body = draft.trim();
+    if (!body || isSending) return;
+    const now = Date.now();
+    const shouldEscalate = shouldEscalateAssistantRequest(body);
+    const localText = buildLocalAssistantAnswer(body) || buildAssistantFreeAnswer(body);
+    setIsSending(true);
+    setDraft("");
+    setChatbotMessages((current) => [
+      ...current,
+      { id: `bot-user-${now}`, sender: "user", text: body, createdAt: new Date(now).toISOString() },
+      {
+        id: `bot-reply-${now}`,
+        sender: "ai",
+        text: localText,
+        createdAt: new Date(now + 1).toISOString(),
+        canEscalate: shouldEscalate,
+      },
+    ]);
+    setIsSending(false);
+  };
+
+  const buildAgentProposal = (body: string): AgentProposal => {
+    const normalizedBody = body.toLowerCase();
+    if (/(หยุด|ปิด|stop|emergency|ฉุกเฉิน|ดับ).*(ปั๊ม|pump|เครื่อง|machine)|(ปั๊ม|pump|เครื่อง|machine).*(หยุด|ปิด|stop|emergency|ฉุกเฉิน|ดับ)/i.test(normalizedBody)) {
+      return {
+        type: "machine_control",
+        command: "EMERGENCY_STOP",
+        requiresConfirmation: true,
+        label: isTH ? "เตรียมหยุดฉุกเฉิน" : "Prepare emergency stop",
+        description: isTH
+          ? "Agent จะเตรียมคำสั่งหยุดฉุกเฉินให้ แต่ยังไม่ส่งคำสั่งจริงจนกว่าจะยืนยันในชั้นควบคุมที่ปลอดภัย"
+          : "The agent will prepare an emergency stop, but it will not send a real command until confirmed in the safe control layer.",
+      };
+    }
+    if (/(เปิด|เริ่ม|start|run).*(ปั๊ม|pump|เครื่อง|machine)|(ปั๊ม|pump|เครื่อง|machine).*(เปิด|เริ่ม|start|run)/i.test(normalizedBody)) {
+      return {
+        type: "machine_control",
+        command: "START",
+        requiresConfirmation: true,
+        label: isTH ? "เตรียมเริ่มเครื่อง" : "Prepare machine start",
+        description: isTH
+          ? "Agent จะเตรียมคำสั่งเริ่มเครื่อง แต่ควรยืนยันหลังตรวจว่าไม่มี lock, ไฟแดง, float alarm หรือค่า pH ผิดช่วง"
+          : "The agent will prepare a start command, but confirmation should happen only after checking lock, red alarm, float alarm, and pH status.",
+      };
+    }
+    if (/(โหลด|ดาวน์โหลด|download|export|ส่งออก|รายงาน|report|csv|pdf)/i.test(normalizedBody)) {
+      return {
+        type: "export",
+        requiresConfirmation: true,
+        label: isTH ? "เตรียม export รายงาน" : "Prepare report export",
+        description: isTH
+          ? "Agent จะจัดขอบเขตข้อมูลของบัญชีนี้ เช่น sensor, crop report, หรือ transcript แล้วให้ผู้ใช้เลือกดาวน์โหลด"
+          : "The agent will scope this account's data, such as sensors, crop reports, or transcript, then let the user choose the download.",
+      };
+    }
+    if (/(เจ้าหน้าที่|แอดมิน|support|staff|admin|human|คนจริง)/i.test(normalizedBody)) {
+      return {
+        type: "handoff",
+        requiresConfirmation: true,
+        label: isTH ? "ส่งต่อเจ้าหน้าที่" : "Hand off to staff",
+        description: isTH
+          ? "Agent จะเปิดช่องแชทเจ้าหน้าที่พร้อมสรุปบริบทปัญหาให้คุยต่อ"
+          : "The agent will open the staff chat with context for follow-up.",
+      };
+    }
+    if (machineNeedsAttention) {
+      return {
+        type: "inspect",
+        requiresConfirmation: true,
+        label: isTH ? "ตรวจระบบที่มีความเสี่ยง" : "Inspect risky system state",
+        description: isTH
+          ? "Agent จะจัดลำดับตรวจ alarm, pump, water level, pH/EC/temp และแนะนำขั้นตอนถัดไปจากข้อมูลบัญชีนี้"
+          : "The agent will check alarms, pumps, water level, pH/EC/temp, and propose next steps from this account's data.",
+      };
+    }
+    return {
+      type: "monitor",
+      requiresConfirmation: false,
+      label: isTH ? "เฝ้าดูและสรุปสถานะ" : "Monitor and summarize",
+      description: isTH
+        ? "Agent จะสรุปสถานะล่าสุด แนวโน้ม และสิ่งที่ควรติดตามจากข้อมูลบัญชีนี้"
+        : "The agent will summarize the latest state, trends, and watch items from this account's data.",
+    };
+  };
+
+  const buildAgentPlanText = (proposal: AgentProposal) => {
+    const sensorLine = `pH ${formatTelemetryValue(phValue || latestTelemetrySnapshot?.phValue || 0, 2)} | EC ${formatTelemetryValue(ecValue || latestTelemetrySnapshot?.ecValue || 0, 2)} | Temp ${formatTelemetryValue(tempValue || latestTelemetrySnapshot?.tempValue || 0, 1)}`;
+    return isTH
+      ? [
+          `แผน Agent: ${proposal.label}`,
+          proposal.description,
+          "",
+          `Active device: ${activeDeviceId || "ยังไม่ได้เลือก"}`,
+          `สถานะเครื่อง: ${natStatusText}`,
+          `ค่าล่าสุด: ${sensorLine}`,
+          `ปั๊ม: Pump1 ${pump1On ? "ON" : "OFF"} | Pump2 ${pump2On ? "ON" : "OFF"}`,
+          proposal.requiresConfirmation ? "ต้องยืนยันก่อนทำ action นี้" : "action นี้เป็นการสรุป/เฝ้าดู ไม่กระทบเครื่องจริง",
+        ].join("\n")
+      : [
+          `Agent plan: ${proposal.label}`,
+          proposal.description,
+          "",
+          `Active device: ${activeDeviceId || "not selected"}`,
+          `Machine status: ${natStatusText}`,
+          `Latest values: ${sensorLine}`,
+          `Pumps: Pump1 ${pump1On ? "ON" : "OFF"} | Pump2 ${pump2On ? "ON" : "OFF"}`,
+          proposal.requiresConfirmation ? "Confirmation is required before this action." : "This is monitor/summary only and does not affect the real machine.",
+        ].join("\n");
+  };
+
+  const submitAgentMessage = async () => {
+    const body = draft.trim();
+    if (!body || isSending) return;
+    const now = Date.now();
+    const proposal = buildAgentProposal(body);
+    setIsSending(true);
+    setDraft("");
+    setAgentMessages((current) => [
+      ...current,
+      { id: `agent-user-${now}`, sender: "user", text: body, createdAt: new Date(now).toISOString() },
+      {
+        id: `agent-plan-${now}`,
+        sender: "ai",
+        text: buildAgentPlanText(proposal),
+        createdAt: new Date(now + 1).toISOString(),
+        canEscalate: proposal.type === "handoff" || machineNeedsAttention,
+        agentProposal: proposal,
+      },
+    ]);
+    setIsSending(false);
+  };
+
+  const confirmAgentProposal = (proposal: AgentProposal) => {
+    const now = Date.now();
+    if (proposal.type === "handoff") {
+      openHumanChat().catch(() => {});
+    }
+    setAgentMessages((current) => [
+      ...current,
+      {
+        id: `agent-confirm-${now}`,
+        sender: "ai",
+        text: isTH
+          ? `ยืนยันแผนแล้ว: ${proposal.label}\nหมายเหตุ: รอบนี้ Agent ยังไม่ส่งคำสั่ง hardware จริงโดยอัตโนมัติ จะทำเฉพาะขั้นตอนปลอดภัย/เปิดหน้าที่เกี่ยวข้องก่อน`
+          : `Plan confirmed: ${proposal.label}\nNote: The agent does not automatically send real hardware commands yet. It only performs safe preparation/navigation steps first.`,
+        createdAt: new Date(now).toISOString(),
+      },
+    ]);
   };
 
   const submitMessage = async () => {
@@ -1101,6 +1404,96 @@ export function CustomerChatWidget({
   };
   const formatTelemetryRowValues = (row: typeof telemetryHistory[number]) =>
     `pH ${formatTelemetryValue(row.phValue, 2)} | EC ${formatTelemetryValue(row.ecValue, 2)} | Temp ${formatTelemetryValue(row.tempValue, 1)} | ปั๊ม1 ${row.pump1On ? "ON" : "OFF"} | ปั๊ม2 ${row.pump2On ? "ON" : "OFF"}`;
+  const buildAssistantProjectSnapshot = () => {
+    const recentYieldEntries = [...cropYieldEntries]
+      .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))
+      .slice(0, 20);
+    const monthlyYield = getMonthlyYieldSummaries(cropYieldEntries, isTH ? "th-TH" : "en-US")
+      .slice(-6)
+      .map((month) => ({
+        month: month.monthLabel,
+        total_yield_g: month.yield,
+        average_yield_g: month.averageYield,
+        harvest_count: month.frequency,
+        avg_ph: month.avgPh,
+        avg_oxygen: month.avgOxygen,
+        avg_ec: month.avgEc,
+        avg_temp: month.avgTemp,
+      }));
+    const totalYield = cropYieldEntries.reduce((sum, entry) => sum + entry.yield, 0);
+
+    return {
+      scope: "frontend snapshot for the currently authenticated account only",
+      page: currentPage,
+      language,
+      user: {
+        id: userContext?.id,
+        name: userContext?.name,
+        role: userContext?.role,
+      },
+      devices: {
+        active_device_id: activeDeviceId || null,
+        loaded_device_count: deviceCount,
+      },
+      live_machine: {
+        status_label: natStatusText,
+        mqtt_status: mqttStatus,
+        board_connected: boardConnected,
+        last_telemetry_at: lastTelemetryAt || latestTelemetrySnapshot?.timestamp || null,
+        telemetry_history_count: telemetryHistory.length,
+        is_on: isOn,
+        pumps: {
+          pump1_on: pump1On,
+          pump2_on: pump2On,
+          active_count: activePumpCount,
+        },
+        water_level: {
+          wls1,
+          wls2,
+          float_alarm: floatAlarm,
+          locked,
+        },
+        values: {
+          ph: phValue || latestTelemetrySnapshot?.phValue || 0,
+          ec: ecValue || latestTelemetrySnapshot?.ecValue || 0,
+          temp_c: tempValue || latestTelemetrySnapshot?.tempValue || 0,
+          ph_ok: phOk,
+        },
+        latest_values_label: latestSensorValues,
+      },
+      sensor_ai: {
+        health_score: sensorAiReport.healthScore,
+        severity: sensorAiReport.severity,
+        status: sensorAiReport.statusText,
+        summary: sensorAiReport.summary,
+        risks: sensorAiReport.risks.slice(0, 6),
+        recommendations: sensorAiReport.recommendations.slice(0, 6),
+        trends: sensorAiReport.trends.slice(0, 6).map((trend) => trend.text),
+      },
+      ai_learning: learningSummary
+        ? {
+            tenant_id: learningSummary.tenant_id,
+            total_samples: learningSummary.total_samples,
+            labels: learningSummary.labels,
+          }
+        : null,
+      crop_yield: {
+        total_entries: cropYieldEntries.length,
+        total_yield_g: Math.round(totalYield * 100) / 100,
+        monthly: monthlyYield,
+        recent_entries: recentYieldEntries.map((entry) => ({
+          date: entry.date,
+          time: entry.time,
+          yield_g: entry.yield,
+          ph: entry.ph,
+          oxygen: entry.oxygen,
+          ec: entry.ec,
+          temp_c: entry.temp,
+          note: entry.note || "",
+        })),
+      },
+    };
+  };
   const buildDateHistoryAnswer = (dateKey: string) => {
     const rows = telemetryHistory
       .filter((row) => formatDateKey(row.timestamp) === dateKey)
@@ -1539,6 +1932,28 @@ export function CustomerChatWidget({
         right: "0.5rem",
         bottom: "calc(4.5rem + env(safe-area-inset-bottom))",
       };
+  const headerTitle = mode === "assistant"
+    ? (isTH ? "NAT AI วิเคราะห์เกษตร" : "NAT AI analysis")
+    : mode === "chatbot"
+      ? (isTH ? "Chatbot ช่วยเหลือ" : "Support chatbot")
+      : mode === "agent"
+        ? (isTH ? "AI Agent ปฏิบัติการ" : "AI Agent actions")
+      : isTH ? "แชทคุยกับเจ้าหน้าที่" : "Chat with support";
+  const headerMeta = mode === "assistant"
+    ? (isTH ? "AI วิเคราะห์ข้อมูลบัญชีนี้และบริบท GreenCrop" : "AI analyzes this account's GreenCrop context")
+    : mode === "chatbot"
+      ? (isTH ? "บอท flow พื้นฐาน แยกจาก NAT AI" : "Rule-based bot, separate from NAT AI")
+      : mode === "agent"
+        ? (isTH ? "เสนอ action และต้องยืนยันก่อนเสมอ" : "Proposes actions and requires confirmation")
+      : humanHeaderMeta;
+  const headerStatusClass = mode === "human" ? statusToneClass : natStatusTone;
+  const headerStatusText = mode === "assistant"
+    ? natStatusText
+    : mode === "chatbot"
+      ? (isTH ? "ตอบจาก flow ไม่ใช่ AI" : "Flow bot, not AI")
+      : mode === "agent"
+        ? (isTH ? "Agent ไม่สั่งเครื่องเอง" : "Agent never auto-controls")
+      : humanHeaderStatus;
 
   const handleLauncherPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
@@ -1658,7 +2073,7 @@ export function CustomerChatWidget({
           <Input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder={isTH ? "พิมพ์ปัญหาให้ AI ช่วยวิเคราะห์..." : "Describe your issue for AI support..."}
+            placeholder={isTH ? "ถาม NAT AI เรื่องเกษตรหรือ GreenCrop..." : "Ask NAT AI about farming or GreenCrop..."}
             className="h-12 rounded-2xl"
             disabled={isSending}
             onKeyDown={(event) => {
@@ -1671,6 +2086,152 @@ export function CustomerChatWidget({
           <Button className="h-12 rounded-2xl px-4" onClick={() => submitAssistantMessage().catch(() => {})} disabled={isSending || !draft.trim()}>
             <Send className="mr-2 h-4 w-4" />
             {isSending ? (isTH ? "กำลังคิด" : "Thinking") : isTH ? "ถาม AI" : "Ask AI"}
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+
+  const chatbotView = (
+    <>
+      <div
+        ref={chatbotListRef}
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain touch-pan-y bg-[linear-gradient(to_right,rgba(20,184,166,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(20,184,166,0.08)_1px,transparent_1px)] bg-[size:24px_24px] px-4 py-4"
+      >
+        <div className="rounded-[1.35rem] border border-teal-100 bg-teal-50/85 px-4 py-4 text-teal-950 shadow-sm dark:border-teal-900/60 dark:bg-teal-950/25 dark:text-teal-50">
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] opacity-80">
+            <MessageCircleMore className="h-4 w-4" />
+            {isTH ? "Chatbot ช่วยเหลือ" : "Support chatbot"}
+          </div>
+          <p className="mt-2 text-sm leading-6">
+            {isTH
+              ? "ตอบจาก flow ที่กำหนดไว้สำหรับปัญหาพื้นฐาน ไม่ใช่โมเดล AI วิเคราะห์ข้อมูลลึก ถ้าต้องวิเคราะห์ข้อมูลบัญชีให้ไปที่ NAT AI"
+              : "Uses predefined support flows for common issues. It is not the deep AI model. Use NAT AI for account data analysis."}
+          </p>
+        </div>
+
+        {chatbotMessages.map((message) => (
+          <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
+            <div className={`max-w-[88%] rounded-[1.35rem] px-4 py-3 shadow-sm ${message.sender === "user" ? "bg-teal-600 text-white" : "border border-teal-100 bg-white text-slate-900 dark:border-teal-950 dark:bg-slate-900 dark:text-slate-100"}`}>
+              <div className={`mb-1 text-[11px] ${message.sender === "user" ? "text-teal-100" : "text-slate-500 dark:text-slate-400"}`}>
+                {message.sender === "user" ? "คุณ" : "Chatbot"}
+              </div>
+              {renderAssistantMessageText(message.text)}
+
+              {message.canEscalate && (
+                <div className="mt-3">
+                  <Button size="sm" className="rounded-full" onClick={() => openHumanChat().catch(() => {})}>
+                    <MessageCircleMore className="mr-2 h-4 w-4" />
+                    {isTH ? "ส่งต่อเจ้าหน้าที่" : "Hand off to staff"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t border-slate-200/80 bg-white/96 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/96">
+        <div className="flex items-end gap-2">
+          <Input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={isTH ? "ถาม Chatbot เรื่องปัญหาพื้นฐาน..." : "Ask the chatbot about common issues..."}
+            className="h-12 rounded-2xl"
+            disabled={isSending}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                submitChatbotMessage().catch(() => {});
+              }
+            }}
+          />
+          <Button className="h-12 rounded-2xl px-4" onClick={() => submitChatbotMessage().catch(() => {})} disabled={isSending || !draft.trim()}>
+            <Send className="mr-2 h-4 w-4" />
+            {isTH ? "ถามบอท" : "Ask bot"}
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+
+  const agentView = (
+    <>
+      <div
+        ref={agentListRef}
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain touch-pan-y bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.18),transparent_34%),linear-gradient(to_right,rgba(245,158,11,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(245,158,11,0.08)_1px,transparent_1px)] bg-[size:auto,24px_24px,24px_24px] px-4 py-4"
+      >
+        <div className="rounded-[1.35rem] border border-amber-200 bg-amber-50/90 px-4 py-4 text-amber-950 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-50">
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] opacity-80">
+            <ShieldCheck className="h-4 w-4" />
+            {isTH ? "AI Agent แบบปลอดภัย" : "Safe AI Agent"}
+          </div>
+          <p className="mt-2 text-sm leading-6">
+            {isTH
+              ? "Agent ช่วยวางแผนและเตรียม action จากข้อมูลบัญชีนี้ แต่ action ที่กระทบเครื่องจริงต้องยืนยันก่อน และรอบนี้ยังไม่ส่งคำสั่ง hardware อัตโนมัติ"
+              : "The agent plans and prepares actions from this account's context. Any real machine-impacting action requires confirmation, and this version does not auto-send hardware commands."}
+          </p>
+        </div>
+
+        {agentMessages.map((message) => (
+          <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
+            <div className={`max-w-[88%] rounded-[1.35rem] px-4 py-3 shadow-sm ${message.sender === "user" ? "bg-amber-600 text-white" : "border border-amber-100 bg-white text-slate-900 dark:border-amber-950 dark:bg-slate-900 dark:text-slate-100"}`}>
+              <div className={`mb-1 text-[11px] ${message.sender === "user" ? "text-amber-100" : "text-slate-500 dark:text-slate-400"}`}>
+                {message.sender === "user" ? "คุณ" : "AI Agent"}
+              </div>
+              {renderAssistantMessageText(message.text)}
+
+              {message.agentProposal && (
+                <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-100">
+                  <div className="flex items-center gap-2 font-bold">
+                    <ClipboardCheck className="h-4 w-4" />
+                    {message.agentProposal.label}
+                  </div>
+                  <div className="mt-1 leading-5 opacity-85">{message.agentProposal.description}</div>
+                  <Button
+                    size="sm"
+                    className="mt-3 rounded-full"
+                    onClick={() => confirmAgentProposal(message.agentProposal!)}
+                  >
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    {message.agentProposal.requiresConfirmation
+                      ? (isTH ? "ยืนยันแผนนี้" : "Confirm this plan")
+                      : (isTH ? "รับทราบ" : "Acknowledge")}
+                  </Button>
+                </div>
+              )}
+
+              {message.canEscalate && (
+                <div className="mt-3">
+                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => openHumanChat().catch(() => {})}>
+                    <MessageCircleMore className="mr-2 h-4 w-4" />
+                    {isTH ? "ส่งต่อเจ้าหน้าที่" : "Hand off to staff"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t border-slate-200/80 bg-white/96 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/96">
+        <div className="flex items-end gap-2">
+          <Input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={isTH ? "ให้ Agent วางแผน action..." : "Ask the agent to plan an action..."}
+            className="h-12 rounded-2xl"
+            disabled={isSending}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                submitAgentMessage().catch(() => {});
+              }
+            }}
+          />
+          <Button className="h-12 rounded-2xl px-4" onClick={() => submitAgentMessage().catch(() => {})} disabled={isSending || !draft.trim()}>
+            <Send className="mr-2 h-4 w-4" />
+            {isTH ? "ให้ Agent ทำแผน" : "Plan"}
           </Button>
         </div>
       </div>
@@ -1871,31 +2432,56 @@ export function CustomerChatWidget({
               <NatAssistantAvatar compact statusClass={natStatusTone} />
               <div className="min-w-0 flex-1">
                 <div className="line-clamp-2 text-base font-black leading-5 text-slate-900 sm:truncate sm:text-base dark:text-slate-100">
-                  {mode === "assistant" ? (isTH ? "NAT AI ช่วยเหลือ" : "NAT AI assistant") : isTH ? "แชทคุยกับเจ้าหน้าที่" : "Chat with support"}
+                  {headerTitle}
                 </div>
                 <div className="line-clamp-2 pr-2 text-[12px] leading-5 text-slate-500 sm:text-xs dark:text-slate-400">
-                  {mode === "assistant"
-                    ? isTH ? "ตรวจสถานะเครื่อง + ช่วยไล่ปัญหาในปุ่มเดียว" : "Machine status and troubleshooting in one place"
-                    : humanHeaderMeta}
+                  {headerMeta}
                 </div>
-                {mode === "assistant" ? (
-                  <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
-                    <span className={`h-2 w-2 rounded-full ${natStatusTone}`} />
-                    <span className="truncate">{natStatusText}</span>
-                  </div>
-                ) : (
-                  <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
-                    <span className={`h-2 w-2 rounded-full ${statusToneClass}`} />
-                    <span className="truncate">{humanHeaderStatus}</span>
-                  </div>
-                )}
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                  <span className={`h-2 w-2 rounded-full ${headerStatusClass}`} />
+                  <span className="truncate">{headerStatusText}</span>
+                </div>
               </div>
             </div>
             <div className="ml-2 flex shrink-0 flex-wrap justify-end gap-1 sm:flex-nowrap sm:gap-2">
-              {mode === "assistant" ? (
-                <Button size="icon" variant="ghost" onClick={resetAssistant} title="Reset">
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
+              {mode !== "human" ? (
+                <>
+                  <Button
+                    size="icon"
+                    variant={mode === "assistant" ? "secondary" : "ghost"}
+                    onClick={() => setMode("assistant")}
+                    title={isTH ? "ไป NAT AI" : "Open NAT AI"}
+                    aria-label={isTH ? "ไป NAT AI" : "Open NAT AI"}
+                  >
+                    <Bot className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant={mode === "chatbot" ? "secondary" : "ghost"}
+                    onClick={() => setMode("chatbot")}
+                    title={isTH ? "ไป Chatbot" : "Open chatbot"}
+                    aria-label={isTH ? "ไป Chatbot" : "Open chatbot"}
+                  >
+                    <MessageCircleMore className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant={mode === "agent" ? "secondary" : "ghost"}
+                    onClick={() => setMode("agent")}
+                    title={isTH ? "ไป AI Agent" : "Open AI Agent"}
+                    aria-label={isTH ? "ไป AI Agent" : "Open AI Agent"}
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={mode === "assistant" ? resetAssistant : mode === "chatbot" ? resetChatbot : resetAgent}
+                    title="Reset"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </>
               ) : (
                 <>
                   <Sheet open={isHistoryFilterOpen} onOpenChange={setIsHistoryFilterOpen}>
@@ -2068,7 +2654,38 @@ export function CustomerChatWidget({
             </div>
           </div>
 
-          {mode === "assistant" ? assistantView : humanView}
+          <div className="grid grid-cols-4 gap-1 border-b border-emerald-100 bg-white/90 px-3 py-2 text-[11px] font-semibold dark:border-emerald-950 dark:bg-slate-950/90">
+            <button
+              type="button"
+              onClick={() => setMode("assistant")}
+              className={`rounded-xl px-2 py-2 transition ${mode === "assistant" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:bg-emerald-50 dark:text-slate-300 dark:hover:bg-emerald-950/30"}`}
+            >
+              NAT AI
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("chatbot")}
+              className={`rounded-xl px-2 py-2 transition ${mode === "chatbot" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 hover:bg-teal-50 dark:text-slate-300 dark:hover:bg-teal-950/30"}`}
+            >
+              Chatbot
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("agent")}
+              className={`rounded-xl px-2 py-2 transition ${mode === "agent" ? "bg-amber-600 text-white shadow-sm" : "text-slate-600 hover:bg-amber-50 dark:text-slate-300 dark:hover:bg-amber-950/30"}`}
+            >
+              Agent
+            </button>
+            <button
+              type="button"
+              onClick={() => openHumanChat().catch(() => setMode("human"))}
+              className={`rounded-xl px-2 py-2 transition ${mode === "human" ? "bg-slate-800 text-white shadow-sm dark:bg-slate-100 dark:text-slate-950" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"}`}
+            >
+              {isTH ? "เจ้าหน้าที่" : "Staff"}
+            </button>
+          </div>
+
+          {mode === "assistant" ? assistantView : mode === "chatbot" ? chatbotView : mode === "agent" ? agentView : humanView}
         </div>
       )}
 

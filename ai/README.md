@@ -30,8 +30,36 @@ NAT_AI_PYTHON_SCRIPT=ai/controller/nat_ai_controller.py
 NAT_AI_PYTHON_TIMEOUT_MS=2500
 ```
 
-OpenAI is still available as the generative fallback when the Python controller
-cannot answer.
+OpenAI is the generative layer for questions that should feel broad but still
+agriculture-first. NAT AI can answer general questions, then connect the answer
+back to farming, crop production, GreenCropNAT, IoT, water, nutrients, sensors,
+or automation. The Python controller still answers deterministic machine, pump,
+sensor, export, and safety questions first. General agriculture-first questions
+are routed to OpenAI when these values are present in `server/.env`:
+
+```bash
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_MAX_OUTPUT_TOKENS=700
+NAT_AI_OPENAI_GENERAL_ENABLED=true
+```
+
+If `OPENAI_API_KEY` is empty, NAT AI falls back to the local controller and
+offline helper text. Project data must remain scoped to the authenticated
+user/tenant; do not train or answer by mixing data from other accounts.
+
+## Assistant Modes
+
+The customer widget separates four roles:
+
+- `NAT AI` — AI assistant for agriculture-first analysis using this account's
+  GreenCrop context.
+- `Chatbot` — rule/flow-based support bot for common issues. It does not call
+  the AI model.
+- `AI Agent` — action planner for safe next steps such as inspection, export
+  preparation, handoff, or machine-control preparation. Any action that can
+  affect hardware must require explicit confirmation before execution.
+- `Staff` — human support chat.
 
 ## Data Scope
 
