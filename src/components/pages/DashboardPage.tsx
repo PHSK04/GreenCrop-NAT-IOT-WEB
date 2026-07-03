@@ -438,63 +438,6 @@ export function DashboardPage({
           </Card>
         </div>
 
-        {/* Water Quality Metrics */}
-        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {[
-            {
-              title: t.metrics.ph.title,
-              value: stablePhValue != null ? stablePhValue.toFixed(2) : "--",
-              status: stablePhValue != null ? (stablePhOk ? "OK" : "CHECK") : "WAITING",
-              desc: t.metrics.ph.desc,
-              icon: Beaker,
-              color: "text-blue-500 dark:text-blue-400",
-              bgColor: "bg-blue-500/10",
-              unit: "",
-            },
-            {
-              title: t.metrics.temp.title,
-              value: stableTempValue != null ? stableTempValue.toFixed(1) : "--",
-              unit: "C",
-              status: stableTempValue != null ? "LIVE" : "WAITING",
-              desc: t.metrics.temp.desc,
-              icon: Thermometer,
-              color: "text-cyan-600 dark:text-cyan-400",
-              bgColor: "bg-cyan-500/10",
-            },
-            {
-              title: t.metrics.ec.title,
-              value: stableEcValue != null ? stableEcValue.toFixed(2) : "--",
-              unit: "mS/cm",
-              status: stableEcValue != null ? "LIVE" : "WAITING",
-              desc: t.metrics.ec.desc,
-              icon: Zap,
-              color: "text-yellow-600 dark:text-yellow-400",
-              bgColor: "bg-yellow-500/10",
-            },
-          ].map((metric) => (
-            <Card key={metric.title} className="rounded-2xl border-border/70 bg-card/70 shadow-sm backdrop-blur-sm">
-              <CardContent className="flex min-h-24 items-center justify-between gap-3 p-4">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${metric.bgColor}`}>
-                    <metric.icon className={`h-5 w-5 ${metric.color}`} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-bold leading-none text-foreground">{metric.value}</span>
-                      {metric.unit && <span className="text-xs font-medium text-muted-foreground">{metric.unit}</span>}
-                    </div>
-                    <h3 className="mt-1 truncate text-sm font-semibold text-foreground">{metric.title}</h3>
-                    <p className="truncate text-[11px] text-muted-foreground">{metric.desc}</p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="shrink-0 border-border bg-background/60 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {metric.status}
-                </Badge>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
         {/* Machine Control Section (Hero) */}
         <div className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-8">
           
@@ -626,35 +569,87 @@ export function DashboardPage({
               </CardContent>
             </Card>
 
-            {/* Sensor Health Status */}
-            <Card className="rounded-2xl border-border/70 bg-card/55 shadow-lg">
-               <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${!boardConnected ? "bg-muted text-muted-foreground" : locked || floatAlarm ? "bg-red-500/10 text-red-500" : isOn ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"}`}>
-                       <Cpu className="w-5 h-5" />
+            {/* Sensor Health + Water Quality */}
+            <div className="grid grid-cols-1 gap-3 min-[520px]:grid-cols-[1fr_1.35fr]">
+              <Card className="rounded-2xl border-border/70 bg-card/55 shadow-lg">
+                 <CardContent className="flex h-full flex-col justify-between gap-4 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`rounded-full p-2 ${!boardConnected ? "bg-muted text-muted-foreground" : locked || floatAlarm ? "bg-red-500/10 text-red-500" : isOn ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"}`}>
+                         <Cpu className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">{t.sensorNetwork}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          {!boardConnected
+                            ? (language === "TH" ? "ยังไม่มีสัญญาณสดจากบอร์ด" : "No live board telemetry")
+                            : locked
+                            ? (language === "TH" ? "หยุดฉุกเฉินและล็อคระบบ" : "Emergency lock active")
+                            : floatAlarm
+                              ? (language === "TH" ? "ลูกลอยแจ้งเตือน" : "Float alarm")
+                              : wls1 || wls2
+                                ? t.sensorsOk
+                                : t.standby}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-foreground">{t.sensorNetwork}</h4>
-                      <p className="text-xs text-muted-foreground">
-                        {!boardConnected
-                          ? (language === "TH" ? "ยังไม่มีสัญญาณสดจากบอร์ด" : "No live board telemetry")
-                          : locked
-                          ? (language === "TH" ? "หยุดฉุกเฉินและล็อคระบบ" : "Emergency lock active")
-                          : floatAlarm
-                            ? (language === "TH" ? "ลูกลอยแจ้งเตือน" : "Float alarm")
-                            : wls1 || wls2
-                              ? t.sensorsOk
-                              : t.standby}
-                      </p>
+                    <span className={`w-fit rounded border border-border bg-muted px-2 py-1 text-xs font-bold ${!boardConnected ? "text-muted-foreground" : locked || floatAlarm ? "text-red-500" : isOn ? "text-emerald-500" : "text-muted-foreground"}`}>
+                      {!boardConnected ? (language === "TH" ? "ไม่มีสัญญาณ" : "NO SIGNAL") : locked ? "LOCKED" : floatAlarm ? "ALARM" : isOn ? t.statusOnline : t.statusSleep}
+                    </span>
+                 </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border-border/70 bg-card/55 shadow-lg">
+                <CardContent className="grid h-full gap-2 p-3">
+                  {[
+                    {
+                      title: t.metrics.ph.title,
+                      value: stablePhValue != null ? stablePhValue.toFixed(2) : "--",
+                      status: stablePhValue != null ? (stablePhOk ? "OK" : "CHECK") : "WAITING",
+                      icon: Beaker,
+                      color: "text-blue-500 dark:text-blue-400",
+                      bgColor: "bg-blue-500/10",
+                      unit: "",
+                    },
+                    {
+                      title: t.metrics.temp.title,
+                      value: stableTempValue != null ? stableTempValue.toFixed(1) : "--",
+                      unit: "C",
+                      status: stableTempValue != null ? "LIVE" : "WAITING",
+                      icon: Thermometer,
+                      color: "text-cyan-600 dark:text-cyan-400",
+                      bgColor: "bg-cyan-500/10",
+                    },
+                    {
+                      title: t.metrics.ec.title,
+                      value: stableEcValue != null ? stableEcValue.toFixed(2) : "--",
+                      unit: "mS/cm",
+                      status: stableEcValue != null ? "LIVE" : "WAITING",
+                      icon: Zap,
+                      color: "text-yellow-600 dark:text-yellow-400",
+                      bgColor: "bg-yellow-500/10",
+                    },
+                  ].map((metric) => (
+                    <div key={metric.title} className="flex min-h-14 items-center justify-between gap-2 rounded-xl border border-border/70 bg-background/45 px-3 py-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${metric.bgColor}`}>
+                          <metric.icon className={`h-4 w-4 ${metric.color}`} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-lg font-bold leading-none text-foreground">{metric.value}</span>
+                            {metric.unit && <span className="text-[10px] font-medium text-muted-foreground">{metric.unit}</span>}
+                          </div>
+                          <p className="truncate text-[11px] font-semibold text-muted-foreground">{metric.title}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="shrink-0 border-border bg-background/60 text-[9px] uppercase tracking-wider text-muted-foreground">
+                        {metric.status}
+                      </Badge>
                     </div>
-                  </div>
-                  <div className="text-right">
-                     <span className={`text-xs font-bold px-2 py-1 rounded bg-muted border border-border ${!boardConnected ? "text-muted-foreground" : locked || floatAlarm ? "text-red-500" : isOn ? "text-emerald-500" : "text-muted-foreground"}`}>
-                       {!boardConnected ? (language === "TH" ? "ไม่มีสัญญาณ" : "NO SIGNAL") : locked ? "LOCKED" : floatAlarm ? "ALARM" : isOn ? t.statusOnline : t.statusSleep}
-                     </span>
-                  </div>
-               </CardContent>
-            </Card>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
 
           </div>
         </div>
