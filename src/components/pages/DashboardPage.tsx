@@ -570,7 +570,7 @@ export function DashboardPage({
             </Card>
 
             {/* Sensor Health + Water Quality */}
-            <div className="grid grid-cols-1 gap-3 min-[520px]:grid-cols-[1fr_1.35fr]">
+            <div className="grid grid-cols-1 gap-3">
               <Card className="rounded-2xl border-border/70 bg-card/55 shadow-lg">
                  <CardContent className="flex h-full flex-col justify-between gap-4 p-4">
                     <div className="flex items-center gap-3">
