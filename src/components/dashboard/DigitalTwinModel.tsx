@@ -145,8 +145,13 @@ export function DigitalTwinModel({
             <PumpUnit size={70} on={p1On} color={C.cyan} label="P1 - Auto" />
           </div>
           <TankCard pct={tank2Level} markOn={liveSignal && wls2} name={isTH ? "ถัง 2" : "Tank 2"} sub="Preparation" color="#38bdf8" />
-          <div style={{ display: "flex", flex: "1 1 210px", minWidth: 180, maxWidth: 260, flexDirection: "column", alignItems: "center", gap: 8, marginTop: -70, overflow: "visible" }}>
-            <Pipe on={p2On} vertical color={C.green} height={24} />
+          <div style={{ display: "flex", flex: "1 1 210px", minWidth: 180, maxWidth: 260, flexDirection: "column", alignItems: "center", gap: 8, marginTop: -70, overflow: "visible", position: "relative" }}>
+            <div style={{ bottom: 88, left: "50%", position: "absolute", transform: "translateX(-50%)", zIndex: 0 }}>
+              <Pipe on={p2On} vertical color={C.green} height={430} />
+            </div>
+            <div style={{ position: "relative", zIndex: 1 }}>
+              <Pipe on={p2On} vertical color={C.green} height={34} />
+            </div>
             <Pipe on={p2On} horizontal color={C.green} extend />
             <PumpUnit size={70} on={p2On} color={C.green} label="P2 - Manual" />
           </div>
