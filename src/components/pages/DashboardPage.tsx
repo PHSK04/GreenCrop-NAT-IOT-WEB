@@ -597,63 +597,62 @@ export function DashboardPage({
                     </span>
                  </CardContent>
               </Card>
+
+              <Card className="rounded-2xl border-border/70 bg-card/65 shadow-lg backdrop-blur-sm">
+                <CardContent className="grid gap-3 p-5">
+                  {[
+                    {
+                      title: t.metrics.ph.title,
+                      value: stablePhValue != null ? stablePhValue.toFixed(2) : "--",
+                      status: stablePhValue != null ? (stablePhOk ? "OK" : "CHECK") : "WAITING",
+                      icon: Beaker,
+                      color: "text-blue-500 dark:text-blue-400",
+                      bgColor: "bg-blue-500/10",
+                      unit: "",
+                    },
+                    {
+                      title: t.metrics.temp.title,
+                      value: stableTempValue != null ? stableTempValue.toFixed(1) : "--",
+                      unit: "C",
+                      status: stableTempValue != null ? "LIVE" : "WAITING",
+                      icon: Thermometer,
+                      color: "text-cyan-600 dark:text-cyan-400",
+                      bgColor: "bg-cyan-500/10",
+                    },
+                    {
+                      title: t.metrics.ec.title,
+                      value: stableEcValue != null ? stableEcValue.toFixed(2) : "--",
+                      unit: "mS/cm",
+                      status: stableEcValue != null ? "LIVE" : "WAITING",
+                      icon: Zap,
+                      color: "text-yellow-600 dark:text-yellow-400",
+                      bgColor: "bg-yellow-500/10",
+                    },
+                  ].map((metric) => (
+                    <div key={metric.title} className="flex min-h-20 items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/45 px-5 py-4">
+                      <div className="flex min-w-0 items-center gap-4">
+                        <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${metric.bgColor}`}>
+                          <metric.icon className={`h-6 w-6 ${metric.color}`} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-3xl font-bold leading-none text-foreground">{metric.value}</span>
+                            {metric.unit && <span className="text-sm font-medium text-muted-foreground">{metric.unit}</span>}
+                          </div>
+                          <p className="mt-1 truncate text-base font-semibold text-muted-foreground">{metric.title}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="shrink-0 border-border bg-background/60 px-4 py-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+                        {metric.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
             </div>
 
           </div>
         </div>
-
-        {/* Water Quality Metrics */}
-        <Card className="mb-10 rounded-2xl border-border/70 bg-card/65 shadow-lg backdrop-blur-sm">
-          <CardContent className="grid gap-3 p-5">
-            {[
-              {
-                title: t.metrics.ph.title,
-                value: stablePhValue != null ? stablePhValue.toFixed(2) : "--",
-                status: stablePhValue != null ? (stablePhOk ? "OK" : "CHECK") : "WAITING",
-                icon: Beaker,
-                color: "text-blue-500 dark:text-blue-400",
-                bgColor: "bg-blue-500/10",
-                unit: "",
-              },
-              {
-                title: t.metrics.temp.title,
-                value: stableTempValue != null ? stableTempValue.toFixed(1) : "--",
-                unit: "C",
-                status: stableTempValue != null ? "LIVE" : "WAITING",
-                icon: Thermometer,
-                color: "text-cyan-600 dark:text-cyan-400",
-                bgColor: "bg-cyan-500/10",
-              },
-              {
-                title: t.metrics.ec.title,
-                value: stableEcValue != null ? stableEcValue.toFixed(2) : "--",
-                unit: "mS/cm",
-                status: stableEcValue != null ? "LIVE" : "WAITING",
-                icon: Zap,
-                color: "text-yellow-600 dark:text-yellow-400",
-                bgColor: "bg-yellow-500/10",
-              },
-            ].map((metric) => (
-              <div key={metric.title} className="flex min-h-20 items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/45 px-5 py-4">
-                <div className="flex min-w-0 items-center gap-4">
-                  <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${metric.bgColor}`}>
-                    <metric.icon className={`h-6 w-6 ${metric.color}`} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold leading-none text-foreground">{metric.value}</span>
-                      {metric.unit && <span className="text-sm font-medium text-muted-foreground">{metric.unit}</span>}
-                    </div>
-                    <p className="mt-1 truncate text-base font-semibold text-muted-foreground">{metric.title}</p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="shrink-0 border-border bg-background/60 px-4 py-1.5 text-xs uppercase tracking-wider text-muted-foreground">
-                  {metric.status}
-                </Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
         
         {/* Charts Row */}
         <div className="mb-10">
