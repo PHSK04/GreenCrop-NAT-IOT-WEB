@@ -438,6 +438,63 @@ export function DashboardPage({
           </Card>
         </div>
 
+        {/* Water Quality Metrics */}
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[
+            {
+              title: t.metrics.ph.title,
+              value: stablePhValue != null ? stablePhValue.toFixed(2) : "--",
+              status: stablePhValue != null ? (stablePhOk ? "OK" : "CHECK") : "WAITING",
+              desc: t.metrics.ph.desc,
+              icon: Beaker,
+              color: "text-blue-500 dark:text-blue-400",
+              bgColor: "bg-blue-500/10",
+              unit: "",
+            },
+            {
+              title: t.metrics.temp.title,
+              value: stableTempValue != null ? stableTempValue.toFixed(1) : "--",
+              unit: "C",
+              status: stableTempValue != null ? "LIVE" : "WAITING",
+              desc: t.metrics.temp.desc,
+              icon: Thermometer,
+              color: "text-cyan-600 dark:text-cyan-400",
+              bgColor: "bg-cyan-500/10",
+            },
+            {
+              title: t.metrics.ec.title,
+              value: stableEcValue != null ? stableEcValue.toFixed(2) : "--",
+              unit: "mS/cm",
+              status: stableEcValue != null ? "LIVE" : "WAITING",
+              desc: t.metrics.ec.desc,
+              icon: Zap,
+              color: "text-yellow-600 dark:text-yellow-400",
+              bgColor: "bg-yellow-500/10",
+            },
+          ].map((metric) => (
+            <Card key={metric.title} className="rounded-2xl border-border/70 bg-card/70 shadow-sm backdrop-blur-sm">
+              <CardContent className="flex min-h-24 items-center justify-between gap-3 p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${metric.bgColor}`}>
+                    <metric.icon className={`h-5 w-5 ${metric.color}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold leading-none text-foreground">{metric.value}</span>
+                      {metric.unit && <span className="text-xs font-medium text-muted-foreground">{metric.unit}</span>}
+                    </div>
+                    <h3 className="mt-1 truncate text-sm font-semibold text-foreground">{metric.title}</h3>
+                    <p className="truncate text-[11px] text-muted-foreground">{metric.desc}</p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="shrink-0 border-border bg-background/60 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {metric.status}
+                </Badge>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
         {/* Machine Control Section (Hero) */}
         <div className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-8">
           
@@ -602,67 +659,6 @@ export function DashboardPage({
           </div>
         </div>
         
-        {/* Water Quality & Analytics Metrics */}
-        <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
-          {[
-            {
-              title: t.metrics.ph.title,
-              value: stablePhValue != null ? stablePhValue.toFixed(2) : "--",
-              status: stablePhValue != null ? (stablePhOk ? "Optimal" : "Check") : "Waiting",
-              desc: t.metrics.ph.desc,
-              icon: Beaker,
-              color: "text-blue-500 dark:text-blue-400",
-              bgColor: "bg-blue-500/10",
-            },
-            {
-              title: t.metrics.temp.title,
-              value: stableTempValue != null ? stableTempValue.toFixed(1) : "--",
-              unit: "C",
-              status: stableTempValue != null ? "Live" : "Waiting",
-              desc: t.metrics.temp.desc,
-              icon: Thermometer,
-              color: "text-cyan-600 dark:text-cyan-400",
-              bgColor: "bg-cyan-500/10",
-            },
-            {
-              title: t.metrics.ec.title,
-              value: stableEcValue != null ? stableEcValue.toFixed(2) : "--",
-              unit: "mS/cm",
-              status: stableEcValue != null ? "Live" : "Waiting",
-              desc: t.metrics.ec.desc,
-              icon: Zap,
-              color: "text-yellow-600 dark:text-yellow-400", 
-              bgColor: "bg-yellow-500/10",
-              detail: "Current capability to conduct electrical current."
-            },
-          ].map((metric) => (
-            <Card key={metric.title} className="rounded-2xl border-border/70 bg-card/65 shadow-md backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-              <CardHeader className="pb-2 p-4">
-                <div className="flex justify-between items-start">
-                  <div className={`p-2 rounded-lg ${metric.bgColor}`}>
-                    <metric.icon className={`w-5 h-5 ${metric.color}`} />
-                  </div>
-                  {metric.status && (
-                    <Badge variant="outline" className="bg-muted/50 border-border text-muted-foreground text-[10px] uppercase tracking-wider">
-                      {metric.status}
-                    </Badge>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-2xl font-bold text-foreground">{metric.value}</span>
-                  {metric.unit && <span className="text-xs text-muted-foreground font-medium">{metric.unit}</span>}
-                </div>
-                <h3 className="text-sm font-semibold text-foreground">{metric.title}</h3>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  {metric.desc}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
         {/* Charts Row */}
         <div className="mb-10">
             <MetricsChart />
