@@ -1919,6 +1919,7 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
             fallbackAiMessage,
             currentPage,
             machineStatus,
+            projectSnapshot,
             intent,
             shouldEscalate,
         } = req.body || {};
@@ -1975,6 +1976,9 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
             controller_intent: generated.intent,
             controller_risk: generated.risk,
             controller_actions: generated.actions,
+            ai_context_chars: generated.context_chars,
+            ai_context_budget_chars: generated.context_budget_chars,
+            ai_context_truncated: generated.context_truncated,
             max_output_tokens: OPENAI_MAX_OUTPUT_TOKENS,
         });
     } catch (err) {

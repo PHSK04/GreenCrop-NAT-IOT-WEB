@@ -963,8 +963,8 @@ export function CustomerChatWidget({
     if (!body || isSending) return;
     const now = Date.now();
     const shouldEscalate = shouldEscalateAssistantRequest(body);
-    const intent = inferAssistantIntent(body);
-    const fallbackAiText = buildAssistantFreeAnswer(body);
+    const intent = inferAssistantIntent(body, assistantMessages);
+    const fallbackAiText = buildAssistantFreeAnswer(body, assistantMessages);
     setIsSending(true);
     setDraft("");
     setAssistantMessages((current) => [
@@ -1022,7 +1022,7 @@ export function CustomerChatWidget({
     if (!body || isSending) return;
     const now = Date.now();
     const shouldEscalate = shouldEscalateAssistantRequest(body);
-    const localText = buildLocalAssistantAnswer(body) || buildAssistantFreeAnswer(body);
+    const localText = buildLocalAssistantAnswer(body, chatbotMessages) || buildAssistantFreeAnswer(body, chatbotMessages);
     setIsSending(true);
     setDraft("");
     setChatbotMessages((current) => [
@@ -1385,6 +1385,18 @@ export function CustomerChatWidget({
 
     return "";
   };
+  const parseRequestedYear = (body: string) => {
+    const normalized = body.toLowerCase();
+    const explicit = normalized.match(/(?:พ\.?\s*ศ\.?|ปี|year|ค\.?\s*ศ\.?)\s*(\d{4})/i);
+    const loose = normalized.match(/\b(20\d{2}|25\d{2})\b/);
+    const match = explicit || loose;
+    if (!match) return null;
+
+    let year = Number(match[1]);
+    if (!Number.isFinite(year)) return null;
+    if (year > 2400) year -= 543;
+    return year >= 2000 && year <= 2100 ? year : null;
+  };
   const formatDateLabel = (dateKey: string) => {
     const parsed = new Date(`${dateKey}T00:00:00`);
     if (Number.isNaN(parsed.getTime())) return dateKey;
@@ -1403,6 +1415,8 @@ export function CustomerChatWidget({
       year: "numeric",
     });
   };
+  const formatYearLabelFor = (year: number, replyThai: boolean) =>
+    replyThai ? `พ.ศ. ${year + 543}` : `${year}`;
   const formatTelemetryRowValues = (row: typeof telemetryHistory[number]) =>
     `pH ${formatTelemetryValue(row.phValue, 2)} | EC ${formatTelemetryValue(row.ecValue, 2)} | Temp ${formatTelemetryValue(row.tempValue, 1)} | ปั๊ม1 ${row.pump1On ? "ON" : "OFF"} | ปั๊ม2 ${row.pump2On ? "ON" : "OFF"}`;
   const buildAssistantProjectSnapshot = () => {
@@ -1420,6 +1434,50 @@ export function CustomerChatWidget({
         avg_oxygen: month.avgOxygen,
         avg_ec: month.avgEc,
         avg_temp: month.avgTemp,
+      }));
+    const yearlyYield = Object.values(
+      cropYieldEntries.reduce<Record<string, {
+        year: number;
+        total_yield_g: number;
+        harvest_count: number;
+        avg_ph_total: number;
+        avg_oxygen_total: number;
+        avg_ec_total: number;
+        avg_temp_total: number;
+      }>>((groups, entry) => {
+        const year = Number(entry.date.slice(0, 4));
+        if (!Number.isFinite(year)) return groups;
+        const key = String(year);
+        const current = groups[key] || {
+          year,
+          total_yield_g: 0,
+          harvest_count: 0,
+          avg_ph_total: 0,
+          avg_oxygen_total: 0,
+          avg_ec_total: 0,
+          avg_temp_total: 0,
+        };
+        current.total_yield_g += entry.yield;
+        current.harvest_count += 1;
+        current.avg_ph_total += entry.ph;
+        current.avg_oxygen_total += entry.oxygen;
+        current.avg_ec_total += entry.ec;
+        current.avg_temp_total += entry.temp;
+        groups[key] = current;
+        return groups;
+      }, {})
+    )
+      .sort((a, b) => b.year - a.year)
+      .slice(0, 8)
+      .map((year) => ({
+        year: year.year,
+        total_yield_g: Math.round(year.total_yield_g * 100) / 100,
+        harvest_count: year.harvest_count,
+        average_yield_g: year.harvest_count ? Math.round((year.total_yield_g / year.harvest_count) * 100) / 100 : 0,
+        avg_ph: year.harvest_count ? Math.round((year.avg_ph_total / year.harvest_count) * 100) / 100 : 0,
+        avg_oxygen: year.harvest_count ? Math.round((year.avg_oxygen_total / year.harvest_count) * 100) / 100 : 0,
+        avg_ec: year.harvest_count ? Math.round((year.avg_ec_total / year.harvest_count) * 100) / 100 : 0,
+        avg_temp: year.harvest_count ? Math.round((year.avg_temp_total / year.harvest_count) * 100) / 100 : 0,
       }));
     const totalYield = cropYieldEntries.reduce((sum, entry) => sum + entry.yield, 0);
 
@@ -1482,6 +1540,7 @@ export function CustomerChatWidget({
         total_entries: cropYieldEntries.length,
         total_yield_g: Math.round(totalYield * 100) / 100,
         monthly: monthlyYield,
+        yearly: yearlyYield,
         recent_entries: recentYieldEntries.map((entry) => ({
           date: entry.date,
           time: entry.time,
@@ -1520,29 +1579,54 @@ export function CustomerChatWidget({
       : `${label} has ${rows.length} telemetry record${rows.length === 1 ? "" : "s"}.\nNewest: ${formatSensorDateTime(newest.timestamp)}\n${formatTelemetryRowValues(newest)}\nDaily average: pH ${average((row) => row.phValue, 2)} | EC ${average((row) => row.ecValue, 2)} | Temp ${average((row) => row.tempValue, 1)}\nRange: ${formatSensorDateTime(oldest.timestamp)} to ${formatSensorDateTime(newest.timestamp)}`;
   };
   const isCropYieldQuestion = (body: string) =>
-    /(ผลผลิต|ผลิตได้|เก็บเกี่ยว|harvest|yield|production output|production)/i.test(body);
+    /(ผลผลิต|ผลิตได้|ผลิตเท่า|มีผลิต|เก็บเกี่ยว|harvest|yield|production output|production)/i.test(body);
+  const isShowDetailsFollowUp = (body: string) => {
+    const compact = body
+      .toLowerCase()
+      .replace(/[\s.?!,，。:;"'“”‘’…]+/g, "")
+      .replace(/(ครับ|ค่ะ|คะ|คับ|จ้า|หน่อย|please)$/i, "");
+
+    return (
+      /^(ขอดู|ดู|แสดง|แสดงให้ดู|ขอรายละเอียด|รายละเอียด|อันนั้น|รายการนั้น|ตัวนั้น|ล่าสุด|show|showme|detail|details|view|viewit|that|thatone)$/i.test(compact) ||
+      /^(ขอดู|ดู|แสดง).*(รายละเอียด|รายการ|ให้ดู)?$/i.test(compact)
+    );
+  };
+  const hasRecentCropYieldContext = (messages: AssistantMessage[] = []) =>
+    messages.slice(-6).some((message) => (
+      isCropYieldQuestion(message.text) ||
+      /สรุปผลผลิต|รายงานผลผลิต|ผลผลิตรวม|รายการล่าสุดที่มี|Yield summary|Yield report|Total yield|Latest saved entry/i.test(message.text)
+    ));
+  const isCropYieldFollowUp = (body: string, messages: AssistantMessage[] = []) =>
+    isShowDetailsFollowUp(body) && hasRecentCropYieldContext(messages);
   const formatYieldNumber = (value: number, replyThai = isTH) =>
     Number.isFinite(value)
       ? value.toLocaleString(replyThai ? "th-TH" : "en-US", { maximumFractionDigits: 2 })
       : "--";
   const buildCropYieldAnswer = (dateKey?: string, userText = "") => {
     const replyThai = shouldReplyThai(userText);
+    const requestedYear = parseRequestedYear(userText);
     const sortedEntries = [...cropYieldEntries].sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
     const targetRows = dateKey
       ? sortedEntries.filter((entry) => entry.date === dateKey)
+      : requestedYear
+        ? sortedEntries.filter((entry) => Number(entry.date.slice(0, 4)) === requestedYear)
       : sortedEntries.slice(0, 1);
-    const label = dateKey ? formatDateLabelFor(dateKey, replyThai) : (replyThai ? "รายการล่าสุด" : "latest entry");
+    const label = dateKey
+      ? formatDateLabelFor(dateKey, replyThai)
+      : requestedYear
+        ? formatYearLabelFor(requestedYear, replyThai)
+        : (replyThai ? "รายการล่าสุด" : "latest entry");
 
     if (targetRows.length === 0) {
       const latest = sortedEntries[0];
       if (!latest) {
         return replyThai
-          ? `ยังไม่มีข้อมูลผลผลิตที่บันทึกไว้ในหน้า รายงานผลผลิต ครับ\nถ้าต้องการให้ผมตอบยอดวันที่ ${label} ให้เพิ่มรายการผลผลิตของวันนั้นก่อน`
+          ? `ยังไม่มีข้อมูลผลผลิตที่บันทึกไว้ในหน้า รายงานผลผลิต ครับ\nถ้าต้องการให้ผมตอบยอด ${label} ให้เพิ่มรายการผลผลิตก่อน`
           : `There is no saved crop yield data in Crop Reports yet.\nAdd a harvest entry for ${label}, then I can answer the total.`;
       }
 
       return replyThai
-        ? `วันที่ ${label} ยังไม่พบรายการผลผลิตที่บันทึกไว้ครับ\nรายการล่าสุดที่มีคือ ${formatDateLabelFor(latest.date, replyThai)} เวลา ${latest.time}: ${formatYieldNumber(latest.yield, replyThai)} กรัม`
+        ? `${requestedYear ? "ปี" : "วันที่"} ${label} ยังไม่พบรายการผลผลิตที่บันทึกไว้ครับ\nรายการล่าสุดที่มีคือ ${formatDateLabelFor(latest.date, replyThai)} เวลา ${latest.time}: ${formatYieldNumber(latest.yield, replyThai)} กรัม`
         : `I do not see a saved yield entry for ${label}.\nLatest saved entry: ${formatDateLabelFor(latest.date, replyThai)} at ${latest.time}: ${formatYieldNumber(latest.yield, replyThai)} g.`;
     }
 
@@ -1593,9 +1677,9 @@ export function CustomerChatWidget({
           ...(qualityLine ? ["", qualityLine] : []),
         ].join("\n");
   };
-  const buildLocalAssistantAnswer = (body: string) => {
+  const buildLocalAssistantAnswer = (body: string, contextMessages: AssistantMessage[] = []) => {
     const requestedDateKey = parseRequestedDateKey(body);
-    if (isCropYieldQuestion(body)) {
+    if (isCropYieldQuestion(body) || isCropYieldFollowUp(body, contextMessages)) {
       return buildCropYieldAnswer(requestedDateKey || undefined, body);
     }
     return "";
@@ -1704,7 +1788,7 @@ export function CustomerChatWidget({
 
     return `${baseAnswer}\n\n${extraAdvice}\n\n${flowContext}`;
   };
-  const buildAssistantFreeAnswer = (body: string) => {
+  const buildAssistantFreeAnswer = (body: string, contextMessages: AssistantMessage[] = []) => {
     const normalizedBody = body.toLowerCase();
     const pageContext = isTH
       ? `ตอนนี้คุณอยู่หน้า ${currentPage} และสถานะเครื่องคือ "${natStatusText}"`
@@ -1715,7 +1799,7 @@ export function CustomerChatWidget({
     const asksPumpTrouble = /(ปั๊ม|pump).*(ไม่หยุด|ไม่ดับ|ค้าง|ยังทำงาน|หยุดไม่ได้|not stop|stuck|still running)|(ไม่หยุด|ไม่ดับ|ค้าง|หยุดไม่ได้).*(ปั๊ม|pump)/i.test(normalizedBody);
     const asksDownloadData =
       /(โหลด|ดาวน์โหลด|download|export|ส่งออก|เอาออก|ดึง).*(ข้อมูล|data|รายงาน|report|ไฟล์|file|csv|excel|pdf)|((ข้อมูล|data|รายงาน|report|ไฟล์|file|csv|excel|pdf).*(โหลด|ดาวน์โหลด|download|export|ส่งออก|เอาออก|ดึง))/i.test(normalizedBody);
-    const asksCropYieldData = isCropYieldQuestion(body);
+    const asksCropYieldData = isCropYieldQuestion(body) || isCropYieldFollowUp(body, contextMessages);
     const asksLatestSensorData =
       /(ล่าสุด|วันไหน|เมื่อไหร่|เวลาไหน|last|latest|recent).*(เซ็นเซอร์|sensor|ข้อมูล|data)|((เซ็นเซอร์|sensor|ข้อมูล|data).*(ล่าสุด|วันไหน|เมื่อไหร่|last|latest|recent))/i.test(normalizedBody) ||
       /(ข้อมูลล่าสุด|latestdata|recentdata).*(เซ็นเซอร์|sensor)|((เซ็นเซอร์|sensor).*(ข้อมูลล่าสุด|วันไหน|ล่าสุด))/i.test(compactBody);
@@ -1789,11 +1873,11 @@ export function CustomerChatWidget({
       ? `ได้ครับ ผมอยู่หน้านี้กับคุณอยู่\nถ้าจะให้ช่วยต่อ บอกมาแบบภาษาคุยได้เลย เช่น อยากโหลดข้อมูลช่วงไหน, เครื่องมีอาการอะไร, หรืออยากให้ดูหน้าจอส่วนไหน\n${pageContext}`
       : `Got it. I am here with this page.\nTell me naturally what you want next, such as which data range to download, what the machine is doing, or which screen you want checked.\n${pageContext}`;
   };
-  const inferAssistantIntent = (body: string) => {
+  const inferAssistantIntent = (body: string, contextMessages: AssistantMessage[] = []) => {
     const normalizedBody = body.toLowerCase();
     if (/status|สถานะ|เครื่อง|online|offline|mqtt|บอร์ด|สัญญาณ/.test(normalizedBody)) return "status";
     if (/alarm|alert|เตือน|แดง|lock|ล็อก|น้ำ|float|ph|ec/.test(normalizedBody)) return "alert";
-    if (isCropYieldQuestion(body)) return "crop_yield";
+    if (isCropYieldQuestion(body) || isCropYieldFollowUp(body, contextMessages)) return "crop_yield";
     if (/(โหลด|ดาวน์โหลด|download|export|ส่งออก|เอาออก|ดึง).*(ข้อมูล|data|รายงาน|report|ไฟล์|file|csv|excel|pdf)|((ข้อมูล|data|รายงาน|report|ไฟล์|file|csv|excel|pdf).*(โหลด|ดาวน์โหลด|download|export|ส่งออก|เอาออก|ดึง))/.test(normalizedBody)) return "download";
     if (/sensor|เซ็นเซอร์|ข้อมูล sensor|sensor data|ข้อมูลล่าสุด|history|ย้อนหลัง|อัปเดต|update|ค้าง|frozen/.test(normalizedBody)) return "sensor";
     if (/pair|เชื่อมต่อ|จับคู่|device id|code/.test(normalizedBody)) return "pairing";

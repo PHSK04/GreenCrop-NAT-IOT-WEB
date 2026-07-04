@@ -79,6 +79,19 @@ def parse_requested_date(text: str) -> str:
     return ""
 
 
+def parse_requested_year(text: str) -> int | None:
+    raw = text.lower()
+    match = re.search(r"(?:พ\.?\s*ศ\.?|ปี|year|ค\.?\s*ศ\.?)\s*(\d{4})", raw)
+    if not match:
+        match = re.search(r"\b(20\d{2}|25\d{2})\b", raw)
+    if not match:
+        return None
+    year = int(match.group(1))
+    if year > 2400:
+        year -= 543
+    return year if 2000 <= year <= 2100 else None
+
+
 def date_label(date_key: str, th: bool) -> str:
     if not date_key:
         return "วันที่ที่ถาม" if th else "the requested date"
@@ -92,6 +105,12 @@ def date_label(date_key: str, th: bool) -> str:
     return date.strftime("%d %b %Y")
 
 
+def year_label(year: int | None, th: bool) -> str:
+    if not year:
+        return "ปีที่ถาม" if th else "the requested year"
+    return f"พ.ศ. {year + 543}" if th else str(year)
+
+
 def detect_language(text: str) -> str:
     return "TH" if re.search(r"[\u0e00-\u0e7f]", text or "") else "EN"
 
@@ -102,7 +121,7 @@ def detect_intent(text: str) -> str:
         return "control_stop"
     if re.search(r"เปิด|เริ่ม|start|run", raw) and re.search(r"ปั๊ม|pump|เครื่อง|machine", raw):
         return "control_start"
-    if re.search(r"ผลผลิต|ผลิตได้|เก็บเกี่ยว|yield|harvest|production", raw):
+    if re.search(r"ผลผลิต|ผลิตได้|ผลิตเท่า|มีผลิต|เก็บเกี่ยว|yield|harvest|production", raw):
         return "crop_yield"
     if re.search(r"สถานะ|status|online|offline|mqtt|สัญญาณ|เครื่อง|device|บอร์ด", raw):
         return "machine_status"
@@ -115,6 +134,39 @@ def detect_intent(text: str) -> str:
     return "general"
 
 
+def compact_text(text: str) -> str:
+    return re.sub(r"[\s\.\?!,，。:;\"'“”‘’…]+", "", (text or "").lower())
+
+
+def is_show_details_follow_up(text: str) -> bool:
+    compact = compact_text(text)
+    compact = re.sub(r"(ครับ|ค่ะ|คะ|คับ|จ้า|หน่อย|please)$", "", compact)
+    return bool(
+        re.fullmatch(
+            r"(ขอดู|ดู|แสดง|แสดงให้ดู|ขอรายละเอียด|รายละเอียด|อันนั้น|รายการนั้น|ตัวนั้น|ล่าสุด|show|showme|details?|view|viewit|that|thatone)",
+            compact,
+        )
+        or re.fullmatch(r"(ขอดู|ดู|แสดง).*(รายละเอียด|รายการ|ให้ดู)?", compact)
+    )
+
+
+def recent_conversation(context: dict[str, Any]) -> list[dict[str, Any]]:
+    items = context.get("recent_conversation")
+    return items if isinstance(items, list) else []
+
+
+def has_recent_crop_yield_context(context: dict[str, Any]) -> bool:
+    crop_markers = re.compile(
+        r"ผลผลิต|ผลิตได้|เก็บเกี่ยว|yield|harvest|production|สรุปผลผลิต|รายงานผลผลิต|รายการล่าสุดที่มี|latest saved entry",
+        re.IGNORECASE,
+    )
+    for message in recent_conversation(context)[-6:]:
+        text = str(message.get("text") if isinstance(message, dict) else "")
+        if crop_markers.search(text):
+            return True
+    return False
+
+
 def latest_sensor(context: dict[str, Any]) -> dict[str, Any]:
     row = context.get("latest_sensor")
     return row if isinstance(row, dict) else {}
@@ -123,6 +175,31 @@ def latest_sensor(context: dict[str, Any]) -> dict[str, Any]:
 def requested_summary(context: dict[str, Any]) -> dict[str, Any]:
     summary = context.get("requested_day_summary")
     return summary if isinstance(summary, dict) else {}
+
+
+def page_project_snapshot(context: dict[str, Any]) -> dict[str, Any]:
+    snapshot = context.get("page_project_snapshot")
+    return snapshot if isinstance(snapshot, dict) else {}
+
+
+def crop_yield_snapshot(context: dict[str, Any]) -> dict[str, Any]:
+    crop = page_project_snapshot(context).get("crop_yield")
+    return crop if isinstance(crop, dict) else {}
+
+
+def crop_yield_entries(context: dict[str, Any]) -> list[dict[str, Any]]:
+    entries = crop_yield_snapshot(context).get("recent_entries")
+    if not isinstance(entries, list):
+        return []
+    clean_entries = [entry for entry in entries if isinstance(entry, dict)]
+    return sorted(clean_entries, key=lambda row: f"{row.get('date') or ''} {row.get('time') or ''}", reverse=True)
+
+
+def crop_yield_yearly(context: dict[str, Any]) -> list[dict[str, Any]]:
+    yearly = crop_yield_snapshot(context).get("yearly")
+    if not isinstance(yearly, list):
+        return []
+    return [row for row in yearly if isinstance(row, dict)]
 
 
 def risk_from_sensor(row: dict[str, Any]) -> tuple[str, int, list[str]]:
@@ -226,6 +303,141 @@ def answer_requested_day(context: dict[str, Any], th: bool) -> dict[str, Any] | 
     return {"text": text, "risk": {"severity": severity, "score": 55 if alarm_seen else 20, "reasons": ["alarm_seen"] if alarm_seen else []}, "actions": [], "confidence": 0.9}
 
 
+def format_yield_number(value: Any, th: bool) -> str:
+    amount = as_number(value)
+    if amount.is_integer():
+        return f"{int(amount):,}"
+    return f"{amount:,.2f}".rstrip("0").rstrip(".")
+
+
+def average_entry_value(entries: list[dict[str, Any]], key: str, digits: int) -> str:
+    values = [as_number(entry.get(key), -1) for entry in entries]
+    values = [value for value in values if value > 0]
+    if not values:
+        return "--"
+    return f"{sum(values) / len(values):.{digits}f}"
+
+
+def answer_crop_yield(context: dict[str, Any], th: bool) -> dict[str, Any]:
+    message = str(context.get("user_message") or "")
+    date_key = context.get("requested_date") or parse_requested_date(message)
+    requested_year = context.get("requested_year") or parse_requested_year(message)
+    entries = crop_yield_entries(context)
+    if date_key:
+        target_entries = [entry for entry in entries if entry.get("date") == date_key]
+    elif requested_year:
+        target_entries = [entry for entry in entries if str(entry.get("date") or "").startswith(f"{int(requested_year):04d}-")]
+    else:
+        target_entries = entries[:1]
+    label = date_label(date_key, th) if date_key else (year_label(int(requested_year), th) if requested_year else ("รายการล่าสุด" if th else "latest entry"))
+
+    if requested_year and not date_key:
+        summary = next((row for row in crop_yield_yearly(context) if int(as_number(row.get("year"), -1)) == int(requested_year)), None)
+        if summary and int(as_number(summary.get("harvest_count"))) > 0:
+            total_yield = as_number(summary.get("total_yield_g"))
+            harvest_count = int(as_number(summary.get("harvest_count")))
+            average_yield = as_number(summary.get("average_yield_g"), total_yield / harvest_count if harvest_count else 0)
+            if th:
+                lines = [
+                    "สรุปผลผลิต",
+                    f"วันที่: {label}",
+                    f"ผลผลิตรวม: {format_yield_number(total_yield, th)} กรัม",
+                    f"จำนวนบันทึก: {harvest_count} รายการ",
+                    f"เฉลี่ยต่อรายการ: {format_yield_number(average_yield, th)} กรัม",
+                    "",
+                    "ค่าน้ำเฉลี่ย",
+                    f"pH: {as_number(summary.get('avg_ph')):.2f}",
+                    f"EC: {as_number(summary.get('avg_ec')):.2f} mS/cm",
+                    f"อุณหภูมิ: {as_number(summary.get('avg_temp')):.1f} C",
+                ]
+            else:
+                lines = [
+                    "Yield summary",
+                    f"Date: {label}",
+                    f"Total yield: {format_yield_number(total_yield, th)} g",
+                    f"Records: {harvest_count}",
+                    f"Average per record: {format_yield_number(average_yield, th)} g",
+                    "",
+                    "Average water values",
+                    f"pH: {as_number(summary.get('avg_ph')):.2f}",
+                    f"EC: {as_number(summary.get('avg_ec')):.2f} mS/cm",
+                    f"Temp: {as_number(summary.get('avg_temp')):.1f} C",
+                ]
+            return {"text": "\n".join(lines), "risk": {"severity": "normal", "score": 0, "reasons": []}, "actions": [], "confidence": 0.94}
+
+    if not target_entries:
+        latest = entries[0] if entries else None
+        if not latest:
+            text = (
+                f"ยังไม่มีข้อมูลผลผลิตที่บันทึกไว้ในหน้า รายงานผลผลิต ครับ"
+                if th
+                else "There is no saved crop yield data in Crop Reports yet."
+            )
+        elif th:
+            text = (
+                f"{'ปี' if requested_year and not date_key else 'วันที่'} {label} ยังไม่พบรายการผลผลิตที่บันทึกไว้ครับ\n"
+                f"รายการล่าสุดที่มีคือ {date_label(str(latest.get('date') or ''), th)} เวลา {latest.get('time') or '--'}: "
+                f"{format_yield_number(latest.get('yield_g'), th)} กรัม"
+            )
+        else:
+            text = (
+                f"I do not see a saved yield entry for {label}.\n"
+                f"Latest saved entry: {date_label(str(latest.get('date') or ''), th)} at {latest.get('time') or '--'}: "
+                f"{format_yield_number(latest.get('yield_g'), th)} g."
+            )
+        return {"text": text, "risk": {"severity": "normal", "score": 0, "reasons": []}, "actions": [], "confidence": 0.9}
+
+    total_yield = sum(as_number(entry.get("yield_g")) for entry in target_entries)
+    average_yield = total_yield / len(target_entries)
+    detail_lines = "\n".join(
+        (
+            f"{index + 1}. เวลา {entry.get('time') or '--'} | {format_yield_number(entry.get('yield_g'), th)} กรัม"
+            if th
+            else f"{index + 1}. {entry.get('time') or '--'} | {format_yield_number(entry.get('yield_g'), th)} g"
+        )
+        for index, entry in enumerate(target_entries)
+    )
+    has_quality = any(as_number(entry.get("ph")) > 0 or as_number(entry.get("ec")) > 0 or as_number(entry.get("temp_c")) > 0 for entry in target_entries)
+    if th:
+        lines = [
+            "สรุปผลผลิต",
+            f"วันที่: {label}",
+            f"ผลผลิตรวม: {format_yield_number(total_yield, th)} กรัม",
+            f"จำนวนบันทึก: {len(target_entries)} รายการ",
+        ]
+        if len(target_entries) > 1:
+            lines.append(f"เฉลี่ยต่อรายการ: {format_yield_number(average_yield, th)} กรัม")
+        lines.extend(["", "รายละเอียดบันทึก", detail_lines])
+        if has_quality:
+            lines.extend([
+                "",
+                "ค่าน้ำเฉลี่ย",
+                f"pH: {average_entry_value(target_entries, 'ph', 2)}",
+                f"EC: {average_entry_value(target_entries, 'ec', 2)} mS/cm",
+                f"อุณหภูมิ: {average_entry_value(target_entries, 'temp_c', 1)} C",
+            ])
+    else:
+        lines = [
+            "Yield summary",
+            f"Date: {label}",
+            f"Total yield: {format_yield_number(total_yield, th)} g",
+            f"Records: {len(target_entries)}",
+        ]
+        if len(target_entries) > 1:
+            lines.append(f"Average per record: {format_yield_number(average_yield, th)} g")
+        lines.extend(["", "Record details", detail_lines])
+        if has_quality:
+            lines.extend([
+                "",
+                "Average water values",
+                f"pH: {average_entry_value(target_entries, 'ph', 2)}",
+                f"EC: {average_entry_value(target_entries, 'ec', 2)} mS/cm",
+                f"Temp: {average_entry_value(target_entries, 'temp_c', 1)} C",
+            ])
+
+    return {"text": "\n".join(lines), "risk": {"severity": "normal", "score": 0, "reasons": []}, "actions": [], "confidence": 0.93}
+
+
 def answer_control(intent: str, context: dict[str, Any], th: bool) -> dict[str, Any]:
     row = latest_sensor(context)
     severity, score, reasons = risk_from_sensor(row)
@@ -266,10 +478,14 @@ def build_response(context: dict[str, Any]) -> dict[str, Any]:
     language = detect_language(message)
     th = language == "TH"
     intent = detect_intent(message)
+    if intent == "general" and is_show_details_follow_up(message) and has_recent_crop_yield_context(context):
+        intent = "crop_yield"
 
     day_answer = answer_requested_day(context, th)
     if day_answer:
         result = day_answer
+    elif intent == "crop_yield":
+        result = answer_crop_yield(context, th)
     elif intent in {"machine_status", "pump_status", "sensor_insight"}:
         result = answer_status(context, th)
     elif intent in {"control_stop", "control_start"}:

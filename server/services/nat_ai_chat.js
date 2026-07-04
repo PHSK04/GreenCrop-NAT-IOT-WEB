@@ -5,11 +5,13 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 const OPENAI_MAX_OUTPUT_TOKENS = Math.max(120, Math.min(1200, Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 700)));
 const NAT_AI_OPENAI_GENERAL_ENABLED = String(process.env.NAT_AI_OPENAI_GENERAL_ENABLED || 'true').toLowerCase() !== 'false';
+const NAT_AI_LLM_FIRST = String(process.env.NAT_AI_LLM_FIRST || 'true').toLowerCase() !== 'false';
 const NAT_AI_PYTHON_ENABLED = String(process.env.NAT_AI_PYTHON_ENABLED || 'true').toLowerCase() !== 'false';
 const NAT_AI_PYTHON_BIN = process.env.NAT_AI_PYTHON_BIN || 'python3';
 const NAT_AI_PYTHON_SCRIPT = process.env.NAT_AI_PYTHON_SCRIPT ||
     path.resolve(__dirname, '../../ai/controller/nat_ai_controller.py');
 const NAT_AI_PYTHON_TIMEOUT_MS = Math.max(800, Math.min(8000, Number(process.env.NAT_AI_PYTHON_TIMEOUT_MS || 2500)));
+const NAT_AI_OPENAI_CONTEXT_MAX_CHARS = Math.max(1200, Math.min(12000, Number(process.env.NAT_AI_OPENAI_CONTEXT_MAX_CHARS || 4500)));
 
 function asBool(value) {
     if (typeof value === 'boolean') return value;
@@ -84,6 +86,69 @@ function parseRequestedDateKey(text) {
     return '';
 }
 
+function parseRequestedYear(text) {
+    const raw = String(text || '').toLowerCase();
+    const explicit = raw.match(/(?:พ\.?\s*ศ\.?|ปี|year|ค\.?\s*ศ\.?)\s*(\d{4})/i);
+    const loose = raw.match(/\b(20\d{2}|25\d{2})\b/);
+    const match = explicit || loose;
+    if (!match) return null;
+
+    let year = Number(match[1]);
+    if (!Number.isFinite(year)) return null;
+    if (year > 2400) year -= 543;
+    return year >= 2000 && year <= 2100 ? year : null;
+}
+
+function detectNatAiRoute(text) {
+    const raw = String(text || '').toLowerCase();
+    const has = (pattern) => pattern.test(raw);
+    const route = {
+        intent: 'general',
+        needsSensorHistory: false,
+        needsLearningSummary: false,
+        needsCropYield: false,
+        needsDevices: false,
+        needsLiveMachine: false,
+        needsProjectSnapshot: false,
+    };
+
+    if (has(/หยุด|ปิด|stop|emergency|ฉุกเฉิน|ดับ/) && has(/ปั๊ม|pump|เครื่อง|machine/)) {
+        route.intent = 'control_stop';
+        route.needsLiveMachine = true;
+    } else if (has(/เปิด|เริ่ม|start|run/) && has(/ปั๊ม|pump|เครื่อง|machine/)) {
+        route.intent = 'control_start';
+        route.needsLiveMachine = true;
+    } else if (has(/ผลผลิต|ผลิตได้|ผลิตเท่า|มีผลิต|เก็บเกี่ยว|yield|harvest|production/)) {
+        route.intent = 'crop_yield';
+        route.needsCropYield = true;
+        route.needsProjectSnapshot = true;
+    } else if (has(/สถานะ|status|online|offline|mqtt|สัญญาณ|เครื่อง|device|บอร์ด/)) {
+        route.intent = 'machine_status';
+        route.needsLiveMachine = true;
+        route.needsSensorHistory = true;
+        route.needsLearningSummary = true;
+        route.needsDevices = true;
+    } else if (has(/ปั๊ม|pump/)) {
+        route.intent = 'pump_status';
+        route.needsLiveMachine = true;
+        route.needsSensorHistory = true;
+    } else if (has(/sensor|เซ็นเซอร์|ph|ec|temp|อุณหภูมิ|น้ำ|ค่าน้ำ|history|ย้อนหลัง/)) {
+        route.intent = 'sensor_insight';
+        route.needsLiveMachine = true;
+        route.needsSensorHistory = true;
+        route.needsLearningSummary = true;
+    } else if (has(/โหลด|ดาวน์โหลด|download|export|ส่งออก/)) {
+        route.intent = 'export_help';
+        route.needsDevices = true;
+    } else if (has(/device|อุปกรณ์|จับคู่|pair|เครื่องหลัก|active device/)) {
+        route.intent = 'device_help';
+        route.needsDevices = true;
+        route.needsLiveMachine = true;
+    }
+
+    return route;
+}
+
 function summarizeRows(rows) {
     const cleanRows = Array.isArray(rows) ? rows.map(compactSensorRow).filter(Boolean) : [];
     if (cleanRows.length === 0) return null;
@@ -113,6 +178,102 @@ function summarizeRows(rows) {
     };
 }
 
+function summarizeCropYearly(entries = []) {
+    const groups = new Map();
+    for (const entry of Array.isArray(entries) ? entries : []) {
+        const year = Number(String(entry?.date || '').slice(0, 4));
+        if (!Number.isFinite(year)) continue;
+        const current = groups.get(year) || {
+            year,
+            total_yield_g: 0,
+            harvest_count: 0,
+            ph_total: 0,
+            oxygen_total: 0,
+            ec_total: 0,
+            temp_total: 0,
+        };
+        const yieldValue = Number(entry.yield_g ?? entry.yield ?? 0);
+        current.total_yield_g += Number.isFinite(yieldValue) ? yieldValue : 0;
+        current.harvest_count += 1;
+        current.ph_total += Number(entry.ph || 0);
+        current.oxygen_total += Number(entry.oxygen || 0);
+        current.ec_total += Number(entry.ec || 0);
+        current.temp_total += Number(entry.temp_c ?? entry.temp ?? 0);
+        groups.set(year, current);
+    }
+
+    return Array.from(groups.values())
+        .sort((a, b) => b.year - a.year)
+        .slice(0, 8)
+        .map((year) => ({
+            year: year.year,
+            total_yield_g: Math.round(year.total_yield_g * 100) / 100,
+            harvest_count: year.harvest_count,
+            average_yield_g: year.harvest_count ? Math.round((year.total_yield_g / year.harvest_count) * 100) / 100 : 0,
+            avg_ph: year.harvest_count ? Math.round((year.ph_total / year.harvest_count) * 100) / 100 : 0,
+            avg_oxygen: year.harvest_count ? Math.round((year.oxygen_total / year.harvest_count) * 100) / 100 : 0,
+            avg_ec: year.harvest_count ? Math.round((year.ec_total / year.harvest_count) * 100) / 100 : 0,
+            avg_temp: year.harvest_count ? Math.round((year.temp_total / year.harvest_count) * 100) / 100 : 0,
+        }));
+}
+
+function compactProjectSnapshot(snapshot, route = detectNatAiRoute('')) {
+    if (!snapshot || typeof snapshot !== 'object') return null;
+    const crop = snapshot.crop_yield && typeof snapshot.crop_yield === 'object'
+        ? snapshot.crop_yield
+        : null;
+    const recentCropEntries = Array.isArray(crop?.recent_entries)
+        ? crop.recent_entries.slice(0, route.needsCropYield ? 12 : 4)
+        : [];
+
+    const compact = {
+        scope: snapshot.scope,
+        page: snapshot.page,
+        language: snapshot.language,
+        devices: snapshot.devices ? {
+            active_device_id: snapshot.devices.active_device_id,
+            loaded_device_count: snapshot.devices.loaded_device_count,
+        } : undefined,
+    };
+
+    if (route.needsLiveMachine || route.needsSensorHistory) {
+        compact.live_machine = snapshot.live_machine ? {
+            status_label: snapshot.live_machine.status_label,
+            mqtt_status: snapshot.live_machine.mqtt_status,
+            board_connected: snapshot.live_machine.board_connected,
+            last_telemetry_at: snapshot.live_machine.last_telemetry_at,
+            pumps: snapshot.live_machine.pumps,
+            water_level: snapshot.live_machine.water_level,
+            values: snapshot.live_machine.values,
+            latest_values_label: snapshot.live_machine.latest_values_label,
+        } : undefined;
+        compact.sensor_ai = snapshot.sensor_ai ? {
+            health_score: snapshot.sensor_ai.health_score,
+            severity: snapshot.sensor_ai.severity,
+            status: snapshot.sensor_ai.status,
+            summary: snapshot.sensor_ai.summary,
+            risks: Array.isArray(snapshot.sensor_ai.risks) ? snapshot.sensor_ai.risks.slice(0, 4) : [],
+            recommendations: Array.isArray(snapshot.sensor_ai.recommendations) ? snapshot.sensor_ai.recommendations.slice(0, 4) : [],
+        } : undefined;
+    }
+
+    if (route.needsCropYield && crop) {
+        compact.crop_yield = {
+            total_entries: crop.total_entries,
+            total_yield_g: crop.total_yield_g,
+            yearly: Array.isArray(crop.yearly) ? crop.yearly.slice(0, 8) : summarizeCropYearly(recentCropEntries),
+            monthly: Array.isArray(crop.monthly) ? crop.monthly.slice(-6) : [],
+            recent_entries: recentCropEntries,
+        };
+    }
+
+    if (route.needsLearningSummary && snapshot.ai_learning) {
+        compact.ai_learning = snapshot.ai_learning;
+    }
+
+    return sanitizeForAi(compact);
+}
+
 function sanitizeForAi(value, depth = 0) {
     if (depth > 4) return null;
     if (value === null || value === undefined) return value;
@@ -129,6 +290,73 @@ function sanitizeForAi(value, depth = 0) {
         );
     }
     return String(value).slice(0, 300);
+}
+
+function truncateJsonForBudget(value, maxChars = NAT_AI_OPENAI_CONTEXT_MAX_CHARS) {
+    const json = JSON.stringify(value);
+    if (json.length <= maxChars) return { value, chars: json.length, truncated: false };
+    const clone = JSON.parse(json);
+    if (Array.isArray(clone.recent_conversation)) clone.recent_conversation = clone.recent_conversation.slice(-2);
+    if (Array.isArray(clone.recent_sensor_samples)) clone.recent_sensor_samples = clone.recent_sensor_samples.slice(0, 2);
+    if (clone.page_project_snapshot?.crop_yield?.recent_entries) clone.page_project_snapshot.crop_yield.recent_entries = clone.page_project_snapshot.crop_yield.recent_entries.slice(0, 3);
+    if (clone.page_project_snapshot?.crop_yield?.monthly) clone.page_project_snapshot.crop_yield.monthly = clone.page_project_snapshot.crop_yield.monthly.slice(-3);
+    const compactJson = JSON.stringify(clone);
+    if (compactJson.length <= maxChars) return { value: clone, chars: compactJson.length, truncated: true };
+    return {
+        value: {
+            ai_route: clone.ai_route,
+            data_scope: clone.data_scope,
+            page: clone.page,
+            machine_status_label: clone.machine_status_label,
+            active_device_id: clone.active_device_id,
+            latest_sensor: clone.latest_sensor,
+            recent_sensor_summary: clone.recent_sensor_summary,
+            page_project_snapshot: clone.page_project_snapshot?.crop_yield ? { crop_yield: clone.page_project_snapshot.crop_yield } : null,
+            recent_conversation: clone.recent_conversation,
+            user_message: clone.user_message,
+            current_datetime: clone.current_datetime,
+            budget_note: `Context compacted to stay under ${maxChars} characters.`,
+        },
+        chars: Math.min(JSON.stringify(clone).length, maxChars),
+        truncated: true,
+    };
+}
+
+function buildOpenAiContext(context, toolResult = null) {
+    const route = context.ai_route || detectNatAiRoute(context.user_message);
+    const compact = {
+        ai_route: route,
+        tool_result: toolResult?.text ? {
+            provider: toolResult.provider || 'controller',
+            intent: toolResult.intent,
+            text: String(toolResult.text || '').slice(0, 900),
+            risk: toolResult.risk || undefined,
+            actions: toolResult.actions || undefined,
+        } : null,
+        user: context.user ? {
+            id: context.user.id,
+            role: context.user.role,
+        } : null,
+        data_scope: context.data_scope,
+        page: context.page,
+        machine_status_label: context.machine_status_label,
+        active_device_id: context.active_device_id,
+        latest_sensor: route.needsLiveMachine || route.needsSensorHistory ? context.latest_sensor : undefined,
+        recent_sensor_summary: route.needsSensorHistory ? context.recent_sensor_summary : undefined,
+        requested_date: context.requested_date,
+        requested_year: context.requested_year,
+        requested_day_summary: context.requested_day_summary,
+        page_project_snapshot: compactProjectSnapshot(context.page_project_snapshot, route),
+        learning_summary: route.needsLearningSummary ? context.learning_summary : undefined,
+        recent_conversation: Array.isArray(context.recent_conversation) ? context.recent_conversation.slice(-4) : [],
+        user_message: context.user_message,
+        current_datetime: context.current_datetime,
+        project: {
+            app: 'GreenCropNAT IoT web app',
+            rule: 'Use authenticated account data only. Prefer exact values from context. Say when data is missing.',
+        },
+    };
+    return truncateJsonForBudget(compact);
 }
 
 function buildProjectKnowledge() {
@@ -151,15 +379,15 @@ function buildProjectKnowledge() {
 function buildNatAiSystemPrompt() {
     return [
         'You are NAT AI, a helpful AI assistant inside the GreenCropNAT IoT web app.',
-        'Act as one unified project assistant. Do not tell users to choose between Chatbot, Agent, or Staff modes; answer the request directly first, then offer staff handoff only when useful or requested.',
+        'Act as one unified project assistant, not a scripted FAQ bot. Answer naturally and directly.',
         'Reply in the same language as the user, usually Thai.',
-        'You can answer broad questions, but keep the answer useful for agriculture, farming, crop production, farm IoT, water, nutrients, sensors, automation, or GreenCropNAT operations.',
-        'If the question is not obviously agricultural, answer briefly and connect it back to a farming or GreenCropNAT use case when possible.',
+        'You can answer broad questions. When the user asks about GreenCropNAT data, use the authenticated context and tool result only.',
         'Be conversational, calm, practical, and direct like a capable agricultural technology assistant.',
         'Answer the exact user question first.',
         'For GreenCropNAT, machine, sensor, pump, account, or project questions, use only the provided authenticated user context and be explicit when data is missing.',
         'Never mix data between users or tenants. If the context is scoped to one user, say "ของบัญชีนี้" / "this account" when summarizing project data.',
-        'For general knowledge, coding, writing, learning, brainstorming, or everyday questions, answer from your general knowledge through an agriculture-first lens without pretending that machine context contains the answer.',
+        'For general knowledge, coding, writing, learning, brainstorming, or everyday questions, answer from your general knowledge without pretending that machine context contains the answer.',
+        'If a tool_result is provided, treat it as verified account data. Use its facts, but rewrite the answer naturally instead of copying a template.',
         'If the user asks for current/latest external information that is not in context, say you may need a current source instead of inventing facts.',
         'For physical machine control, never claim you directly changed hardware; propose safe actions that require confirmation.',
         'Keep normal answers concise, but give step-by-step detail when the user asks for teaching or implementation help.',
@@ -185,16 +413,23 @@ async function buildNatAiContext({
     const deviceId = String(options.deviceId || session.device_id || '').trim().toUpperCase();
     const tenantId = String(req.tenant || req.user?.tenant_id || req.user?.id || defaultTenantId);
     const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
+    const route = detectNatAiRoute(userMessage);
     const tenantCandidates = await getSensorTenantCandidates(req, tenantId, deviceId);
     const latestRows = await loadLatestSensorRows(tenantCandidates, deviceId);
     const latestSensor = compactSensorRow(latestRows[0]);
     const devices = typeof getDevicesForUser === 'function'
         ? await getDevicesForUser(req.user).catch(() => [])
         : [];
-    const recentHistoryRows = loadSensorHistoryRows
-        ? await loadSensorHistoryRows(tenantCandidates, deviceId, { limit: 240 }).catch(() => [])
-        : [];
     const requestedDateKey = parseRequestedDateKey(userMessage);
+    const requestedYear = parseRequestedYear(userMessage);
+    const historyLimit = requestedDateKey
+        ? 160
+        : route.needsSensorHistory
+            ? 80
+            : 0;
+    const recentHistoryRows = loadSensorHistoryRows && historyLimit > 0
+        ? await loadSensorHistoryRows(tenantCandidates, deviceId, { limit: historyLimit }).catch(() => [])
+        : [];
     const requestedDayRows = requestedDateKey && loadSensorHistoryRows
         ? await loadSensorHistoryRows(tenantCandidates, deviceId, {
             limit: 500,
@@ -202,19 +437,20 @@ async function buildNatAiContext({
             endDate: `${requestedDateKey}T23:59:59`,
         }).catch(() => [])
         : [];
-    const learningSummary = await getTenantLearningSummary(db, {
+    const learningSummary = route.needsLearningSummary ? await getTenantLearningSummary(db, {
         tenantId,
         deviceId,
-        limit: 8,
-    }).catch(() => null);
-    const recentMessages = (await loadAiChatMessages(session.id, 8))
-        .slice(-6)
+        limit: 4,
+    }).catch(() => null) : null;
+    const recentMessages = (await loadAiChatMessages(session.id, 6))
+        .slice(-4)
         .map((message) => ({
             role: message.sender_role === 'user' ? 'user' : 'assistant',
-            text: String(message.body || '').slice(0, 360),
+            text: String(message.body || '').slice(0, 240),
         }));
 
     return {
+        ai_route: route,
         user: {
             id: req.user?.id,
             name: req.user?.name,
@@ -231,9 +467,9 @@ async function buildNatAiContext({
         page: options.currentPage || null,
         machine_status_label: options.machineStatus || null,
         active_device_id: deviceId || null,
-        project_knowledge: buildProjectKnowledge(),
-        page_project_snapshot: sanitizeForAi(options.projectSnapshot || null),
-        user_devices: devices.slice(0, 12).map((device) => ({
+        project_knowledge: route.intent === 'general' ? buildProjectKnowledge() : null,
+        page_project_snapshot: compactProjectSnapshot(options.projectSnapshot || null, route),
+        user_devices: (route.needsDevices ? devices : []).slice(0, 8).map((device) => ({
             device_id: device.device_id,
             device_name: device.device_name,
             location: device.location,
@@ -244,8 +480,9 @@ async function buildNatAiContext({
         })),
         latest_sensor: latestSensor,
         recent_sensor_summary: summarizeRows(recentHistoryRows),
-        recent_sensor_samples: recentHistoryRows.slice(0, 8).map(compactSensorRow).filter(Boolean),
+        recent_sensor_samples: recentHistoryRows.slice(0, route.needsSensorHistory ? 5 : 0).map(compactSensorRow).filter(Boolean),
         requested_date: requestedDateKey || null,
+        requested_year: requestedYear || null,
         requested_day_summary: requestedDateKey ? {
             date: requestedDateKey,
             ...summarizeRows(requestedDayRows),
@@ -336,18 +573,22 @@ function runPythonController(context) {
 
 async function generateNatAiReply(context, fallbackText) {
     const pythonReply = await runPythonController(context);
-    const shouldPreferOpenAi =
+    const isControlIntent = pythonReply?.intent === 'control_stop' || pythonReply?.intent === 'control_start';
+    const shouldUseOpenAi =
         NAT_AI_OPENAI_GENERAL_ENABLED &&
         OPENAI_API_KEY &&
-        pythonReply?.intent === 'general';
+        !isControlIntent &&
+        (NAT_AI_LLM_FIRST || pythonReply?.intent === 'general');
 
-    if (pythonReply?.text && !shouldPreferOpenAi) {
+    if (pythonReply?.text && !shouldUseOpenAi) {
         return {
             text: pythonReply.text,
             provider: pythonReply.provider || 'python-controller',
             intent: pythonReply.intent,
             risk: pythonReply.risk,
             actions: pythonReply.actions,
+            context_chars: 0,
+            context_budget_chars: NAT_AI_OPENAI_CONTEXT_MAX_CHARS,
         };
     }
 
@@ -359,11 +600,14 @@ async function generateNatAiReply(context, fallbackText) {
                 intent: pythonReply.intent,
                 risk: pythonReply.risk,
                 actions: pythonReply.actions,
+                context_chars: 0,
+                context_budget_chars: NAT_AI_OPENAI_CONTEXT_MAX_CHARS,
             };
         }
         return { text: fallbackText, provider: 'fallback' };
     }
 
+    const openAiContext = buildOpenAiContext(context, pythonReply);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12000);
     try {
@@ -382,7 +626,7 @@ async function generateNatAiReply(context, fallbackText) {
                     { role: 'system', content: buildNatAiSystemPrompt() },
                     {
                         role: 'user',
-                        content: `Context for NAT AI:\n${JSON.stringify(context)}\n\nAnswer the user's latest message now.`,
+                        content: `Compact authenticated context and optional tool result for NAT AI:\n${JSON.stringify(openAiContext.value)}\n\nAnswer the user's latest message now. If this is about GreenCropNAT account data, use only values in this compact context/tool result. Do not sound like a predefined FAQ.`,
                     },
                 ],
             }),
@@ -396,7 +640,13 @@ async function generateNatAiReply(context, fallbackText) {
 
         const data = await response.json();
         const text = extractOpenAiText(data);
-        return { text: text || fallbackText, provider: text ? 'openai' : 'fallback' };
+        return {
+            text: text || fallbackText,
+            provider: text ? (pythonReply?.text ? 'openai-with-controller-context' : 'openai') : 'fallback',
+            context_chars: openAiContext.chars,
+            context_budget_chars: NAT_AI_OPENAI_CONTEXT_MAX_CHARS,
+            context_truncated: openAiContext.truncated,
+        };
     } catch (err) {
         console.warn('NAT AI OpenAI fallback:', err.message);
         return { text: fallbackText, provider: 'fallback' };
