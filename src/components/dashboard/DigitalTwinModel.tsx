@@ -143,13 +143,6 @@ export function DigitalTwinModel({
           wls2={wls2}
         />
 
-        <div className="dt-glass" style={{ marginTop: 16, padding: "14px 16px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 10 }}>
-            <SensorCard label="pH" value={valueText(phValue, 2)} unit="" color={C.cyan} ok={phOk} />
-            <SensorCard label="EC" value={valueText(ecValue, 2)} unit="mS/cm" color={C.amber} ok={ecValue != null} />
-            <SensorCard label={isTH ? "Temp" : "Temp"} value={valueText(tempValue, 1)} unit="C" color={C.red} ok={tempValue == null || tempValue < 30} />
-          </div>
-        </div>
       </div>
     </div>
   );
