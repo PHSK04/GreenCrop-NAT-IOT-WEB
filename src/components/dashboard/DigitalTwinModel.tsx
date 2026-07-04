@@ -93,6 +93,7 @@ export function DigitalTwinModel({
         @keyframes dtRing { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(1.8); opacity: 0; } }
         @keyframes dtSlide { from { background-position: -55% 0; } to { background-position: 155% 0; } }
         @keyframes dtBob { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(3px) rotate(4deg); } }
+        @keyframes dtPipeFlow { to { stroke-dashoffset: -76; } }
         .dt-glass {
           background: rgba(255,255,255,.72);
           border: 1px solid rgba(255,255,255,.9);
@@ -132,30 +133,16 @@ export function DigitalTwinModel({
           <HorizontalTank level={tank3Level} active={p2On} color={C.green} />
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, marginBottom: 8 }}>
-          <Pipe on={false} vertical color={C.green} height={14} />
-          <PumpUnit size={92} on={false} color={C.green} label={isTH ? "P3 - ปั๊มใหญ่ (ยังไม่เชื่อมต่อ)" : "P3 - Main pump"} />
-          <Pipe on={false} vertical color={C.green} height={14} />
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "nowrap", gap: 0, overflow: "visible" }}>
-          <TankCard pct={tank1Level} markOn={liveSignal && wls1} name={isTH ? "ถัง 1" : "Tank 1"} sub="Raw Water" color={C.cyan} />
-          <div style={{ display: "flex", flex: "1 1 210px", minWidth: 180, maxWidth: 260, flexDirection: "column", alignItems: "center", gap: 8, marginTop: -70, overflow: "visible" }}>
-            <Pipe on={p1On} horizontal color={C.cyan} extend />
-            <PumpUnit size={70} on={p1On} color={C.cyan} label="P1 - Auto" />
-          </div>
-          <TankCard pct={tank2Level} markOn={liveSignal && wls2} name={isTH ? "ถัง 2" : "Tank 2"} sub="Preparation" color="#38bdf8" />
-          <div style={{ display: "flex", flex: "1 1 210px", minWidth: 180, maxWidth: 260, flexDirection: "column", alignItems: "center", gap: 8, marginTop: -70, overflow: "visible", position: "relative" }}>
-            <div style={{ bottom: 88, left: "50%", position: "absolute", transform: "translateX(-50%)", zIndex: 0 }}>
-              <Pipe on={p2On} vertical color={C.green} height={430} />
-            </div>
-            <div style={{ position: "relative", zIndex: 1 }}>
-              <Pipe on={p2On} vertical color={C.green} height={34} />
-            </div>
-            <Pipe on={p2On} horizontal color={C.green} extend />
-            <PumpUnit size={70} on={p2On} color={C.green} label="P2 - Manual" />
-          </div>
-        </div>
+        <ProcessPlumbing
+          isTH={isTH}
+          tank1Level={tank1Level}
+          tank2Level={tank2Level}
+          p1On={p1On}
+          p2On={p2On}
+          liveSignal={liveSignal}
+          wls1={wls1}
+          wls2={wls2}
+        />
 
         <div className="dt-glass" style={{ marginTop: 16, padding: "14px 16px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 10 }}>
@@ -166,6 +153,166 @@ export function DigitalTwinModel({
         </div>
       </div>
     </div>
+  );
+}
+
+function ProcessPlumbing({
+  isTH,
+  tank1Level,
+  tank2Level,
+  p1On,
+  p2On,
+  liveSignal,
+  wls1,
+  wls2,
+}: {
+  isTH: boolean;
+  tank1Level: number;
+  tank2Level: number;
+  p1On: boolean;
+  p2On: boolean;
+  liveSignal: boolean;
+  wls1: boolean;
+  wls2: boolean;
+}) {
+  const cyanOn = liveSignal && wls1;
+  const greenOn = liveSignal && wls2;
+
+  return (
+    <div
+      style={{
+        marginTop: -4,
+        overflowX: "auto",
+        overflowY: "hidden",
+        padding: "4px 0 0",
+      }}
+    >
+      <div
+        style={{
+          height: 430,
+          margin: "0 auto",
+          minWidth: 820,
+          position: "relative",
+          width: 900,
+        }}
+      >
+        <svg
+          aria-hidden="true"
+          preserveAspectRatio="none"
+          viewBox="0 0 900 430"
+          style={{
+            inset: 0,
+            overflow: "visible",
+            pointerEvents: "none",
+            position: "absolute",
+            zIndex: 1,
+          }}
+        >
+          <defs>
+            <filter id="dtPipeShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#0f172a" floodOpacity=".13" />
+            </filter>
+          </defs>
+
+          <PipeRun d="M446 8 V54" on={false} color={C.green} muted />
+          <PipeRun d="M446 118 V160" on={false} color={C.green} muted />
+
+          <PipeRun d="M184 300 H306" on={p1On} color={C.cyan} />
+          <PipeRun d="M378 300 H502" on={p1On} color={C.cyan} />
+
+          <PipeRun d="M654 300 H730" on={p2On} color={C.green} />
+          <PipeRun d="M790 300 H842 V18" on={p2On} color={C.green} />
+
+          <PipePort cx={184} cy={300} on={cyanOn || p1On} color={C.cyan} />
+          <PipePort cx={306} cy={300} on={p1On} color={C.cyan} />
+          <PipePort cx={378} cy={300} on={p1On} color={C.cyan} />
+          <PipePort cx={502} cy={300} on={p1On || greenOn} color="#38bdf8" />
+          <PipePort cx={654} cy={300} on={p2On || greenOn} color="#38bdf8" />
+          <PipePort cx={730} cy={300} on={p2On} color={C.green} />
+          <PipePort cx={790} cy={300} on={p2On} color={C.green} />
+          <PipePort cx={842} cy={18} on={p2On} color={C.green} />
+          <PipePort cx={446} cy={8} on={false} color={C.green} muted />
+          <PipePort cx={446} cy={160} on={false} color={C.green} muted />
+        </svg>
+
+        <div style={{ left: 351, position: "absolute", top: 45, zIndex: 2 }}>
+          <PumpUnit size={94} on={false} color={C.green} label={isTH ? "P3 - ปั๊มใหญ่ (Standby)" : "P3 - Main pump (Standby)"} />
+        </div>
+
+        <div style={{ left: 34, position: "absolute", top: 202, zIndex: 3 }}>
+          <TankCard pct={tank1Level} markOn={liveSignal && wls1} name={isTH ? "ถัง 1" : "Tank 1"} sub="Raw Water" color={C.cyan} />
+        </div>
+
+        <div style={{ left: 311, position: "absolute", top: 247, zIndex: 3 }}>
+          <PumpUnit size={72} on={p1On} color={C.cyan} label="P1 - Auto" />
+        </div>
+
+        <div style={{ left: 504, position: "absolute", top: 202, zIndex: 3 }}>
+          <TankCard pct={tank2Level} markOn={liveSignal && wls2} name={isTH ? "ถัง 2" : "Tank 2"} sub="Preparation" color="#38bdf8" />
+        </div>
+
+        <div style={{ left: 733, position: "absolute", top: 247, zIndex: 3 }}>
+          <PumpUnit size={72} on={p2On} color={C.green} label="P2 - Manual" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PipeRun({
+  d,
+  on,
+  color,
+  muted,
+}: {
+  d: string;
+  on: boolean;
+  color: string;
+  muted?: boolean;
+}) {
+  const shell = muted ? "#cbd5e1" : "#94a3b8";
+  const highlight = muted ? "#e2e8f0" : "#eaf2fb";
+  const inner = on ? color : muted ? "#dbe4ee" : "#cbd5e1";
+
+  return (
+    <g filter="url(#dtPipeShadow)">
+      <path d={d} fill="none" stroke={shell} strokeLinecap="round" strokeLinejoin="round" strokeWidth="18" />
+      <path d={d} fill="none" stroke={highlight} strokeLinecap="round" strokeLinejoin="round" strokeWidth="13" />
+      <path
+        d={d}
+        fill="none"
+        stroke={inner}
+        strokeDasharray={on ? "16 18" : undefined}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="6"
+        style={{
+          animation: on ? "dtPipeFlow .9s linear infinite" : "none",
+          filter: on ? `drop-shadow(0 0 7px ${color}99)` : "none",
+        }}
+      />
+    </g>
+  );
+}
+
+function PipePort({
+  cx,
+  cy,
+  on,
+  color,
+  muted,
+}: {
+  cx: number;
+  cy: number;
+  on: boolean;
+  color: string;
+  muted?: boolean;
+}) {
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r="12" fill={on ? `${color}2f` : muted ? "#f1f5f9" : "#e2e8f0"} stroke={on ? `${color}88` : "#cbd5e1"} strokeWidth="2" />
+      <circle cx={cx} cy={cy} r="5" fill={on ? color : muted ? "#cbd5e1" : "#94a3b8"} />
+    </g>
   );
 }
 
