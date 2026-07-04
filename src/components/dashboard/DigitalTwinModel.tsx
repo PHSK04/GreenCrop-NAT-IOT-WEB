@@ -93,7 +93,6 @@ export function DigitalTwinModel({
         @keyframes dtRing { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(1.8); opacity: 0; } }
         @keyframes dtSlide { from { background-position: -55% 0; } to { background-position: 155% 0; } }
         @keyframes dtBob { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(3px) rotate(4deg); } }
-        @keyframes dtPipeFlow { to { stroke-dashoffset: -76; } }
         .dt-glass {
           background: rgba(255,255,255,.72);
           border: 1px solid rgba(255,255,255,.9);
@@ -175,9 +174,6 @@ function ProcessPlumbing({
   wls1: boolean;
   wls2: boolean;
 }) {
-  const cyanOn = liveSignal && wls1;
-  const greenOn = liveSignal && wls2;
-
   return (
     <div
       style={{
@@ -196,44 +192,15 @@ function ProcessPlumbing({
           width: 900,
         }}
       >
-        <svg
-          aria-hidden="true"
-          preserveAspectRatio="none"
-          viewBox="0 0 900 430"
-          style={{
-            inset: 0,
-            overflow: "visible",
-            pointerEvents: "none",
-            position: "absolute",
-            zIndex: 1,
-          }}
-        >
-          <defs>
-            <filter id="dtPipeShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#0f172a" floodOpacity=".13" />
-            </filter>
-          </defs>
+        <PipeSegment x={444} y={0} length={55} vertical color={C.green} muted />
+        <PipeSegment x={444} y={122} length={48} vertical color={C.green} muted />
 
-          <PipeRun d="M446 8 V54" on={false} color={C.green} muted />
-          <PipeRun d="M446 118 V160" on={false} color={C.green} muted />
+        <PipeSegment x={178} y={300} length={138} color={C.cyan} on={p1On || (liveSignal && wls1)} />
+        <PipeSegment x={374} y={300} length={166} color={C.cyan} on={p1On} />
 
-          <PipeRun d="M184 300 H306" on={p1On} color={C.cyan} />
-          <PipeRun d="M378 300 H502" on={p1On} color={C.cyan} />
-
-          <PipeRun d="M654 300 H730" on={p2On} color={C.green} />
-          <PipeRun d="M790 300 H842 V18" on={p2On} color={C.green} />
-
-          <PipePort cx={184} cy={300} on={cyanOn || p1On} color={C.cyan} />
-          <PipePort cx={306} cy={300} on={p1On} color={C.cyan} />
-          <PipePort cx={378} cy={300} on={p1On} color={C.cyan} />
-          <PipePort cx={502} cy={300} on={p1On || greenOn} color="#38bdf8" />
-          <PipePort cx={654} cy={300} on={p2On || greenOn} color="#38bdf8" />
-          <PipePort cx={730} cy={300} on={p2On} color={C.green} />
-          <PipePort cx={790} cy={300} on={p2On} color={C.green} />
-          <PipePort cx={842} cy={18} on={p2On} color={C.green} />
-          <PipePort cx={446} cy={8} on={false} color={C.green} muted />
-          <PipePort cx={446} cy={160} on={false} color={C.green} muted />
-        </svg>
+        <PipeSegment x={650} y={300} length={94} color={C.green} on={p2On || (liveSignal && wls2)} />
+        <PipeSegment x={790} y={300} length={62} color={C.green} on={p2On} />
+        <PipeSegment x={838} y={0} length={314} vertical color={C.green} on={p2On} />
 
         <div style={{ left: 351, position: "absolute", top: 45, zIndex: 2 }}>
           <PumpUnit size={94} on={false} color={C.green} label={isTH ? "P3 - ปั๊มใหญ่ (Standby)" : "P3 - Main pump (Standby)"} />
@@ -259,60 +226,67 @@ function ProcessPlumbing({
   );
 }
 
-function PipeRun({
-  d,
-  on,
+function PipeSegment({
+  x,
+  y,
+  length,
   color,
-  muted,
+  on = false,
+  vertical = false,
+  muted = false,
 }: {
-  d: string;
-  on: boolean;
+  x: number;
+  y: number;
+  length: number;
   color: string;
+  on?: boolean;
+  vertical?: boolean;
   muted?: boolean;
 }) {
-  const shell = muted ? "#cbd5e1" : "#94a3b8";
-  const highlight = muted ? "#e2e8f0" : "#eaf2fb";
-  const inner = on ? color : muted ? "#dbe4ee" : "#cbd5e1";
-
   return (
-    <g filter="url(#dtPipeShadow)">
-      <path d={d} fill="none" stroke={shell} strokeLinecap="round" strokeLinejoin="round" strokeWidth="18" />
-      <path d={d} fill="none" stroke={highlight} strokeLinecap="round" strokeLinejoin="round" strokeWidth="13" />
-      <path
-        d={d}
-        fill="none"
-        stroke={inner}
-        strokeDasharray={on ? "16 18" : undefined}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="6"
+    <div
+      style={{
+        background: vertical
+          ? "linear-gradient(90deg,#94a3b8 0%,#eef4fb 28%,#cbd5e1 48%,#7c8da6 100%)"
+          : "linear-gradient(180deg,#f8fafc 0%,#cbd5e1 34%,#94a3b8 56%,#e2e8f0 100%)",
+        border: "1px solid rgba(100,116,139,.5)",
+        borderRadius: 999,
+        boxShadow:
+          "inset 0 1px 2px rgba(255,255,255,.9), inset 0 -2px 3px rgba(15,23,42,.2), 0 8px 18px rgba(15,23,42,.11)",
+        height: vertical ? length : 14,
+        left: x,
+        opacity: muted ? 0.72 : 1,
+        overflow: "hidden",
+        position: "absolute",
+        top: y,
+        width: vertical ? 14 : length,
+        zIndex: 2,
+      }}
+    >
+      <div
         style={{
-          animation: on ? "dtPipeFlow .9s linear infinite" : "none",
-          filter: on ? `drop-shadow(0 0 7px ${color}99)` : "none",
+          animation: on ? "dtSlide 1s linear infinite" : "none",
+          background: on
+            ? vertical
+              ? `linear-gradient(180deg,transparent 0%,${color} 20%,${color} 80%,transparent 100%)`
+              : `linear-gradient(90deg,transparent 0%,${color} 20%,${color} 80%,transparent 100%)`
+            : vertical
+              ? "linear-gradient(180deg,rgba(148,163,184,.2),rgba(226,232,240,.28))"
+              : "linear-gradient(90deg,rgba(148,163,184,.2),rgba(226,232,240,.28))",
+          backgroundSize: on ? (vertical ? "100% 44px" : "58px 100%") : undefined,
+          borderRadius: 999,
+          bottom: vertical ? 3 : undefined,
+          boxShadow: on ? `0 0 10px ${color}88` : "none",
+          height: vertical ? undefined : 6,
+          left: vertical ? "50%" : 3,
+          position: "absolute",
+          right: vertical ? undefined : 3,
+          top: vertical ? 3 : "50%",
+          transform: vertical ? "translateX(-50%)" : "translateY(-50%)",
+          width: vertical ? 6 : undefined,
         }}
       />
-    </g>
-  );
-}
-
-function PipePort({
-  cx,
-  cy,
-  on,
-  color,
-  muted,
-}: {
-  cx: number;
-  cy: number;
-  on: boolean;
-  color: string;
-  muted?: boolean;
-}) {
-  return (
-    <g>
-      <circle cx={cx} cy={cy} r="12" fill={on ? `${color}2f` : muted ? "#f1f5f9" : "#e2e8f0"} stroke={on ? `${color}88` : "#cbd5e1"} strokeWidth="2" />
-      <circle cx={cx} cy={cy} r="5" fill={on ? color : muted ? "#cbd5e1" : "#94a3b8"} />
-    </g>
+    </div>
   );
 }
 
