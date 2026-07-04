@@ -18,6 +18,7 @@ import {
 import { MetricsChart } from "../MetricsChart";
 import { DigitalTwinModel } from "../dashboard/DigitalTwinModel";
 import type { AdminDbDeviceRow } from "@/features/auth/services/authService";
+import type { LucideIcon } from "lucide-react";
 
 
 interface DashboardPageProps {
@@ -42,6 +43,107 @@ const useStablePositiveValue = (value: number, enabled = true) => {
 
   return stableValue;
 };
+
+type SensorTrendPoint = {
+  time: number;
+  ph: number | null;
+  temp: number | null;
+  ec: number | null;
+};
+
+function MiniSensorChart({
+  data,
+  dataKey,
+  color,
+}: {
+  data: SensorTrendPoint[];
+  dataKey: "ph" | "temp" | "ec";
+  color: string;
+}) {
+  const values = data
+    .map((point) => point[dataKey])
+    .filter((value): value is number => value != null && Number.isFinite(value));
+
+  if (values.length < 2) {
+    return (
+      <div className="grid h-16 place-items-center rounded-xl border border-dashed border-border/70 bg-muted/20 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Waiting for trend
+      </div>
+    );
+  }
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(max - min, 0.01);
+  const width = 220;
+  const height = 58;
+  const points = values.map((value, index) => {
+    const x = values.length === 1 ? 0 : (index / (values.length - 1)) * width;
+    const y = height - ((value - min) / span) * (height - 10) - 5;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const path = `M ${points.join(" L ")}`;
+  const fillPath = `${path} L ${width},${height} L 0,${height} Z`;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-16 w-full overflow-visible rounded-xl bg-background/35">
+      <path d={fillPath} fill={color} opacity="0.12" />
+      <path d={path} fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+      {points.map((point, index) => {
+        if (index !== points.length - 1) return null;
+        const [cx, cy] = point.split(",");
+        return <circle key={point} cx={cx} cy={cy} r="4" fill={color} />;
+      })}
+    </svg>
+  );
+}
+
+function RealtimeMetricCard({
+  title,
+  value,
+  unit,
+  status,
+  icon: Icon,
+  color,
+  bgColor,
+  data,
+  dataKey,
+}: {
+  title: string;
+  value: string;
+  unit: string;
+  status: string;
+  icon: LucideIcon;
+  color: string;
+  bgColor: string;
+  data: SensorTrendPoint[];
+  dataKey: "ph" | "temp" | "ec";
+}) {
+  return (
+    <Card className="rounded-2xl border-border/70 bg-card/65 shadow-lg backdrop-blur-sm">
+      <CardContent className="grid gap-4 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${bgColor}`}>
+              <Icon className={`h-6 w-6 ${color}`} />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-muted-foreground">{title}</p>
+              <div className="mt-1 flex items-end gap-2">
+                <span className="font-mono text-3xl font-black leading-none text-foreground">{value}</span>
+                {unit && <span className="pb-0.5 text-sm font-semibold text-muted-foreground">{unit}</span>}
+              </div>
+            </div>
+          </div>
+          <Badge variant="outline" className="shrink-0 border-border bg-background/70 px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+            {status}
+          </Badge>
+        </div>
+        <MiniSensorChart data={data} dataKey={dataKey} color={color.includes("yellow") ? "#ca8a04" : color.includes("cyan") ? "#0891b2" : "#3b82f6"} />
+      </CardContent>
+    </Card>
+  );
+}
 
 const translations = {
   EN: {
@@ -170,6 +272,7 @@ export function DashboardPage({
   const stablePhOk =
     stablePhValue != null ? stablePhValue >= 6.5 && stablePhValue <= 7.5 : phOk;
   const liveSignal = mqttStatus === "connected" && boardConnected;
+  const [sensorTrend, setSensorTrend] = useState<SensorTrendPoint[]>([]);
 
   const formatUptime = (seconds: number) => {
     const hh = String(Math.floor(seconds / 3600)).padStart(2, "0");
@@ -183,6 +286,30 @@ export function DashboardPage({
       setDismissedWaterFullAlarm(false);
     }
   }, [waterFullAlarm]);
+
+  useEffect(() => {
+    const hasAnyLiveMetric = stablePhValue != null || stableTempValue != null || stableEcValue != null;
+    if (!hasAnyLiveMetric) return;
+
+    setSensorTrend((prev) => {
+      const nextPoint: SensorTrendPoint = {
+        time: Date.now(),
+        ph: stablePhValue,
+        temp: stableTempValue,
+        ec: stableEcValue,
+      };
+      const last = prev[prev.length - 1];
+      if (
+        last &&
+        last.ph === nextPoint.ph &&
+        last.temp === nextPoint.temp &&
+        last.ec === nextPoint.ec
+      ) {
+        return prev;
+      }
+      return [...prev, nextPoint].slice(-24);
+    });
+  }, [stableEcValue, stablePhValue, stableTempValue]);
 
   const handleStopWaterFullAlarm = () => {
     setDismissedWaterFullAlarm(true);
@@ -598,57 +725,51 @@ export function DashboardPage({
                  </CardContent>
               </Card>
 
-              <Card className="rounded-2xl border-border/70 bg-card/65 shadow-lg backdrop-blur-sm">
-                <CardContent className="grid gap-3 p-5">
-                  {[
-                    {
-                      title: t.metrics.ph.title,
-                      value: stablePhValue != null ? stablePhValue.toFixed(2) : "--",
-                      status: stablePhValue != null ? (stablePhOk ? "OK" : "CHECK") : "WAITING",
-                      icon: Beaker,
-                      color: "text-blue-500 dark:text-blue-400",
-                      bgColor: "bg-blue-500/10",
-                      unit: "",
-                    },
-                    {
-                      title: t.metrics.temp.title,
-                      value: stableTempValue != null ? stableTempValue.toFixed(1) : "--",
-                      unit: "C",
-                      status: stableTempValue != null ? "LIVE" : "WAITING",
-                      icon: Thermometer,
-                      color: "text-cyan-600 dark:text-cyan-400",
-                      bgColor: "bg-cyan-500/10",
-                    },
-                    {
-                      title: t.metrics.ec.title,
-                      value: stableEcValue != null ? stableEcValue.toFixed(2) : "--",
-                      unit: "mS/cm",
-                      status: stableEcValue != null ? "LIVE" : "WAITING",
-                      icon: Zap,
-                      color: "text-yellow-600 dark:text-yellow-400",
-                      bgColor: "bg-yellow-500/10",
-                    },
-                  ].map((metric) => (
-                    <div key={metric.title} className="flex min-h-20 items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/45 px-5 py-4">
-                      <div className="flex min-w-0 items-center gap-4">
-                        <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${metric.bgColor}`}>
-                          <metric.icon className={`h-6 w-6 ${metric.color}`} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-bold leading-none text-foreground">{metric.value}</span>
-                            {metric.unit && <span className="text-sm font-medium text-muted-foreground">{metric.unit}</span>}
-                          </div>
-                          <p className="mt-1 truncate text-base font-semibold text-muted-foreground">{metric.title}</p>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="shrink-0 border-border bg-background/60 px-4 py-1.5 text-xs uppercase tracking-wider text-muted-foreground">
-                        {metric.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+              {[
+                {
+                  title: t.metrics.ph.title,
+                  value: stablePhValue != null ? stablePhValue.toFixed(2) : "--",
+                  status: stablePhValue != null ? (stablePhOk ? "OK" : "CHECK") : "WAITING",
+                  icon: Beaker,
+                  color: "text-blue-500 dark:text-blue-400",
+                  bgColor: "bg-blue-500/10",
+                  unit: "",
+                  dataKey: "ph" as const,
+                },
+                {
+                  title: t.metrics.temp.title,
+                  value: stableTempValue != null ? stableTempValue.toFixed(1) : "--",
+                  unit: "C",
+                  status: stableTempValue != null ? "LIVE" : "WAITING",
+                  icon: Thermometer,
+                  color: "text-cyan-600 dark:text-cyan-400",
+                  bgColor: "bg-cyan-500/10",
+                  dataKey: "temp" as const,
+                },
+                {
+                  title: t.metrics.ec.title,
+                  value: stableEcValue != null ? stableEcValue.toFixed(2) : "--",
+                  unit: "mS/cm",
+                  status: stableEcValue != null ? "LIVE" : "WAITING",
+                  icon: Zap,
+                  color: "text-yellow-600 dark:text-yellow-400",
+                  bgColor: "bg-yellow-500/10",
+                  dataKey: "ec" as const,
+                },
+              ].map((metric) => (
+                <RealtimeMetricCard
+                  key={metric.title}
+                  title={metric.title}
+                  value={metric.value}
+                  unit={metric.unit}
+                  status={metric.status}
+                  icon={metric.icon}
+                  color={metric.color}
+                  bgColor={metric.bgColor}
+                  data={sensorTrend}
+                  dataKey={metric.dataKey}
+                />
+              ))}
             </div>
 
           </div>
