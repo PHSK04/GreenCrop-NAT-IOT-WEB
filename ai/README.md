@@ -37,11 +37,25 @@ or automation. The Python controller still answers deterministic machine, pump,
 sensor, export, and safety questions first. General agriculture-first questions
 are routed to OpenAI when these values are present in `server/.env`:
 
+Before generation, the backend retrieves relevant excerpts from an allowlist of
+project documentation (`README.md`, AI/API/spec, IoT, and project-structure
+guides). These excerpts are returned as `project_evidence`, so project answers
+can name the repository sources they actually used instead of relying on model
+memory. Live account telemetry remains a separate, tenant-bound source.
+
+General/project chat is generative by default (`NAT_AI_GENERATIVE_CHAT_REQUIRED=true`).
+If no language model is configured, NAT AI reports that configuration is needed
+instead of pretending a predefined fallback is an intelligent answer. The local
+Python controller remains available for deterministic sensor safety and machine
+control analysis.
+
 ```bash
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4.1-mini
 OPENAI_MAX_OUTPUT_TOKENS=700
 NAT_AI_OPENAI_GENERAL_ENABLED=true
+NAT_AI_GENERATIVE_CHAT_REQUIRED=true
+NAT_AI_OPENAI_CONTEXT_MAX_CHARS=8000
 ```
 
 If `OPENAI_API_KEY` is empty, NAT AI falls back to the local controller and

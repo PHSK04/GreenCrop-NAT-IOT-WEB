@@ -1,17 +1,19 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const { searchProjectKnowledge } = require('./project_knowledge');
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 const OPENAI_MAX_OUTPUT_TOKENS = Math.max(120, Math.min(1200, Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 700)));
 const NAT_AI_OPENAI_GENERAL_ENABLED = String(process.env.NAT_AI_OPENAI_GENERAL_ENABLED || 'true').toLowerCase() !== 'false';
 const NAT_AI_LLM_FIRST = String(process.env.NAT_AI_LLM_FIRST || 'true').toLowerCase() !== 'false';
+const NAT_AI_GENERATIVE_CHAT_REQUIRED = String(process.env.NAT_AI_GENERATIVE_CHAT_REQUIRED || 'true').toLowerCase() !== 'false';
 const NAT_AI_PYTHON_ENABLED = String(process.env.NAT_AI_PYTHON_ENABLED || 'true').toLowerCase() !== 'false';
 const NAT_AI_PYTHON_BIN = process.env.NAT_AI_PYTHON_BIN || 'python3';
 const NAT_AI_PYTHON_SCRIPT = process.env.NAT_AI_PYTHON_SCRIPT ||
     path.resolve(__dirname, '../../ai/controller/nat_ai_controller.py');
 const NAT_AI_PYTHON_TIMEOUT_MS = Math.max(800, Math.min(8000, Number(process.env.NAT_AI_PYTHON_TIMEOUT_MS || 2500)));
-const NAT_AI_OPENAI_CONTEXT_MAX_CHARS = Math.max(1200, Math.min(12000, Number(process.env.NAT_AI_OPENAI_CONTEXT_MAX_CHARS || 4500)));
+const NAT_AI_OPENAI_CONTEXT_MAX_CHARS = Math.max(2000, Math.min(16000, Number(process.env.NAT_AI_OPENAI_CONTEXT_MAX_CHARS || 8000)));
 
 function asBool(value) {
     if (typeof value === 'boolean') return value;
@@ -347,8 +349,9 @@ function buildOpenAiContext(context, toolResult = null) {
         requested_year: context.requested_year,
         requested_day_summary: context.requested_day_summary,
         page_project_snapshot: compactProjectSnapshot(context.page_project_snapshot, route),
+        project_evidence: Array.isArray(context.project_evidence) ? context.project_evidence.slice(0, 4) : [],
         learning_summary: route.needsLearningSummary ? context.learning_summary : undefined,
-        recent_conversation: Array.isArray(context.recent_conversation) ? context.recent_conversation.slice(-4) : [],
+        recent_conversation: Array.isArray(context.recent_conversation) ? context.recent_conversation.slice(-10) : [],
         user_message: context.user_message,
         current_datetime: context.current_datetime,
         project: {
@@ -388,6 +391,9 @@ function buildNatAiSystemPrompt() {
         'Never mix data between users or tenants. If the context is scoped to one user, say "ของบัญชีนี้" / "this account" when summarizing project data.',
         'For general knowledge, coding, writing, learning, brainstorming, or everyday questions, answer from your general knowledge without pretending that machine context contains the answer.',
         'If a tool_result is provided, treat it as verified account data. Use its facts, but rewrite the answer naturally instead of copying a template.',
+        'Project evidence contains excerpts retrieved from approved repository documentation. Prefer it over general memory for project facts.',
+        'When project_evidence supports the answer, end with a short "อ้างอิงในโปรเจกต์:" or "Project references:" line listing only the source paths you actually used.',
+        'Do not cite a project source that does not support the claim. Clearly separate live account data from documentation.',
         'If the user asks for current/latest external information that is not in context, say you may need a current source instead of inventing facts.',
         'For physical machine control, never claim you directly changed hardware; propose safe actions that require confirmation.',
         'Keep normal answers concise, but give step-by-step detail when the user asks for teaching or implementation help.',
@@ -442,8 +448,8 @@ async function buildNatAiContext({
         deviceId,
         limit: 4,
     }).catch(() => null) : null;
-    const recentMessages = (await loadAiChatMessages(session.id, 6))
-        .slice(-4)
+    const recentMessages = (await loadAiChatMessages(session.id, 14))
+        .slice(-10)
         .map((message) => ({
             role: message.sender_role === 'user' ? 'user' : 'assistant',
             text: String(message.body || '').slice(0, 240),
@@ -468,6 +474,7 @@ async function buildNatAiContext({
         machine_status_label: options.machineStatus || null,
         active_device_id: deviceId || null,
         project_knowledge: route.intent === 'general' ? buildProjectKnowledge() : null,
+        project_evidence: searchProjectKnowledge(userMessage, { limit: 4 }),
         page_project_snapshot: compactProjectSnapshot(options.projectSnapshot || null, route),
         user_devices: (route.needsDevices ? devices : []).slice(0, 8).map((device) => ({
             device_id: device.device_id,
@@ -593,6 +600,18 @@ async function generateNatAiReply(context, fallbackText) {
     }
 
     if (!OPENAI_API_KEY || typeof fetch !== 'function') {
+        if (NAT_AI_GENERATIVE_CHAT_REQUIRED && pythonReply?.intent === 'general') {
+            const isThai = /[\u0E00-\u0E7F]/.test(String(context.user_message || ''));
+            return {
+                text: isThai
+                    ? 'ตอนนี้ NAT AI ยังไม่ได้เชื่อมต่อโมเดลภาษาครับ จึงยังสร้างคำตอบใหม่จากข้อมูลโปรเจกต์ไม่ได้ กรุณาตั้งค่า OPENAI_API_KEY ใน server/.env แล้วเริ่มเซิร์ฟเวอร์ใหม่'
+                    : 'NAT AI is not connected to a language model yet, so it cannot generate a new grounded answer. Configure OPENAI_API_KEY in server/.env and restart the server.',
+                provider: 'model-configuration-required',
+                intent: 'general',
+                risk: pythonReply?.risk,
+                actions: [],
+            };
+        }
         if (pythonReply?.text) {
             return {
                 text: pythonReply.text,

@@ -5,6 +5,7 @@
   "main": "nest-server.js",
   "scripts": {
     "start": "node nest-server.js",
+    "test": "node --test services/*.test.js",
     "start:legacy": "node server.js",
     "dev": "sh -c 'PIDS=$(lsof -tiTCP:3001 -sTCP:LISTEN 2>/dev/null); if [ -n \"$PIDS\" ]; then kill $PIDS; fi; nodemon nest-server.js'",
     "dev:legacy": "sh -c 'PIDS=$(lsof -tiTCP:3001 -sTCP:LISTEN 2>/dev/null); if [ -n \"$PIDS\" ]; then kill $PIDS; fi; nodemon server.js'",
