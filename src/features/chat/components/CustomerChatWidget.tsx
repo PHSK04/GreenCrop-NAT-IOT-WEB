@@ -9,7 +9,6 @@ import {
   MessageCircleMore,
   Pencil,
   Reply,
-  RotateCcw,
   Send,
   ShieldCheck,
   Sparkles,
@@ -410,19 +409,23 @@ export function CustomerChatWidget({
   const previousChatbotMessageCountRef = useRef(chatbotMessages.length);
   const previousAgentMessageCountRef = useRef(agentMessages.length);
   const typingTimeoutRef = useRef<number | null>(null);
+  const localChatDateKey = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  }, []);
 
   const draftKey = useMemo(() => `chat_draft_${selectedThreadId || thread?.id || "pending"}`, [selectedThreadId, thread?.id]);
   const assistantHistoryKey = useMemo(
-    () => `${ASSISTANT_HISTORY_PREFIX}_${language}_${activeDeviceId || "no_device"}`,
-    [activeDeviceId, language],
+    () => `${ASSISTANT_HISTORY_PREFIX}_${language}_${activeDeviceId || "no_device"}_${localChatDateKey}`,
+    [activeDeviceId, language, localChatDateKey],
   );
   const chatbotHistoryKey = useMemo(
-    () => `${CHATBOT_HISTORY_PREFIX}_${language}_${activeDeviceId || "no_device"}`,
-    [activeDeviceId, language],
+    () => `${CHATBOT_HISTORY_PREFIX}_${language}_${activeDeviceId || "no_device"}_${localChatDateKey}`,
+    [activeDeviceId, language, localChatDateKey],
   );
   const agentHistoryKey = useMemo(
-    () => `${AGENT_HISTORY_PREFIX}_${language}_${activeDeviceId || "no_device"}`,
-    [activeDeviceId, language],
+    () => `${AGENT_HISTORY_PREFIX}_${language}_${activeDeviceId || "no_device"}_${localChatDateKey}`,
+    [activeDeviceId, language, localChatDateKey],
   );
   const humanListRef = listRef;
   const locale = isTH ? "th-TH" : "en-US";
@@ -782,9 +785,6 @@ export function CustomerChatWidget({
           hasLoadedAssistantHistoryRef.current = true;
           return;
         }
-        if (nextMessages.length > 0) {
-          chatService.clearMyAiSession({ deviceId: activeDeviceId || undefined }).catch(() => {});
-        }
         loadStoredHistory();
       })
       .catch(() => {
@@ -926,14 +926,6 @@ export function CustomerChatWidget({
       .catch(() => {
         // Keep the local transcript as an offline fallback if the API is unavailable.
       });
-  };
-
-  const resetAssistant = () => {
-    setMode("assistant");
-    const welcome = createAssistantWelcome(isTH);
-    setAssistantMessages([welcome]);
-    chatService.clearMyAiSession({ deviceId: activeDeviceId || undefined }).catch(() => {});
-    setError("");
   };
 
   const loadAiHistory = async () => {
@@ -2831,14 +2823,6 @@ export function CustomerChatWidget({
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={resetAssistant}
-                    title={isTH ? "ล้างแชทปัจจุบัน" : "Clear current chat"}
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
                 </>
               ) : (
                 <>
@@ -3032,6 +3016,81 @@ export function CustomerChatWidget({
           {mode === "human" ? humanView : assistantView}
         </div>
       )}
+
+      <Sheet open={isAiHistoryOpen} onOpenChange={setIsAiHistoryOpen}>
+        <SheetContent className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <SheetHeader className="border-b border-slate-200 px-5 py-4 text-left dark:border-slate-800">
+            <div className="flex items-start justify-between gap-3 pr-8">
+              <div>
+                <SheetTitle>{isTH ? "ประวัติ NAT AI" : "NAT AI history"}</SheetTitle>
+                <SheetDescription>
+                  {isTH ? "แชทเก่าแยกตามวันและหัวข้อ เปิดอ่านได้โดยไม่ปนกับแชทล่าสุด" : "Past chats are separated by date and topic and never mixed into the latest chat."}
+                </SheetDescription>
+              </div>
+              <Button size="sm" className="shrink-0 rounded-xl" onClick={() => startNewAiChat().catch(() => {})} disabled={isSending}>
+                <Pencil className="mr-2 h-4 w-4" />
+                {isTH ? "แชทใหม่" : "New chat"}
+              </Button>
+            </div>
+          </SheetHeader>
+
+          <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] sm:grid-cols-[230px_minmax(0,1fr)] sm:grid-rows-1">
+            <div className="max-h-56 overflow-y-auto border-b border-slate-200 bg-slate-50/80 p-3 sm:max-h-none sm:border-b-0 sm:border-r dark:border-slate-800 dark:bg-slate-950/60">
+              {isAiHistoryLoading && aiSessions.length === 0 ? (
+                <div className="px-2 py-6 text-center text-sm text-slate-500">{isTH ? "กำลังโหลดประวัติ..." : "Loading history..."}</div>
+              ) : aiSessions.length === 0 ? (
+                <div className="px-2 py-6 text-center text-sm text-slate-500">{isTH ? "ยังไม่มีประวัติแชท" : "No chat history yet"}</div>
+              ) : (
+                <div className="space-y-2">
+                  {aiSessions.map((session) => {
+                    const selected = selectedAiHistory?.session.id === session.id;
+                    const date = new Date(session.created_at || session.updated_at || Date.now());
+                    return (
+                      <button
+                        key={session.id}
+                        type="button"
+                        onClick={() => selectAiHistory(session).catch(() => {})}
+                        className={`w-full rounded-xl border px-3 py-3 text-left transition ${selected ? "border-emerald-300 bg-white shadow-sm dark:border-emerald-700 dark:bg-slate-900" : "border-transparent hover:border-slate-200 hover:bg-white dark:hover:border-slate-800 dark:hover:bg-slate-900/70"}`}
+                      >
+                        <div className="line-clamp-2 text-sm font-bold text-slate-900 dark:text-slate-100">{session.title || (isTH ? "แชท NAT AI" : "NAT AI chat")}</div>
+                        <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                          {date.toLocaleDateString(isTH ? "th-TH" : "en-US", { day: "numeric", month: "short", year: "numeric" })}
+                          {session.status === "active" ? ` · ${isTH ? "ล่าสุด" : "Current"}` : ""}
+                        </div>
+                        {session.last_message_preview && <div className="mt-1 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{session.last_message_preview}</div>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="min-h-0 overflow-y-auto bg-white px-4 py-4 dark:bg-slate-950">
+              {!selectedAiHistory ? (
+                <div className="flex h-full items-center justify-center text-center text-sm text-slate-500">
+                  {isTH ? "เลือกแชททางด้านบนเพื่อดูข้อความย้อนหลัง" : "Select a chat to read its transcript"}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="sticky top-0 z-10 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-500 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 dark:text-slate-400">
+                    {isTH ? "โหมดอ่านอย่างเดียว · ประวัตินี้จะไม่ปนกับแชทล่าสุด" : "Read only · This history is separate from the latest chat"}
+                  </div>
+                  {selectedAiHistory.messages.map((message) => (
+                    <div key={message.id} className={`flex ${message.sender_role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[90%] rounded-2xl px-3 py-2.5 ${message.sender_role === "user" ? "bg-emerald-600 text-white" : "border border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"}`}>
+                        <div className={`mb-1 text-[10px] ${message.sender_role === "user" ? "text-emerald-100" : "text-slate-400"}`}>
+                          {message.sender_role === "user" ? (isTH ? "คุณ" : "You") : "NAT AI"} · {formatTime(message.created_at)}
+                        </div>
+                        {message.sender_role === "user" ? <div className="whitespace-pre-wrap break-words text-sm leading-6">{message.body}</div> : renderAssistantMessageText(message.body)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={Boolean(messagePendingDelete)} onOpenChange={(open) => !open && setMessagePendingDelete(null)}>
         <DialogContent className="border-slate-200 bg-white text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
