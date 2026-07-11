@@ -1,3 +1,5 @@
+import waterSystemModel from "../../assets/images/generated/water_system_model_tall.png";
+
 type DigitalTwinModelProps = {
   language?: string;
   liveSignal: boolean;
@@ -79,11 +81,10 @@ export function DigitalTwinModel({
       style={{
         position: "relative",
         overflow: "hidden",
-        borderRadius: 24,
-        background:
-          "linear-gradient(135deg,#f0f9ff 0%,#e0f2fe 40%,#f0fdf4 75%,#fefce8 100%)",
+        borderRadius: 20,
+        background: "#f1f5f9",
         color: "#0f172a",
-        padding: "18px 14px 22px",
+        padding: 12,
       }}
     >
       <style>{`
@@ -93,23 +94,20 @@ export function DigitalTwinModel({
         @keyframes dtRing { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(1.8); opacity: 0; } }
         @keyframes dtSlide { from { background-position: -55% 0; } to { background-position: 155% 0; } }
         @keyframes dtBob { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(3px) rotate(4deg); } }
+        @keyframes dtFlowLine { to { stroke-dashoffset: -30; } }
+        @keyframes dtMachineGlow { 0%,100% { opacity: .28; } 50% { opacity: .55; } }
         .dt-glass {
-          background: rgba(255,255,255,.72);
-          border: 1px solid rgba(255,255,255,.9);
-          border-radius: 24px;
-          backdrop-filter: blur(18px);
-          box-shadow: 0 2px 0 rgba(255,255,255,.85) inset, 0 24px 48px -18px rgba(15,23,42,.16), 0 8px 20px -10px rgba(6,182,212,.15);
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          box-shadow: 0 12px 32px -24px rgba(15,23,42,.35);
         }
         @media (prefers-reduced-motion: reduce) {
           * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
         }
       `}</style>
 
-      <Glow color={C.cyan} left="2%" top="-10%" />
-      <Glow color={C.green} left="72%" top="-6%" />
-      <Glow color={C.amber} left="-8%" top="70%" />
-
-      <div className="dt-glass" style={{ position: "relative", zIndex: 1, padding: 18 }}>
+      <div className="dt-glass" style={{ position: "relative", zIndex: 1, padding: 20 }}>
         <Header statusText={statusText} statusColor={statusColor} liveSignal={liveSignal} />
 
         <ControlPanel
@@ -136,6 +134,7 @@ export function DigitalTwinModel({
           isTH={isTH}
           tank1Level={tank1Level}
           tank2Level={tank2Level}
+          tank3Level={tank3Level}
           p1On={p1On}
           p2On={p2On}
           liveSignal={liveSignal}
@@ -152,6 +151,7 @@ function ProcessPlumbing({
   isTH,
   tank1Level,
   tank2Level,
+  tank3Level,
   p1On,
   p2On,
   liveSignal,
@@ -161,62 +161,102 @@ function ProcessPlumbing({
   isTH: boolean;
   tank1Level: number;
   tank2Level: number;
+  tank3Level: number;
   p1On: boolean;
   p2On: boolean;
   liveSignal: boolean;
   wls1: boolean;
   wls2: boolean;
 }) {
+  const focus = p2On
+    ? { label: isTH ? "กำลังแสดง: P2 ส่งน้ำขึ้นบ่อเพาะเลี้ยง" : "Focus: P2 feeding grow bed", x: "58%", tilt: "rotateY(-4deg) rotateX(1deg) scale(1.025)" }
+    : p1On
+      ? { label: isTH ? "กำลังแสดง: P1 ส่งน้ำจากถัง 1 ไปถัง 2" : "Focus: P1 transferring Tank 1 → Tank 2", x: "42%", tilt: "rotateY(4deg) rotateX(1deg) scale(1.025)" }
+      : liveSignal
+        ? { label: isTH ? "ระบบพร้อมทำงาน · แสดงภาพรวม" : "System ready · Overview", x: "50%", tilt: "rotateY(0deg) rotateX(0deg) scale(1)" }
+        : { label: isTH ? "รอสัญญาณจากเครื่อง" : "Waiting for device signal", x: "50%", tilt: "rotateY(0deg) rotateX(0deg) scale(1)" };
+
   return (
     <div
       style={{
-        marginTop: -4,
-        overflowX: "auto",
-        overflowY: "hidden",
-        padding: "4px 0 0",
+        background: "linear-gradient(145deg,#f8fafc 0%,#eff6ff 55%,#ecfdf5 100%)",
+        border: "1px solid #e2e8f0",
+        borderRadius: 18,
+        marginTop: 14,
+        overflow: "hidden",
+        padding: "16px 18px 10px",
+        position: "relative",
       }}
     >
       <div
         style={{
-          height: 430,
+          backgroundImage: "linear-gradient(rgba(148,163,184,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.12) 1px,transparent 1px)",
+          backgroundSize: "28px 28px",
+          borderRadius: 14,
+          height: 620,
           margin: "0 auto",
-          minWidth: 820,
+          maxWidth: 1060,
           position: "relative",
-          width: 900,
+          width: "100%",
         }}
       >
-        <PipeSegment x={444} y={0} length={55} vertical color={C.green} muted />
-        <PipeSegment x={444} y={122} length={48} vertical color={C.green} muted />
-
-        <PipeSegment x={178} y={300} length={138} color={C.cyan} on={p1On || (liveSignal && wls1)} />
-        <PipeSegment x={374} y={300} length={166} color={C.cyan} on={p1On} />
-
-        <PipeSegment x={650} y={300} length={94} color={C.green} on={p2On || (liveSignal && wls2)} />
-        <PipeSegment x={790} y={300} length={62} color={C.green} on={p2On} />
-        <PipeSegment x={838} y={0} length={314} vertical color={C.green} on={p2On} />
-
-        <div style={{ left: 351, position: "absolute", top: 45, zIndex: 2 }}>
-          <PumpUnit size={94} on={false} color={C.green} label={isTH ? "P3 - ปั๊มใหญ่ (Standby)" : "P3 - Main pump (Standby)"} />
+        <div style={{ color: "#64748b", fontSize: 10, fontWeight: 800, left: 16, letterSpacing: ".12em", position: "absolute", textTransform: "uppercase", top: 14 }}>
+          {isTH ? "ภาพรวมระบบแบบเรียลไทม์" : "Live system overview"}
         </div>
-
-        <div style={{ left: 34, position: "absolute", top: 202, zIndex: 3 }}>
-          <TankCard pct={tank1Level} markOn={liveSignal && wls1} name={isTH ? "ถัง 1" : "Tank 1"} sub="Raw Water" color={C.cyan} />
+        <div style={{ alignItems: "center", backdropFilter: "blur(10px)", background: liveSignal ? "rgba(236,253,245,.92)" : "rgba(248,250,252,.92)", border: `1px solid ${liveSignal ? "#a7f3d0" : "#e2e8f0"}`, borderRadius: 999, color: liveSignal ? "#047857" : "#64748b", display: "flex", fontSize: 10, fontWeight: 750, gap: 7, padding: "7px 11px", position: "absolute", right: 14, top: 10, zIndex: 8 }}>
+          <span style={{ animation: liveSignal ? "dtPulse 1.4s ease-in-out infinite" : "none", background: liveSignal ? C.green : "#94a3b8", borderRadius: "50%", height: 7, width: 7 }} />
+          {focus.label}
         </div>
-
-        <div style={{ left: 311, position: "absolute", top: 247, zIndex: 3 }}>
-          <PumpUnit size={72} on={p1On} color={C.cyan} label="P1 - Auto" />
-        </div>
-
-        <div style={{ left: 504, position: "absolute", top: 202, zIndex: 3 }}>
-          <TankCard pct={tank2Level} markOn={liveSignal && wls2} name={isTH ? "ถัง 2" : "Tank 2"} sub="Preparation" color="#38bdf8" />
-        </div>
-
-        <div style={{ left: 733, position: "absolute", top: 247, zIndex: 3 }}>
-          <PumpUnit size={72} on={p2On} color={C.green} label="P2 - Manual" />
-        </div>
+        <img
+          alt={isTH ? "โมเดลระบบน้ำอัตโนมัติ" : "Automated water system model"}
+          src={waterSystemModel}
+          style={{ filter: "drop-shadow(0 24px 28px rgba(15,23,42,.16))", height: "100%", objectFit: "contain", objectPosition: `${focus.x} center`, padding: "28px 54px 8px", transform: focus.tilt, transformOrigin: focus.x, transition: "transform .8s cubic-bezier(.22,1,.36,1), object-position .8s ease, filter .4s ease", width: "100%" }}
+        />
+        <svg aria-hidden="true" viewBox="0 0 1000 620" preserveAspectRatio="none" style={{ inset: 0, overflow: "visible", pointerEvents: "none", position: "absolute", width: "100%", height: "100%" }}>
+          <defs>
+            <filter id="dtFlowGlow"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+            <linearGradient id="dtLampGlow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#fef9c3" stopOpacity=".8" /><stop offset="1" stopColor="#fef9c3" stopOpacity="0" /></linearGradient>
+          </defs>
+          {liveSignal && <path d="M300 62 H720 L670 220 H315 Z" fill="url(#dtLampGlow)" style={{ animation: "dtMachineGlow 2.2s ease-in-out infinite" }} />}
+          <AnimatedFlow d="M260 480 C350 500 410 505 500 500 C575 498 630 490 700 482" on={p1On} color={C.cyan} />
+          <AnimatedFlow d="M725 476 C820 440 838 350 822 260 C810 225 790 215 760 215" on={p2On} color={C.green} />
+          <AnimatedFlow d="M685 238 C590 220 500 216 405 225 C350 230 310 250 285 285" on={p2On} color={C.green} />
+          {p1On && <circle cx="505" cy="500" r="22" fill="none" stroke={C.cyan} strokeWidth="3" opacity=".6" style={{ animation: "dtPulse .8s ease-in-out infinite" }} />}
+          {p2On && <circle cx="820" cy="310" r="22" fill="none" stroke={C.green} strokeWidth="3" opacity=".6" style={{ animation: "dtPulse .8s ease-in-out infinite" }} />}
+          {p1On && <path d="M505 466 V420" stroke={C.cyan} strokeDasharray="3 6" strokeWidth="2" style={{ animation: "dtFlowLine .7s linear infinite" }} />}
+          {p2On && <path d="M820 278 V225" stroke={C.green} strokeDasharray="3 6" strokeWidth="2" style={{ animation: "dtFlowLine .7s linear infinite" }} />}
+        </svg>
+        <ModelMetric label={isTH ? "บ่อเพาะเลี้ยง · WLS3" : "Grow bed · WLS3"} value={tank3Level} active={liveSignal && tank3Level > 20} color={C.green} left="8%" top="14%" />
+        <ModelMetric label={isTH ? "ถัง 1 · WLS1" : "Tank 1 · WLS1"} value={tank1Level} active={liveSignal && wls1} color={C.cyan} left="6%" top="68%" />
+        <ModelMetric label={isTH ? "ถัง 2 · WLS2" : "Tank 2 · WLS2"} value={tank2Level} active={liveSignal && wls2} color="#38bdf8" left="73%" top="70%" />
+        <FlowBadge label={`P1 · ${p1On ? "RUNNING" : "OFF"}`} on={p1On} color={C.cyan} left="35%" top="82%" />
+        <FlowBadge label={`P2 · ${p2On ? "RUNNING" : "OFF"}`} on={p2On} color={C.green} left="81%" top="49%" />
+        <FlowBadge label="P3 · STANDBY" on={false} color={C.slate} left="47%" top="48%" />
       </div>
     </div>
   );
+}
+
+function AnimatedFlow({ d, on, color }: { d: string; on: boolean; color: string }) {
+  return (
+    <>
+      <path d={d} fill="none" stroke={on ? `${color}32` : "transparent"} strokeLinecap="round" strokeWidth="10" />
+      <path d={d} fill="none" filter={on ? "url(#dtFlowGlow)" : undefined} stroke={on ? color : "transparent"} strokeDasharray="4 10" strokeLinecap="round" strokeWidth="4" style={{ animation: on ? "dtFlowLine .75s linear infinite" : "none" }} />
+    </>
+  );
+}
+
+function ModelMetric({ label, value, active, color, left, top }: { label: string; value: number; active: boolean; color: string; left: string; top: string }) {
+  return (
+    <div style={{ backdropFilter: "blur(10px)", background: "rgba(255,255,255,.88)", border: `1px solid ${active ? color + "55" : "#e2e8f0"}`, borderRadius: 12, boxShadow: "0 10px 28px -18px rgba(15,23,42,.45)", left, minWidth: 108, padding: "9px 11px", position: "absolute", top }}>
+      <div style={{ alignItems: "center", color: "#64748b", display: "flex", fontSize: 9, fontWeight: 700, gap: 5 }}><span style={{ background: active ? color : "#cbd5e1", borderRadius: "50%", boxShadow: active ? `0 0 8px ${color}` : "none", height: 6, width: 6 }} />{label}</div>
+      <div style={{ color: "#0f172a", fontSize: 22, fontWeight: 800, lineHeight: 1.15, marginTop: 3 }}>{Math.round(value)}<span style={{ color: "#94a3b8", fontSize: 10, marginLeft: 2 }}>%</span></div>
+    </div>
+  );
+}
+
+function FlowBadge({ label, on, color, left, top }: { label: string; on: boolean; color: string; left: string; top: string }) {
+  return <div style={{ background: on ? color : "rgba(255,255,255,.9)", border: `1px solid ${on ? color : "#cbd5e1"}`, borderRadius: 999, boxShadow: "0 8px 20px -14px rgba(15,23,42,.5)", color: on ? "white" : "#64748b", fontFamily: "JetBrains Mono,monospace", fontSize: 8, fontWeight: 800, left, padding: "5px 9px", position: "absolute", top }}>{label}</div>;
 }
 
 function PipeSegment({
@@ -375,81 +415,49 @@ function ControlPanel({
   return (
     <div
       style={{
-        background: "linear-gradient(155deg,#f1f5f9 0%,#e2e8f0 45%,#cbd5e1 100%)",
-        border: "1px solid #94a3b8",
-        borderRadius: 3,
-        boxShadow:
-          "inset 0 2px 3px rgba(255,255,255,.8), inset 0 -3px 8px rgba(0,0,0,.06), 0 10px 24px -10px rgba(15,23,42,.25)",
+        background: "#0f172a",
+        border: "1px solid #1e293b",
+        borderRadius: 16,
         marginBottom: 16,
-        padding: "20px 24px",
-        position: "relative",
+        padding: 18,
       }}
     >
-      <Screw top={9} left={9} />
-      <Screw top={9} right={9} />
-      <Screw bottom={9} left={9} />
-      <Screw bottom={9} right={9} />
+      <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 18, justifyContent: "space-between" }}>
+        <div style={{ display: "flex", flex: "1 1 360px", flexWrap: "wrap", gap: 8 }}>
+          <PanelLed on={redOn} color={C.red} label="ALARM / FULL" />
+          <PanelLed on={amberOn} color={C.amber} label="PUMP 2 ON" />
+          <PanelLed on={greenOn} color={C.green} label="READY" />
+          <PanelLed on={cyanOn} color={C.cyan} label="PUMP 1 ON" />
+        </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
-        <PanelLed on={redOn} color={C.red} label="ALARM / FULL" />
-        <PanelLed on={amberOn} color={C.amber} label="PUMP 2 ON" />
-        <PanelLed on={greenOn} color={C.green} label="READY" />
-        <PanelLed on={cyanOn} color={C.cyan} label="PUMP 1 ON" />
-      </div>
-
-      <div style={{ alignItems: "center", display: "flex", flexDirection: "column", gap: 20 }}>
-        <div style={{ alignItems: "center", display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ alignItems: "center", display: "flex", gap: 14 }}>
+          <div style={{ alignItems: "center", display: "flex", flexDirection: "column", gap: 5 }}>
           <div
             style={{
               animation: locked ? "dtPulse .8s ease-in-out infinite" : "none",
               background: "radial-gradient(circle at 34% 26%, #fca5a5 0%, #dc2626 45%, #7f1d1d 100%)",
-              border: locked ? "8px solid #dc2626" : "8px solid #eab308",
+              border: locked ? "5px solid #ef4444" : "5px solid #f59e0b",
               borderRadius: "50%",
-              boxShadow: locked
-                ? "0 0 28px rgba(239,68,68,.6), inset 0 3px 3px rgba(255,255,255,.4), inset 0 -6px 10px rgba(0,0,0,.4), 0 6px 14px rgba(0,0,0,.3)"
-                : "inset 0 3px 3px rgba(255,255,255,.5), inset 0 -6px 10px rgba(0,0,0,.4), 0 8px 18px rgba(0,0,0,.28), 0 1px 0 rgba(255,255,255,.3)",
-              height: 76,
-              width: 76,
+              boxShadow: locked ? "0 0 20px rgba(239,68,68,.45)" : "0 5px 12px rgba(0,0,0,.3)",
+              height: 48,
+              width: 48,
             }}
           />
-          <span style={{ color: locked ? C.red : "#475569", fontSize: 9, fontWeight: 700, letterSpacing: ".3px" }}>
+          <span style={{ color: locked ? "#fca5a5" : "#94a3b8", fontSize: 8, fontWeight: 700, letterSpacing: ".5px" }}>
             {locked ? "กดเพื่อ RESET" : "E-STOP"}
           </span>
-        </div>
-
-        <div style={{ alignItems: "center", display: "flex", flexDirection: "column", gap: 5 }}>
-          <div
-            style={{
-              animation: redOn ? "dtPulse .5s ease-in-out infinite" : "none",
-              background: redOn
-                ? "radial-gradient(circle at 34% 26%, #a5b4fc, #4338ca 75%)"
-                : "radial-gradient(circle at 34% 26%, #e0e7ff, #c7d2fe 75%)",
-              borderRadius: "50%",
-              boxShadow: redOn
-                ? "0 0 20px rgba(99,102,241,.75), inset 0 -3px 5px rgba(0,0,0,.25), inset 0 2px 2px rgba(255,255,255,.6)"
-                : "inset 0 -2px 4px rgba(0,0,0,.1), inset 0 2px 2px rgba(255,255,255,.7), 0 1px 3px rgba(0,0,0,.1)",
-              height: 24,
-              width: 24,
-            }}
-          />
-          <span style={{ color: "#64748b", fontSize: 8, fontWeight: 600, letterSpacing: ".3px" }}>BEACON</span>
-        </div>
-
-        <div style={{ alignItems: "flex-end", display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
-          <ControlButton color="green" label="?" disabled />
-          <ControlButton color="red" label="?" disabled />
+          </div>
           <ControlButton color="red" label="STOP" disabled={!canStop} />
           <ControlButton color="green" label="START" disabled={!canStart} />
           <div style={{ alignItems: "center", display: "flex", flexDirection: "column", gap: 4 }}>
             <div
               style={{
-                background: "linear-gradient(155deg,#f1f5f9 0%,#cbd5e1 40%,#8494a8 100%)",
-                border: "1px solid #64748b",
-                borderRadius: 3,
-                boxShadow: "inset 0 1px 1px rgba(255,255,255,.7), inset 0 -2px 4px rgba(0,0,0,.15), 0 2px 4px rgba(0,0,0,.15)",
-                height: 46,
+                background: "#334155",
+                border: "1px solid #475569",
+                borderRadius: 8,
+                height: 38,
                 position: "relative",
-                width: 27,
+                width: 24,
               }}
             >
               <div
@@ -460,13 +468,13 @@ function ControlPanel({
                   height: 20,
                   left: "50%",
                   position: "absolute",
-                  top: 6,
+                  top: 5,
                   transform: "translateX(-50%)",
                   width: 13,
                 }}
               />
             </div>
-            <span style={{ color: "#64748b", fontSize: 8, fontWeight: 600, letterSpacing: ".3px" }}>MODE</span>
+            <span style={{ color: "#94a3b8", fontSize: 8, fontWeight: 600, letterSpacing: ".3px" }}>MODE</span>
           </div>
         </div>
       </div>
@@ -609,9 +617,9 @@ function SensorCard({ label, value, unit, color, ok }: { label: string; value: s
 
 function PanelLed({ on, color, label }: { on: boolean; color: string; label: string }) {
   return (
-    <div style={{ alignItems: "center", background: on ? `${color}18` : "rgba(15,23,42,.06)", border: `1px solid ${on ? color + "45" : "rgba(15,23,42,.1)"}`, borderRadius: 2, display: "flex", gap: 6, padding: "5px 11px", transition: "all .25s" }}>
-      <div style={{ animation: on && color === C.red ? "dtPulse .8s ease-in-out infinite" : "none", background: on ? color : "#cbd5e1", borderRadius: "50%", boxShadow: on ? `0 0 10px ${color}` : "inset 0 1px 1px rgba(0,0,0,.15)", height: 8, width: 8 }} />
-      <span style={{ color: on ? color : "#94a3b8", fontFamily: "JetBrains Mono, monospace", fontSize: 10, fontWeight: 700, letterSpacing: ".2px" }}>{label}</span>
+    <div style={{ alignItems: "center", background: on ? `${color}18` : "#1e293b", border: `1px solid ${on ? color + "55" : "#334155"}`, borderRadius: 999, display: "flex", gap: 7, padding: "7px 11px", transition: "all .25s" }}>
+      <div style={{ animation: on && color === C.red ? "dtPulse .8s ease-in-out infinite" : "none", background: on ? color : "#64748b", borderRadius: "50%", boxShadow: on ? `0 0 10px ${color}` : "none", height: 7, width: 7 }} />
+      <span style={{ color: on ? color : "#94a3b8", fontFamily: "JetBrains Mono, monospace", fontSize: 9, fontWeight: 700, letterSpacing: ".3px" }}>{label}</span>
     </div>
   );
 }
