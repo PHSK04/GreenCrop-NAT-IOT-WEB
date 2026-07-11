@@ -31,7 +31,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { chatService, AiChatMessage, AiSensorLearningSummary, ChatMessage, ChatThread } from "@/features/chat/services/chatService";
+import { chatService, AiChatMessage, AiChatSession, AiSensorLearningSummary, ChatMessage, ChatThread } from "@/features/chat/services/chatService";
 import { toast } from "sonner";
 import { useActiveDeviceId } from "@/hooks/useActiveDeviceId";
 import { useMachine } from "@/contexts/MachineContext";
@@ -358,6 +358,10 @@ export function CustomerChatWidget({
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([createAssistantWelcome(isTH)]);
   const [chatbotMessages, setChatbotMessages] = useState<AssistantMessage[]>([createChatbotWelcome(isTH)]);
   const [agentMessages, setAgentMessages] = useState<AssistantMessage[]>([createAgentWelcome(isTH)]);
+  const [isAiHistoryOpen, setIsAiHistoryOpen] = useState(false);
+  const [aiSessions, setAiSessions] = useState<AiChatSession[]>([]);
+  const [selectedAiHistory, setSelectedAiHistory] = useState<{ session: AiChatSession; messages: AiChatMessage[] } | null>(null);
+  const [isAiHistoryLoading, setIsAiHistoryLoading] = useState(false);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
   const [thread, setThread] = useState<ChatThread | null>(null);
@@ -932,6 +936,60 @@ export function CustomerChatWidget({
     setError("");
   };
 
+  const loadAiHistory = async () => {
+    setIsAiHistoryLoading(true);
+    try {
+      const { sessions } = await chatService.listMyAiSessions({ deviceId: activeDeviceId || undefined });
+      setAiSessions(sessions);
+      if (!selectedAiHistory && sessions[0]) {
+        const history = await chatService.getMyAiSessionHistory(sessions[0].id);
+        setSelectedAiHistory(history);
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to load NAT AI history");
+    } finally {
+      setIsAiHistoryLoading(false);
+    }
+  };
+
+  const openAiHistory = () => {
+    setIsAiHistoryOpen(true);
+    setSelectedAiHistory(null);
+    loadAiHistory().catch(() => {});
+  };
+
+  const selectAiHistory = async (session: AiChatSession) => {
+    setIsAiHistoryLoading(true);
+    try {
+      setSelectedAiHistory(await chatService.getMyAiSessionHistory(session.id));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to load NAT AI history");
+    } finally {
+      setIsAiHistoryLoading(false);
+    }
+  };
+
+  const startNewAiChat = async () => {
+    setIsSending(true);
+    try {
+      await chatService.createMyAiSession({ deviceId: activeDeviceId || undefined });
+      const assistantWelcome = createAssistantWelcome(isTH);
+      const chatbotWelcome = createChatbotWelcome(isTH);
+      setAssistantMessages([assistantWelcome]);
+      setChatbotMessages([chatbotWelcome]);
+      localStorage.removeItem(assistantHistoryKey);
+      localStorage.removeItem(chatbotHistoryKey);
+      setIsAiHistoryOpen(false);
+      setSelectedAiHistory(null);
+      setError("");
+      toast.success(isTH ? "เริ่มแชทใหม่แล้ว" : "New chat started");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to create NAT AI chat");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   const resetChatbot = () => {
     setMode("chatbot");
     const welcome = createChatbotWelcome(isTH);
@@ -995,23 +1053,26 @@ export function CustomerChatWidget({
         setAssistantMessages(nextMessages);
         previousAssistantMessageCountRef.current = nextMessages.length;
       }
-    } catch {
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Unable to reach NAT AI";
+      const isAuthError = /unauthorized|no token|invalid token/i.test(reason);
       setAssistantMessages((current) => [
         ...current.filter((message) => message.id !== `ai-thinking-${now}`),
         {
-          id: `ai-free-${now}`,
+          id: `ai-error-${now}`,
           sender: "ai",
-          text: fallbackAiText,
+          text: isTH
+            ? (isAuthError
+              ? "NAT AI ต้องเข้าสู่ระบบก่อนจึงจะอ่านข้อมูลบัญชีและตอบได้ครับ กรุณาเข้าสู่ระบบใหม่ แล้วลองส่งคำถามอีกครั้ง"
+              : `ตอนนี้ NAT AI ติดต่อ backend ไม่สำเร็จ: ${reason}\nกรุณาตรวจว่า server ทำงานอยู่ที่พอร์ต 3001 แล้วลองใหม่ครับ`)
+            : (isAuthError
+              ? "NAT AI needs an active sign-in before it can read account data. Please sign in again and retry."
+              : `NAT AI could not reach the backend: ${reason}\nCheck that the server is running on port 3001 and try again.`),
           createdAt: new Date(now + 1).toISOString(),
-          canEscalate: shouldEscalate,
+          canEscalate: false,
         },
       ]);
-      persistAssistantExchange({
-        userMessage: body,
-        aiMessage: fallbackAiText,
-        intent,
-        shouldEscalate,
-      });
+      setError(reason);
     } finally {
       setIsSending(false);
     }
@@ -1029,14 +1090,53 @@ export function CustomerChatWidget({
       ...current,
       { id: `bot-user-${now}`, sender: "user", text: body, createdAt: new Date(now).toISOString() },
       {
-        id: `bot-reply-${now}`,
+        id: `bot-thinking-${now}`,
         sender: "ai",
-        text: localText,
+        text: isTH ? "กำลังค้นข้อมูลโปรเจกต์และคิดคำตอบครับ..." : "Checking project context and thinking...",
         createdAt: new Date(now + 1).toISOString(),
-        canEscalate: shouldEscalate,
       },
     ]);
-    setIsSending(false);
+    try {
+      const { messages } = await chatService.generateAiReply({
+        deviceId: activeDeviceId || undefined,
+        userMessage: body,
+        fallbackAiMessage: localText,
+        currentPage,
+        machineStatus: natStatusText,
+        projectSnapshot: buildAssistantProjectSnapshot(),
+        intent: inferAssistantIntent(body, chatbotMessages),
+        shouldEscalate,
+      });
+      const latestReply = [...messages].reverse().find((message) => message.sender_role === "ai");
+      if (!latestReply?.body) throw new Error(isTH ? "ไม่ได้รับคำตอบจาก NAT AI" : "No response from NAT AI");
+      setChatbotMessages((current) => [
+        ...current.filter((message) => message.id !== `bot-thinking-${now}`),
+        {
+          id: `bot-reply-${latestReply.id || now}`,
+          sender: "ai",
+          text: latestReply.body,
+          createdAt: latestReply.created_at || new Date(now + 1).toISOString(),
+          canEscalate: shouldEscalate,
+        },
+      ]);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Unable to reach NAT AI";
+      setChatbotMessages((current) => [
+        ...current.filter((message) => message.id !== `bot-thinking-${now}`),
+        {
+          id: `bot-error-${now}`,
+          sender: "ai",
+          text: isTH
+            ? `ตอนนี้ Chatbot ติดต่อ NAT AI ไม่สำเร็จ: ${reason}`
+            : `The chatbot could not reach NAT AI: ${reason}`,
+          createdAt: new Date(now + 1).toISOString(),
+          canEscalate: false,
+        },
+      ]);
+      setError(reason);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const buildAgentProposal = (body: string): AgentProposal => {
@@ -1967,8 +2067,88 @@ export function CustomerChatWidget({
       </div>
     );
   };
+  const renderMachineRiskCard = (text: string) => {
+    const severityMatch = text.match(/ความเสี่ยงระดับ\s+(normal|good|watch|warning|critical|offline)|(?:risk|severity)\s*[:=]?\s*(normal|good|watch|warning|critical|offline)/i);
+    const valuesMatch = text.match(/pH\s+([^|\n]+)\s*\|\s*EC\s+([^|\n]+)\s*\|\s*Temp\s+([^|\n]+)\s*\|\s*Pump1\s+(ON|OFF)\s*\|\s*Pump2\s+(ON|OFF)/i);
+    if (!severityMatch || !valuesMatch) return null;
+
+    const severity = String(severityMatch[1] || severityMatch[2] || "watch").toLowerCase();
+    const tone = severity === "critical"
+      ? "border-rose-200 bg-rose-50 text-rose-950 dark:border-rose-900/60 dark:bg-rose-950/25 dark:text-rose-50"
+      : severity === "warning"
+        ? "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-50"
+        : severity === "offline"
+          ? "border-slate-200 bg-slate-100 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          : "border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/25 dark:text-emerald-50";
+    const badgeTone = severity === "critical"
+      ? "bg-rose-600 text-white"
+      : severity === "warning"
+        ? "bg-amber-500 text-white"
+        : severity === "offline"
+          ? "bg-slate-600 text-white"
+          : "bg-emerald-600 text-white";
+    const severityLabel: Record<string, string> = {
+      normal: isTH ? "ปกติ" : "Normal",
+      good: isTH ? "ปกติ" : "Good",
+      watch: isTH ? "เฝ้าระวัง" : "Watch",
+      warning: isTH ? "ควรตรวจสอบ" : "Warning",
+      critical: isTH ? "เร่งด่วน" : "Critical",
+      offline: isTH ? "ไม่มีสัญญาณ" : "Offline",
+    };
+    const reasonMatch = text.match(/(?:สาเหตุที่เห็น|Reasons?)\s*:\s*([^\n]+)/i);
+    const reasonLabels: Record<string, string> = {
+      ph_out_of_range: isTH ? "ค่า pH อยู่นอกช่วง" : "pH is out of range",
+      telemetry_stale: isTH ? "ข้อมูลหยุดอัปเดต" : "Telemetry is stale",
+      sensor_values_missing: isTH ? "ข้อมูลเซ็นเซอร์ไม่ครบ" : "Sensor values are missing",
+      locked: isTH ? "เครื่องถูกล็อก" : "Machine is locked",
+      red_alarm: isTH ? "สัญญาณไฟแดงทำงาน" : "Red alarm is active",
+      float_alarm: isTH ? "พบสัญญาณเตือนระดับน้ำ" : "Water-level alarm is active",
+    };
+    const reasons = String(reasonMatch?.[1] || "")
+      .split(",")
+      .map((reason) => reason.trim())
+      .filter(Boolean)
+      .map((reason) => reasonLabels[reason] || reason.replace(/_/g, " "));
+    const metrics = [
+      { label: "pH", value: valuesMatch[1].trim() },
+      { label: "EC", value: valuesMatch[2].trim() },
+      { label: isTH ? "อุณหภูมิ" : "Temperature", value: valuesMatch[3].trim() },
+      { label: isTH ? "ปั๊ม 1" : "Pump 1", value: valuesMatch[4].toUpperCase() },
+      { label: isTH ? "ปั๊ม 2" : "Pump 2", value: valuesMatch[5].toUpperCase() },
+    ];
+
+    return (
+      <div className={`min-w-0 overflow-hidden rounded-2xl border shadow-sm ${tone}`}>
+        <div className="flex items-center justify-between gap-3 border-b border-current/10 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2 font-black">
+            <ShieldCheck className="h-4 w-4 shrink-0" />
+            <span className="truncate">{isTH ? "สถานะเครื่องล่าสุด" : "Latest machine status"}</span>
+          </div>
+          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ${badgeTone}`}>
+            {severityLabel[severity] || severity}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
+          {metrics.map((metric) => (
+            <div key={metric.label} className="min-w-0 rounded-xl bg-white/80 px-3 py-2 shadow-sm dark:bg-slate-950/40">
+              <div className="text-[10px] font-semibold opacity-60">{metric.label}</div>
+              <div className="mt-0.5 truncate text-sm font-black">{metric.value}</div>
+            </div>
+          ))}
+        </div>
+        {reasons.length > 0 && (
+          <div className="mx-3 mb-3 rounded-xl bg-white/70 px-3 py-2 text-xs leading-5 dark:bg-slate-950/35">
+            <div className="font-bold opacity-65">{isTH ? "สิ่งที่ตรวจพบ" : "Detected"}</div>
+            {reasons.map((reason) => <div key={reason}>• {reason}</div>)}
+          </div>
+        )}
+      </div>
+    );
+  };
   const renderAssistantMessageText = (text: string) => {
     if (!text.startsWith("สรุปผลผลิต\n") && !text.startsWith("Yield summary\n")) {
+      const machineRiskCard = renderMachineRiskCard(text);
+      if (machineRiskCard) return machineRiskCard;
       const blocks = text.trim().split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
       return (
         <div className="space-y-3">
@@ -2273,8 +2453,8 @@ export function CustomerChatWidget({
           </div>
           <p className="mt-2 text-sm leading-6">
             {isTH
-              ? "ตอบจาก flow ที่กำหนดไว้สำหรับปัญหาพื้นฐาน ไม่ใช่โมเดล AI วิเคราะห์ข้อมูลลึก ถ้าต้องวิเคราะห์ข้อมูลบัญชีให้ไปที่ NAT AI"
-              : "Uses predefined support flows for common issues. It is not the deep AI model. Use NAT AI for account data analysis."}
+              ? "เชื่อมกับ NAT AI และ Ollama แล้ว ถามเป็นภาษาธรรมชาติได้ทั้งเรื่องโปรเจกต์ วิธีใช้งาน และข้อมูลเครื่องของบัญชีนี้"
+              : "Connected to NAT AI and Ollama. Ask naturally about the project, app usage, or this account's machine data."}
           </p>
         </div>
 
@@ -2304,7 +2484,7 @@ export function CustomerChatWidget({
           <Input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder={isTH ? "ถาม Chatbot เรื่องปัญหาพื้นฐาน..." : "Ask the chatbot about common issues..."}
+            placeholder={isTH ? "ถาม Chatbot ได้เหมือน NAT AI..." : "Ask the chatbot just like NAT AI..."}
             className="h-12 rounded-2xl"
             disabled={isSending}
             onKeyDown={(event) => {
@@ -2635,8 +2815,27 @@ export function CustomerChatWidget({
                   <Button
                     size="icon"
                     variant="ghost"
+                    onClick={openAiHistory}
+                    title={isTH ? "ประวัติ NAT AI" : "NAT AI history"}
+                    aria-label={isTH ? "ประวัติ NAT AI" : "NAT AI history"}
+                  >
+                    <CalendarRange className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => startNewAiChat().catch(() => {})}
+                    title={isTH ? "เริ่มแชทใหม่" : "Start new chat"}
+                    aria-label={isTH ? "เริ่มแชทใหม่" : "Start new chat"}
+                    disabled={isSending}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
                     onClick={resetAssistant}
-                    title="Reset"
+                    title={isTH ? "ล้างแชทปัจจุบัน" : "Clear current chat"}
                   >
                     <RotateCcw className="h-4 w-4" />
                   </Button>

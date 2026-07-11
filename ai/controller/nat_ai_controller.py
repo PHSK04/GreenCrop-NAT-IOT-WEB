@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -123,7 +123,7 @@ def detect_intent(text: str) -> str:
         return "control_start"
     if re.search(r"ผลผลิต|ผลิตได้|ผลิตเท่า|มีผลิต|เก็บเกี่ยว|yield|harvest|production", raw):
         return "crop_yield"
-    if re.search(r"สถานะ|status|online|offline|mqtt|สัญญาณ|เครื่อง|device|บอร์ด", raw):
+    if re.search(r"สถานะ|status|online|offline|mqtt|สัญญาณ|เครื่อง|device|บอร์ด|ไม่อัปเดต|ไม่อัพเดต|ค้าง|stale|not updating", raw):
         return "machine_status"
     if re.search(r"ปั๊ม|pump", raw):
         return "pump_status"
@@ -202,10 +202,37 @@ def crop_yield_yearly(context: dict[str, Any]) -> list[dict[str, Any]]:
     return [row for row in yearly if isinstance(row, dict)]
 
 
-def risk_from_sensor(row: dict[str, Any]) -> tuple[str, int, list[str]]:
+def sensor_age_minutes(row: dict[str, Any], context: dict[str, Any] | None = None) -> float | None:
+    raw_timestamp = row.get("timestamp")
+    if not raw_timestamp:
+        return None
+    try:
+        captured = datetime.fromisoformat(str(raw_timestamp).replace("Z", "+00:00"))
+        if captured.tzinfo is None:
+            captured = captured.replace(tzinfo=timezone.utc)
+        raw_now = (context or {}).get("current_datetime")
+        now = datetime.fromisoformat(str(raw_now).replace("Z", "+00:00")) if raw_now else datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        return max(0.0, (now - captured).total_seconds() / 60.0)
+    except (TypeError, ValueError):
+        return None
+
+
+def has_valid_sensor_values(row: dict[str, Any]) -> bool:
+    return any(as_number(row.get(key)) > 0 for key in ("ph_value", "ec_value", "temp_c"))
+
+
+def risk_from_sensor(row: dict[str, Any], context: dict[str, Any] | None = None) -> tuple[str, int, list[str]]:
     reasons: list[str] = []
     if not row:
         return "offline", 50, ["no_latest_sensor"]
+
+    age_minutes = sensor_age_minutes(row, context)
+    if age_minutes is not None and age_minutes > 10:
+        return "offline", 78, ["telemetry_stale"]
+    if not has_valid_sensor_values(row):
+        return "offline", 60, ["sensor_values_missing"]
 
     if as_bool(row.get("locked")):
         reasons.append("locked")
@@ -215,7 +242,7 @@ def risk_from_sensor(row: dict[str, Any]) -> tuple[str, int, list[str]]:
         reasons.append("float_alarm")
     if as_bool(row.get("pump2_on")) and as_bool(row.get("wls2")):
         reasons.append("pump2_running_while_upper_water_detected")
-    if not as_bool(row.get("ph_ok")):
+    if as_number(row.get("ph_value")) > 0 and not as_bool(row.get("ph_ok")):
         reasons.append("ph_out_of_range")
 
     if any(reason in reasons for reason in ["locked", "red_alarm", "float_alarm", "pump2_running_while_upper_water_detected"]):
@@ -233,25 +260,48 @@ def format_sensor_values(row: dict[str, Any], th: bool) -> str:
     temp = as_number(row.get("temp_c"))
     pump1 = "ON" if as_bool(row.get("pump1_on")) else "OFF"
     pump2 = "ON" if as_bool(row.get("pump2_on")) else "OFF"
-    return f"pH {ph:.2f} | EC {ec:.2f} | Temp {temp:.1f} | Pump1 {pump1} | Pump2 {pump2}"
+    ph_label = f"{ph:.2f}" if ph > 0 else "--"
+    ec_label = f"{ec:.2f}" if ec > 0 else "--"
+    temp_label = f"{temp:.1f}" if temp > 0 else "--"
+    return f"pH {ph_label} | EC {ec_label} | Temp {temp_label} | Pump1 {pump1} | Pump2 {pump2}"
 
 
 def answer_status(context: dict[str, Any], th: bool) -> dict[str, Any]:
     row = latest_sensor(context)
-    severity, score, reasons = risk_from_sensor(row)
+    severity, score, reasons = risk_from_sensor(row, context)
     values = format_sensor_values(row, th)
+    age_minutes = sensor_age_minutes(row, context)
     if th:
         if severity == "normal":
             text = f"ตอนนี้เครื่องดูปกติจากข้อมูลล่าสุดครับ\n{values}"
         elif severity == "offline":
-            text = "ตอนนี้ยังไม่มี sensor ล่าสุดให้วิเคราะห์ครับ\nให้ตรวจไฟเลี้ยง, Wi-Fi, MQTT และ device id ก่อน"
+            if "telemetry_stale" in reasons:
+                age_label = f"{age_minutes:.0f}" if age_minutes is not None else "มากกว่า 10"
+                text = (
+                    f"ข้อมูล telemetry ล่าสุดหยุดอัปเดตประมาณ {age_label} นาทีครับ จึงไม่ควรใช้ค่าชุดนี้ตัดสินสถานะเครื่อง\n"
+                    "ให้ตรวจตามลำดับ: 1) ไฟและสถานะ ESP32 2) Wi-Fi ของบอร์ด 3) MQTT ว่ายัง connected/publish อยู่ "
+                    "4) device id และ topic ให้ตรงกับอุปกรณ์ที่เลือก แล้วส่งข้อมูลทดสอบใหม่"
+                )
+            elif "sensor_values_missing" in reasons:
+                text = (
+                    "ระบบพบแถวข้อมูลล่าสุด แต่ค่า pH, EC และอุณหภูมิยังว่างหรือเป็นศูนย์ จึงยังสรุปว่าค่าผิดช่วงไม่ได้ครับ\n"
+                    "ให้ตรวจ payload จาก ESP32, การ map ชื่อ field และ MQTT topic ก่อน"
+                )
+            else:
+                text = "ตอนนี้ยังไม่มี sensor ล่าสุดให้วิเคราะห์ครับ\nให้ตรวจไฟเลี้ยง, Wi-Fi, MQTT และ device id ก่อน"
         else:
             text = f"ตอนนี้เครื่องมีความเสี่ยงระดับ {severity} ครับ\n{values}\nสาเหตุที่เห็น: {', '.join(reasons)}"
     else:
         if severity == "normal":
             text = f"The machine looks normal from the latest telemetry.\n{values}"
         elif severity == "offline":
-            text = "No latest sensor data is available. Check power, Wi-Fi, MQTT, and device id first."
+            if "telemetry_stale" in reasons:
+                age_label = f"{age_minutes:.0f}" if age_minutes is not None else "more than 10"
+                text = f"Telemetry has not updated for about {age_label} minutes. Check ESP32 power, Wi-Fi, MQTT publishing, device id, and topic, then send a test reading."
+            elif "sensor_values_missing" in reasons:
+                text = "A latest row exists, but pH, EC, and temperature are empty or zero. Check the ESP32 payload, field mapping, and MQTT topic."
+            else:
+                text = "No latest sensor data is available. Check power, Wi-Fi, MQTT, and device id first."
         else:
             text = f"The machine is in {severity} state.\n{values}\nReasons: {', '.join(reasons)}"
 
@@ -440,7 +490,7 @@ def answer_crop_yield(context: dict[str, Any], th: bool) -> dict[str, Any]:
 
 def answer_control(intent: str, context: dict[str, Any], th: bool) -> dict[str, Any]:
     row = latest_sensor(context)
-    severity, score, reasons = risk_from_sensor(row)
+    severity, score, reasons = risk_from_sensor(row, context)
     wants_stop = intent == "control_stop"
     action = {
         "type": "machine_control",

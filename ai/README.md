@@ -43,18 +43,35 @@ guides). These excerpts are returned as `project_evidence`, so project answers
 can name the repository sources they actually used instead of relying on model
 memory. Live account telemetry remains a separate, tenant-bound source.
 
-General/project chat is generative by default (`NAT_AI_GENERATIVE_CHAT_REQUIRED=true`).
-If no language model is configured, NAT AI reports that configuration is needed
-instead of pretending a predefined fallback is an intelligent answer. The local
-Python controller remains available for deterministic sensor safety and machine
-control analysis.
+General/project chat works locally by default (`NAT_AI_GENERATIVE_CHAT_REQUIRED=false`).
+It retrieves relevant project evidence, carries recent user questions into
+follow-up retrieval, and composes a source-backed response without paid tokens.
+The Python controller handles deterministic sensor safety and machine control.
+OpenAI remains an optional language-polishing layer when a key is configured.
+
+## Local Ollama Conversation
+
+NAT AI uses Ollama as its first natural-language provider when enabled. This
+keeps prompts and project context on the local machine and has no per-token API
+charge. The Python controller still safety-gates direct hardware actions.
+
+```bash
+ollama pull qwen2.5:7b
+```
+
+```env
+NAT_AI_OLLAMA_ENABLED=true
+NAT_AI_OLLAMA_URL=http://127.0.0.1:11434
+NAT_AI_OLLAMA_MODEL=qwen2.5:7b
+NAT_AI_OLLAMA_TIMEOUT_MS=60000
+```
 
 ```bash
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4.1-mini
 OPENAI_MAX_OUTPUT_TOKENS=700
 NAT_AI_OPENAI_GENERAL_ENABLED=true
-NAT_AI_GENERATIVE_CHAT_REQUIRED=true
+NAT_AI_GENERATIVE_CHAT_REQUIRED=false
 NAT_AI_OPENAI_CONTEXT_MAX_CHARS=8000
 ```
 

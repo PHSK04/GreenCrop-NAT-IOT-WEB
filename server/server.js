@@ -1478,7 +1478,13 @@ function mapAiChatMessage(row) {
     };
 }
 
-async function ensureAiChatSessionForUser(user, deviceId = null) {
+function localDateKey(value = new Date()) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+async function ensureAiChatSessionForUser(user, deviceId = null, { forceNew = false } = {}) {
     const userId = Number(user?.id || 0);
     if (!userId) throw new Error('User id is required for NAT AI chat');
 
@@ -1493,12 +1499,20 @@ async function ensureAiChatSessionForUser(user, deviceId = null) {
         [userId, normalizedDeviceId]
     );
 
-    if (existing) return mapAiChatSession(existing);
+    const isTodaySession = existing && localDateKey(existing.created_at) === localDateKey();
+    if (existing && isTodaySession && !forceNew) return mapAiChatSession(existing);
+
+    if (existing) {
+        await db.run(
+            `UPDATE ai_chat_sessions SET status = 'closed', updated_at = ? WHERE id = ?`,
+            [new Date(), existing.id]
+        );
+    }
 
     const now = new Date();
     const userName = String(user?.name || user?.email || `User ${userId}`).trim();
     const userEmail = String(user?.email || '').trim().toLowerCase() || null;
-    const title = normalizedDeviceId ? `NAT AI for ${normalizedDeviceId}` : 'NAT AI Assistant';
+    const title = normalizedDeviceId ? `NAT AI · ${normalizedDeviceId}` : `NAT AI · ${localDateKey(now)}`;
     const created = await db.run(
         `INSERT INTO ai_chat_sessions (
             user_id, user_name, user_email, device_id, title, status,
@@ -1509,6 +1523,17 @@ async function ensureAiChatSessionForUser(user, deviceId = null) {
 
     const session = await db.get("SELECT * FROM ai_chat_sessions WHERE id = ?", [created.id]);
     return mapAiChatSession(session);
+}
+
+async function maybeSetAiSessionTitle(session, userText) {
+    const countRow = await db.get(
+        `SELECT COUNT(*) AS total FROM ai_chat_messages WHERE session_id = ? AND sender_role = 'user'`,
+        [session.id]
+    );
+    if (Number(countRow?.total || 0) > 0) return;
+    const cleanTitle = String(userText || '').replace(/\s+/g, ' ').trim().slice(0, 72);
+    if (!cleanTitle) return;
+    await db.run(`UPDATE ai_chat_sessions SET title = ?, updated_at = ? WHERE id = ?`, [cleanTitle, new Date(), session.id]);
 }
 
 async function loadAiChatMessages(sessionId, limit = 80) {
@@ -1830,6 +1855,51 @@ async function loadChatMessagesForThreadIds(threadIds, viewerRole, limit = 500, 
 }
 
 // --- NAT AI Chat APIs ---
+app.get('/api/ai-chat/sessions/me', async (req, res) => {
+    try {
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const deviceId = String(req.query.deviceId || '').trim();
+        const where = ['user_id = ?'];
+        const params = [Number(req.user.id)];
+        if (deviceId) {
+            where.push(`COALESCE(device_id, '') = COALESCE(?, '')`);
+            params.push(deviceId);
+        }
+        const rows = await db.all(
+            `SELECT TOP 100 * FROM ai_chat_sessions WHERE ${where.join(' AND ')} ORDER BY updated_at DESC, id DESC`,
+            params
+        );
+        res.json({ sessions: rows.map(mapAiChatSession) });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to load NAT AI history' });
+    }
+});
+
+app.post('/api/ai-chat/sessions/me', async (req, res) => {
+    try {
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const session = await ensureAiChatSessionForUser(req.user, req.body?.deviceId, { forceNew: true });
+        res.status(201).json({ session, messages: [] });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to create NAT AI chat' });
+    }
+});
+
+app.get('/api/ai-chat/sessions/me/:sessionId', async (req, res) => {
+    try {
+        if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const session = await db.get(
+            `SELECT * FROM ai_chat_sessions WHERE id = ? AND user_id = ?`,
+            [Number(req.params.sessionId), Number(req.user.id)]
+        );
+        if (!session) return res.status(404).json({ error: 'NAT AI chat not found' });
+        const messages = await loadAiChatMessages(session.id, req.query.limit || 200);
+        res.json({ session: mapAiChatSession(session), messages });
+    } catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to load NAT AI chat history' });
+    }
+});
+
 app.get('/api/ai-chat/session/me', async (req, res) => {
     try {
         if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
@@ -1862,6 +1932,7 @@ app.post('/api/ai-chat/session/me/messages', async (req, res) => {
         }
 
         const session = await ensureAiChatSessionForUser(req.user, deviceId);
+        await maybeSetAiSessionTitle(session, userText);
         const now = new Date();
         await db.run(
             `INSERT INTO ai_chat_messages (
@@ -1935,6 +2006,7 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
         }
 
         const session = await ensureAiChatSessionForUser(req.user, deviceId);
+        await maybeSetAiSessionTitle(session, userText);
         const context = await buildNatAiContext({
             req,
             db,

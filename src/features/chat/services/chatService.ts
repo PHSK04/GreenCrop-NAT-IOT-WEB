@@ -198,6 +198,29 @@ const parseJson = async <T>(response: Response, fallback: string): Promise<T> =>
 };
 
 export const chatService = {
+  async listMyAiSessions(query?: Pick<AiChatQuery, "deviceId">): Promise<{ sessions: AiChatSession[] }> {
+    const response = await fetch(buildApiUrl(`/ai-chat/sessions/me${toQueryString(query)}`), {
+      headers: getAuthHeaders(),
+    });
+    return parseJson(response, "Failed to load NAT AI history");
+  },
+
+  async createMyAiSession(payload?: { deviceId?: string }): Promise<{ session: AiChatSession; messages: AiChatMessage[] }> {
+    const response = await fetch(buildApiUrl("/ai-chat/sessions/me"), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload || {}),
+    });
+    return parseJson(response, "Failed to create NAT AI chat");
+  },
+
+  async getMyAiSessionHistory(sessionId: number, limit = 200): Promise<{ session: AiChatSession; messages: AiChatMessage[] }> {
+    const response = await fetch(buildApiUrl(`/ai-chat/sessions/me/${sessionId}${toQueryString({ limit })}`), {
+      headers: getAuthHeaders(),
+    });
+    return parseJson(response, "Failed to load NAT AI chat history");
+  },
+
   async getMyAiSession(query?: AiChatQuery): Promise<{ session: AiChatSession; messages: AiChatMessage[] }> {
     const response = await fetch(buildApiUrl(`/ai-chat/session/me${toQueryString(query)}`), {
       headers: getAuthHeaders(),

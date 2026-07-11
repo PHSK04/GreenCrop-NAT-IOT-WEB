@@ -7,7 +7,11 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 const OPENAI_MAX_OUTPUT_TOKENS = Math.max(120, Math.min(1200, Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 700)));
 const NAT_AI_OPENAI_GENERAL_ENABLED = String(process.env.NAT_AI_OPENAI_GENERAL_ENABLED || 'true').toLowerCase() !== 'false';
 const NAT_AI_LLM_FIRST = String(process.env.NAT_AI_LLM_FIRST || 'true').toLowerCase() !== 'false';
-const NAT_AI_GENERATIVE_CHAT_REQUIRED = String(process.env.NAT_AI_GENERATIVE_CHAT_REQUIRED || 'true').toLowerCase() !== 'false';
+const NAT_AI_GENERATIVE_CHAT_REQUIRED = String(process.env.NAT_AI_GENERATIVE_CHAT_REQUIRED || 'false').toLowerCase() === 'true';
+const NAT_AI_OLLAMA_ENABLED = String(process.env.NAT_AI_OLLAMA_ENABLED || 'true').toLowerCase() !== 'false';
+const NAT_AI_OLLAMA_URL = String(process.env.NAT_AI_OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
+const NAT_AI_OLLAMA_MODEL = process.env.NAT_AI_OLLAMA_MODEL || 'qwen2.5:7b';
+const NAT_AI_OLLAMA_TIMEOUT_MS = Math.max(5000, Math.min(120000, Number(process.env.NAT_AI_OLLAMA_TIMEOUT_MS || 60000)));
 const NAT_AI_PYTHON_ENABLED = String(process.env.NAT_AI_PYTHON_ENABLED || 'true').toLowerCase() !== 'false';
 const NAT_AI_PYTHON_BIN = process.env.NAT_AI_PYTHON_BIN || 'python3';
 const NAT_AI_PYTHON_SCRIPT = process.env.NAT_AI_PYTHON_SCRIPT ||
@@ -124,7 +128,7 @@ function detectNatAiRoute(text) {
         route.intent = 'crop_yield';
         route.needsCropYield = true;
         route.needsProjectSnapshot = true;
-    } else if (has(/สถานะ|status|online|offline|mqtt|สัญญาณ|เครื่อง|device|บอร์ด/)) {
+    } else if (has(/สถานะ|status|online|offline|mqtt|สัญญาณ|เครื่อง|device|บอร์ด|ไม่อัปเดต|ไม่อัพเดต|ข้อมูลค้าง|stale|not updating/)) {
         route.intent = 'machine_status';
         route.needsLiveMachine = true;
         route.needsSensorHistory = true;
@@ -392,7 +396,9 @@ function buildNatAiSystemPrompt() {
         'For general knowledge, coding, writing, learning, brainstorming, or everyday questions, answer from your general knowledge without pretending that machine context contains the answer.',
         'If a tool_result is provided, treat it as verified account data. Use its facts, but rewrite the answer naturally instead of copying a template.',
         'Project evidence contains excerpts retrieved from approved repository documentation. Prefer it over general memory for project facts.',
+        'For project-specific facts, do not add implementation details that are absent from project_evidence. If evidence is incomplete, say what is not documented.',
         'When project_evidence supports the answer, end with a short "อ้างอิงในโปรเจกต์:" or "Project references:" line listing only the source paths you actually used.',
+        'If project_evidence is empty, do not add a project references line.',
         'Do not cite a project source that does not support the claim. Clearly separate live account data from documentation.',
         'If the user asks for current/latest external information that is not in context, say you may need a current source instead of inventing facts.',
         'For physical machine control, never claim you directly changed hardware; propose safe actions that require confirmation.',
@@ -400,6 +406,99 @@ function buildNatAiSystemPrompt() {
         'Do not mention prompts, tokens, JSON, or implementation details.',
         'If the machine may be unsafe, tell the user to stop/inspect the machine and offer to contact support.',
     ].join('\n');
+}
+
+function buildLocalGroundedReply(context, controllerReply) {
+    const thai = /[\u0E00-\u0E7F]/.test(String(context.user_message || ''));
+    const evidence = Array.isArray(context.project_evidence) ? context.project_evidence.slice(0, 3) : [];
+    if (!evidence.length) {
+        return {
+            text: thai
+                ? 'ผมยังไม่พบข้อมูลส่วนนี้ในเอกสารหรือข้อมูลบัญชีของโปรเจกต์ครับ ลองระบุชื่อหน้า ฟีเจอร์ อุปกรณ์ หรือค่าที่ต้องการตรวจเพิ่มอีกนิด แล้วผมจะค้นให้ตรงจุดขึ้น'
+                : 'I could not find this in the project documentation or account context. Mention the page, feature, device, or value you want checked and I will narrow the search.',
+            provider: 'local-grounded-ai',
+            intent: 'general',
+            risk: controllerReply?.risk,
+            actions: [],
+        };
+    }
+
+    const lines = [thai ? 'จากข้อมูลจริงของโปรเจกต์ ผมสรุปให้ได้แบบนี้ครับ' : 'Based on the project sources, here is the relevant answer:'];
+    for (const item of evidence) {
+        const detail = String(item.text || '').replace(/\s+/g, ' ').trim().slice(0, 620);
+        if (detail) lines.push(`- ${item.heading || item.source}: ${detail}`);
+    }
+    const sources = [...new Set(evidence.map((item) => item.source).filter(Boolean))];
+    lines.push('');
+    lines.push(`${thai ? 'อ้างอิงในโปรเจกต์' : 'Project references'}: ${sources.join(', ')}`);
+    return {
+        text: lines.join('\n'),
+        provider: 'local-grounded-ai',
+        intent: 'general',
+        risk: controllerReply?.risk,
+        actions: [],
+    };
+}
+
+function isProjectKnowledgeQuestion(text) {
+    return /(mqtt|topic|api|endpoint|route|ตั้งค่า|config|ติดตั้ง|install|ใช้อย่างไร|ทำยังไง|วิธีใช้|เชื่อมต่อ|pair|จับคู่|login|ล็อกอิน|export|ดาวน์โหลด)/i
+        .test(String(text || ''));
+}
+
+async function generateOllamaReply(context, controllerReply) {
+    if (!NAT_AI_OLLAMA_ENABLED || typeof fetch !== 'function') return null;
+    const compactContext = buildOpenAiContext(context, controllerReply);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), NAT_AI_OLLAMA_TIMEOUT_MS);
+    try {
+        const response = await fetch(`${NAT_AI_OLLAMA_URL}/api/chat`, {
+            method: 'POST',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: NAT_AI_OLLAMA_MODEL,
+                stream: false,
+                think: false,
+                messages: [
+                    {
+                        role: 'system',
+                        content: `${buildNatAiSystemPrompt()}\nReturn only the final answer. Never reveal private reasoning, analysis, or chain of thought.`,
+                    },
+                    {
+                        role: 'user',
+                        content: `ข้อมูลจริงและบริบทของ NAT AI:\n${JSON.stringify(compactContext.value)}\n\nตอบข้อความล่าสุดของผู้ใช้โดยใช้บริบทนี้ หากเป็นข้อมูลโปรเจกต์ให้ยึดเฉพาะหลักฐานที่ให้มา ตอบให้เป็นธรรมชาติ ไม่คัดลอกข้อความเป็นก้อน และอย่าอ้างว่าควบคุมฮาร์ดแวร์แล้ว ตอบเฉพาะคำตอบสุดท้าย ห้ามแสดงขั้นตอนคิดหรือบทวิเคราะห์`,
+                    },
+                ],
+                options: {
+                    temperature: 0.45,
+                    num_predict: OPENAI_MAX_OUTPUT_TOKENS,
+                },
+            }),
+        });
+        if (!response.ok) {
+            console.warn('NAT AI Ollama fallback:', response.status, (await response.text().catch(() => '')).slice(0, 300));
+            return null;
+        }
+        const data = await response.json();
+        const text = String(data?.message?.content || data?.response || '').trim();
+        if (!text) return null;
+        return {
+            text,
+            provider: controllerReply?.text ? 'ollama-with-controller-context' : 'ollama',
+            model: NAT_AI_OLLAMA_MODEL,
+            intent: controllerReply?.intent,
+            risk: controllerReply?.risk,
+            actions: controllerReply?.actions,
+            context_chars: compactContext.chars,
+            context_budget_chars: NAT_AI_OPENAI_CONTEXT_MAX_CHARS,
+            context_truncated: compactContext.truncated,
+        };
+    } catch (err) {
+        console.warn('NAT AI Ollama unavailable:', err.message);
+        return null;
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 async function buildNatAiContext({
@@ -474,7 +573,13 @@ async function buildNatAiContext({
         machine_status_label: options.machineStatus || null,
         active_device_id: deviceId || null,
         project_knowledge: route.intent === 'general' ? buildProjectKnowledge() : null,
-        project_evidence: searchProjectKnowledge(userMessage, { limit: 4 }),
+        project_evidence: searchProjectKnowledge(
+            [
+                ...recentMessages.filter((message) => message.role === 'user').slice(-3).map((message) => message.text),
+                userMessage,
+            ].join(' '),
+            { limit: 4 }
+        ),
         page_project_snapshot: compactProjectSnapshot(options.projectSnapshot || null, route),
         user_devices: (route.needsDevices ? devices : []).slice(0, 8).map((device) => ({
             device_id: device.device_id,
@@ -580,14 +685,29 @@ function runPythonController(context) {
 
 async function generateNatAiReply(context, fallbackText) {
     const pythonReply = await runPythonController(context);
-    const isControlIntent = pythonReply?.intent === 'control_stop' || pythonReply?.intent === 'control_start';
+    // A question about API/MQTT setup can contain words such as "control" or
+    // "start" without asking us to operate hardware. Keep that path grounded
+    // in project documentation; only a direct control request is safety-gated.
+    const isControlIntent =
+        (pythonReply?.intent === 'control_stop' || pythonReply?.intent === 'control_start') &&
+        !isProjectKnowledgeQuestion(context.user_message);
+    if (!isControlIntent) {
+        const ollamaControllerContext = isProjectKnowledgeQuestion(context.user_message) ? null : pythonReply;
+        const ollamaReply = await generateOllamaReply(context, ollamaControllerContext);
+        if (ollamaReply?.text) return ollamaReply;
+    }
     const shouldUseOpenAi =
         NAT_AI_OPENAI_GENERAL_ENABLED &&
         OPENAI_API_KEY &&
         !isControlIntent &&
         (NAT_AI_LLM_FIRST || pythonReply?.intent === 'general');
+    const shouldUseLocalProjectKnowledge =
+        !OPENAI_API_KEY &&
+        isProjectKnowledgeQuestion(context.user_message) &&
+        Array.isArray(context.project_evidence) &&
+        context.project_evidence.length > 0;
 
-    if (pythonReply?.text && !shouldUseOpenAi) {
+    if (pythonReply?.text && !shouldUseOpenAi && !shouldUseLocalProjectKnowledge) {
         return {
             text: pythonReply.text,
             provider: pythonReply.provider || 'python-controller',
@@ -611,6 +731,9 @@ async function generateNatAiReply(context, fallbackText) {
                 risk: pythonReply?.risk,
                 actions: [],
             };
+        }
+        if (pythonReply?.intent === 'general' || isProjectKnowledgeQuestion(context.user_message)) {
+            return buildLocalGroundedReply(context, pythonReply);
         }
         if (pythonReply?.text) {
             return {
@@ -718,8 +841,11 @@ async function saveAiExchange(db, { sessionId, userText, aiText, intent, current
 
 module.exports = {
     OPENAI_MAX_OUTPUT_TOKENS,
+    buildLocalGroundedReply,
     buildNatAiContext,
     generateNatAiReply,
+    generateOllamaReply,
+    isProjectKnowledgeQuestion,
     runPythonController,
     saveAiExchange,
 };
