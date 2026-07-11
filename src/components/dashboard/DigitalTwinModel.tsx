@@ -96,6 +96,8 @@ export function DigitalTwinModel({
         @keyframes dtBob { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(3px) rotate(4deg); } }
         @keyframes dtFlowLine { to { stroke-dashoffset: -30; } }
         @keyframes dtMachineGlow { 0%,100% { opacity: .28; } 50% { opacity: .55; } }
+        @keyframes dtRipple { 0% { transform: scale(.55); opacity: .55; } 100% { transform: scale(1.35); opacity: 0; } }
+        @keyframes dtRotor { to { transform: rotate(360deg); } }
         .dt-glass {
           background: #ffffff;
           border: 1px solid #e2e8f0;
@@ -217,12 +219,17 @@ function ProcessPlumbing({
             <filter id="dtFlowGlow"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
             <linearGradient id="dtLampGlow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#fef9c3" stopOpacity=".8" /><stop offset="1" stopColor="#fef9c3" stopOpacity="0" /></linearGradient>
           </defs>
-          {liveSignal && <path d="M300 62 H720 L670 220 H315 Z" fill="url(#dtLampGlow)" style={{ animation: "dtMachineGlow 2.2s ease-in-out infinite" }} />}
+          <path d="M300 62 H720 L670 220 H315 Z" fill="url(#dtLampGlow)" style={{ animation: "dtMachineGlow 2.2s ease-in-out infinite", opacity: liveSignal ? 1 : .35 }} />
+          <WaterRipple cx={350} cy={420} active={p1On} color={C.cyan} />
+          <WaterRipple cx={635} cy={438} active={p1On || p2On} color="#38bdf8" />
+          <WaterRipple cx={515} cy={206} active={p2On} color={C.green} wide />
           <AnimatedFlow d="M260 480 C350 500 410 505 500 500 C575 498 630 490 700 482" on={p1On} color={C.cyan} />
           <AnimatedFlow d="M725 476 C820 440 838 350 822 260 C810 225 790 215 760 215" on={p2On} color={C.green} />
           <AnimatedFlow d="M685 238 C590 220 500 216 405 225 C350 230 310 250 285 285" on={p2On} color={C.green} />
           {p1On && <circle cx="505" cy="500" r="22" fill="none" stroke={C.cyan} strokeWidth="3" opacity=".6" style={{ animation: "dtPulse .8s ease-in-out infinite" }} />}
           {p2On && <circle cx="820" cy="310" r="22" fill="none" stroke={C.green} strokeWidth="3" opacity=".6" style={{ animation: "dtPulse .8s ease-in-out infinite" }} />}
+          <PumpRotor cx={505} cy={500} on={p1On} color={C.cyan} />
+          <PumpRotor cx={820} cy={310} on={p2On} color={C.green} />
           {p1On && <path d="M505 466 V420" stroke={C.cyan} strokeDasharray="3 6" strokeWidth="2" style={{ animation: "dtFlowLine .7s linear infinite" }} />}
           {p2On && <path d="M820 278 V225" stroke={C.green} strokeDasharray="3 6" strokeWidth="2" style={{ animation: "dtFlowLine .7s linear infinite" }} />}
         </svg>
@@ -246,11 +253,30 @@ function AnimatedFlow({ d, on, color }: { d: string; on: boolean; color: string 
   );
 }
 
-function ModelMetric({ label, value, active, color, left, top }: { label: string; value: number; active: boolean; color: string; left: string; top: string }) {
+function WaterRipple({ cx, cy, active, color, wide = false }: { cx: number; cy: number; active: boolean; color: string; wide?: boolean }) {
   return (
-    <div style={{ backdropFilter: "blur(10px)", background: "rgba(255,255,255,.88)", border: `1px solid ${active ? color + "55" : "#e2e8f0"}`, borderRadius: 12, boxShadow: "0 10px 28px -18px rgba(15,23,42,.45)", left, minWidth: 108, padding: "9px 11px", position: "absolute", top }}>
-      <div style={{ alignItems: "center", color: "#64748b", display: "flex", fontSize: 9, fontWeight: 700, gap: 5 }}><span style={{ background: active ? color : "#cbd5e1", borderRadius: "50%", boxShadow: active ? `0 0 8px ${color}` : "none", height: 6, width: 6 }} />{label}</div>
+    <g style={{ transformBox: "fill-box", transformOrigin: "center" }}>
+      {[0, .7, 1.4].map((delay) => <ellipse key={delay} cx={cx} cy={cy} rx={wide ? 68 : 38} ry={wide ? 10 : 7} fill="none" stroke={color} strokeWidth={active ? 3 : 1.5} opacity={active ? .7 : .28} style={{ animation: `dtRipple ${active ? 1.5 : 3.2}s ease-out ${delay}s infinite`, transformBox: "fill-box", transformOrigin: "center" }} />)}
+    </g>
+  );
+}
+
+function PumpRotor({ cx, cy, on, color }: { cx: number; cy: number; on: boolean; color: string }) {
+  return (
+    <g style={{ animation: on ? "dtRotor .8s linear infinite" : "none", transformBox: "fill-box", transformOrigin: `${cx}px ${cy}px` }}>
+      <circle cx={cx} cy={cy} r="13" fill={on ? `${color}25` : "transparent"} stroke={on ? color : "transparent"} strokeDasharray="7 4" strokeWidth="3" />
+      <path d={`M${cx} ${cy - 10} L${cx + 4} ${cy} L${cx} ${cy + 10} L${cx - 4} ${cy} Z`} fill={on ? color : "transparent"} opacity=".8" />
+    </g>
+  );
+}
+
+function ModelMetric({ label, value, active, color, left, top }: { label: string; value: number; active: boolean; color: string; left: string; top: string }) {
+  const stateColor = active ? color : C.red;
+  return (
+    <div style={{ backdropFilter: "blur(10px)", background: "rgba(255,255,255,.9)", border: `1px solid ${stateColor}55`, borderRadius: 12, boxShadow: `0 10px 28px -18px ${stateColor}99`, left, minWidth: 118, padding: "9px 11px", position: "absolute", top }}>
+      <div style={{ alignItems: "center", color: "#64748b", display: "flex", fontSize: 9, fontWeight: 700, gap: 5 }}><span style={{ animation: "dtPulse 1.2s ease-in-out infinite", background: stateColor, borderRadius: "50%", boxShadow: `0 0 8px ${stateColor}`, height: 7, width: 7 }} />{label}</div>
       <div style={{ color: "#0f172a", fontSize: 22, fontWeight: 800, lineHeight: 1.15, marginTop: 3 }}>{Math.round(value)}<span style={{ color: "#94a3b8", fontSize: 10, marginLeft: 2 }}>%</span></div>
+      <div style={{ color: stateColor, fontSize: 8, fontWeight: 800, letterSpacing: ".08em", marginTop: 2 }}>{active ? "● WATER DETECTED" : "● LOW / NOT DETECTED"}</div>
     </div>
   );
 }
