@@ -170,13 +170,13 @@ function ProcessPlumbing({
   wls1: boolean;
   wls2: boolean;
 }) {
-  const focus = p2On
-    ? { label: isTH ? "กำลังแสดง: P2 ส่งน้ำขึ้นบ่อเพาะเลี้ยง" : "Focus: P2 feeding grow bed", x: "58%", tilt: "rotateY(-4deg) rotateX(1deg) scale(1.025)" }
+  const focusLabel = p2On
+    ? (isTH ? "P2 กำลังส่งน้ำขึ้นบ่อ" : "P2 feeding grow bed")
     : p1On
-      ? { label: isTH ? "กำลังแสดง: P1 ส่งน้ำจากถัง 1 ไปถัง 2" : "Focus: P1 transferring Tank 1 → Tank 2", x: "42%", tilt: "rotateY(4deg) rotateX(1deg) scale(1.025)" }
+      ? (isTH ? "P1 กำลังส่งน้ำไปถัง 2" : "P1 filling Tank 2")
       : liveSignal
-        ? { label: isTH ? "ระบบพร้อมทำงาน · แสดงภาพรวม" : "System ready · Overview", x: "50%", tilt: "rotateY(0deg) rotateX(0deg) scale(1)" }
-        : { label: isTH ? "รอสัญญาณจากเครื่อง" : "Waiting for device signal", x: "50%", tilt: "rotateY(0deg) rotateX(0deg) scale(1)" };
+        ? (isTH ? "ระบบพร้อมทำงาน" : "System ready")
+        : (isTH ? "รอสัญญาณจากเครื่อง" : "Waiting for device");
 
   return (
     <div
@@ -207,12 +207,12 @@ function ProcessPlumbing({
         </div>
         <div style={{ alignItems: "center", backdropFilter: "blur(10px)", background: liveSignal ? "rgba(236,253,245,.92)" : "rgba(248,250,252,.92)", border: `1px solid ${liveSignal ? "#a7f3d0" : "#e2e8f0"}`, borderRadius: 999, color: liveSignal ? "#047857" : "#64748b", display: "flex", fontSize: 10, fontWeight: 750, gap: 7, padding: "7px 11px", position: "absolute", right: 14, top: 10, zIndex: 8 }}>
           <span style={{ animation: liveSignal ? "dtPulse 1.4s ease-in-out infinite" : "none", background: liveSignal ? C.green : "#94a3b8", borderRadius: "50%", height: 7, width: 7 }} />
-          {focus.label}
+          {focusLabel}
         </div>
         <img
           alt={isTH ? "โมเดลระบบน้ำอัตโนมัติ" : "Automated water system model"}
           src={waterSystemModel}
-          style={{ filter: "drop-shadow(0 24px 28px rgba(15,23,42,.16))", height: "100%", objectFit: "contain", objectPosition: `${focus.x} center`, padding: "28px 54px 8px", transform: focus.tilt, transformOrigin: focus.x, transition: "transform .8s cubic-bezier(.22,1,.36,1), object-position .8s ease, filter .4s ease", width: "100%" }}
+          style={{ filter: "drop-shadow(0 20px 24px rgba(15,23,42,.13))", height: "100%", objectFit: "contain", padding: "28px 54px 8px", transition: "filter .4s ease", width: "100%" }}
         />
         <svg aria-hidden="true" viewBox="0 0 1000 620" preserveAspectRatio="none" style={{ inset: 0, overflow: "visible", pointerEvents: "none", position: "absolute", width: "100%", height: "100%" }}>
           <defs>
@@ -226,12 +226,8 @@ function ProcessPlumbing({
           <AnimatedFlow d="M260 480 C350 500 410 505 500 500 C575 498 630 490 700 482" on={p1On} color={C.cyan} />
           <AnimatedFlow d="M725 476 C820 440 838 350 822 260 C810 225 790 215 760 215" on={p2On} color={C.green} />
           <AnimatedFlow d="M685 238 C590 220 500 216 405 225 C350 230 310 250 285 285" on={p2On} color={C.green} />
-          {p1On && <circle cx="505" cy="500" r="22" fill="none" stroke={C.cyan} strokeWidth="3" opacity=".6" style={{ animation: "dtPulse .8s ease-in-out infinite" }} />}
-          {p2On && <circle cx="820" cy="310" r="22" fill="none" stroke={C.green} strokeWidth="3" opacity=".6" style={{ animation: "dtPulse .8s ease-in-out infinite" }} />}
           <PumpRotor cx={505} cy={500} on={p1On} color={C.cyan} />
           <PumpRotor cx={820} cy={310} on={p2On} color={C.green} />
-          {p1On && <path d="M505 466 V420" stroke={C.cyan} strokeDasharray="3 6" strokeWidth="2" style={{ animation: "dtFlowLine .7s linear infinite" }} />}
-          {p2On && <path d="M820 278 V225" stroke={C.green} strokeDasharray="3 6" strokeWidth="2" style={{ animation: "dtFlowLine .7s linear infinite" }} />}
         </svg>
         <ModelMetric label={isTH ? "บ่อเพาะเลี้ยง · WLS3" : "Grow bed · WLS3"} value={tank3Level} active={liveSignal && tank3Level > 20} color={C.green} left="8%" top="14%" />
         <ModelMetric label={isTH ? "ถัง 1 · WLS1" : "Tank 1 · WLS1"} value={tank1Level} active={liveSignal && wls1} color={C.cyan} left="6%" top="68%" />
@@ -247,16 +243,17 @@ function ProcessPlumbing({
 function AnimatedFlow({ d, on, color }: { d: string; on: boolean; color: string }) {
   return (
     <>
-      <path d={d} fill="none" stroke={on ? `${color}32` : "transparent"} strokeLinecap="round" strokeWidth="10" />
-      <path d={d} fill="none" filter={on ? "url(#dtFlowGlow)" : undefined} stroke={on ? color : "transparent"} strokeDasharray="4 10" strokeLinecap="round" strokeWidth="4" style={{ animation: on ? "dtFlowLine .75s linear infinite" : "none" }} />
+      <path d={d} fill="none" stroke={on ? `${color}20` : "transparent"} strokeLinecap="round" strokeWidth="6" />
+      <path d={d} fill="none" stroke={on ? color : "transparent"} strokeDasharray="3 12" strokeLinecap="round" strokeWidth="2.5" style={{ animation: on ? "dtFlowLine 1s linear infinite" : "none" }} />
     </>
   );
 }
 
 function WaterRipple({ cx, cy, active, color, wide = false }: { cx: number; cy: number; active: boolean; color: string; wide?: boolean }) {
+  if (!active) return null;
   return (
     <g style={{ transformBox: "fill-box", transformOrigin: "center" }}>
-      {[0, .7, 1.4].map((delay) => <ellipse key={delay} cx={cx} cy={cy} rx={wide ? 68 : 38} ry={wide ? 10 : 7} fill="none" stroke={color} strokeWidth={active ? 3 : 1.5} opacity={active ? .7 : .28} style={{ animation: `dtRipple ${active ? 1.5 : 3.2}s ease-out ${delay}s infinite`, transformBox: "fill-box", transformOrigin: "center" }} />)}
+      {[0, .9].map((delay) => <ellipse key={delay} cx={cx} cy={cy} rx={wide ? 54 : 28} ry={wide ? 7 : 5} fill="none" stroke={color} strokeWidth="1.5" opacity=".35" style={{ animation: `dtRipple 2.2s ease-out ${delay}s infinite`, transformBox: "fill-box", transformOrigin: "center" }} />)}
     </g>
   );
 }
@@ -273,10 +270,10 @@ function PumpRotor({ cx, cy, on, color }: { cx: number; cy: number; on: boolean;
 function ModelMetric({ label, value, active, color, left, top }: { label: string; value: number; active: boolean; color: string; left: string; top: string }) {
   const stateColor = active ? color : C.red;
   return (
-    <div style={{ backdropFilter: "blur(10px)", background: "rgba(255,255,255,.9)", border: `1px solid ${stateColor}55`, borderRadius: 12, boxShadow: `0 10px 28px -18px ${stateColor}99`, left, minWidth: 118, padding: "9px 11px", position: "absolute", top }}>
+    <div style={{ backdropFilter: "blur(10px)", background: "rgba(255,255,255,.92)", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 10px 24px -18px rgba(15,23,42,.35)", left, minWidth: 118, padding: "9px 11px", position: "absolute", top }}>
       <div style={{ alignItems: "center", color: "#64748b", display: "flex", fontSize: 9, fontWeight: 700, gap: 5 }}><span style={{ animation: "dtPulse 1.2s ease-in-out infinite", background: stateColor, borderRadius: "50%", boxShadow: `0 0 8px ${stateColor}`, height: 7, width: 7 }} />{label}</div>
       <div style={{ color: "#0f172a", fontSize: 22, fontWeight: 800, lineHeight: 1.15, marginTop: 3 }}>{Math.round(value)}<span style={{ color: "#94a3b8", fontSize: 10, marginLeft: 2 }}>%</span></div>
-      <div style={{ color: stateColor, fontSize: 8, fontWeight: 800, letterSpacing: ".08em", marginTop: 2 }}>{active ? "● WATER DETECTED" : "● LOW / NOT DETECTED"}</div>
+      <div style={{ color: stateColor, fontSize: 8, fontWeight: 800, letterSpacing: ".06em", marginTop: 2 }}>{active ? "ตรวจพบน้ำ" : "ระดับต่ำ / ไม่พบ"}</div>
     </div>
   );
 }
