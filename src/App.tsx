@@ -6,7 +6,6 @@ import { SocialAuth } from "@/features/auth/components/SocialAuth";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { useTheme } from "next-themes";
-import nightHero from "@/assets/images/generated/greencrop-night-hero.png";
 
 const VIDEO_URL =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_204103_f607742e-09da-4cf5-bb06-4e67b0a531de.mp4";
@@ -303,13 +302,7 @@ function GreenCropLanding() {
         playsInline
         aria-hidden="true"
       />
-      <img
-        src={nightHero}
-        alt=""
-        aria-hidden="true"
-        className={`landing-night-hero absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${isDark ? "opacity-30 mix-blend-multiply" : "opacity-0"}`}
-      />
-      <div className={`absolute inset-0 transition-colors duration-700 ${isDark ? "bg-[linear-gradient(to_bottom,rgba(2,8,23,.16),rgba(2,12,27,.04)_42%,rgba(2,8,23,.28))]" : "bg-[linear-gradient(to_bottom,rgba(1,79,157,.1),rgba(0,82,165,.04)_45%,rgba(3,91,169,.18))]"}`} />
+      <div className={`absolute inset-0 transition-colors duration-700 ${isDark ? "bg-[linear-gradient(to_bottom,rgba(1,6,18,.46),rgba(3,18,40,.22)_42%,rgba(1,7,20,.58))]" : "bg-[linear-gradient(to_bottom,rgba(1,79,157,.1),rgba(0,82,165,.04)_45%,rgba(3,91,169,.18))]"}`} />
 
       <div
         aria-hidden="true"
@@ -320,6 +313,15 @@ function GreenCropLanding() {
         <div className="landing-night-stars absolute inset-0" />
         <div className="landing-night-mist absolute inset-x-[-18%] top-[42%] h-[34%] bg-[radial-gradient(ellipse_at_center,rgba(125,211,252,.13),rgba(15,23,42,0)_68%)] blur-2xl" />
         <div className="landing-night-beam absolute inset-x-0 top-0 h-[36%] bg-[linear-gradient(180deg,rgba(125,211,252,.06),transparent)]" />
+        <div className="landing-night-spray-field absolute inset-0 overflow-hidden">
+          {[3, 15, 28, 72, 85, 97].map((left, index) => (
+            <span
+              key={left}
+              className="landing-night-sprayer"
+              style={{ left: `${left}%`, animationDelay: `${index * -0.42}s` }}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="relative z-10 flex min-h-screen flex-col">
