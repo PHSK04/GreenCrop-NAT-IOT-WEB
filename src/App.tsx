@@ -7,8 +7,9 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { useTheme } from "next-themes";
 
-const VIDEO_URL =
+const DAY_VIDEO_URL =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_204103_f607742e-09da-4cf5-bb06-4e67b0a531de.mp4";
+const NIGHT_VIDEO_URL = `${import.meta.env.BASE_URL}videos/greencrop-night.mp4`;
 const BRAND_LOGO_URL = `${import.meta.env.BASE_URL}favicon.png`;
 
 function SocialLogo({ provider }: { provider: "Google" | "Microsoft" | "LINE" | "Facebook" }) {
@@ -318,26 +319,15 @@ function GreenCropLanding() {
     <main className="relative isolate min-h-screen w-full overflow-hidden bg-[#020817] font-sans">
       <video
         ref={videoRef}
-        className={`absolute inset-0 h-full w-full object-cover transition-[filter,opacity,transform] duration-700 ${isDark ? "landing-night-video opacity-100" : "opacity-100"}`}
-        src={VIDEO_URL}
+        className="absolute inset-0 h-full w-full object-cover opacity-100 transition-opacity duration-700"
+        src={isDark ? NIGHT_VIDEO_URL : DAY_VIDEO_URL}
         autoPlay
         muted={isMuted}
         loop
         playsInline
         aria-hidden="true"
       />
-      <div className={`absolute inset-0 transition-colors duration-700 ${isDark ? "bg-[linear-gradient(to_bottom,rgba(1,6,18,.46),rgba(3,18,40,.22)_42%,rgba(1,7,20,.58))]" : "bg-[linear-gradient(to_bottom,rgba(1,79,157,.1),rgba(0,82,165,.04)_45%,rgba(3,91,169,.18))]"}`} />
-
-      <div
-        aria-hidden="true"
-        className={`pointer-events-none absolute inset-0 transition-opacity duration-700 ${isDark ? "opacity-100" : "opacity-0"}`}
-      >
-        <div className="landing-night-aurora absolute -left-[12%] -top-[22%] h-[62vw] w-[62vw] rounded-full bg-cyan-400/10 blur-[110px]" />
-        <div className="landing-night-aurora landing-night-aurora--secondary absolute -right-[16%] top-[14%] h-[52vw] w-[52vw] rounded-full bg-emerald-300/[0.08] blur-[120px]" />
-        <div className="landing-night-stars absolute inset-0" />
-        <div className="landing-night-mist absolute inset-x-[-18%] top-[42%] h-[34%] bg-[radial-gradient(ellipse_at_center,rgba(125,211,252,.13),rgba(15,23,42,0)_68%)] blur-2xl" />
-        <div className="landing-night-beam absolute inset-x-0 top-0 h-[36%] bg-[linear-gradient(180deg,rgba(125,211,252,.06),transparent)]" />
-      </div>
+      <div className={`absolute inset-0 transition-colors duration-700 ${isDark ? "bg-[linear-gradient(to_bottom,rgba(1,6,18,.12),rgba(2,12,28,.02)_45%,rgba(1,7,20,.18))]" : "bg-[linear-gradient(to_bottom,rgba(1,79,157,.1),rgba(0,82,165,.04)_45%,rgba(3,91,169,.18))]"}`} />
 
       <div className="relative z-10 flex min-h-screen flex-col">
         <header className="mx-auto flex w-full max-w-[1680px] items-center justify-between px-6 py-5 sm:px-10 md:py-7 lg:px-16">
