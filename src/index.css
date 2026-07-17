@@ -130,9 +130,28 @@ body {
 }
 
 .landing-night-hero {
-  animation: landing-night-drift 22s ease-in-out infinite;
+  animation: landing-night-drift 16s ease-in-out infinite;
   transform-origin: center 62%;
   will-change: transform;
+}
+
+.landing-night-video {
+  filter: brightness(0.34) saturate(0.72) contrast(1.18) hue-rotate(4deg);
+  transform: scale(1.015);
+}
+
+.landing-night-content::before {
+  position: absolute;
+  z-index: -1;
+  top: -4rem;
+  left: 50%;
+  width: min(94vw, 70rem);
+  height: 32rem;
+  content: "";
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(2, 8, 23, 0.34) 0%, rgba(2, 8, 23, 0.12) 48%, transparent 74%);
+  filter: blur(12px);
 }
 
 .landing-night-aurora { animation: landing-night-aurora 16s ease-in-out infinite; }

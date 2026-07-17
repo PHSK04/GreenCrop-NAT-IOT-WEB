@@ -295,7 +295,7 @@ function GreenCropLanding() {
   return (
     <main className="relative isolate min-h-screen w-full overflow-hidden bg-[#020817] font-sans">
       <video
-        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${isDark ? "opacity-0" : "opacity-100"}`}
+        className={`absolute inset-0 h-full w-full object-cover transition-[filter,opacity,transform] duration-700 ${isDark ? "landing-night-video opacity-100" : "opacity-100"}`}
         src={VIDEO_URL}
         autoPlay
         muted
@@ -307,9 +307,9 @@ function GreenCropLanding() {
         src={nightHero}
         alt=""
         aria-hidden="true"
-        className={`landing-night-hero absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${isDark ? "opacity-100" : "opacity-0"}`}
+        className={`landing-night-hero absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${isDark ? "opacity-30 mix-blend-multiply" : "opacity-0"}`}
       />
-      <div className={`absolute inset-0 transition-colors duration-700 ${isDark ? "bg-slate-950/20" : "bg-[linear-gradient(to_bottom,rgba(1,79,157,.1),rgba(0,82,165,.04)_45%,rgba(3,91,169,.18))]"}`} />
+      <div className={`absolute inset-0 transition-colors duration-700 ${isDark ? "bg-[linear-gradient(to_bottom,rgba(2,8,23,.16),rgba(2,12,27,.04)_42%,rgba(2,8,23,.28))]" : "bg-[linear-gradient(to_bottom,rgba(1,79,157,.1),rgba(0,82,165,.04)_45%,rgba(3,91,169,.18))]"}`} />
 
       <div
         aria-hidden="true"
@@ -355,16 +355,16 @@ function GreenCropLanding() {
           </div>
         </header>
 
-        <section className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col items-center justify-start px-5 pt-[11vh] text-center sm:pt-[12vh]">
+        <section className={`relative mx-auto flex w-full max-w-[1240px] flex-1 flex-col items-center justify-start px-5 pt-[7vh] text-center sm:pt-[8vh] ${isDark ? "landing-night-content" : ""}`}>
           <div className="flex items-center gap-3">
             <span className={`h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_16px_rgba(110,231,183,.9)] ${isDark ? "landing-night-pulse" : ""}`} />
             <p className="text-[10px] font-bold uppercase tracking-[0.34em] text-emerald-100 sm:text-xs">Smart agriculture ecosystem</p>
           </div>
-          <h1 className={`mt-5 text-[clamp(3.2rem,6.2vw,6.8rem)] font-semibold leading-[0.9] tracking-[-0.055em] text-white drop-shadow-[0_12px_34px_rgba(2,6,23,0.2)] ${isDark ? "landing-night-title" : ""}`}>
+          <h1 className={`mt-5 max-w-[1120px] text-[clamp(2.65rem,5.35vw,5.9rem)] font-semibold leading-[0.92] tracking-[-0.05em] text-white drop-shadow-[0_12px_34px_rgba(2,6,23,0.2)] ${isDark ? "landing-night-title" : ""}`}>
             SMART IoT FOR<br />
             EVERY <span className="text-emerald-200">GREEN</span> FUTURE
           </h1>
-          <p className="mt-8 max-w-md text-base font-light leading-7 text-white/75 sm:text-lg">
+          <p className="mt-7 max-w-md text-base font-normal leading-7 text-white/85 drop-shadow-[0_3px_12px_rgba(2,8,23,.7)] sm:text-lg">
             เชื่อมต่อทุกแปลงเกษตร เข้าถึงทุกข้อมูล<br />และควบคุมอุปกรณ์ได้จากทุกมุมโลก
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
