@@ -58,7 +58,7 @@ interface SocialAuthProps {
     dividerLabel?: string;
     showDivider?: boolean;
     providers?: Array<'Google' | 'Microsoft' | 'LINE' | 'Facebook'>;
-    tone?: 'default' | 'light';
+    tone?: 'default' | 'light' | 'dark';
 }
 
 export function SocialAuth({
@@ -236,13 +236,15 @@ export function SocialAuth({
         }
     };
 
-    const socialButtonBase = tone === 'light'
-        ? "group relative h-11 w-full overflow-hidden rounded-[13px] border !border-emerald-100 !bg-white/92 !text-slate-700 shadow-[0_8px_18px_rgba(15,118,110,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:!border-emerald-200 hover:!bg-white hover:shadow-[0_12px_24px_rgba(15,118,110,0.14)] disabled:opacity-60 dark:!border-emerald-100 dark:!bg-white/92 dark:!text-slate-700"
-        : "group relative h-12 w-full overflow-hidden rounded-[1.1rem] border transition-all duration-200 disabled:opacity-60 " +
+    const socialButtonBase = tone === 'dark'
+        ? "group relative h-11 w-full overflow-hidden rounded-[13px] border !border-[#111d33] !bg-[#020817] !text-slate-300 shadow-[0_8px_18px_rgba(2,8,23,0.16)] transition-all duration-200 hover:-translate-y-0.5 hover:!border-emerald-500/40 hover:!bg-[#071326] hover:!text-white hover:shadow-[0_12px_24px_rgba(2,8,23,0.22)] disabled:opacity-60"
+        : tone === 'light'
+          ? "group relative h-11 w-full overflow-hidden rounded-[13px] border !border-slate-200 !bg-white !text-slate-700 shadow-[0_8px_18px_rgba(15,118,110,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:!border-emerald-200 hover:!bg-emerald-50 hover:shadow-[0_12px_24px_rgba(15,118,110,0.14)] disabled:opacity-60 dark:!border-slate-200 dark:!bg-white dark:!text-slate-700 dark:hover:!bg-emerald-50"
+          : "group relative h-12 w-full overflow-hidden rounded-[1.1rem] border transition-all duration-200 disabled:opacity-60 " +
           "border-slate-200 bg-white/90 text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.05)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)] " +
           "dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-emerald-500/40 dark:hover:bg-slate-900";
 
-    const gridClassName = providers.length === 1 ? "grid grid-cols-1 gap-4" : tone === 'light' ? "grid grid-cols-2 gap-3" : "grid grid-cols-2 gap-4";
+    const gridClassName = providers.length === 1 ? "grid grid-cols-1 gap-4" : tone === 'light' || tone === 'dark' ? "grid grid-cols-2 gap-3" : "grid grid-cols-2 gap-4";
     const dividerClassName = tone === 'light'
         ? "bg-emerald-50/90 px-3 text-slate-400"
         : "bg-slate-50 px-3 text-slate-400 dark:bg-slate-900/95 dark:text-slate-300";

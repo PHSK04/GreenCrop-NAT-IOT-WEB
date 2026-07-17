@@ -6,48 +6,31 @@
 @layer base {
   :root {
     --font-size: 14px;
-
-    /* Base Palette: Clean, Professional Light Mode (Slate/Emerald) */
-    /* All values in HSL format for Tailwind interoperability */
-    
-    --background: 210 40% 98%; /* Slate-50 #F8FAFC */
-    --foreground: 222 47% 11%; /* Slate-900 #0F172A */
-
-    --card: 0 0% 100%; /* White */
+    --background: 150 20% 98%;
+    --foreground: 222 38% 13%;
+    --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-
-    --primary: 158 64% 52%; /* Emerald-500 #10B981 */
+    --primary: 160 84% 39%;
     --primary-foreground: 0 0% 100%;
-
-    --secondary: 210 40% 96.1%; /* Slate-100 #F1F5F9 */
+    --secondary: 150 18% 95%;
     --secondary-foreground: 222 47% 11%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215 16% 47%; /* Slate-500 #64748B */
-
-    --accent: 210 40% 96.1%;
+    --muted: 150 14% 96%;
+    --muted-foreground: 215 16% 44%;
+    --accent: 154 24% 93%;
     --accent-foreground: 222 47% 11%;
-
-    --destructive: 0 84.2% 60.2%; /* Red-500 */
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%; /* Slate-200 #E2E8F0 */
-    --input: 214.3 31.8% 91.4%;
-    --ring: 158 64% 52%; /* Emerald-500 */
-
-    --radius: 1rem;
-
-    /* Chart Colors (HSL) */
+    --border: 150 14% 86%;
+    --input: 150 14% 86%;
+    --ring: 160 84% 39%;
+    --radius: 0.875rem;
     --chart-1: 158 64% 52%;
     --chart-2: 217 91% 60%;
     --chart-3: 38 92% 50%;
     --chart-4: 335 85% 60%;
     --chart-5: 247 74% 67%;
-    
-    /* Legacy Vars Mapped */
     --dark-bg: 210 40% 98%;
     --dark-card: 0 0% 100%;
     --dark-primary-text: 222 47% 11%;
@@ -59,44 +42,30 @@
   }
 
   .dark {
-    /* Dark Mode: High-Tech Future (Slate/Emerald) */
-    
-    --background: 222 47% 5%; /* Slate-950 approx #020617 (Darker) */
-    --foreground: 210 40% 98%; /* Slate-50 */
-
-    --card: 222 47% 11%; /* Slate-900 #0F172A */
+    --background: 222 47% 5%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 11%;
     --card-foreground: 210 40% 98%;
-
     --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
-
-    --primary: 158 64% 52%; /* Emerald-500 */
+    --primary: 158 64% 52%;
     --primary-foreground: 0 0% 100%;
-
-    --secondary: 217 33% 17%; /* Slate-800 #1E293B */
+    --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 98%;
-
     --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%; /* Slate-400 #94A3B8 */
-
+    --muted-foreground: 215 20% 65%;
     --accent: 217 33% 17%;
     --accent-foreground: 210 40% 98%;
-
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 217 33% 17%;
     --input: 217 33% 17%;
     --ring: 158 64% 52%;
-
-    /* Chart Colors (HSL) */
     --chart-1: 158 64% 52%;
     --chart-2: 217 91% 60%;
     --chart-3: 38 92% 50%;
     --chart-4: 335 85% 60%;
     --chart-5: 247 74% 67%;
-
-    /* Legacy Vars Mapped */
     --dark-bg: 222 47% 5%;
     --dark-card: 222 47% 11%;
     --dark-primary-text: 210 40% 98%;
@@ -106,37 +75,39 @@
     --dark-tag: 217 33% 17%;
     --dark-hover: 217 33% 17%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
-  body {
-    @apply bg-background text-foreground antialiased;
-    font-family: "Noto Sans Thai", "Montserrat", sans-serif;
-    line-height: 1.55;
-    text-rendering: optimizeLegibility;
-  }
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  font-family: "Noto Sans Thai", "Montserrat", sans-serif;
+  line-height: 1.55;
+  text-rendering: optimizeLegibility;
+  background-image:
+    linear-gradient(to right, hsl(158 30% 18% / 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(158 30% 18% / 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-attachment: fixed;
 }
 
 @layer utilities {
-  .force-solid header,
-  .force-solid [data-slot="card"] {
-    background-color: hsl(var(--card)) !important;
+  .force-solid header {
+    background-color: hsl(var(--card) / 0.94) !important;
     opacity: 1 !important;
-    backdrop-filter: none !important;
+    backdrop-filter: blur(10px) !important;
     position: relative;
     z-index: 5;
     isolation: isolate;
   }
 
-  .force-solid header::before,
-  .force-solid [data-slot="card"]::before {
+  .force-solid header::before {
     content: "";
     position: absolute;
     inset: 0;
-    background-color: hsl(var(--card));
+    background: hsl(var(--card) / 0.94);
     border-radius: inherit;
     z-index: -1;
   }
@@ -148,13 +119,13 @@
   }
 
   [data-slot="card"] {
-    background-color: hsl(var(--card)) !important;
+    background-color: hsl(var(--card) / 0.94);
     opacity: 1 !important;
-    backdrop-filter: none !important;
+    backdrop-filter: blur(10px) !important;
     position: relative;
     z-index: 1;
     overflow: hidden;
-    border-radius: 20px !important;
+    border-radius: 16px !important;
   }
 
   .force-solid .rounded-2xl,
@@ -165,93 +136,46 @@
     border-radius: 16px !important;
   }
 
-  .rounded-sm {
-    border-radius: 0.875rem !important;
-  }
-
+  .rounded-sm { border-radius: 0.5rem !important; }
   .rounded,
-  .rounded-md {
-    border-radius: 1rem !important;
-  }
-
+  .rounded-md { border-radius: 0.625rem !important; }
   .rounded-lg,
-  .rounded-xl {
-    border-radius: 1.25rem !important;
-  }
+  .rounded-xl { border-radius: 0.875rem !important; }
+  .rounded-2xl { border-radius: 1rem !important; }
+  .rounded-3xl { border-radius: 1.25rem !important; }
+  .rounded-full { border-radius: 9999px !important; }
 
-  .rounded-2xl {
-    border-radius: 1.5rem !important;
-  }
-
-  .rounded-3xl {
-    border-radius: 1.75rem !important;
-  }
-
-  .rounded-full {
-    border-radius: 9999px !important;
-  }
-
-  /* Legacy dark utilities mapped to semantic tokens */
-  .text-dark-primary {
-    @apply text-foreground;
-  }
-
-  .text-dark-secondary {
-    @apply text-muted-foreground;
-  }
-
-  .text-dark-cta {
-    @apply text-primary;
-  }
-
-  .bg-dark-bg {
-    @apply bg-background;
-  }
-
-  .bg-dark-card {
-    @apply bg-card;
-  }
-
-  .bg-dark-tag {
-    @apply bg-secondary text-secondary-foreground;
-  }
-
-  .bg-dark-hover {
-    @apply hover:bg-accent hover:text-accent-foreground;
-  }
-
-  .border-dark-color {
-    @apply border-border;
-  }
+  .text-dark-primary { @apply text-foreground; }
+  .text-dark-secondary { @apply text-muted-foreground; }
+  .text-dark-cta { @apply text-primary; }
+  .bg-dark-bg { @apply bg-background; }
+  .bg-dark-card { @apply bg-card; }
+  .bg-dark-tag { @apply bg-secondary text-secondary-foreground; }
+  .bg-dark-hover { @apply hover:bg-accent hover:text-accent-foreground; }
+  .border-dark-color { @apply border-border; }
 }
 
 @layer components {
-  /* Mapped legacy component styles to new system */
   .dark-card {
     @apply rounded-xl border border-border bg-card p-6 shadow-sm;
   }
 
   .dark-button-primary {
-    @apply font-semibold px-6 py-3 rounded-xl transition-all duration-200 text-primary-foreground bg-primary hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20;
+    @apply rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground transition-all duration-200 hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20;
   }
 
   .dark-button-secondary {
-    @apply font-semibold px-6 py-3 rounded-xl transition-all duration-200 bg-transparent text-primary border border-primary hover:bg-primary/10;
+    @apply rounded-xl border border-primary bg-transparent px-6 py-3 font-semibold text-primary transition-all duration-200 hover:bg-primary/10;
   }
 
   .dark-nav-item {
-    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-muted-foreground hover:bg-accent hover:text-accent-foreground;
+    @apply flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-accent-foreground;
   }
 
   .dark-nav-item-active {
-    @apply bg-accent text-foreground border border-border;
+    @apply border border-border bg-accent text-foreground;
   }
 
-  .dark-shadow {
-    @apply shadow-md;
-  }
-
-  .dark-shadow-lg {
-    @apply shadow-lg;
-  }
+  .dark-shadow { @apply shadow-md; }
+  .dark-shadow-lg { @apply shadow-lg; }
 }
