@@ -5,6 +5,8 @@ import { AppRouter } from "@/features/auth/components/AppRouter";
 import { SocialAuth } from "@/features/auth/components/SocialAuth";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { useTheme } from "next-themes";
+import nightHero from "@/assets/images/generated/greencrop-night-hero.png";
 
 const VIDEO_URL =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_204103_f607742e-09da-4cf5-bb06-4e67b0a531de.mp4";
@@ -81,7 +83,7 @@ function LoginForm({ onClose, onRegister }: { onClose: () => void; onRegister: (
   };
 
   return (
-    <div className="relative mx-auto max-h-[92vh] w-full max-w-[390px] overflow-y-auto rounded-2xl border border-emerald-100 bg-[#f8fbf9]/98 p-5 text-slate-900 shadow-[0_24px_70px_-34px_rgba(6,78,59,0.45)] backdrop-blur-xl sm:p-7">
+    <div className="relative mx-auto max-h-[92vh] w-full max-w-[390px] overflow-y-auto rounded-2xl border border-emerald-100 !bg-[#f8fbf9] p-5 !text-slate-900 shadow-[0_24px_70px_-34px_rgba(6,78,59,0.45)] sm:p-7">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
       <button
         type="button"
@@ -197,7 +199,7 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
   };
 
   return (
-    <div className="relative mx-auto max-h-[92vh] w-full max-w-[390px] overflow-y-auto rounded-2xl border border-emerald-100 bg-[#f8fbf9]/98 p-5 text-slate-900 shadow-[0_24px_70px_-34px_rgba(6,78,59,0.45)] backdrop-blur-xl sm:p-7">
+    <div className="relative mx-auto max-h-[92vh] w-full max-w-[390px] overflow-y-auto rounded-2xl border border-emerald-100 !bg-[#f8fbf9] p-5 !text-slate-900 shadow-[0_24px_70px_-34px_rgba(6,78,59,0.45)] sm:p-7">
       <button
         type="button"
         onClick={onClose}
@@ -261,6 +263,11 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
 function GreenCropLanding() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [themeReady, setThemeReady] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark = themeReady && resolvedTheme === "dark";
+
+  useEffect(() => setThemeReady(true), []);
 
   const openLogin = () => {
     setAuthMode("login");
@@ -282,7 +289,7 @@ function GreenCropLanding() {
   return (
     <main className="relative min-h-screen w-full overflow-x-hidden bg-[#035ba9] font-sans">
       <video
-        className="absolute inset-0 h-full w-full object-cover"
+        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${isDark ? "opacity-0" : "opacity-100"}`}
         src={VIDEO_URL}
         autoPlay
         muted
@@ -290,7 +297,13 @@ function GreenCropLanding() {
         playsInline
         aria-hidden="true"
       />
-      <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(1,79,157,.1),rgba(0,82,165,.04)_45%,rgba(3,91,169,.18))]" />
+      <img
+        src={nightHero}
+        alt=""
+        aria-hidden="true"
+        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${isDark ? "opacity-100" : "opacity-0"}`}
+      />
+      <div className={`absolute inset-0 transition-colors duration-700 ${isDark ? "bg-slate-950/20" : "bg-[linear-gradient(to_bottom,rgba(1,79,157,.1),rgba(0,82,165,.04)_45%,rgba(3,91,169,.18))]"}`} />
 
       <div className="relative z-10 flex min-h-screen flex-col">
         <header className="mx-auto flex w-full max-w-[1680px] items-center justify-between px-6 py-5 sm:px-10 md:py-7 lg:px-16">
@@ -304,7 +317,16 @@ function GreenCropLanding() {
             </span>
           </a>
 
-          <div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setTheme(isDark ? "light" : "dark")}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/40 bg-slate-950/15 text-white backdrop-blur-md transition-colors hover:bg-white/15"
+              aria-label={isDark ? "เปลี่ยนเป็นโหมดกลางวัน" : "เปลี่ยนเป็นโหมดกลางคืน"}
+              title={isDark ? "โหมดกลางวัน" : "โหมดกลางคืน"}
+            >
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
             <button
               type="button"
               onClick={openLogin}
