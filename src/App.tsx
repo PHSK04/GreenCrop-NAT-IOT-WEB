@@ -313,15 +313,6 @@ function GreenCropLanding() {
         <div className="landing-night-stars absolute inset-0" />
         <div className="landing-night-mist absolute inset-x-[-18%] top-[42%] h-[34%] bg-[radial-gradient(ellipse_at_center,rgba(125,211,252,.13),rgba(15,23,42,0)_68%)] blur-2xl" />
         <div className="landing-night-beam absolute inset-x-0 top-0 h-[36%] bg-[linear-gradient(180deg,rgba(125,211,252,.06),transparent)]" />
-        <div className="landing-night-spray-field absolute inset-0 overflow-hidden">
-          {[3, 15, 28, 72, 85, 97].map((left, index) => (
-            <span
-              key={left}
-              className="landing-night-sprayer"
-              style={{ left: `${left}%`, animationDelay: `${index * -0.42}s` }}
-            />
-          ))}
-        </div>
       </div>
 
       <div className="relative z-10 flex min-h-screen flex-col">
