@@ -391,7 +391,7 @@ export const authService = {
   },
 
   // Register via API (DB-backed)
-  register: async (email: string, password: string, name: string): Promise<User> => {
+  register: async (email: string, password: string, name: string, phone?: string): Promise<User> => {
     return withTransientRetry(async () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -400,7 +400,7 @@ export const authService = {
         const response = await fetchWithApiFallback('/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name }),
+          body: JSON.stringify({ email, password, name, phone }),
           signal: controller.signal
         });
 

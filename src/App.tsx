@@ -189,10 +189,12 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
     const form = new FormData(event.currentTarget);
     const password = String(form.get("password") || "");
     const confirmPassword = String(form.get("confirmPassword") || "");
+    const phone = String(form.get("phone") || "").replace(/\D/g, "");
     if (password !== confirmPassword) return;
+    if (phone.length < 10) return;
     setIsSubmitting(true);
     try {
-      await register(String(form.get("email") || ""), password, String(form.get("name") || ""));
+      await register(String(form.get("email") || ""), password, String(form.get("name") || ""), phone);
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -223,6 +225,7 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
         {[
           { name: "name", label: "ชื่อผู้ใช้งาน", type: "text", placeholder: "กรอกชื่อผู้ใช้งาน", autoComplete: "name" },
           { name: "email", label: "อีเมล", type: "email", placeholder: "name@example.com", autoComplete: "email" },
+          { name: "phone", label: "เบอร์โทรศัพท์", type: "tel", placeholder: "0812345678", autoComplete: "tel" },
           { name: "password", label: "รหัสผ่าน", type: "password", placeholder: "อย่างน้อย 8 ตัวอักษร", autoComplete: "new-password" },
           { name: "confirmPassword", label: "ยืนยันรหัสผ่าน", type: "password", placeholder: "กรอกรหัสผ่านอีกครั้ง", autoComplete: "new-password" },
         ].map((field) => (
@@ -234,6 +237,8 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
               required
               placeholder={field.placeholder}
               autoComplete={field.autoComplete}
+              inputMode={field.name === "phone" ? "numeric" : undefined}
+              minLength={field.name === "phone" ? 10 : undefined}
               className="h-10 w-full rounded-xl border border-slate-200 bg-white/85 px-4 text-[13px] text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
             />
           </label>
