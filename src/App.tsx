@@ -293,7 +293,7 @@ function GreenCropLanding() {
   }, [loginOpen]);
 
   return (
-    <main className="relative min-h-screen w-full overflow-x-hidden bg-[#035ba9] font-sans">
+    <main className="relative isolate min-h-screen w-full overflow-hidden bg-[#020817] font-sans">
       <video
         className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${isDark ? "opacity-0" : "opacity-100"}`}
         src={VIDEO_URL}
@@ -307,9 +307,20 @@ function GreenCropLanding() {
         src={nightHero}
         alt=""
         aria-hidden="true"
-        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${isDark ? "opacity-100" : "opacity-0"}`}
+        className={`landing-night-hero absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${isDark ? "opacity-100" : "opacity-0"}`}
       />
       <div className={`absolute inset-0 transition-colors duration-700 ${isDark ? "bg-slate-950/20" : "bg-[linear-gradient(to_bottom,rgba(1,79,157,.1),rgba(0,82,165,.04)_45%,rgba(3,91,169,.18))]"}`} />
+
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 transition-opacity duration-700 ${isDark ? "opacity-100" : "opacity-0"}`}
+      >
+        <div className="landing-night-aurora absolute -left-[12%] -top-[22%] h-[62vw] w-[62vw] rounded-full bg-cyan-400/10 blur-[110px]" />
+        <div className="landing-night-aurora landing-night-aurora--secondary absolute -right-[16%] top-[14%] h-[52vw] w-[52vw] rounded-full bg-emerald-300/[0.08] blur-[120px]" />
+        <div className="landing-night-stars absolute inset-0" />
+        <div className="landing-night-mist absolute inset-x-[-18%] top-[42%] h-[34%] bg-[radial-gradient(ellipse_at_center,rgba(125,211,252,.13),rgba(15,23,42,0)_68%)] blur-2xl" />
+        <div className="landing-night-beam absolute inset-x-0 top-0 h-[36%] bg-[linear-gradient(180deg,rgba(125,211,252,.06),transparent)]" />
+      </div>
 
       <div className="relative z-10 flex min-h-screen flex-col">
         <header className="mx-auto flex w-full max-w-[1680px] items-center justify-between px-6 py-5 sm:px-10 md:py-7 lg:px-16">
@@ -345,8 +356,11 @@ function GreenCropLanding() {
         </header>
 
         <section className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col items-center justify-start px-5 pt-[11vh] text-center sm:pt-[12vh]">
-          <p className="text-[10px] font-bold uppercase tracking-[0.34em] text-emerald-100 sm:text-xs">Smart agriculture ecosystem</p>
-          <h1 className="mt-5 text-[clamp(3.2rem,6.2vw,6.8rem)] font-semibold leading-[0.9] tracking-[-0.055em] text-white drop-shadow-[0_12px_34px_rgba(2,6,23,0.2)]">
+          <div className="flex items-center gap-3">
+            <span className={`h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_16px_rgba(110,231,183,.9)] ${isDark ? "landing-night-pulse" : ""}`} />
+            <p className="text-[10px] font-bold uppercase tracking-[0.34em] text-emerald-100 sm:text-xs">Smart agriculture ecosystem</p>
+          </div>
+          <h1 className={`mt-5 text-[clamp(3.2rem,6.2vw,6.8rem)] font-semibold leading-[0.9] tracking-[-0.055em] text-white drop-shadow-[0_12px_34px_rgba(2,6,23,0.2)] ${isDark ? "landing-night-title" : ""}`}>
             SMART IoT FOR<br />
             EVERY <span className="text-emerald-200">GREEN</span> FUTURE
           </h1>
