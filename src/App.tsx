@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
-import { Activity, ArrowRight, Cpu, Eye, EyeOff, Lock, Mail, Moon, Play, Radio, ShieldCheck, Sun, X } from "lucide-react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { Activity, ArrowRight, Cpu, Eye, EyeOff, Lock, Mail, Moon, Play, Radio, ShieldCheck, Sun, Volume2, VolumeX, X } from "lucide-react";
 import { AuthProvider, useAuth } from "@/features/auth/contexts/AuthContext";
 import { AppRouter } from "@/features/auth/components/AppRouter";
 import { SocialAuth } from "@/features/auth/components/SocialAuth";
@@ -269,10 +269,33 @@ function GreenCropLanding() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [themeReady, setThemeReady] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = themeReady && resolvedTheme === "dark";
 
   useEffect(() => setThemeReady(true), []);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.volume = 0.2;
+  }, []);
+
+  const toggleAudio = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const nextMuted = !isMuted;
+    video.muted = nextMuted;
+    video.volume = 0.2;
+    setIsMuted(nextMuted);
+    if (!nextMuted) {
+      try {
+        await video.play();
+      } catch {
+        video.muted = true;
+        setIsMuted(true);
+      }
+    }
+  };
 
   const openLogin = () => {
     setAuthMode("login");
@@ -294,10 +317,11 @@ function GreenCropLanding() {
   return (
     <main className="relative isolate min-h-screen w-full overflow-hidden bg-[#020817] font-sans">
       <video
+        ref={videoRef}
         className={`absolute inset-0 h-full w-full object-cover transition-[filter,opacity,transform] duration-700 ${isDark ? "landing-night-video opacity-100" : "opacity-100"}`}
         src={VIDEO_URL}
         autoPlay
-        muted
+        muted={isMuted}
         loop
         playsInline
         aria-hidden="true"
@@ -328,6 +352,16 @@ function GreenCropLanding() {
           </a>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleAudio}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/40 bg-slate-950/15 text-white backdrop-blur-md transition-colors hover:bg-white/15"
+              aria-label={isMuted ? "เปิดเสียงบรรยากาศ" : "ปิดเสียงบรรยากาศ"}
+              aria-pressed={!isMuted}
+              title={isMuted ? "เปิดเสียง" : "ปิดเสียง"}
+            >
+              {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </button>
             <button
               type="button"
               onClick={() => setTheme(isDark ? "light" : "dark")}
