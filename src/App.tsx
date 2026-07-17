@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Activity, ArrowRight, Cpu, Eye, EyeOff, Leaf, Lock, Mail, Moon, Play, Radio, ShieldCheck, Sun, X } from "lucide-react";
+import { Activity, ArrowRight, Cpu, Eye, EyeOff, Lock, Mail, Moon, Play, Radio, ShieldCheck, Sun, X } from "lucide-react";
 import { AuthProvider, useAuth } from "@/features/auth/contexts/AuthContext";
 import { AppRouter } from "@/features/auth/components/AppRouter";
 import { SocialAuth } from "@/features/auth/components/SocialAuth";
@@ -10,6 +10,7 @@ import nightHero from "@/assets/images/generated/greencrop-night-hero.png";
 
 const VIDEO_URL =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_204103_f607742e-09da-4cf5-bb06-4e67b0a531de.mp4";
+const BRAND_LOGO_URL = `${import.meta.env.BASE_URL}favicon.png`;
 
 function SocialLogo({ provider }: { provider: "Google" | "Microsoft" | "LINE" | "Facebook" }) {
   if (provider === "Google") {
@@ -96,7 +97,7 @@ function LoginForm({ onClose, onRegister }: { onClose: () => void; onRegister: (
 
       <div className="relative mb-5 text-center">
         <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full border border-emerald-200 bg-emerald-100">
-          <Leaf className="h-5 w-5 text-emerald-600" />
+          <img src={BRAND_LOGO_URL} alt="GreenCrop NAT" className="h-6 w-6 object-contain" />
         </div>
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-700">GreenCrop NAT IoT</p>
         <h2 className="text-3xl font-semibold leading-none tracking-tight text-slate-900">Login</h2>
@@ -211,7 +212,7 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
 
       <div className="relative mb-5 text-center">
         <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full border border-emerald-200 bg-emerald-100">
-          <Leaf className="h-5 w-5 text-emerald-600" />
+          <img src={BRAND_LOGO_URL} alt="GreenCrop NAT" className="h-6 w-6 object-contain" />
         </div>
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-700">GreenCrop NAT IoT</p>
         <h2 className="text-3xl font-semibold leading-none tracking-tight text-slate-900">สมัครสมาชิก</h2>
@@ -308,8 +309,8 @@ function GreenCropLanding() {
       <div className="relative z-10 flex min-h-screen flex-col">
         <header className="mx-auto flex w-full max-w-[1680px] items-center justify-between px-6 py-5 sm:px-10 md:py-7 lg:px-16">
           <a href="#" className="flex items-center gap-3 text-white" aria-label="GreenCrop หน้าหลัก">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/25 bg-white/10 backdrop-blur-md">
-              <Leaf className="h-5 w-5 text-emerald-200" />
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/30 bg-white/90 shadow-sm backdrop-blur-md">
+              <img src={BRAND_LOGO_URL} alt="" className="h-7 w-7 object-contain" />
             </span>
             <span>
               <span className="block text-[15px] font-semibold leading-none">GreenCrop</span>
