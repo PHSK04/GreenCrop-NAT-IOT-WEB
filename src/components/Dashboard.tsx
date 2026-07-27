@@ -187,7 +187,7 @@ function SidebarContent({
         onClick={() => handleNavClick(item.label)}
         title={compact ? (t[item.label] || item.label) : undefined}
         className={`
-          group flex items-center rounded-full text-sm font-medium transition-all duration-200 w-full
+          group flex w-full items-center rounded-xl text-sm font-medium transition-all duration-200
           ${compact ? "justify-center gap-0 px-2 py-3" : "gap-3 px-4 py-2.5"}
           ${isActive
             ? "bg-emerald-600 text-white !text-white shadow-sm"
@@ -206,13 +206,13 @@ function SidebarContent({
   };
 
   return (
-    <div className="flex flex-col h-full bg-card/85 backdrop-blur-xl border-r border-border">
+    <div className="flex h-full flex-col border-r border-border/80 bg-[#f8fbf9]/96 shadow-none backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/96">
       <div 
-        className={`border-b border-border bg-card/60 cursor-pointer hover:bg-accent/40 transition-colors ${compact ? "p-3" : "p-5"}`}
+        className={`cursor-pointer border-b border-emerald-100/70 bg-white/55 transition-colors hover:bg-white/80 dark:border-slate-800 dark:bg-slate-950/40 ${compact ? "p-3" : "p-5"}`}
         onClick={() => handleNavClick(isAdmin ? "Admin Panel" : "Dashboard")}
       >
         <div className={`flex items-center ${compact ? "justify-center" : "gap-3"}`}>
-          <div className={`${compact ? "w-10 h-10" : "w-12 h-12"} rounded-xl flex items-center justify-center shadow-[0_0_14px_rgba(16,185,129,0.32)] relative overflow-hidden group transition-all duration-500 ${isOn ? "bg-gradient-to-br from-primary to-emerald-700" : "bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 grayscale"}`}>
+          <div className={`${compact ? "h-10 w-10" : "h-11 w-11"} group relative flex items-center justify-center overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50 shadow-none transition-all duration-300 dark:border-emerald-900 dark:bg-emerald-950/40 ${isOn ? "" : "grayscale"}`}>
             <div className="absolute inset-0 bg-background/50 backdrop-blur-md/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <div className="absolute inset-[5px] rounded-lg bg-white/78 dark:bg-slate-900/35" />
             <img
@@ -309,8 +309,8 @@ function SidebarContent({
         )}
       </nav>
 
-      <div className={`border-t border-border bg-card/80 ${compact ? "p-2" : "p-4"}`}>
-         <div className={`rounded-lg bg-accent/30 border border-border ${compact ? "p-1.5 space-y-1.5" : "p-2 flex items-center justify-between gap-2"}`}>
+      <div className={`border-t border-emerald-100/70 bg-white/45 dark:border-slate-800 dark:bg-slate-950/35 ${compact ? "p-2" : "p-4"}`}>
+         <div className={`rounded-2xl border border-white/80 bg-white/65 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/60 ${compact ? "space-y-1.5 p-1.5" : "flex items-center justify-between gap-2 p-2"}`}>
             <div className={`flex items-center ${compact ? "justify-center gap-1.5" : "gap-2"}`}>
                <Button 
                 variant="ghost" 
@@ -496,10 +496,9 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       </div>
 
       {/* Main Content */}
-      <div className="force-solid relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background transition-colors duration-300">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f8fbf9] transition-colors duration-300 dark:bg-slate-950">
          {/* Background Grid Pattern */}
-         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,rgba(15,23,42,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.05)_1px,transparent_1px)] bg-[size:24px_24px] dark:bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)]"></div>
-         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_800px_at_50%_-30%,rgba(16,185,129,0.14),transparent)] dark:bg-[radial-gradient(circle_800px_at_50%_-30%,rgba(16,185,129,0.2),transparent)]"></div>
+         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(6,78,59,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(6,78,59,0.035)_1px,transparent_1px)] bg-[size:32px_32px] dark:bg-[linear-gradient(to_right,rgba(148,163,184,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.05)_1px,transparent_1px)]"></div>
          
          {/* Mobile Header */}
          <div className="lg:hidden sticky top-0 z-30 border-b border-border bg-card/85 px-3 py-3 backdrop-blur-md">
@@ -573,7 +572,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
           </Button>
         </div>
 
-        <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {renderContent()}
         </div>
 

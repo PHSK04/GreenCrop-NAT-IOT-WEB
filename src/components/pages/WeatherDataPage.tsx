@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Thermometer, Droplets, Activity, AlertTriangle, Download, FileText, CloudRain, Database } from "lucide-react";
+import { Thermometer, Droplets, Activity, AlertTriangle, Download, FileText, CloudRain, Database, LocateFixed, MapPin, RefreshCw, Wind } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
@@ -14,6 +14,9 @@ import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { useMachine } from "@/contexts/MachineContext";
 import { MinimalDatePicker } from "../ui/minimal-date-picker";
 import { MinimalMonthPicker } from "../ui/minimal-month-picker";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { useLiveWeather } from "@/features/weather/useLiveWeather";
 
 type WeatherDataPageProps = {
   language?: string;
@@ -50,6 +53,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [dismissedEmptyDataKey, setDismissedEmptyDataKey] = useState<string | null>(null);
+  const liveWeather = useLiveWeather();
 
   const filteredTelemetry = useMemo(() => {
     return telemetryHistory.filter((row) => {
@@ -468,6 +472,93 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
           </TabsContent>
 
           <TabsContent value="weather">
+            <div className="space-y-6">
+            <Card className="rounded-xl border border-border bg-card/50 shadow-lg">
+              <CardHeader>
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-foreground">
+                      <CloudRain className="h-5 w-5 text-sky-500" />
+                      {isTH ? "สภาพอากาศจริง ณ ตำแหน่งฟาร์ม" : "Live Weather at Farm Location"}
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      {isTH ? "อัปเดตอัตโนมัติทุก 10 นาทีจาก Open‑Meteo" : "Automatically refreshed every 10 minutes via Open‑Meteo"}
+                    </CardDescription>
+                  </div>
+                  <Button variant="outline" className="gap-2" onClick={liveWeather.refresh} disabled={liveWeather.loading}>
+                    <RefreshCw className={`h-4 w-4 ${liveWeather.loading ? "animate-spin" : ""}`} />
+                    {isTH ? "อัปเดตตอนนี้" : "Refresh now"}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button
+                    variant={liveWeather.mode === "automatic" ? "default" : "outline"}
+                    className="gap-2"
+                    onClick={() => liveWeather.setMode("automatic")}
+                  >
+                    <LocateFixed className="h-4 w-4" />
+                    {isTH ? "ตำแหน่งอัตโนมัติ" : "Automatic location"}
+                  </Button>
+                  <Button
+                    variant={liveWeather.mode === "manual" ? "default" : "outline"}
+                    className="gap-2"
+                    onClick={() => liveWeather.setMode("manual")}
+                  >
+                    <MapPin className="h-4 w-4" />
+                    {isTH ? "เลือกพิกัดเอง" : "Choose coordinates"}
+                  </Button>
+                </div>
+
+                {liveWeather.mode === "manual" && (
+                  <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                    <div className="space-y-2">
+                      <Label htmlFor="weather-latitude">{isTH ? "ละติจูด" : "Latitude"}</Label>
+                      <Input id="weather-latitude" inputMode="decimal" value={liveWeather.latitude} onChange={(event) => liveWeather.setLatitude(event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="weather-longitude">{isTH ? "ลองจิจูด" : "Longitude"}</Label>
+                      <Input id="weather-longitude" inputMode="decimal" value={liveWeather.longitude} onChange={(event) => liveWeather.setLongitude(event.target.value)} />
+                    </div>
+                    <Button onClick={liveWeather.refresh}>{isTH ? "ใช้พิกัดนี้" : "Use location"}</Button>
+                  </div>
+                )}
+
+                {liveWeather.error && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                    {liveWeather.error === "location_denied"
+                      ? (isTH ? "กรุณาอนุญาตตำแหน่ง หรือเลือกกรอกพิกัดเอง" : "Allow location access or enter coordinates manually.")
+                      : liveWeather.error === "invalid_coordinates"
+                        ? (isTH ? "พิกัดไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง" : "Invalid coordinates.")
+                        : (isTH ? "ยังดึงข้อมูลอากาศไม่ได้ กรุณาลองใหม่" : "Weather data is currently unavailable.")}
+                  </div>
+                )}
+
+                {liveWeather.weather && (
+                  <>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                      {[
+                        [Thermometer, isTH ? "อุณหภูมิอากาศ" : "Air temperature", `${liveWeather.weather.temperature} °C`, "text-orange-500"],
+                        [Droplets, isTH ? "ความชื้นอากาศ" : "Humidity", `${liveWeather.weather.humidity}%`, "text-cyan-500"],
+                        [CloudRain, isTH ? "ปริมาณฝน" : "Precipitation", `${liveWeather.weather.precipitation} mm`, "text-blue-500"],
+                        [Wind, isTH ? "ความเร็วลม" : "Wind speed", `${liveWeather.weather.windSpeed} km/h`, "text-slate-500"],
+                      ].map(([Icon, label, value, color]) => (
+                        <div key={String(label)} className="rounded-xl border border-border bg-background/60 p-4">
+                          <Icon className={`mb-3 h-5 w-5 ${color}`} />
+                          <p className="text-xs text-muted-foreground">{String(label)}</p>
+                          <p className="mt-1 text-2xl font-bold">{String(value)}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {isTH ? "พิกัด" : "Coordinates"}: {liveWeather.weather.latitude.toFixed(4)}, {liveWeather.weather.longitude.toFixed(4)}
+                      {" · "}{isTH ? "ข้อมูลเวลา" : "Observed"}: {formatTime(liveWeather.weather.observedAt)}
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
             <Card className="rounded-xl border border-border bg-card/50 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
@@ -504,6 +595,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
                 </Table>
               </CardContent>
             </Card>
+            </div>
           </TabsContent>
           <TabsContent value="water">
              <Card className="rounded-xl border border-border bg-card/50 shadow-lg">

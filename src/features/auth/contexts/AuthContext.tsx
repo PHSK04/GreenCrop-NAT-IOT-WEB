@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (email: string, password: string, name: string, phone?: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
   updateProfile: (data: Partial<User>) => Promise<void>;
@@ -36,9 +36,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (email: string, password: string, name: string) => {
+  const register = async (email: string, password: string, name: string, phone?: string) => {
     try {
-      const user = await authService.register(email, password, name);
+      const user = await authService.register(email, password, name, phone);
       setUser(user);
       toast.success("Account Created", { description: "Welcome to GreenCropNAT!" });
     } catch (error: any) {

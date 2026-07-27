@@ -2,7 +2,47 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { buildLocalGroundedReply, isProjectKnowledgeQuestion } = require('./nat_ai_chat');
+const { buildLocalGroundedReply, buildModelMessages, buildNatAiContext, isProjectKnowledgeQuestion } = require('./nat_ai_chat');
+
+test('generative chat sends recent turns as real conversation roles', () => {
+    const result = buildModelMessages({
+        user_message: 'แล้วเครื่องที่สองล่ะ',
+        recent_conversation: [
+            { role: 'user', text: 'เครื่องแรกเป็นยังไง' },
+            { role: 'assistant', text: 'เครื่องแรกออนไลน์ครับ' },
+        ],
+        data_scope: { tenant_id: 'user-1' },
+    });
+
+    assert.deepEqual(result.messages.slice(1, 3), [
+        { role: 'user', content: 'เครื่องแรกเป็นยังไง' },
+        { role: 'assistant', content: 'เครื่องแรกออนไลน์ครับ' },
+    ]);
+    assert.match(result.messages.at(-1).content, /^แล้วเครื่องที่สองล่ะ/);
+    assert.doesNotMatch(result.messages.at(-1).content, /recent_conversation/);
+});
+
+test('short follow-up inherits the previous topic for data routing', async () => {
+    const context = await buildNatAiContext({
+        req: { user: { id: 1, role: 'user' }, tenant: 'tenant-1' },
+        db: {},
+        session: { id: 9 },
+        userMessage: 'แล้วเมื่อวานล่ะ',
+        getSensorTenantCandidates: async () => ['tenant-1'],
+        loadLatestSensorRows: async () => [],
+        loadSensorHistoryRows: async () => [],
+        loadAiChatMessages: async () => [
+            { sender_role: 'user', body: 'ปั๊มทำงานเป็นยังไง' },
+            { sender_role: 'ai', body: 'ตอนนี้ปั๊มหยุดอยู่ครับ' },
+        ],
+        getTenantLearningSummary: async () => null,
+        getDevicesForUser: async () => [],
+    });
+
+    assert.equal(context.ai_route.intent, 'pump_status');
+    assert.equal(context.ai_route.needsSensorHistory, true);
+    assert.ok(context.requested_date);
+});
 
 test('local AI composes a Thai source-backed answer without an API key', () => {
     const result = buildLocalGroundedReply({

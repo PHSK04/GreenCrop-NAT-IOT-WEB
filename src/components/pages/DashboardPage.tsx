@@ -13,7 +13,9 @@ import {
   Clock3,
   Siren,
   Thermometer,
-  AlertTriangle
+  AlertTriangle,
+  Wifi,
+  Droplets
 } from "lucide-react";
 import { MetricsChart } from "../MetricsChart";
 import { DigitalTwinModel } from "../dashboard/DigitalTwinModel";
@@ -234,11 +236,9 @@ export function DashboardPage({
 }: DashboardPageProps) {
   const t = translations[language as keyof typeof translations] || translations.EN;
   const { 
-    isOn, 
     sendStartCommand,
     stopPump2FromWeb,
     sendEmergencyStop,
-    resetUptime,
     uptimeSeconds,
     ecValue,
     phValue,
@@ -261,9 +261,6 @@ export function DashboardPage({
     .filter(Boolean)
     .join(", ");
   const [dismissedWaterFullAlarm, setDismissedWaterFullAlarm] = useState(false);
-  const activeDevice = devices.find((device) => device.device_id === activeDeviceId);
-  const activeDeviceName = activeDevice?.device_name || activeDeviceId || t.noDevice;
-  const activeDeviceLocation = activeDevice?.location || "-";
   const waterFullAlarm = boardConnected && redOn;
   const showWaterFullAlarm = waterFullAlarm && !dismissedWaterFullAlarm;
   const stablePhValue = useStablePositiveValue(phValue, boardConnected);
@@ -464,20 +461,34 @@ export function DashboardPage({
       {waterFullAlarmOverlay}
 
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-border/60 bg-card/75 px-4 py-4 backdrop-blur-xl md:px-8 md:py-6">
+      <header className="sticky top-0 z-20 border-b border-sky-900/60 bg-[#061a35]/95 px-4 py-4 text-white shadow-[0_16px_40px_-28px_rgba(2,20,46,.85)] backdrop-blur-xl md:px-7">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
           <div>
-            <h1 className="flex items-center gap-3 text-lg font-bold tracking-tight text-foreground sm:text-xl md:text-2xl">
-              <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary/15 text-primary sm:h-9 sm:w-9">
+            <h1 className="flex items-center gap-3 text-lg font-bold tracking-tight text-white sm:text-xl md:text-2xl">
+              <span className="grid h-8 w-8 place-items-center rounded-xl border border-emerald-300/20 bg-emerald-300/10 text-emerald-300 sm:h-9 sm:w-9">
                 <Activity className="h-5 w-5" />
               </span>
               {t.title}
             </h1>
-            <p className="mt-1 text-xs font-medium text-muted-foreground md:text-sm">{t.subtitle}</p>
+            <p className="mt-1 text-xs font-medium text-sky-100/55 md:text-sm">{t.subtitle}</p>
           </div>
-          <Badge 
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+              <select
+                aria-label={t.changeDevice}
+                className="h-10 w-full rounded-xl border border-white/15 bg-white/[0.07] px-3 pr-8 text-xs font-semibold text-white outline-none backdrop-blur transition focus:border-emerald-300/50 disabled:opacity-60"
+                value={activeDeviceId}
+                onChange={(event) => onDeviceChange?.(event.target.value)}
+                disabled={!devices.length}
+              >
+                {devices.length === 0 ? <option value="">{t.noDevice}</option> : devices.map((device) => (
+                  <option key={String(device.id)} value={device.device_id}>{device.device_name || device.device_id}</option>
+                ))}
+              </select>
+            </div>
+          <Badge
             variant={mqttStatus === "connected" && boardConnected ? "default" : "secondary"}
-            className={`self-end border px-4 py-1.5 font-mono text-xs sm:self-auto ${mqttStatus === "connected" && boardConnected ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20" : "border-border bg-muted text-muted-foreground"}`}
+            className={`hidden border px-3 py-1.5 font-mono text-[10px] sm:flex ${mqttStatus === "connected" && boardConnected ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-200 hover:bg-emerald-300/10" : "border-white/10 bg-white/[0.05] text-sky-100/50"}`}
           >
             {mqttStatus === "connected" ? (
               <span className="flex items-center gap-2">
@@ -499,79 +510,43 @@ export function DashboardPage({
                 {language === "TH" ? "MQTT ยังไม่เชื่อมต่อ" : "MQTT DISCONNECTED"}
               </span>
             )}
-          </Badge>
+          </Badge></div>
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 overflow-auto p-4 md:p-8">
-        <Card className="mb-6 rounded-2xl border-emerald-500/20 bg-card/75 shadow-sm backdrop-blur-sm">
-          <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                {t.activeDevice}
-              </p>
-              <h2 className="mt-1 text-lg font-bold text-foreground">
-                {activeDeviceName}
-              </h2>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
-                  {t.deviceId}: {activeDeviceId || "-"}
-                </Badge>
-                <Badge variant="outline" className="border-border bg-background/70 text-muted-foreground">
-                  {t.location}: {activeDeviceLocation}
-                </Badge>
-                {activeDevice?.is_primary && (
-                  <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
-                    Primary
-                  </Badge>
-                )}
-              </div>
-            </div>
-            <div className="w-full md:w-72">
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                {t.changeDevice}
-              </label>
-              <select
-                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground disabled:opacity-60"
-                value={activeDeviceId}
-                onChange={(event) => onDeviceChange?.(event.target.value)}
-                disabled={!devices.length}
-              >
-                {devices.length === 0 ? (
-                  <option value="">{t.noDevice}</option>
-                ) : (
-                  devices.map((device) => (
-                    <option key={String(device.id)} value={device.device_id}>
-                      {device.device_name || device.device_id} ({device.device_id})
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-          </CardContent>
-        </Card>
+      <main className="relative z-10 flex-1 overflow-auto bg-[radial-gradient(circle_at_top,#dff5ff_0%,#eff9ff_38%,#f5fbff_72%)] p-4 md:p-6 xl:p-7">
 
-        <div className="mb-6 grid grid-cols-1 gap-4 md:mb-8">
-          <Card className="rounded-2xl border-border/60 bg-card/70 shadow-sm backdrop-blur-sm">
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t.uptime}</p>
-                <p className="mt-1 font-mono text-xl font-semibold text-foreground">{formatUptime(uptimeSeconds)}</p>
-              </div>
-              <div className="rounded-xl bg-primary/15 p-2 text-primary">
-                <Clock3 className="h-5 w-5" />
-              </div>
-            </CardContent>
-          </Card>
+        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: language === "TH" ? "สถานะระบบ" : "System status", value: liveSignal ? (language === "TH" ? "ระบบพร้อมทำงาน" : "System ready") : (language === "TH" ? "รอสัญญาณ" : "Waiting"), detail: locked ? "LOCKED" : liveSignal ? (language === "TH" ? "ปกติ" : "Normal") : "--", icon: Wifi, tone: "emerald" },
+            { label: language === "TH" ? "สถานะปั๊ม" : "Pump status", value: pump2On ? (language === "TH" ? "ปั๊มน้ำ #2" : "Water pump #2") : (language === "TH" ? "ปั๊มพร้อมทำงาน" : "Pumps ready"), detail: activePumpLabels || "OFF", icon: Cpu, tone: "cyan" },
+            { label: language === "TH" ? "ระดับน้ำ" : "Water level", value: liveSignal ? `${wls2 ? 76 : wls1 ? 48 : 24}%` : "--", detail: wls2 ? (language === "TH" ? "ระดับเหมาะสม" : "Normal") : (language === "TH" ? "กำลังตรวจสอบ" : "Checking"), icon: Droplets, tone: "blue" },
+            { label: t.metrics.ph.title, value: stablePhValue != null ? stablePhValue.toFixed(2) : "--", detail: stablePhValue != null ? (stablePhOk ? (language === "TH" ? "เหมาะสม" : "Suitable") : (language === "TH" ? "ควรตรวจสอบ" : "Check")) : "WAITING", icon: Beaker, tone: "emerald" },
+          ].map((item) => {
+            const Icon = item.icon;
+            const tone = item.tone === "blue" ? "bg-blue-50 text-blue-600" : item.tone === "cyan" ? "bg-cyan-50 text-cyan-600" : "bg-emerald-50 text-emerald-600";
+            return (
+              <Card key={item.label} className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${tone}`}><Icon className="h-6 w-6" /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-slate-500">{item.label}</p>
+                    <p className="mt-0.5 truncate text-lg font-bold text-slate-900">{item.value}</p>
+                  </div>
+                  <Badge variant="secondary" className="shrink-0 bg-emerald-50 text-[10px] text-emerald-700">{item.detail}</Badge>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Machine Control Section (Hero) */}
-        <div className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-8">
+        <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-12">
           
           {/* Left Column: Visual Model */}
           <div className="lg:col-span-7 space-y-6">
-            <Card className="h-full min-h-[320px] overflow-hidden rounded-2xl border-border/70 bg-card/65 shadow-lg backdrop-blur-xl sm:min-h-[420px] lg:min-h-[500px]">
-              <CardContent className="bg-gradient-to-b from-transparent to-background/30 p-3 sm:p-4 lg:p-5">
+            <Card className="h-full min-h-[320px] overflow-hidden rounded-2xl border-0 bg-transparent shadow-none sm:min-h-[420px] lg:min-h-[500px]">
+              <CardContent className="p-0">
                 <DigitalTwinModel
                   language={language}
                   liveSignal={liveSignal}
@@ -591,187 +566,62 @@ export function DashboardPage({
             </Card>
           </div>
 
-          {/* Right Column: Controls & Pumps */}
-          <div className="lg:col-span-5 space-y-6">
-            {/* Master Control */}
-            <Card className="rounded-2xl border-border/70 bg-card/80 shadow-xl backdrop-blur-md">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-foreground">
-                  <Power className="w-5 h-5" />
-                  {t.masterControl}
+          {/* Right Column: Controls and live readings */}
+          <div className="lg:col-span-5">
+            <Card className="h-full rounded-2xl border-sky-100 bg-white/95 shadow-[0_20px_55px_-38px_rgba(7,55,92,.5)]">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-slate-900">
+                  <span className="flex items-center gap-2"><Power className="h-5 w-5 text-emerald-600" />{t.masterControl}</span>
+                  <span className="font-mono text-xs font-medium text-slate-400">{formatUptime(uptimeSeconds)}</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex flex-col gap-4 rounded-xl border border-border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-4">
-                     <div
-                       className={`
-                         w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all duration-300
-                         ${pump2On 
-                           ? "bg-primary/20 border-primary text-primary shadow-[0_0_15px_rgba(16,185,129,0.3)]" 
-                           : locked
-                             ? "border-red-500/40 bg-red-500/10 text-red-500"
-                             : "bg-muted border-border text-muted-foreground"
-                         }
-                       `}
-                     >
-                       <Power className={`w-8 h-8 ${pump2On ? "scale-110" : "scale-100"}`} />
-                     </div>
-                      <div>
-                        <h3 className="text-lg font-medium text-foreground">
-                          {locked ? (language === "TH" ? "ระบบล็อค" : "Locked") : pump2On ? t.running : t.stopped}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          {wls2 ? (language === "TH" ? "น้ำถึง WLS2 พร้อมกดมือ" : "WLS2 ready for manual start") : t.manualMode}
-                        </p>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <button onClick={sendStartCommand} className="group flex min-h-28 flex-col items-center justify-center rounded-2xl border border-emerald-400 bg-gradient-to-br from-emerald-400 to-emerald-600 p-3 text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,.8)] transition hover:-translate-y-0.5">
+                    <span className="grid h-11 w-11 place-items-center rounded-full bg-white text-emerald-600 shadow"><Power className="h-5 w-5" /></span>
+                    <span className="mt-2 text-sm font-bold">{language === "TH" ? "เริ่มทำงาน" : "Start"}</span>
+                    <span className="text-[10px] text-emerald-50">Pump 2</span>
+                  </button>
+                  <button onClick={stopPump2FromWeb} className="flex min-h-28 flex-col items-center justify-center rounded-2xl border border-amber-300 bg-amber-50 p-3 text-amber-800 transition hover:-translate-y-0.5 hover:bg-amber-100">
+                    <span className="grid h-11 w-11 place-items-center rounded-full border border-amber-300 bg-white"><Cpu className="h-5 w-5" /></span>
+                    <span className="mt-2 text-sm font-bold">{language === "TH" ? "หยุดชั่วคราว" : "Pause"}</span>
+                    <span className="text-[10px] text-amber-600">Pump 2</span>
+                  </button>
+                  <button onClick={sendEmergencyStop} className="flex min-h-28 flex-col items-center justify-center rounded-2xl border border-red-300 bg-red-50 p-3 text-red-700 transition hover:-translate-y-0.5 hover:bg-red-100">
+                    <span className="grid h-11 w-11 place-items-center rounded-full border border-red-300 bg-white"><Siren className="h-5 w-5" /></span>
+                    <span className="mt-2 text-sm font-bold">{language === "TH" ? "หยุดฉุกเฉิน" : "Emergency"}</span>
+                    <span className="text-[10px] text-red-500">E-STOP</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {[
+                    { label: t.metrics.ph.title, value: stablePhValue != null ? stablePhValue.toFixed(2) : "--", unit: "", icon: Beaker, accent: "emerald", note: stablePhOk ? (language === "TH" ? "เหมาะสม" : "Suitable") : (language === "TH" ? "รอตรวจสอบ" : "Waiting") },
+                    { label: t.metrics.temp.title, value: stableTempValue != null ? stableTempValue.toFixed(1) : "--", unit: "°C", icon: Thermometer, accent: "blue", note: stableTempValue != null ? (language === "TH" ? "ปกติ" : "Normal") : "Waiting" },
+                    { label: t.metrics.ec.title, value: stableEcValue != null ? stableEcValue.toFixed(2) : "--", unit: "mS/cm", icon: Zap, accent: "cyan", note: stableEcValue != null ? (language === "TH" ? "เหมาะสม" : "Suitable") : "Waiting" },
+                  ].map((metric) => {
+                    const Icon = metric.icon;
+                    const accent = metric.accent === "blue" ? "bg-blue-50 text-blue-600" : metric.accent === "cyan" ? "bg-cyan-50 text-cyan-600" : "bg-emerald-50 text-emerald-600";
+                    return (
+                      <div key={metric.label} className="rounded-2xl border border-sky-100 bg-[#fbfdff] p-4">
+                        <div className={`grid h-9 w-9 place-items-center rounded-full ${accent}`}><Icon className="h-4 w-4" /></div>
+                        <p className="mt-3 truncate text-[11px] font-semibold text-slate-500">{metric.label}</p>
+                        <div className="mt-1 flex items-end gap-1"><span className="font-mono text-2xl font-black text-[#082a54]">{metric.value}</span><span className="pb-1 text-[10px] text-slate-500">{metric.unit}</span></div>
+                        <p className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{metric.note}</p>
                       </div>
-                    </div>
-                    <div className="space-y-1 text-left sm:text-right">
-                      <p className="text-xs text-muted-foreground">{t.uptime}</p>
-                      <p className="font-mono text-primary">{formatUptime(uptimeSeconds)}</p>
-                      <button
-                        type="button"
-                        onClick={resetUptime}
-                        className="mt-1 inline-flex h-9 w-full items-center justify-center gap-1 rounded-md border border-red-400/30 bg-red-600 px-3 text-[11px] font-bold text-white transition-colors hover:bg-red-500 sm:w-28"
-                      >
-                        <span>↺</span>
-                        {language === "TH" ? "รีเซ็ตเวลา" : "RESET"}
-                      </button>
-                    </div>
+                    );
+                  })}
                 </div>
 
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <Button onClick={sendStartCommand} className="h-11 bg-emerald-600 text-white hover:bg-emerald-700">
-                    <Power className="mr-2 h-4 w-4" />
-                    {language === "TH" ? "เริ่มปั๊ม 2" : "Start P2"}
-                  </Button>
-                  <Button onClick={stopPump2FromWeb} variant="outline" className="h-11 border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300">
-                    <Cpu className="mr-2 h-4 w-4" />
-                    {language === "TH" ? "หยุดปั๊ม 2" : "Stop P2"}
-                  </Button>
-                  <Button onClick={sendEmergencyStop} variant="destructive" className="h-11">
-                    <Siren className="mr-2 h-4 w-4" />
-                    {language === "TH" ? "หยุดฉุกเฉิน" : "E-Stop"}
-                  </Button>
-                </div>
-
-                {/* Pump Status Grid */}
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">{t.pumpStatus}</h4>
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/35 px-3 py-2">
-                    <span className="text-xs font-medium text-muted-foreground">{t.activePumps}</span>
-                    <Badge
-                      variant={activePumpLabels ? "default" : "secondary"}
-                      className={activePumpLabels ? "bg-blue-500 text-white hover:bg-blue-500" : "bg-background text-muted-foreground"}
-                    >
-                      {activePumpLabels || t.noActivePumps}
-                    </Badge>
+                <div className="flex items-center justify-between rounded-xl border border-sky-100 bg-sky-50/70 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className={`grid h-9 w-9 place-items-center rounded-full ${!boardConnected ? "bg-slate-100 text-slate-400" : locked || floatAlarm ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}><Cpu className="h-4 w-4" /></span>
+                    <div><p className="text-xs font-bold text-slate-800">{t.sensorNetwork}</p><p className="text-[10px] text-slate-500">{boardConnected ? t.sensorsOk : (language === "TH" ? "รอสัญญาณจากอุปกรณ์" : "Waiting for device")}</p></div>
                   </div>
-                  <div className="grid grid-cols-1 min-[450px]:grid-cols-2 gap-2">
-                    {visiblePumpStates.map((active, idx) => {
-                      return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={idx === 1 ? (active ? stopPump2FromWeb : sendStartCommand) : undefined}
-                        className={`
-                        flex min-h-[98px] flex-col items-center justify-center rounded-lg border p-2 transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-500/60
-                        ${active 
-                          ? "bg-blue-500/10 border-blue-500/40 shadow-[0_0_10px_rgba(59,130,246,0.1)]" 
-                          : "bg-muted/50 border-border opacity-70"
-                        }
-                      `}>
-                         <div className={`w-1.5 h-1.5 rounded-full mb-1.5 ${active ? "bg-blue-500 animate-pulse" : "bg-muted-foreground"}`}></div>
-                         <Cpu className={`w-4 h-4 mb-1 ${active ? "text-blue-500 dark:text-blue-400" : "text-muted-foreground"}`} />
-                         <span className="text-[9px] text-muted-foreground font-medium text-center leading-tight line-clamp-2 h-6 flex items-center">{t.pumpNames[idx]}</span>
-                         <span className="text-[8px] text-muted-foreground font-mono mt-0.5">P{idx + 1}</span>
-                         <span className={`mt-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${active ? "bg-blue-500 text-white" : "bg-background text-muted-foreground"}`}>
-                           {active ? "ON" : "OFF"}
-                         </span>
-                      </button>
-                      );
-                    })}
-                  </div>
+                  <Badge className={boardConnected ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}>{boardConnected ? t.statusOnline : "OFFLINE"}</Badge>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Sensor Health */}
-            <div className="grid grid-cols-1 gap-3">
-              <Card className="rounded-2xl border-border/70 bg-card/55 shadow-lg">
-                 <CardContent className="flex h-full flex-col justify-between gap-4 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`rounded-full p-2 ${!boardConnected ? "bg-muted text-muted-foreground" : locked || floatAlarm ? "bg-red-500/10 text-red-500" : isOn ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"}`}>
-                         <Cpu className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-foreground">{t.sensorNetwork}</h4>
-                        <p className="text-xs text-muted-foreground">
-                          {!boardConnected
-                            ? (language === "TH" ? "ยังไม่มีสัญญาณสดจากบอร์ด" : "No live board telemetry")
-                            : locked
-                            ? (language === "TH" ? "หยุดฉุกเฉินและล็อคระบบ" : "Emergency lock active")
-                            : floatAlarm
-                              ? (language === "TH" ? "ลูกลอยแจ้งเตือน" : "Float alarm")
-                              : wls1 || wls2
-                                ? t.sensorsOk
-                                : t.standby}
-                        </p>
-                      </div>
-                    </div>
-                    <span className={`w-fit rounded border border-border bg-muted px-2 py-1 text-xs font-bold ${!boardConnected ? "text-muted-foreground" : locked || floatAlarm ? "text-red-500" : isOn ? "text-emerald-500" : "text-muted-foreground"}`}>
-                      {!boardConnected ? (language === "TH" ? "ไม่มีสัญญาณ" : "NO SIGNAL") : locked ? "LOCKED" : floatAlarm ? "ALARM" : isOn ? t.statusOnline : t.statusSleep}
-                    </span>
-                 </CardContent>
-              </Card>
-
-              {[
-                {
-                  title: t.metrics.ph.title,
-                  value: stablePhValue != null ? stablePhValue.toFixed(2) : "--",
-                  status: stablePhValue != null ? (stablePhOk ? "OK" : "CHECK") : "WAITING",
-                  icon: Beaker,
-                  color: "text-blue-500 dark:text-blue-400",
-                  bgColor: "bg-blue-500/10",
-                  unit: "",
-                  dataKey: "ph" as const,
-                },
-                {
-                  title: t.metrics.temp.title,
-                  value: stableTempValue != null ? stableTempValue.toFixed(1) : "--",
-                  unit: "C",
-                  status: stableTempValue != null ? "LIVE" : "WAITING",
-                  icon: Thermometer,
-                  color: "text-cyan-600 dark:text-cyan-400",
-                  bgColor: "bg-cyan-500/10",
-                  dataKey: "temp" as const,
-                },
-                {
-                  title: t.metrics.ec.title,
-                  value: stableEcValue != null ? stableEcValue.toFixed(2) : "--",
-                  unit: "mS/cm",
-                  status: stableEcValue != null ? "LIVE" : "WAITING",
-                  icon: Zap,
-                  color: "text-yellow-600 dark:text-yellow-400",
-                  bgColor: "bg-yellow-500/10",
-                  dataKey: "ec" as const,
-                },
-              ].map((metric) => (
-                <RealtimeMetricCard
-                  key={metric.title}
-                  title={metric.title}
-                  value={metric.value}
-                  unit={metric.unit}
-                  status={metric.status}
-                  icon={metric.icon}
-                  color={metric.color}
-                  bgColor={metric.bgColor}
-                  data={sensorTrend}
-                  dataKey={metric.dataKey}
-                />
-              ))}
-            </div>
-
           </div>
         </div>
         

@@ -58,6 +58,14 @@ function formatDateKey(value) {
 
 function parseRequestedDateKey(text) {
     const raw = String(text || '').toLowerCase();
+    const relativeDate = new Date();
+    if (/(เมื่อวาน|yesterday)/i.test(raw)) {
+        relativeDate.setDate(relativeDate.getDate() - 1);
+        return formatDateKey(relativeDate);
+    }
+    if (/(วันนี้|today)/i.test(raw)) {
+        return formatDateKey(relativeDate);
+    }
     const thaiMonths = {
         'ม.ค.': 1, 'มกราคม': 1,
         'ก.พ.': 2, 'กุมภาพันธ์': 2,
@@ -390,6 +398,11 @@ function buildNatAiSystemPrompt() {
         'Reply in the same language as the user, usually Thai.',
         'You can answer broad questions. When the user asks about GreenCropNAT data, use the authenticated context and tool result only.',
         'Be conversational, calm, practical, and direct like a capable agricultural technology assistant.',
+        'Treat the conversation as an ongoing dialogue. Resolve short follow-ups such as "แล้วล่ะ", "ทำยังไงต่อ", pronouns, and omitted subjects from the recent turns.',
+        'Adapt to the user\'s tone and level of detail. Natural informal Thai is welcome when the user writes informally; do not sound like a call-center script.',
+        'Vary wording naturally. Do not repeat greetings, introductions, disclaimers, or the user\'s question unless repetition helps clarity.',
+        'Do not force the user into predefined choices. Ask at most one focused follow-up question only when a missing fact materially changes the answer.',
+        'Acknowledge corrections and preferences briefly, then apply them in later turns.',
         'Answer the exact user question first.',
         'For GreenCropNAT, machine, sensor, pump, account, or project questions, use only the provided authenticated user context and be explicit when data is missing.',
         'Never mix data between users or tenants. If the context is scoped to one user, say "ของบัญชีนี้" / "this account" when summarizing project data.',
@@ -406,6 +419,39 @@ function buildNatAiSystemPrompt() {
         'Do not mention prompts, tokens, JSON, or implementation details.',
         'If the machine may be unsafe, tell the user to stop/inspect the machine and offer to contact support.',
     ].join('\n');
+}
+
+function buildModelMessages(context, toolResult = null, { ollama = false } = {}) {
+    const compactContext = buildOpenAiContext(context, toolResult);
+    const history = Array.isArray(context.recent_conversation)
+        ? context.recent_conversation.slice(-12)
+        : [];
+    const messages = [
+        {
+            role: 'system',
+            content: `${buildNatAiSystemPrompt()}${ollama ? '\nReturn only the final answer. Never reveal private reasoning, analysis, or chain of thought.' : ''}`,
+        },
+        ...history
+            .filter((message) => message?.role === 'user' || message?.role === 'assistant')
+            .map((message) => ({
+                role: message.role,
+                content: String(message.text || '').slice(0, 700),
+            }))
+            .filter((message) => message.content.trim()),
+        {
+            role: 'user',
+            content: [
+                String(context.user_message || '').trim(),
+                '',
+                '<authenticated_context>',
+                JSON.stringify({ ...compactContext.value, recent_conversation: undefined, user_message: undefined }),
+                '</authenticated_context>',
+                '',
+                'Use the authenticated context only when it is relevant. Continue the dialogue naturally and answer this latest message directly. Do not describe the context format.',
+            ].join('\n'),
+        },
+    ];
+    return { messages, context: compactContext };
 }
 
 function buildLocalGroundedReply(context, controllerReply) {
@@ -447,7 +493,8 @@ function isProjectKnowledgeQuestion(text) {
 
 async function generateOllamaReply(context, controllerReply) {
     if (!NAT_AI_OLLAMA_ENABLED || typeof fetch !== 'function') return null;
-    const compactContext = buildOpenAiContext(context, controllerReply);
+    const modelInput = buildModelMessages(context, controllerReply, { ollama: true });
+    const compactContext = modelInput.context;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), NAT_AI_OLLAMA_TIMEOUT_MS);
     try {
@@ -459,16 +506,7 @@ async function generateOllamaReply(context, controllerReply) {
                 model: NAT_AI_OLLAMA_MODEL,
                 stream: false,
                 think: false,
-                messages: [
-                    {
-                        role: 'system',
-                        content: `${buildNatAiSystemPrompt()}\nReturn only the final answer. Never reveal private reasoning, analysis, or chain of thought.`,
-                    },
-                    {
-                        role: 'user',
-                        content: `ข้อมูลจริงและบริบทของ NAT AI:\n${JSON.stringify(compactContext.value)}\n\nตอบข้อความล่าสุดของผู้ใช้โดยใช้บริบทนี้ หากเป็นข้อมูลโปรเจกต์ให้ยึดเฉพาะหลักฐานที่ให้มา ตอบให้เป็นธรรมชาติ ไม่คัดลอกข้อความเป็นก้อน และอย่าอ้างว่าควบคุมฮาร์ดแวร์แล้ว ตอบเฉพาะคำตอบสุดท้าย ห้ามแสดงขั้นตอนคิดหรือบทวิเคราะห์`,
-                    },
-                ],
+                messages: modelInput.messages,
                 options: {
                     temperature: 0.45,
                     num_predict: OPENAI_MAX_OUTPUT_TOKENS,
@@ -518,7 +556,21 @@ async function buildNatAiContext({
     const deviceId = String(options.deviceId || session.device_id || '').trim().toUpperCase();
     const tenantId = String(req.tenant || req.user?.tenant_id || req.user?.id || defaultTenantId);
     const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
-    const route = detectNatAiRoute(userMessage);
+    const recentMessages = (await loadAiChatMessages(session.id, 18))
+        .slice(-12)
+        .map((message) => ({
+            role: message.sender_role === 'user' ? 'user' : 'assistant',
+            text: String(message.body || '').slice(0, 700),
+        }));
+    const recentUserContext = recentMessages
+        .filter((message) => message.role === 'user')
+        .slice(-3)
+        .map((message) => message.text)
+        .join(' ');
+    // Short follow-ups often omit their subject (for example "แล้วเมื่อวานล่ะ").
+    // Route against recent user turns as well, while keeping the latest message
+    // last so its intent has the strongest signal.
+    const route = detectNatAiRoute(`${recentUserContext} ${userMessage}`.trim());
     const tenantCandidates = await getSensorTenantCandidates(req, tenantId, deviceId);
     const latestRows = await loadLatestSensorRows(tenantCandidates, deviceId);
     const latestSensor = compactSensorRow(latestRows[0]);
@@ -547,13 +599,6 @@ async function buildNatAiContext({
         deviceId,
         limit: 4,
     }).catch(() => null) : null;
-    const recentMessages = (await loadAiChatMessages(session.id, 14))
-        .slice(-10)
-        .map((message) => ({
-            role: message.sender_role === 'user' ? 'user' : 'assistant',
-            text: String(message.body || '').slice(0, 240),
-        }));
-
     return {
         ai_route: route,
         user: {
@@ -749,7 +794,8 @@ async function generateNatAiReply(context, fallbackText) {
         return { text: fallbackText, provider: 'fallback' };
     }
 
-    const openAiContext = buildOpenAiContext(context, pythonReply);
+    const modelInput = buildModelMessages(context, pythonReply);
+    const openAiContext = modelInput.context;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12000);
     try {
@@ -764,13 +810,7 @@ async function generateNatAiReply(context, fallbackText) {
                 model: OPENAI_MODEL,
                 max_output_tokens: OPENAI_MAX_OUTPUT_TOKENS,
                 temperature: 0.35,
-                input: [
-                    { role: 'system', content: buildNatAiSystemPrompt() },
-                    {
-                        role: 'user',
-                        content: `Compact authenticated context and optional tool result for NAT AI:\n${JSON.stringify(openAiContext.value)}\n\nAnswer the user's latest message now. If this is about GreenCropNAT account data, use only values in this compact context/tool result. Do not sound like a predefined FAQ.`,
-                    },
-                ],
+                input: modelInput.messages,
             }),
         });
 
@@ -842,6 +882,7 @@ async function saveAiExchange(db, { sessionId, userText, aiText, intent, current
 module.exports = {
     OPENAI_MAX_OUTPUT_TOKENS,
     buildLocalGroundedReply,
+    buildModelMessages,
     buildNatAiContext,
     generateNatAiReply,
     generateOllamaReply,

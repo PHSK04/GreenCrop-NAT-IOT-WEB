@@ -5,12 +5,12 @@ set -euo pipefail
 # Usage:
 #   bash scripts/smoke_web_api.sh
 # Optional env:
-#   API_BASE=http://localhost:3001/api
+#   API_BASE=https://greencrop-api.onrender.com/api
 #   WEB_URL=http://localhost:5173
 #   START_SERVER=1
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-API_BASE="${API_BASE:-http://localhost:3001/api}"
+API_BASE="${API_BASE:-https://greencrop-api.onrender.com/api}"
 WEB_URL="${WEB_URL:-http://localhost:5173}"
 START_SERVER="${START_SERVER:-1}"
 WAIT_SECONDS="${WAIT_SECONDS:-20}"
@@ -233,4 +233,3 @@ printf "PASS: %d | FAIL: %d | WARN: %d\n" "$pass_count" "$fail_count" "$warn_cou
 if [[ "$fail_count" -gt 0 ]]; then
   exit 1
 fi
-

@@ -7,6 +7,8 @@ import {
   Download,
   FileText,
   MessageCircleMore,
+  Mic,
+  MicOff,
   Pencil,
   Reply,
   Send,
@@ -15,6 +17,8 @@ import {
   Trash2,
   UserCheck,
   UserRoundX,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import natAssistantImage from "@/assets/images/generated/nat_ai_assistant_full.png";
@@ -83,6 +87,24 @@ type LauncherPosition = {
   x: number;
   y: number;
 };
+
+type BrowserSpeechRecognitionEvent = Event & {
+  results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>;
+};
+
+type BrowserSpeechRecognition = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: Event & { error?: string }) => void) | null;
+};
+
+type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
 
 const safeSenderLabel = (message: Pick<ChatMessage, "sender_name" | "sender_role">, isTH: boolean) => {
   if (message.sender_role === "admin") {
@@ -371,6 +393,8 @@ export function CustomerChatWidget({
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [messagePendingDelete, setMessagePendingDelete] = useState<ChatMessage | null>(null);
@@ -409,6 +433,9 @@ export function CustomerChatWidget({
   const previousChatbotMessageCountRef = useRef(chatbotMessages.length);
   const previousAgentMessageCountRef = useRef(agentMessages.length);
   const typingTimeoutRef = useRef<number | null>(null);
+  const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const lastSpokenAssistantMessageRef = useRef<string | null>(null);
+  const handsFreeConversationRef = useRef(false);
   const localChatDateKey = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -1008,8 +1035,121 @@ export function CustomerChatWidget({
     setSelectedThreadId((current) => current ?? items[0]?.id ?? null);
   };
 
-  const submitAssistantMessage = async () => {
-    const body = draft.trim();
+  const stopListening = () => {
+    speechRecognitionRef.current?.stop();
+    setIsListening(false);
+  };
+
+  const startVoiceInput = () => {
+    const speechWindow = window as typeof window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      toast.error(isTH ? "เบราว์เซอร์นี้ยังไม่รองรับการฟังเสียง กรุณาใช้ Chrome หรือ Edge" : "Voice input is not supported. Try Chrome or Edge.");
+      return;
+    }
+
+    window.speechSynthesis?.cancel();
+    const recognition = new Recognition();
+    let submittedFinalResult = false;
+    recognition.lang = isTH ? "th-TH" : "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let index = 0; index < event.results.length; index += 1) {
+        transcript += event.results[index]?.[0]?.transcript || "";
+      }
+      const cleanTranscript = transcript.trim();
+      setDraft(cleanTranscript);
+      const finalResult = event.results[event.results.length - 1];
+      if (finalResult?.isFinal && cleanTranscript && handsFreeConversationRef.current && !submittedFinalResult) {
+        submittedFinalResult = true;
+        recognition.stop();
+        window.setTimeout(() => submitAssistantMessage(cleanTranscript).catch(() => {}), 0);
+      }
+    };
+    recognition.onerror = (event) => {
+      setIsListening(false);
+      if (event.error !== "aborted" && event.error !== "no-speech") {
+        handsFreeConversationRef.current = false;
+        toast.error(isTH ? "ฟังเสียงไม่สำเร็จ กรุณาอนุญาตใช้ไมโครโฟนแล้วลองใหม่" : "Could not listen. Allow microphone access and try again.");
+      }
+    };
+    recognition.onend = () => {
+      setIsListening(false);
+      if (handsFreeConversationRef.current && !submittedFinalResult) {
+        window.setTimeout(() => startVoiceInput(), 350);
+      }
+    };
+    speechRecognitionRef.current = recognition;
+    setIsListening(true);
+    try {
+      recognition.start();
+    } catch {
+      setIsListening(false);
+    }
+  };
+
+  const toggleVoiceInput = () => {
+    if (isListening || handsFreeConversationRef.current) {
+      handsFreeConversationRef.current = false;
+      stopListening();
+      window.speechSynthesis?.cancel();
+      return;
+    }
+    handsFreeConversationRef.current = true;
+    lastSpokenAssistantMessageRef.current = [...assistantMessages].reverse().find((message) => message.sender === "ai")?.id || null;
+    setVoiceReplyEnabled(true);
+    startVoiceInput();
+  };
+
+  const toggleVoiceReply = () => {
+    if (voiceReplyEnabled) {
+      window.speechSynthesis?.cancel();
+      setVoiceReplyEnabled(false);
+      return;
+    }
+    const latest = [...assistantMessages].reverse().find((message) => message.sender === "ai");
+    lastSpokenAssistantMessageRef.current = latest?.id || null;
+    setVoiceReplyEnabled(true);
+    toast.success(isTH ? "เปิดเสียงตอบกลับแล้ว" : "Voice replies enabled");
+  };
+
+  useEffect(() => {
+    if (!voiceReplyEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const latest = [...assistantMessages].reverse().find((message) => message.sender === "ai" && !message.id.includes("thinking"));
+    if (!latest || latest.id === lastSpokenAssistantMessageRef.current) return;
+    lastSpokenAssistantMessageRef.current = latest.id;
+    const utterance = new SpeechSynthesisUtterance(latest.text.replace(/[*#`_>-]/g, " ").replace(/\s+/g, " ").trim());
+    utterance.lang = isTH ? "th-TH" : "en-US";
+    utterance.rate = isTH ? 1 : 0.95;
+    utterance.onend = () => {
+      if (handsFreeConversationRef.current && isOpen && mode === "assistant") {
+        startVoiceInput();
+      }
+    };
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }, [assistantMessages, isOpen, isTH, mode, voiceReplyEnabled]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== "assistant" || isSending || isListening || handsFreeConversationRef.current) return;
+    handsFreeConversationRef.current = true;
+    lastSpokenAssistantMessageRef.current = [...assistantMessages].reverse().find((message) => message.sender === "ai")?.id || null;
+    setVoiceReplyEnabled(true);
+    startVoiceInput();
+  }, [isOpen, mode]);
+
+  useEffect(() => () => {
+    speechRecognitionRef.current?.abort();
+    window.speechSynthesis?.cancel();
+  }, []);
+
+  const submitAssistantMessage = async (voiceTranscript?: string) => {
+    const body = String(voiceTranscript ?? draft).trim();
     if (!body || isSending) return;
     const now = Date.now();
     const shouldEscalate = shouldEscalateAssistantRequest(body);
@@ -2410,6 +2550,18 @@ export function CustomerChatWidget({
 
       <div className="border-t border-slate-200/80 bg-white/96 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/96">
         <div className="flex items-end gap-2">
+          <Button
+            type="button"
+            variant={isListening ? "default" : "outline"}
+            size="icon"
+            className={`h-12 w-12 shrink-0 rounded-2xl ${isListening ? "animate-pulse bg-red-500 hover:bg-red-600" : ""}`}
+            onClick={toggleVoiceInput}
+            disabled={isSending}
+            aria-label={isListening ? (isTH ? "หยุดฟัง" : "Stop listening") : (isTH ? "พูดกับ NAT AI" : "Talk to NAT AI")}
+            title={isListening ? (isTH ? "กำลังฟัง—กดเพื่อหยุด" : "Listening—click to stop") : (isTH ? "พูดกับ NAT AI" : "Talk to NAT AI")}
+          >
+            {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+          </Button>
           <Input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
@@ -2427,6 +2579,22 @@ export function CustomerChatWidget({
             <Send className="mr-2 h-4 w-4" />
             {isSending ? (isTH ? "กำลังคิด" : "Thinking") : isTH ? "ส่ง" : "Send"}
           </Button>
+          <Button
+            type="button"
+            variant={voiceReplyEnabled ? "default" : "outline"}
+            size="icon"
+            className="h-12 w-12 shrink-0 rounded-2xl"
+            onClick={toggleVoiceReply}
+            aria-label={voiceReplyEnabled ? (isTH ? "ปิดเสียงตอบกลับ" : "Disable voice replies") : (isTH ? "เปิดเสียงตอบกลับ" : "Enable voice replies")}
+            title={voiceReplyEnabled ? (isTH ? "AI จะพูดคำตอบ" : "AI will speak replies") : (isTH ? "เปิดให้ AI พูดตอบ" : "Enable spoken replies")}
+          >
+            {voiceReplyEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+          </Button>
+        </div>
+        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+          {isListening
+            ? (isTH ? "กำลังฟังอยู่ พูดได้เลยครับ" : "Listening—go ahead.")
+            : (isTH ? "กดไมค์เพื่อพูด และตรวจข้อความก่อนส่งคำสั่ง" : "Tap the mic to speak and review commands before sending.")}
         </div>
       </div>
     </>
