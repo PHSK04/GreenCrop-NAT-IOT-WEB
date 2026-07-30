@@ -153,6 +153,7 @@ interface SidebarContentProps {
   devices?: AdminDbDeviceRow[];
   activeDeviceId?: string;
   onDeviceChange?: (deviceId: string) => void;
+  onToggleCompact?: () => void;
 }
 
 function SidebarContent({ 
@@ -167,9 +168,11 @@ function SidebarContent({
   compact = false,
   devices = [],
   activeDeviceId,
-  onDeviceChange
+  onDeviceChange,
+  onToggleCompact
 }: SidebarContentProps & { user?: { name: string; role?: string } }) {
   const { isOn } = useMachine();
+  const [isCompactHovered, setIsCompactHovered] = useState(false);
   const isAdmin = isAdminUser ?? (String(user?.role || "").toLowerCase() === "admin");
   const brandName = isAdmin ? "GreenCropNAT Admin" : "GreenCropNAT";
   const t = (navTranslations as any)[language] || navTranslations.EN;
@@ -181,37 +184,49 @@ function SidebarContent({
 
   const renderNavItem = (item: any, isActive: boolean) => {
     const Icon = item.icon;
-    return (
+    const translatedLabel = t[item.label] || item.label;
+    const navButton = (
       <button
-        key={item.label}
         onClick={() => handleNavClick(item.label)}
-        title={compact ? (t[item.label] || item.label) : undefined}
+        aria-label={translatedLabel}
         className={`
-          group flex w-full items-center rounded-xl text-sm font-medium transition-all duration-200
-          ${compact ? "justify-center gap-0 px-2 py-3" : "gap-3 px-4 py-2.5"}
+          group flex items-center text-[13px] font-medium transition-all duration-150
+          ${compact
+            ? `mx-auto h-11 ${isCompactHovered ? "w-[200px] justify-start gap-3 rounded-xl px-4" : "w-11 justify-center rounded-full px-0"}`
+            : "w-full gap-3 rounded-2xl px-3 py-2.5"}
           ${isActive
-            ? "bg-emerald-600 text-white !text-white shadow-sm"
-            : "text-slate-900 border border-transparent hover:bg-emerald-50 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-emerald-900/20 dark:hover:text-white"
+            ? compact
+              ? "!bg-emerald-600 text-white !text-white shadow-[0_10px_24px_-12px_rgba(5,150,105,0.95)] hover:!bg-emerald-700 dark:!bg-emerald-500 dark:text-white dark:!text-white"
+              : "bg-emerald-600 text-white !text-white shadow-[0_5px_16px_-10px_rgba(5,150,105,0.8)]"
+            : compact
+              ? isCompactHovered
+                ? "border border-transparent bg-transparent text-slate-700 hover:bg-slate-950/[0.045] hover:text-emerald-700 dark:text-slate-200 dark:hover:bg-white/[0.07]"
+                : "border border-white/90 bg-white/95 text-slate-700 shadow-[0_7px_20px_-14px_rgba(15,23,42,0.55)] hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              : "border border-transparent text-slate-600 hover:bg-black/[0.035] hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.06] dark:hover:text-white"
           }
         `}
       >
-        <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? "text-white !text-white opacity-100" : "text-slate-700 group-hover:text-emerald-700 dark:text-slate-300 dark:group-hover:text-emerald-300"}`} />
-        {!compact && (
-          <span className={`truncate ${isActive ? "text-white !text-white opacity-100" : ""}`}>
-            {t[item.label] || item.label}
-          </span>
-        )}
+        <Icon className={`${compact ? "h-5 w-5" : "h-4 w-4"} shrink-0 transition-colors ${isActive ? "text-white !text-white opacity-100" : "text-slate-700 group-hover:text-emerald-700 dark:text-slate-300 dark:group-hover:text-emerald-300"}`} />
+        <span className={`truncate transition-all duration-200 ${compact ? `text-sm font-medium ${isCompactHovered ? "max-w-[150px] opacity-100" : "max-w-0 opacity-0"}` : ""} ${isActive ? "text-white !text-white" : ""}`}>
+          {translatedLabel}
+        </span>
       </button>
     );
+
+    return <div key={item.label}>{navButton}</div>;
   };
 
   return (
-    <div className="flex h-full flex-col border-r border-border/80 bg-[#f8fbf9]/96 shadow-none backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/96">
+    <div
+      onMouseEnter={() => compact && setIsCompactHovered(true)}
+      onMouseLeave={() => compact && setIsCompactHovered(false)}
+      className={`flex flex-col transition-[width,border-radius] duration-300 ${compact ? `pointer-events-auto mx-auto h-[calc(100%-2rem)] overflow-hidden border border-white/80 bg-white/90 shadow-[0_28px_70px_-34px_rgba(15,23,42,0.5)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/92 ${isCompactHovered ? "w-56 rounded-[24px]" : "w-20 rounded-[40px]"}` : "h-full border-r border-border/70 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/92"}`}
+    >
       <div 
-        className={`cursor-pointer border-b border-emerald-100/70 bg-white/55 transition-colors hover:bg-white/80 dark:border-slate-800 dark:bg-slate-950/40 ${compact ? "p-3" : "p-5"}`}
+        className={`cursor-pointer transition-colors ${compact ? "flex min-h-[74px] w-full items-center px-2 py-2" : "flex min-h-[102px] items-center border-b border-border/60 px-5 hover:bg-muted/35 dark:border-slate-800"}`}
         onClick={() => handleNavClick(isAdmin ? "Admin Panel" : "Dashboard")}
       >
-        <div className={`flex items-center ${compact ? "justify-center" : "gap-3"}`}>
+        <div className={`flex w-full items-center ${compact ? `${isCompactHovered ? "flex-row px-1" : "flex-col"} gap-2` : "gap-3"}`}>
           <div className={`${compact ? "h-10 w-10" : "h-11 w-11"} group relative flex items-center justify-center overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50 shadow-none transition-all duration-300 dark:border-emerald-900 dark:bg-emerald-950/40 ${isOn ? "" : "grayscale"}`}>
             <div className="absolute inset-0 bg-background/50 backdrop-blur-md/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <div className="absolute inset-[5px] rounded-lg bg-white/78 dark:bg-slate-900/35" />
@@ -222,7 +237,7 @@ function SidebarContent({
               draggable={false}
             />
           </div>
-          {!compact && <div>
+          <div className={`min-w-0 flex-1 ${compact && !isCompactHovered ? "hidden" : ""}`}>
             <h1 className="text-lg font-bold text-foreground tracking-tight leading-tight">
               {brandName}
             </h1>
@@ -235,7 +250,33 @@ function SidebarContent({
                 {isOn ? t["System Online"] : t["System Offline"]}
               </p>
             </div>
-          </div>}
+          </div>
+          {compact && (
+            <button
+              type="button"
+              title={language === "TH" ? "ขยายเมนู" : "Expand menu"}
+              className={`${isCompactHovered ? "ml-auto" : ""} flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200/70 bg-white/75 text-slate-600 transition-colors hover:bg-white hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleCompact?.();
+              }}
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </button>
+          )}
+          {!compact && onToggleCompact && (
+            <button
+              type="button"
+              title={language === "TH" ? "ย่อเมนู" : "Collapse menu"}
+              className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background/80 text-muted-foreground shadow-sm transition-colors hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/40"
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleCompact();
+              }}
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -257,38 +298,32 @@ function SidebarContent({
       )}
 
       {/* Navigation */}
-      <nav className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${compact ? "p-2 space-y-4" : "p-4 space-y-7"}`}>
+      <nav className={`min-h-0 ${compact ? `flex w-full flex-1 flex-col border-y border-slate-200/55 px-2 py-3 dark:border-slate-700/60 ${isCompactHovered ? "justify-start space-y-4 overflow-y-auto overscroll-contain" : "justify-center space-y-1 overflow-hidden"}` : "flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-5"}`}>
         {!isAdmin && (
           <>
             <div className="space-y-1">
-              {!compact && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">{t["Control Center"]}</h3>}
+              {(!compact || isCompactHovered) && <h3 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">{t["Control Center"]}</h3>}
             {mainNavItems
               .filter((item) => !(isAdmin && item.label === "Device Pairing"))
               .map((item) => renderNavItem(item, activePage === item.label))}
             </div>
 
-            {!compact && <Separator className="bg-border/50" />}
-
             <div className="space-y-1">
-              {!compact && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">{t["Field Insights"]}</h3>}
+              {(!compact || isCompactHovered) && <h3 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">{t["Field Insights"]}</h3>}
               <div className="space-y-1">
                 {insightItems.map((item) => renderNavItem(item, activePage === item.label))}
               </div>
             </div>
 
-            {!compact && <Separator className="bg-border/50" />}
-
             <div className="space-y-1">
-              {!compact && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">{t["Resources"]}</h3>}
+              {(!compact || isCompactHovered) && <h3 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">{t["Resources"]}</h3>}
               <div className="space-y-1">
                 {analyticsItems.map((item) => renderNavItem(item, activePage === item.label))}
               </div>
             </div>
 
-            {!compact && <Separator className="bg-border/50" />}
-
             <div className="space-y-1">
-              {!compact && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">{t["System"]}</h3>}
+              {(!compact || isCompactHovered) && <h3 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">{t["System"]}</h3>}
               <div className="space-y-1">
                 {otherItems.map((item) => renderNavItem(item, activePage === item.label))}
               </div>
@@ -298,9 +333,9 @@ function SidebarContent({
 
         {isAdmin && (
           <>
-            {!compact && <Separator className="bg-border/50" />}
+            {(!compact || isCompactHovered) && <Separator className="bg-border/50" />}
             <div className="space-y-1">
-              {!compact && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">Administration</h3>}
+              {(!compact || isCompactHovered) && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">Administration</h3>}
               <div className="space-y-1">
                 {adminItems.map((item) => renderNavItem(item, activePage === item.label))}
               </div>
@@ -309,8 +344,31 @@ function SidebarContent({
         )}
       </nav>
 
-      <div className={`border-t border-emerald-100/70 bg-white/45 dark:border-slate-800 dark:bg-slate-950/35 ${compact ? "p-2" : "p-4"}`}>
-         <div className={`rounded-2xl border border-white/80 bg-white/65 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/60 ${compact ? "space-y-1.5 p-1.5" : "flex items-center justify-between gap-2 p-2"}`}>
+      <div className={`${compact ? "mx-auto px-2 py-3" : "border-t border-border/60 p-3 dark:border-slate-800"}`}>
+         {compact ? (
+           <div className={`flex items-center justify-center ${isCompactHovered ? "w-[200px] gap-3" : "w-11 flex-col gap-2"}`}>
+             <Button
+               variant="ghost"
+               size="icon"
+               title={language === "TH" ? "เปลี่ยนภาษา" : "Change language"}
+               className={`${isCompactHovered ? "flex" : "hidden"} h-10 w-10 rounded-full`}
+               onClick={() => setLanguage(l => l === "EN" ? "TH" : "EN")}
+             >
+               <span className="text-xs font-bold font-mono">{language}</span>
+             </Button>
+             <ModeToggle />
+             <Button
+               variant="ghost"
+               size="icon"
+               title={language === "TH" ? "ออกจากระบบ" : "Logout"}
+               className={`${isCompactHovered ? "flex" : "hidden"} h-10 w-10 rounded-full border border-white/90 bg-white/92 text-slate-600 shadow-[0_6px_18px_-12px_rgba(15,23,42,0.35)] hover:bg-white hover:text-red-500 dark:border-slate-700 dark:bg-slate-900`}
+               onClick={onLogout}
+             >
+               <LogOut className="h-4 w-4" />
+             </Button>
+           </div>
+         ) : (
+         <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 p-1.5 dark:bg-slate-900/60">
             <div className={`flex items-center ${compact ? "justify-center gap-1.5" : "gap-2"}`}>
                <Button 
                 variant="ghost" 
@@ -327,8 +385,9 @@ function SidebarContent({
                 <LogOut className="w-4 h-4" />
             </Button>
          </div>
+         )}
       </div>
-    </div>
+      </div>
   );
 }
 
@@ -340,7 +399,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   const [tank2On, setTank2On] = useState(false);
   const [tank3On, setTank3On] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isDesktopSidebarCompact, setIsDesktopSidebarCompact] = useState(false);
+  const [isDesktopSidebarCompact, setIsDesktopSidebarCompact] = useState(true);
   const [devices, setDevices] = useState<AdminDbDeviceRow[]>([]);
   const [activeDeviceId, setActiveDeviceId] = useState<string>("");
   const showDeviceSelector = devices.length > 1;
@@ -398,6 +457,9 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
 	            devices={devices}
 	            activeDeviceId={activeDeviceId}
 	            onDeviceChange={handleDeviceChange}
+	            user={user}
+	            onOpenProfile={() => setActivePage("My Profile")}
+	            onLogout={onLogout}
 	          />
 	        );
       case "Crop Reports":
@@ -464,7 +526,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
       case "My Profile":
         return <MyProfilePage onLogout={onLogout} language={language} />;
 	      case "Admin Panel":
-	        return isAdminUser ? <AdminOverview language={language} /> : <DashboardPage language={language} devices={devices} activeDeviceId={activeDeviceId} onDeviceChange={handleDeviceChange} />;
+	        return isAdminUser ? <AdminOverview language={language} /> : <DashboardPage language={language} devices={devices} activeDeviceId={activeDeviceId} onDeviceChange={handleDeviceChange} user={user} />;
 	      case "User Management":
 	        return isAdminUser ? <UserManagementPage language={language} /> : <DashboardPage language={language} devices={devices} activeDeviceId={activeDeviceId} onDeviceChange={handleDeviceChange} />;
 	      case "Audit Logs":
@@ -472,14 +534,18 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
 	      case "Database Viewer":
 	        return isAdminUser ? <DatabaseViewerPage language={language} /> : <DashboardPage language={language} devices={devices} activeDeviceId={activeDeviceId} onDeviceChange={handleDeviceChange} />;
 	      default:
-	        return <DashboardPage language={language} devices={devices} activeDeviceId={activeDeviceId} onDeviceChange={handleDeviceChange} />;
+	        return <DashboardPage language={language} devices={devices} activeDeviceId={activeDeviceId} onDeviceChange={handleDeviceChange} user={user} />;
     }
   };
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-background font-sans text-foreground transition-colors duration-300 selection:bg-primary/30">
       {/* Desktop Sidebar */}
-      <div className={`hidden lg:block h-full shrink-0 z-20 relative border-r border-border/60 transition-[width] duration-300 ${isDesktopSidebarCompact ? "w-24" : "w-72"}`}>
+      <div className={`z-50 hidden h-full transition-[width] duration-300 lg:block ${
+        isDesktopSidebarCompact
+          ? "pointer-events-none absolute inset-y-0 left-0 flex w-24 items-center"
+          : "relative w-64 shrink-0"
+      }`}>
         <SidebarContent 
           activePage={activePage} 
           setActivePage={setActivePage} 
@@ -492,13 +558,14 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
           devices={devices}
           activeDeviceId={activeDeviceId}
           onDeviceChange={handleDeviceChange}
+          onToggleCompact={() => setIsDesktopSidebarCompact((value) => !value)}
         />
       </div>
 
       {/* Main Content */}
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f8fbf9] transition-colors duration-300 dark:bg-slate-950">
-         {/* Background Grid Pattern */}
-         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(6,78,59,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(6,78,59,0.035)_1px,transparent_1px)] bg-[size:32px_32px] dark:bg-[linear-gradient(to_right,rgba(148,163,184,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.05)_1px,transparent_1px)]"></div>
+      <div className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f7faf8] transition-[padding,background-color] duration-300 dark:bg-slate-950 ${
+        isDesktopSidebarCompact ? "lg:pl-0" : ""
+      }`}>
          
          {/* Mobile Header */}
          <div className="lg:hidden sticky top-0 z-30 border-b border-border bg-card/85 px-3 py-3 backdrop-blur-md">
@@ -560,19 +627,9 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
            )}
          </div>
 
-        <div className="hidden lg:block absolute top-4 left-4 z-30">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 rounded-xl bg-card/85 backdrop-blur-md border-border shadow-sm"
-            onClick={() => setIsDesktopSidebarCompact(prev => !prev)}
-            title={isDesktopSidebarCompact ? "Expand menu" : "Collapse menu"}
-          >
-            {isDesktopSidebarCompact ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          </Button>
-        </div>
-
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-[padding] duration-300 ${
+          isDesktopSidebarCompact ? "lg:pl-28" : ""
+        }`}>
           {renderContent()}
         </div>
 

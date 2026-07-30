@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,7 +6,7 @@
 @layer base {
   :root {
     --font-size: 14px;
-    --background: 150 20% 98%;
+    --background: 150 14% 98%;
     --foreground: 222 38% 13%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -14,7 +14,7 @@
     --popover-foreground: 222 47% 11%;
     --primary: 160 84% 39%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 150 18% 95%;
+    --secondary: 150 12% 96%;
     --secondary-foreground: 222 47% 11%;
     --muted: 150 14% 96%;
     --muted-foreground: 215 16% 44%;
@@ -22,8 +22,8 @@
     --accent-foreground: 222 47% 11%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 150 14% 86%;
-    --input: 150 14% 86%;
+    --border: 150 10% 89%;
+    --input: 150 10% 87%;
     --ring: 160 84% 39%;
     --radius: 0.875rem;
     --chart-1: 158 64% 52%;
@@ -83,13 +83,10 @@
 
 body {
   @apply bg-background text-foreground antialiased;
-  font-family: "Noto Sans Thai", "Montserrat", sans-serif;
+  font-family: "Outfit", "Noto Sans Thai", sans-serif;
   line-height: 1.55;
   text-rendering: optimizeLegibility;
-  background-image:
-    linear-gradient(to right, hsl(158 30% 18% / 0.025) 1px, transparent 1px),
-    linear-gradient(to bottom, hsl(158 30% 18% / 0.025) 1px, transparent 1px);
-  background-size: 32px 32px;
+  background-image: radial-gradient(circle at 85% -10%, hsl(158 60% 88% / 0.22), transparent 30rem);
   background-attachment: fixed;
 }
 
@@ -202,13 +199,12 @@ body {
   }
 
   [data-slot="card"] {
-    background-color: hsl(var(--card) / 0.94);
+    background-color: hsl(var(--card) / 0.97);
     opacity: 1 !important;
     backdrop-filter: blur(10px) !important;
     position: relative;
     z-index: 1;
     overflow: hidden;
-    border-radius: 16px !important;
   }
 
   .force-solid .rounded-2xl,

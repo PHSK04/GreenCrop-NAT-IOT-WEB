@@ -3325,6 +3325,30 @@ app.get('/api/login-sessions', async (req, res) => {
     }
 });
 
+// Login sessions for the authenticated account only.
+app.get('/api/me/login-sessions', async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Authenticated user required' });
+        }
+
+        const limit = parsePositiveInt(req.query.limit, 20, 1, 100);
+        const sessions = await db.all(`
+            SELECT id, user_id, device_type, device_name, browser,
+                   browser_version, os, ip_address, login_time, logout_time,
+                   session_duration_minutes, status
+            FROM login_sessions
+            WHERE user_id = ?
+            ORDER BY login_time DESC
+        `, [userId]);
+
+        res.json(sessions.slice(0, limit));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // 10. GET LOGIN SESSIONS BY USER
 app.get('/api/login-sessions/user/:userId', async (req, res) => {
     try {

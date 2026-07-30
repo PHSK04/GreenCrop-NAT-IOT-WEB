@@ -354,11 +354,11 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
   return (
     <>
       {/* Header */}
-      <header className="solid-surface border-b border-border px-8 py-6">
-        <div className="flex items-center justify-between">
+      <header className="border-b border-white/80 bg-white/90 px-4 py-5 shadow-[0_12px_35px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl md:px-8">
+        <div className="mx-auto flex max-w-[1840px] items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
-              <Factory className="w-6 h-6 text-blue-500" />
+            <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 text-blue-600 shadow-sm"><Factory className="h-6 w-6" /></span>
               {isTH ? "วิเคราะห์ประสิทธิภาพเครื่องจักร" : "Machine Performance Analytics"}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -377,7 +377,8 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
         </div>
       </header>
 
-      <main className="page-solid-cards flex-1 overflow-auto p-8 ">
+      <main className="page-solid-cards flex-1 overflow-auto bg-[#f2f5f3] p-4 dark:bg-slate-950 md:p-6">
+        <div className="mx-auto max-w-[1840px]">
         <ExportFiltersCard
           startDate={exportStart}
           endDate={exportEnd}
@@ -404,7 +405,7 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           
           {/* Chart 1: Production Output (Spans 2 columns) */}
-          <Card className="lg:col-span-2 rounded-xl border border-border shadow-lg !bg-card !opacity-100">
+          <Card className="lg:col-span-2 rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <TrendingUp className="w-5 h-5 text-emerald-500" />
@@ -450,7 +451,7 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
           </Card>
 
           {/* Chart 2: Machine Radar Stats (Spans 1 column) */}
-          <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100">
+          <Card className="rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Zap className="w-5 h-5 text-yellow-500" />
@@ -479,7 +480,7 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
         {/* Factors & Issues */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Top Performance Factors */}
-          <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100">
+          <Card className="rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Star className="w-5 h-5 text-emerald-500" />
@@ -502,7 +503,7 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
           </Card>
 
           {/* Bottlenecks */}
-          <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100">
+          <Card className="rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <AlertCircle className="w-5 h-5 text-red-500" />
@@ -526,7 +527,7 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
         </div>
 
         {/* Advanced Analytics CTA */}
-        <div className="rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-900 dark:to-slate-800 border border-border p-1 relative overflow-hidden shadow-sm">
+        <div className="relative overflow-hidden rounded-[24px] border border-slate-700 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 p-1 shadow-[0_28px_70px_-42px_rgba(15,23,42,.8)]">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-emerald-500 to-purple-500"></div>
           <div className="p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
             <div className="flex items-center gap-4">
@@ -574,6 +575,7 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
               </div>
             </div>
           )}
+        </div>
         </div>
       </main>
     </>

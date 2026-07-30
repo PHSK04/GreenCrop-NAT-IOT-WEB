@@ -211,10 +211,11 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
 
   return (
     <>
-      <header className="solid-surface border-b border-border px-8 py-6 animate-in fade-in slide-in-from-bottom-2 duration-700 motion-reduce:animate-none">
-        <div className="flex items-center justify-between">
+      <header className="animate-in border-b border-white/80 bg-white/90 px-4 py-5 shadow-[0_12px_35px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl fade-in slide-in-from-bottom-2 duration-700 motion-reduce:animate-none md:px-8">
+        <div className="mx-auto flex max-w-[1840px] items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">
+            <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-50 to-lime-50 text-emerald-600 shadow-sm"><Sprout className="h-6 w-6" /></span>
               {isTH ? "รายงานผลผลิต" : "Crop Reports"}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -235,9 +236,10 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
         </div>
       </header>
 
-      <main className="page-solid-cards flex-1 overflow-auto p-8">
+      <main className="page-solid-cards flex-1 overflow-auto bg-[#f2f5f3] p-4 dark:bg-slate-950 md:p-6">
+        <div className="mx-auto max-w-[1840px]">
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 motion-reduce:animate-none">
-          <Card className="mb-6 rounded-xl border border-border shadow-lg !bg-card !opacity-100">
+          <Card className="mb-6 rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Plus className="h-5 w-5 text-emerald-500" />
@@ -369,25 +371,25 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-150 motion-reduce:animate-none">
+          <Card className="animate-in rounded-2xl border border-white/80 bg-gradient-to-br from-white to-slate-50 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5 !opacity-100 fade-in slide-in-from-bottom-6 duration-700 delay-150 motion-reduce:animate-none">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-foreground mb-1">{reportSummary.days}</div>
               <div className="text-sm text-muted-foreground">{isTH ? "จำนวนวันที่บันทึก" : "Days Recorded"}</div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-200 motion-reduce:animate-none">
+          <Card className="animate-in rounded-2xl border border-white/80 bg-gradient-to-br from-white to-emerald-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5 !opacity-100 fade-in slide-in-from-bottom-6 duration-700 delay-200 motion-reduce:animate-none">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">{reportSummary.totalYield} g</div>
               <div className="text-sm text-muted-foreground">{isTH ? "ผลผลิตรวม" : "Total Yield"}</div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-250 motion-reduce:animate-none">
+          <Card className="animate-in rounded-2xl border border-white/80 bg-gradient-to-br from-white to-blue-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5 !opacity-100 fade-in slide-in-from-bottom-6 duration-700 delay-250 motion-reduce:animate-none">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">{reportSummary.avgPh}</div>
               <div className="text-sm text-muted-foreground">{isTH ? "ค่า pH เฉลี่ย" : "Avg pH Level"}</div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-border shadow-sm !bg-card !opacity-100 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-300 motion-reduce:animate-none">
+          <Card className="animate-in rounded-2xl border border-white/80 bg-gradient-to-br from-white to-cyan-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5 !opacity-100 fade-in slide-in-from-bottom-6 duration-700 delay-300 motion-reduce:animate-none">
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-cyan-600 dark:text-cyan-400 mb-1">{reportSummary.avgOxygen}</div>
               <div className="text-sm text-muted-foreground">{isTH ? "ออกซิเจนเฉลี่ย (mg/L)" : "Avg Oxygen (mg/L)"}</div>
@@ -395,7 +397,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
           </Card>
         </div>
 
-        <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-350 motion-reduce:animate-none">
+        <Card className="animate-in rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100 fade-in slide-in-from-bottom-8 duration-700 delay-350 motion-reduce:animate-none">
           <CardHeader>
             <CardTitle className="text-foreground">
               {isTH ? "รายงานผลผลิตและคุณภาพรายวัน" : "Daily Harvest & Quality Report"}
@@ -579,6 +581,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
             </Table>
           </CardContent>
         </Card>
+        </div>
       </main>
 
       {/* Report Detail Dialog */}

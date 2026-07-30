@@ -580,11 +580,11 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         </div>
       )}
 
-      <header className="border-b border-border bg-card/70 px-4 py-5 backdrop-blur-sm md:px-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <header className="border-b border-white/80 bg-white/90 px-4 py-5 shadow-[0_12px_35px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl md:px-8">
+        <div className="mx-auto flex max-w-[1840px] flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
-              <Activity className="h-6 w-6 text-emerald-500" />
+            <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-50 to-cyan-50 text-emerald-600 shadow-sm"><Activity className="h-6 w-6" /></span>
               {isTH ? "มอนิเตอร์อุปกรณ์จริง" : "Live Device Monitor"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -610,10 +610,11 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 overflow-auto p-4 md:p-8">
-        <div className="mb-6 grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardContent className="p-4">
+      <main className="relative z-10 flex-1 overflow-auto bg-[#f2f5f3] p-4 dark:bg-slate-950 md:p-6">
+        <div className="mx-auto max-w-[1840px]">
+        <div className="mb-5 grid gap-4 md:grid-cols-3">
+          <Card className="rounded-2xl border-white/80 bg-gradient-to-br from-white to-emerald-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5">
+            <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">{isTH ? "ค่า pH" : "pH"}</p>
               <p className="mt-2 text-3xl font-bold text-foreground">{boardConnected ? phValue.toFixed(2) : "--"}</p>
               <Badge variant="outline" className={boardConnected && phOk ? "mt-3 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : boardConnected ? "mt-3 border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400" : "mt-3 border-border bg-muted text-muted-foreground"}>
@@ -621,15 +622,15 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
               </Badge>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
+          <Card className="rounded-2xl border-white/80 bg-gradient-to-br from-white to-cyan-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5">
+            <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">{isTH ? "ค่า EC" : "EC"}</p>
               <p className="mt-2 text-3xl font-bold text-foreground">{boardConnected ? ecValue.toFixed(2) : "--"}</p>
               <p className="mt-1 text-xs text-muted-foreground">mS/cm</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
+          <Card className="rounded-2xl border-white/80 bg-gradient-to-br from-white to-amber-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5">
+            <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">{isTH ? "อุณหภูมิ" : "Temperature"}</p>
               <p className="mt-2 text-3xl font-bold text-foreground">{boardConnected ? tempValue.toFixed(1) : "--"}</p>
               <p className="mt-1 text-xs text-muted-foreground">°C</p>
@@ -724,7 +725,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
           </div>
         )}
 
-        <Card className="rounded-lg border border-border bg-card/60 shadow-sm">
+        <Card className="rounded-[24px] border-white/80 bg-white/95 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)]">
           <CardHeader>
             <CardTitle>{isTH ? "รายการสถานะจากบอร์ด" : "Board Telemetry List"}</CardTitle>
             <CardDescription>
@@ -783,7 +784,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
         </Card>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_1.35fr]">
-          <Card className="rounded-lg border border-border bg-card/60 shadow-sm">
+          <Card className="rounded-[24px] border-white/80 bg-white/95 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-emerald-500" />
@@ -805,7 +806,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg border border-border bg-card/60 shadow-sm">
+          <Card className="rounded-[24px] border-white/80 bg-white/95 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="h-5 w-5 text-emerald-500" />
@@ -855,7 +856,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
           </Card>
         </div>
 
-        <Card className="mt-6 rounded-lg border border-border bg-card/60 shadow-sm">
+        <Card className="mt-6 rounded-[24px] border-white/80 bg-white/95 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)]">
           <CardHeader>
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
@@ -1015,6 +1016,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
             )}
           </CardContent>
         </Card>
+        </div>
       </main>
 
       <Dialog open={!!selectedDevice} onOpenChange={() => setSelectedDevice(null)}>
