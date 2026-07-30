@@ -9,11 +9,11 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto rounded-[20px]"
+      className="relative w-full max-h-[min(70vh,720px)] overflow-auto rounded-2xl border border-slate-200/80 bg-white dark:border-slate-700 dark:bg-slate-900"
     >
       <table
         data-slot="table"
-        className={cn("w-full caption-bottom text-sm overflow-hidden", className)}
+        className={cn("w-full caption-bottom text-sm", className)}
         {...props}
       />
     </div>
@@ -25,7 +25,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
     <thead
       data-slot="table-header"
       className={cn(
-        "sticky top-0 z-20 !bg-emerald-600/95 !text-white [&_tr]:border-b [&_tr]:border-emerald-700/60 [&_tr>th:first-child]:rounded-tl-[20px] [&_tr>th:last-child]:rounded-tr-[20px] dark:!bg-emerald-700/90",
+        "relative z-30 !bg-emerald-700 !text-white shadow-[0_5px_14px_-8px_rgba(15,23,42,.8)] [&_tr]:border-b [&_tr]:border-emerald-800 dark:!bg-emerald-700",
         className,
       )}
       {...props}
@@ -61,7 +61,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "hover:bg-slate-700/50 data-[state=selected]:bg-slate-700 border-b transition-colors",
+        "border-b border-slate-100 transition-colors hover:bg-emerald-50/60 data-[state=selected]:bg-emerald-50 dark:border-slate-800 dark:hover:bg-emerald-950/25 dark:data-[state=selected]:bg-emerald-950/35",
         className,
       )}
       {...props}
@@ -74,7 +74,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-12 px-4 text-left align-middle font-semibold uppercase tracking-[0.18em] !text-white/90 whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "sticky top-0 z-30 h-12 whitespace-nowrap !bg-emerald-700 px-4 text-left align-middle text-[11px] font-bold uppercase tracking-[0.08em] !text-white shadow-[inset_0_-1px_0_rgba(255,255,255,.16)] dark:!bg-emerald-700 [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className,
       )}
       {...props}
@@ -87,7 +87,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "whitespace-nowrap p-3 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className,
       )}
       {...props}
