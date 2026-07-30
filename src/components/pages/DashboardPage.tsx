@@ -6,7 +6,6 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { 
   Power, 
-  Activity, 
   Beaker, 
   Zap, 
   Cpu,
@@ -30,6 +29,7 @@ import { DigitalTwinModel } from "../dashboard/DigitalTwinModel";
 import type { AdminDbDeviceRow } from "@/features/auth/services/authService";
 import type { LucideIcon } from "lucide-react";
 import { useLiveWeather } from "@/features/weather/useLiveWeather";
+import greenCropLogo from "@/assets/images/3_transparent_logo_green.png";
 
 
 interface DashboardPageProps {
@@ -576,14 +576,24 @@ export function DashboardPage({
       {/* Header */}
       <header className="sticky top-0 z-20 flex min-h-[102px] items-center border-b border-border/60 bg-white/90 px-4 text-foreground backdrop-blur-xl dark:bg-slate-950/90 md:px-6">
         <div className="flex w-full flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-          <div>
-            <h1 className="flex items-center gap-3 text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-              <span className="grid h-11 w-11 place-items-center rounded-2xl border border-emerald-500/10 bg-emerald-500/10 text-emerald-600">
-                <Activity className="h-[22px] w-[22px]" />
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50 to-cyan-50 shadow-[0_10px_30px_-14px_rgba(5,150,105,0.65)] dark:border-emerald-700/50 dark:from-slate-900 dark:via-emerald-950 dark:to-slate-900">
+              <span className="absolute inset-1 rounded-xl border border-white/80 dark:border-white/10" />
+              <img
+                src={greenCropLogo}
+                alt="GreenCropNAT"
+                className="relative h-10 w-10 object-contain contrast-125 saturate-125"
+              />
+            </span>
+            <div className="min-w-0">
+              <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-[0.2em] text-emerald-600/80 dark:text-emerald-400">
+                Smart Hydroponic Control
               </span>
-              {t.title}
-            </h1>
-            <p className="ml-14 mt-0.5 text-xs text-muted-foreground">{t.subtitle}</p>
+              <h1 className="truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+                {t.title}
+              </h1>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{t.subtitle}</p>
+            </div>
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
