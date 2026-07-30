@@ -581,7 +581,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
       )}
 
       <header className="border-b border-white/80 bg-white/90 px-4 py-5 shadow-[0_12px_35px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl md:px-8">
-        <div className="mx-auto flex max-w-[1840px] flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex w-full flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900">
               <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-50 to-cyan-50 text-emerald-600 shadow-sm"><Activity className="h-6 w-6" /></span>
@@ -611,7 +611,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
       </header>
 
       <main className="relative z-10 flex-1 overflow-auto bg-[#f2f5f3] p-4 dark:bg-slate-950 md:p-6">
-        <div className="mx-auto max-w-[1840px]">
+        <div className="w-full">
         <div className="mb-5 grid gap-4 md:grid-cols-3">
           <Card className="rounded-2xl border-white/80 bg-gradient-to-br from-white to-emerald-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5">
             <CardContent className="p-5">

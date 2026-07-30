@@ -302,7 +302,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
       </Dialog>
 
       <header className="border-b border-border/60 bg-card/80 px-4 py-4 backdrop-blur-xl md:px-6">
-        <div className="mx-auto flex max-w-[1500px] flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex w-full flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0">
             <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground md:text-2xl">
               <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-500/10">
@@ -345,7 +345,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
       </header>
 
       <main className="flex-1 overflow-auto px-4 py-5 md:px-6 md:py-6">
-        <Tabs defaultValue="overview" className="mx-auto w-full max-w-[1500px]">
+        <Tabs defaultValue="overview" className="w-full">
           <TabsList className="mb-6 grid w-full max-w-xl grid-cols-4 rounded-xl border border-border/60 bg-muted/60 p-1">
             <TabsTrigger value="overview" className="data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground">{isTH ? "ภาพรวม" : "Overview"}</TabsTrigger>
             <TabsTrigger value="weather" className="data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground">{isTH ? "บรรยากาศ" : "Atmosphere"}</TabsTrigger>
