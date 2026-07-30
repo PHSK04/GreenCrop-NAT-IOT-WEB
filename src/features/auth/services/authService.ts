@@ -52,10 +52,12 @@ export interface AdminDbSessionRow {
   device_type?: string;
   device_name?: string;
   browser?: string;
+  browser_version?: string;
   os?: string;
   ip_address?: string;
   login_time?: string;
   logout_time?: string;
+  session_duration_minutes?: number;
   status?: string;
 }
 
@@ -507,6 +509,14 @@ export const authService = {
       headers: getAuthHeaders()
     });
     if (!response.ok) await throwHttpError(response, 'Failed to load DB login sessions');
+    return await response.json();
+  },
+
+  getMyLoginSessions: async (limit = 20): Promise<AdminDbSessionRow[]> => {
+    const response = await fetchWithApiFallback(`/me/login-sessions?limit=${Math.max(1, Math.min(100, limit))}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) await throwHttpError(response, 'Failed to load login sessions');
     return await response.json();
   },
 

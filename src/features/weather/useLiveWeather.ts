@@ -8,6 +8,7 @@ export type LiveWeather = {
   precipitation: number;
   windSpeed: number;
   weatherCode: number;
+  isDay: boolean;
   observedAt: string;
   latitude: number;
   longitude: number;
@@ -45,7 +46,7 @@ export function useLiveWeather() {
       const params = new URLSearchParams({
         latitude: String(lat),
         longitude: String(lon),
-        current: "temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m",
+        current: "temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,is_day",
         timezone: "auto",
       });
       const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
@@ -57,6 +58,7 @@ export function useLiveWeather() {
         precipitation: data.current.precipitation,
         windSpeed: data.current.wind_speed_10m,
         weatherCode: data.current.weather_code,
+        isDay: data.current.is_day === 1,
         observedAt: data.current.time,
         latitude: data.latitude,
         longitude: data.longitude,

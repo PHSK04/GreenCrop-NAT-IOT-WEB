@@ -194,11 +194,11 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
 
   return (
     <>
-      <header className="solid-surface border-b border-border px-8 py-6">
-        <div className="flex items-center justify-between">
+      <header className="border-b border-white/80 bg-white/90 px-4 py-5 shadow-[0_12px_35px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl md:px-8">
+        <div className="mx-auto flex max-w-[1840px] items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
-              <Scale className="w-6 h-6 text-primary" />
+            <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 shadow-sm"><Scale className="h-6 w-6" /></span>
               {isTH ? "วิเคราะห์บ่อวูล์ฟเฟีย" : "Wolffia Pond Analytics"}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -275,7 +275,8 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
         </DialogContent>
       </Dialog>
 
-      <main className="page-solid-cards flex-1 overflow-auto p-8 ">
+      <main className="page-solid-cards flex-1 overflow-auto bg-[#f2f5f3] p-4 dark:bg-slate-950 md:p-6">
+        <div className="mx-auto max-w-[1840px]">
         <ExportFiltersCard
           startDate={exportStart}
           endDate={exportEnd}
@@ -305,7 +306,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
           downloadPdfLabel={isTH ? "ดาวน์โหลด PDF" : "Download PDF"}
         />
         {/* Dual Axis Chart */}
-        <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100 mb-8">
+        <Card className="mb-8 rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-foreground">
               <Sprout className="w-5 h-5 text-primary" />
@@ -384,7 +385,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
         {/* Metrics & Logs */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Performance Metrics */}
-          <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100">
+          <Card className="rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Droplets className="w-5 h-5 text-blue-500" />
@@ -397,7 +398,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
             <CardContent>
                <div className="grid grid-cols-2 gap-4">
                  {pondMetricsDevice.map((item, idx) => (
-                   <div key={idx} className="p-4 rounded-lg bg-muted/30 border border-border">
+                   <div key={idx} className="rounded-2xl border border-slate-100 bg-[#f8faf9] p-4 transition-transform hover:-translate-y-0.5 hover:shadow-sm">
                       <p className="text-xs text-muted-foreground mb-1">
                         {isTH
                           ? ({
@@ -424,7 +425,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
           </Card>
 
           {/* Recent Harvests */}
-          <Card className="rounded-xl border border-border shadow-lg !bg-card !opacity-100">
+          <Card className="rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Timer className="w-5 h-5 text-amber-500" />
@@ -477,6 +478,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
               </Table>
             </CardContent>
           </Card>
+        </div>
         </div>
       </main>
 

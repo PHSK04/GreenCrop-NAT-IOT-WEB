@@ -94,7 +94,7 @@ export function DigitalTwinModel({
           <img
             src={waterSystemModel}
             alt={isTH ? "อุปกรณ์ระบบปลูกพืช GreenCropNAT" : "GreenCropNAT growing system"}
-            className="relative z-[2] max-h-[430px] w-full object-contain drop-shadow-[0_26px_25px_rgba(7,42,76,.18)] sm:max-h-[485px]"
+            className="relative z-[2] max-h-[430px] w-full object-contain drop-shadow-[0_26px_25px_rgba(7,42,76,.18)] sm:max-h-[520px]"
           />
 
           <StatusCallout className="right-[2%] top-[18%]" title={isTH ? "ระดับน้ำบ่อปลูก" : "Grow bed level"} value={level2 == null ? "--" : `${level2}%`} active={liveSignal && wls2} />

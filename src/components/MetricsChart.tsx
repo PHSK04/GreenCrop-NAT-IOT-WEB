@@ -3,10 +3,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { MinimalDatePicker } from "./ui/minimal-date-picker";
 import { useMachine } from "@/contexts/MachineContext";
-import { AlertCircle, CalendarSearch, Database } from "lucide-react";
+import { AlertCircle, ArrowUpRight, CalendarDays, CalendarSearch, ChevronDown, ChevronUp, Database, WifiOff } from "lucide-react";
 
 const formatDateKey = (value: string) => {
   const parsed = new Date(value);
@@ -55,12 +62,21 @@ const average = (values: number[]) =>
 
 type ChartRangeMode = "today" | "7d" | "14d" | "month" | "custom";
 
-export function MetricsChart() {
+const rangeModeLabels: Record<ChartRangeMode, string> = {
+  today: "วันนี้",
+  "7d": "7 วันล่าสุด",
+  "14d": "14 วันล่าสุด",
+  month: "เดือนนี้",
+  custom: "กำหนดเอง",
+};
+
+export function MetricsChart({ compact = false }: { compact?: boolean }) {
   const { telemetryHistory } = useMachine();
   const [rangeMode, setRangeMode] = useState<ChartRangeMode>("7d");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [dismissedEmptyKey, setDismissedEmptyKey] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const handleRangeModeChange = (value: ChartRangeMode) => {
     setRangeMode(value);
@@ -165,6 +181,64 @@ export function MetricsChart() {
     </div>
   );
 
+  if (compact && !expanded) {
+    return (
+      <Card className="h-full border-0 bg-transparent shadow-none">
+        <CardHeader className="flex-row items-center justify-between gap-3 pb-3">
+          <div>
+            <CardTitle className="text-base">Water Quality Trend</CardTitle>
+            <CardDescription className="text-xs">pH และ EC จากข้อมูลจริง</CardDescription>
+          </div>
+          <div className="flex items-center gap-1">
+            {(["today", "7d"] as ChartRangeMode[]).map((mode) => (
+              <Button
+                key={mode}
+                size="sm"
+                variant={rangeMode === mode ? "secondary" : "ghost"}
+                className="h-8 rounded-full px-3 text-xs"
+                onClick={() => handleRangeModeChange(mode)}
+              >
+                {mode === "today" ? "24 ชม." : "7 วัน"}
+              </Button>
+            ))}
+            <Button size="sm" variant="outline" className="ml-1 h-8 rounded-full text-xs" onClick={() => setExpanded(true)}>
+              ดูทั้งหมด <ArrowUpRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {hasNoChartData || hasNoRecordsInRange ? (
+            <div className="flex h-[170px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 text-center">
+              <div className="max-w-sm px-5">
+                <span className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-400">
+                  <WifiOff className="h-5 w-5" />
+                </span>
+                <p className="mt-3 text-sm font-semibold text-slate-700">ยังไม่ได้รับข้อมูลจากเซนเซอร์</p>
+                <p className="mt-1 text-xs text-slate-400">กราฟจะแสดงเมื่อมี packet จากอุปกรณ์</p>
+                <Button variant="link" className="mt-1 h-8 text-xs" onClick={() => setExpanded(true)}>
+                  ดูการวิเคราะห์ทั้งหมด <ArrowUpRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="h-[170px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={waterMetricsData} margin={{ top: 8, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={10} />
+                  <YAxis tickLine={false} axisLine={false} fontSize={10} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="ph" stroke="#10b981" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="ec" stroke="#0ea5e9" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <>
       <Dialog
@@ -202,19 +276,47 @@ export function MetricsChart() {
               </CardDescription>
             </div>
             <div className="space-y-2 lg:w-[620px]">
+              {compact && (
+                <div className="flex justify-end">
+                  <Button size="sm" variant="ghost" className="gap-1 text-xs" onClick={() => setExpanded(false)}>
+                    ย่อกราฟ <ChevronUp className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
               <div className={`grid gap-2 ${rangeMode === "custom" ? "sm:grid-cols-3" : "sm:grid-cols-[1fr_auto_auto]"}`}>
-                <select
-                  aria-label="Chart range"
-                  value={rangeMode}
-                  onChange={(event) => handleRangeModeChange(event.target.value as ChartRangeMode)}
-                  className="h-10 w-full rounded-full border border-border bg-background/90 px-4 text-sm font-medium text-foreground shadow-sm outline-none transition hover:border-emerald-300 focus:ring-2 focus:ring-emerald-300/60"
-                >
-                  <option value="today">วันนี้</option>
-                  <option value="7d">7 วันล่าสุด</option>
-                  <option value="14d">14 วันล่าสุด</option>
-                  <option value="month">เดือนนี้</option>
-                  <option value="custom">กำหนดเอง</option>
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Chart range"
+                      className="group flex h-10 w-full items-center gap-2 rounded-full border border-border bg-background/90 px-4 text-sm font-medium text-foreground shadow-sm outline-none transition hover:border-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-300/60"
+                    >
+                      <CalendarDays className="h-4 w-4 text-emerald-600" />
+                      <span>{rangeModeLabels[rangeMode]}</span>
+                      <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={8}
+                    className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-52 rounded-2xl border-border/70 bg-popover/95 p-2 shadow-[0_18px_45px_-20px_rgba(15,23,42,0.4)] backdrop-blur-xl"
+                  >
+                    <DropdownMenuRadioGroup
+                      value={rangeMode}
+                      onValueChange={(value) => handleRangeModeChange(value as ChartRangeMode)}
+                    >
+                      {(Object.keys(rangeModeLabels) as ChartRangeMode[]).map((mode) => (
+                        <DropdownMenuRadioItem
+                          key={mode}
+                          value={mode}
+                          className="rounded-xl py-2.5 pl-9 pr-3 data-[state=checked]:bg-emerald-500/10 data-[state=checked]:font-semibold data-[state=checked]:text-emerald-700 dark:data-[state=checked]:text-emerald-300"
+                        >
+                          {rangeModeLabels[mode]}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 {rangeMode === "custom" && (
                   <>
                     <MinimalDatePicker ariaLabel="Chart start date" value={startDate} onChange={handleStartDateChange} />

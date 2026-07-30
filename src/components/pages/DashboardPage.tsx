@@ -10,17 +10,26 @@ import {
   Beaker, 
   Zap, 
   Cpu,
-  Clock3,
   Siren,
   Thermometer,
   AlertTriangle,
   Wifi,
-  Droplets
+  Droplets,
+  CloudSun,
+  CloudRain,
+  CloudLightning,
+  Moon,
+  UserRound,
+  ChevronDown,
+  Bell,
+  LogOut,
+  UserCircle
 } from "lucide-react";
 import { MetricsChart } from "../MetricsChart";
 import { DigitalTwinModel } from "../dashboard/DigitalTwinModel";
 import type { AdminDbDeviceRow } from "@/features/auth/services/authService";
 import type { LucideIcon } from "lucide-react";
+import { useLiveWeather } from "@/features/weather/useLiveWeather";
 
 
 interface DashboardPageProps {
@@ -28,6 +37,9 @@ interface DashboardPageProps {
   devices?: AdminDbDeviceRow[];
   activeDeviceId?: string;
   onDeviceChange?: (deviceId: string) => void;
+  user?: { name: string; email?: string; role?: string };
+  onOpenProfile?: () => void;
+  onLogout?: () => void;
 }
 
 const useStablePositiveValue = (value: number, enabled = true) => {
@@ -233,6 +245,9 @@ export function DashboardPage({
   devices = [],
   activeDeviceId = "",
   onDeviceChange,
+  user,
+  onOpenProfile,
+  onLogout,
 }: DashboardPageProps) {
   const t = translations[language as keyof typeof translations] || translations.EN;
   const { 
@@ -240,6 +255,7 @@ export function DashboardPage({
     stopPump2FromWeb,
     sendEmergencyStop,
     uptimeSeconds,
+    flowRate,
     ecValue,
     phValue,
     tempValue,
@@ -269,7 +285,104 @@ export function DashboardPage({
   const stablePhOk =
     stablePhValue != null ? stablePhValue >= 6.5 && stablePhValue <= 7.5 : phOk;
   const liveSignal = mqttStatus === "connected" && boardConnected;
+  const availableSensorCount = [stablePhValue, stableTempValue, stableEcValue].filter(
+    (value) => value != null,
+  ).length;
+  const activePumpCount = visiblePumpStates.filter(Boolean).length;
+  const systemHealthChecks = [
+    mqttStatus === "connected",
+    boardConnected,
+    stablePhValue != null,
+    stableTempValue != null,
+    stableEcValue != null,
+    !locked,
+    !floatAlarm && !redOn,
+  ];
+  const systemHealthPercent = Math.round(
+    (systemHealthChecks.filter(Boolean).length / systemHealthChecks.length) * 100,
+  );
+  const activeAlertCount = [mqttStatus !== "connected", !boardConnected, locked, floatAlarm, redOn].filter(Boolean).length;
   const [sensorTrend, setSensorTrend] = useState<SensorTrendPoint[]>([]);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
+  const [notificationsRead, setNotificationsRead] = useState(false);
+  const liveWeather = useLiveWeather();
+  const currentWeather = liveWeather.weather;
+  const dashboardNotifications = [
+    {
+      title: mqttStatus === "connected"
+        ? (language === "TH" ? "เชื่อมต่อ MQTT แล้ว" : "MQTT connected")
+        : (language === "TH" ? "MQTT ยังไม่เชื่อมต่อ" : "MQTT disconnected"),
+      detail: boardConnected
+        ? (language === "TH" ? "บอร์ดกำลังส่งข้อมูล" : "Board is sending data")
+        : (language === "TH" ? "กำลังรอสัญญาณจากบอร์ด" : "Waiting for board signal"),
+      active: mqttStatus === "connected" && boardConnected,
+      icon: Wifi,
+    },
+    {
+      title: language === "TH" ? "สถานะระดับน้ำ" : "Water level status",
+      detail: wls2
+        ? (language === "TH" ? "ระดับน้ำอยู่ในเกณฑ์" : "Water level is normal")
+        : (language === "TH" ? "กำลังตรวจสอบระดับน้ำ" : "Checking water level"),
+      active: wls2,
+      icon: Droplets,
+    },
+    {
+      title: language === "TH" ? "ข้อมูลคุณภาพน้ำ" : "Water quality data",
+      detail: stablePhValue != null || stableEcValue != null
+        ? (language === "TH" ? "ได้รับข้อมูลเซนเซอร์ล่าสุดแล้ว" : "Latest sensor data received")
+        : (language === "TH" ? "ยังไม่ได้รับค่า pH และ EC" : "Waiting for pH and EC"),
+      active: stablePhValue != null || stableEcValue != null,
+      icon: Beaker,
+    },
+  ];
+  const notificationCount = dashboardNotifications.filter((item) => !item.active).length;
+  const weatherVisual = (() => {
+    const code = currentWeather?.weatherCode ?? -1;
+    if (code >= 95) {
+      return {
+        icon: CloudLightning,
+        label: language === "TH" ? "พายุฝน" : "Thunderstorm",
+        card: "border-violet-300/60 bg-gradient-to-br from-violet-100 to-slate-200",
+        iconTone: "bg-violet-200 text-violet-700",
+        badge: "bg-violet-200/80 text-violet-800",
+      };
+    }
+    if ((code >= 51 && code <= 82) || (currentWeather?.precipitation ?? 0) > 0) {
+      return {
+        icon: CloudRain,
+        label: language === "TH" ? "มีฝนตก" : "Rain",
+        card: "border-sky-300/60 bg-gradient-to-br from-sky-100 to-blue-200",
+        iconTone: "bg-sky-200 text-sky-700",
+        badge: "bg-sky-200/80 text-sky-800",
+      };
+    }
+    if (currentWeather && !currentWeather.isDay) {
+      return {
+        icon: Moon,
+        label: language === "TH" ? "กลางคืน" : "Night",
+        card: "border-indigo-300/50 bg-gradient-to-br from-indigo-100 to-slate-200",
+        iconTone: "bg-indigo-200 text-indigo-700",
+        badge: "bg-indigo-200/80 text-indigo-800",
+      };
+    }
+    if (code === 0) {
+      return {
+        icon: CloudSun,
+        label: language === "TH" ? "ท้องฟ้าแจ่มใส" : "Clear",
+        card: "border-amber-300/60 bg-gradient-to-br from-amber-50 to-orange-100",
+        iconTone: "bg-amber-100 text-amber-600",
+        badge: "bg-amber-100 text-amber-800",
+      };
+    }
+    return {
+      icon: CloudSun,
+      label: currentWeather ? (language === "TH" ? "มีเมฆบางส่วน" : "Cloudy") : (language === "TH" ? "รอข้อมูล" : "Waiting"),
+      card: "border-slate-200 bg-gradient-to-br from-white to-slate-100",
+      iconTone: "bg-slate-100 text-slate-600",
+      badge: "bg-slate-100 text-slate-600",
+    };
+  })();
 
   const formatUptime = (seconds: number) => {
     const hh = String(Math.floor(seconds / 3600)).padStart(2, "0");
@@ -461,22 +574,22 @@ export function DashboardPage({
       {waterFullAlarmOverlay}
 
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-sky-900/60 bg-[#061a35]/95 px-4 py-4 text-white shadow-[0_16px_40px_-28px_rgba(2,20,46,.85)] backdrop-blur-xl md:px-7">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
+      <header className="sticky top-0 z-20 flex min-h-[102px] items-center border-b border-border/60 bg-white/90 px-4 text-foreground backdrop-blur-xl dark:bg-slate-950/90 md:px-6">
+        <div className="mx-auto flex w-full max-w-[1840px] flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <div>
-            <h1 className="flex items-center gap-3 text-lg font-bold tracking-tight text-white sm:text-xl md:text-2xl">
-              <span className="grid h-8 w-8 place-items-center rounded-xl border border-emerald-300/20 bg-emerald-300/10 text-emerald-300 sm:h-9 sm:w-9">
-                <Activity className="h-5 w-5" />
+            <h1 className="flex items-center gap-3 text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl border border-emerald-500/10 bg-emerald-500/10 text-emerald-600">
+                <Activity className="h-[22px] w-[22px]" />
               </span>
               {t.title}
             </h1>
-            <p className="mt-1 text-xs font-medium text-sky-100/55 md:text-sm">{t.subtitle}</p>
+            <p className="ml-14 mt-0.5 text-xs text-muted-foreground">{t.subtitle}</p>
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
               <select
                 aria-label={t.changeDevice}
-                className="h-10 w-full rounded-xl border border-white/15 bg-white/[0.07] px-3 pr-8 text-xs font-semibold text-white outline-none backdrop-blur transition focus:border-emerald-300/50 disabled:opacity-60"
+                className="h-9 w-full rounded-xl border border-border bg-background px-3 pr-8 text-xs font-medium text-foreground outline-none transition focus:border-emerald-500/50 disabled:opacity-60"
                 value={activeDeviceId}
                 onChange={(event) => onDeviceChange?.(event.target.value)}
                 disabled={!devices.length}
@@ -488,7 +601,7 @@ export function DashboardPage({
             </div>
           <Badge
             variant={mqttStatus === "connected" && boardConnected ? "default" : "secondary"}
-            className={`hidden border px-3 py-1.5 font-mono text-[10px] sm:flex ${mqttStatus === "connected" && boardConnected ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-200 hover:bg-emerald-300/10" : "border-white/10 bg-white/[0.05] text-sky-100/50"}`}
+            className={`hidden border px-3 py-1.5 font-mono text-[10px] sm:flex ${mqttStatus === "connected" && boardConnected ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300" : "border-border bg-muted text-muted-foreground"}`}
           >
             {mqttStatus === "connected" ? (
               <span className="flex items-center gap-2">
@@ -510,30 +623,117 @@ export function DashboardPage({
                 {language === "TH" ? "MQTT ยังไม่เชื่อมต่อ" : "MQTT DISCONNECTED"}
               </span>
             )}
-          </Badge></div>
+          </Badge>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setNotificationMenuOpen((open) => !open);
+                setAccountMenuOpen(false);
+                setNotificationsRead(true);
+              }}
+              className="relative grid h-10 w-10 place-items-center rounded-xl border border-border bg-white/85 text-slate-600 shadow-sm transition hover:border-emerald-200 hover:bg-white hover:text-emerald-600 dark:bg-slate-900"
+              aria-label={language === "TH" ? "การแจ้งเตือน" : "Notifications"}
+            >
+              <Bell className="h-4.5 w-4.5" />
+              {!notificationsRead && notificationCount > 0 && (
+                <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full border-2 border-white bg-red-500 px-1 text-[9px] font-bold text-white">
+                  {notificationCount}
+                </span>
+              )}
+            </button>
+            {notificationMenuOpen && (
+              <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_60px_-22px_rgba(15,23,42,.35)] dark:border-slate-700 dark:bg-slate-900">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+                  <p className="text-sm font-bold">{language === "TH" ? "การแจ้งเตือน" : "Notifications"}</p>
+                  <span className="text-[10px] text-slate-400">{language === "TH" ? "สถานะล่าสุด" : "Latest status"}</span>
+                </div>
+                <div className="p-2">
+                  {dashboardNotifications.map(({ title, detail, active, icon: Icon }) => (
+                    <div key={title} className="flex gap-3 rounded-xl p-3 hover:bg-slate-50 dark:hover:bg-slate-800/70">
+                      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${active ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{title}</p>
+                        <p className="mt-0.5 text-[10px] leading-4 text-slate-500">{detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setAccountMenuOpen((open) => !open);
+                setNotificationMenuOpen(false);
+              }}
+              className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-border bg-white/85 px-2.5 text-left shadow-sm transition hover:border-emerald-200 hover:bg-white dark:bg-slate-900"
+              aria-label={language === "TH" ? "บัญชีผู้ใช้งาน" : "User account"}
+            >
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
+                <UserRound className="h-4 w-4" />
+              </span>
+              <span className="hidden min-w-0 sm:block">
+                <span className="block max-w-28 truncate text-xs font-semibold text-slate-800 dark:text-slate-100">
+                  {user?.name || (language === "TH" ? "ผู้ใช้งาน" : "User")}
+                </span>
+                <span className="block text-[9px] uppercase tracking-wide text-slate-400">
+                  {user?.role || "Member"}
+                </span>
+              </span>
+              <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${accountMenuOpen ? "rotate-180" : ""}`} />
+            </button>
+            {accountMenuOpen && (
+              <div className="absolute right-0 top-12 z-50 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_20px_60px_-22px_rgba(15,23,42,.35)] dark:border-slate-700 dark:bg-slate-900">
+                <div className="mb-1 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
+                  <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{user?.name || (language === "TH" ? "ผู้ใช้งาน" : "User")}</p>
+                  <p className="mt-0.5 truncate text-[10px] text-slate-500">{user?.email || user?.role || "Member"}</p>
+                </div>
+                <button type="button" onClick={onOpenProfile} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 dark:text-slate-200">
+                  <UserCircle className="h-4 w-4" />
+                  {language === "TH" ? "โปรไฟล์ของฉัน" : "My profile"}
+                </button>
+                <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+                <button type="button" onClick={onLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                  <LogOut className="h-4 w-4" />
+                  {language === "TH" ? "ออกจากระบบ" : "Logout"}
+                </button>
+              </div>
+            )}
+          </div>
+          </div>
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 overflow-auto bg-[radial-gradient(circle_at_top,#dff5ff_0%,#eff9ff_38%,#f5fbff_72%)] p-4 md:p-6 xl:p-7">
+      <main className="relative z-10 flex-1 overflow-auto bg-[#f2f5f3] p-3 dark:bg-slate-950 md:p-5">
+        <div className="mx-auto max-w-[1840px] rounded-[28px] border border-slate-200/80 bg-[#e9eeeb] p-3 shadow-[0_24px_70px_-46px_rgba(15,23,42,0.42)] dark:border-slate-800 dark:bg-slate-900/55 md:p-4">
 
-        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
           {[
+            { label: language === "TH" ? "สภาพอากาศ" : "Weather", value: currentWeather ? `${Math.round(currentWeather.temperature)} °C` : "--", detail: weatherVisual.label, icon: weatherVisual.icon, tone: "weather", cardClass: weatherVisual.card, iconClass: weatherVisual.iconTone, badgeClass: weatherVisual.badge },
             { label: language === "TH" ? "สถานะระบบ" : "System status", value: liveSignal ? (language === "TH" ? "ระบบพร้อมทำงาน" : "System ready") : (language === "TH" ? "รอสัญญาณ" : "Waiting"), detail: locked ? "LOCKED" : liveSignal ? (language === "TH" ? "ปกติ" : "Normal") : "--", icon: Wifi, tone: "emerald" },
             { label: language === "TH" ? "สถานะปั๊ม" : "Pump status", value: pump2On ? (language === "TH" ? "ปั๊มน้ำ #2" : "Water pump #2") : (language === "TH" ? "ปั๊มพร้อมทำงาน" : "Pumps ready"), detail: activePumpLabels || "OFF", icon: Cpu, tone: "cyan" },
             { label: language === "TH" ? "ระดับน้ำ" : "Water level", value: liveSignal ? `${wls2 ? 76 : wls1 ? 48 : 24}%` : "--", detail: wls2 ? (language === "TH" ? "ระดับเหมาะสม" : "Normal") : (language === "TH" ? "กำลังตรวจสอบ" : "Checking"), icon: Droplets, tone: "blue" },
-            { label: t.metrics.ph.title, value: stablePhValue != null ? stablePhValue.toFixed(2) : "--", detail: stablePhValue != null ? (stablePhOk ? (language === "TH" ? "เหมาะสม" : "Suitable") : (language === "TH" ? "ควรตรวจสอบ" : "Check")) : "WAITING", icon: Beaker, tone: "emerald" },
+            { label: "pH", value: stablePhValue != null ? stablePhValue.toFixed(2) : "--", detail: stablePhValue != null && stablePhOk ? (language === "TH" ? "เหมาะสม" : "Suitable") : "WAITING", icon: Beaker, tone: "emerald" },
+            { label: "EC", value: stableEcValue != null ? stableEcValue.toFixed(2) : "--", detail: "mS/cm", icon: Zap, tone: "cyan" },
           ].map((item) => {
             const Icon = item.icon;
-            const tone = item.tone === "blue" ? "bg-blue-50 text-blue-600" : item.tone === "cyan" ? "bg-cyan-50 text-cyan-600" : "bg-emerald-50 text-emerald-600";
+            const tone = item.iconClass || (item.tone === "blue" ? "bg-blue-50 text-blue-600" : item.tone === "cyan" ? "bg-cyan-50 text-cyan-600" : "bg-emerald-50 text-emerald-600");
             return (
-              <Card key={item.label} className="rounded-2xl border-slate-200 bg-white shadow-sm">
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${tone}`}><Icon className="h-6 w-6" /></div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-slate-500">{item.label}</p>
-                    <p className="mt-0.5 truncate text-lg font-bold text-slate-900">{item.value}</p>
+              <Card key={item.label} className={`rounded-2xl border-white/70 bg-white/90 shadow-none ${item.cardClass || ""}`}>
+                <CardContent className="flex items-center gap-3 p-3">
+                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${tone}`}>
+                    <Icon className="h-5 w-5" />
                   </div>
-                  <Badge variant="secondary" className="shrink-0 bg-emerald-50 text-[10px] text-emerald-700">{item.detail}</Badge>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-medium text-slate-500">{item.label}</p>
+                    <p className="mt-0.5 truncate text-sm font-bold text-slate-900 md:text-base">{item.value}</p>
+                  </div>
+                  <Badge variant="secondary" className={`hidden shrink-0 text-[9px] sm:inline-flex ${item.badgeClass || "bg-emerald-50 text-emerald-700"}`}>{item.detail}</Badge>
                 </CardContent>
               </Card>
             );
@@ -541,11 +741,11 @@ export function DashboardPage({
         </div>
 
         {/* Machine Control Section (Hero) */}
-        <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-12">
+        <div className="mb-3 grid grid-cols-1 gap-3 xl:grid-cols-12">
           
           {/* Left Column: Visual Model */}
-          <div className="lg:col-span-7 space-y-6">
-            <Card className="h-full min-h-[320px] overflow-hidden rounded-2xl border-0 bg-transparent shadow-none sm:min-h-[420px] lg:min-h-[500px]">
+          <div className="space-y-3 xl:col-span-8">
+            <Card className="h-full min-h-[400px] overflow-hidden rounded-[24px] border-white/80 bg-white/75 shadow-none sm:min-h-[540px] xl:min-h-[640px]">
               <CardContent className="p-0">
                 <DigitalTwinModel
                   language={language}
@@ -567,8 +767,8 @@ export function DashboardPage({
           </div>
 
           {/* Right Column: Controls and live readings */}
-          <div className="lg:col-span-5">
-            <Card className="h-full rounded-2xl border-sky-100 bg-white/95 shadow-[0_20px_55px_-38px_rgba(7,55,92,.5)]">
+          <div className="xl:col-span-4">
+            <Card className="h-full rounded-[24px] border-white/80 bg-white/90 shadow-none">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between text-slate-900">
                   <span className="flex items-center gap-2"><Power className="h-5 w-5 text-emerald-600" />{t.masterControl}</span>
@@ -576,25 +776,25 @@ export function DashboardPage({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <button onClick={sendStartCommand} className="group flex min-h-28 flex-col items-center justify-center rounded-2xl border border-emerald-400 bg-gradient-to-br from-emerald-400 to-emerald-600 p-3 text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,.8)] transition hover:-translate-y-0.5">
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={sendStartCommand} className="group flex min-h-24 flex-col items-center justify-center rounded-2xl border border-emerald-500 bg-emerald-600 p-3 text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,.8)] transition hover:bg-emerald-700">
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-white text-emerald-600 shadow"><Power className="h-5 w-5" /></span>
                     <span className="mt-2 text-sm font-bold">{language === "TH" ? "เริ่มทำงาน" : "Start"}</span>
                     <span className="text-[10px] text-emerald-50">Pump 2</span>
                   </button>
-                  <button onClick={stopPump2FromWeb} className="flex min-h-28 flex-col items-center justify-center rounded-2xl border border-amber-300 bg-amber-50 p-3 text-amber-800 transition hover:-translate-y-0.5 hover:bg-amber-100">
+                  <button onClick={stopPump2FromWeb} className="flex min-h-24 flex-col items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-800 transition hover:bg-amber-100">
                     <span className="grid h-11 w-11 place-items-center rounded-full border border-amber-300 bg-white"><Cpu className="h-5 w-5" /></span>
                     <span className="mt-2 text-sm font-bold">{language === "TH" ? "หยุดชั่วคราว" : "Pause"}</span>
                     <span className="text-[10px] text-amber-600">Pump 2</span>
                   </button>
-                  <button onClick={sendEmergencyStop} className="flex min-h-28 flex-col items-center justify-center rounded-2xl border border-red-300 bg-red-50 p-3 text-red-700 transition hover:-translate-y-0.5 hover:bg-red-100">
+                  <button onClick={sendEmergencyStop} className="flex min-h-24 flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-3 text-red-700 transition hover:bg-red-100">
                     <span className="grid h-11 w-11 place-items-center rounded-full border border-red-300 bg-white"><Siren className="h-5 w-5" /></span>
                     <span className="mt-2 text-sm font-bold">{language === "TH" ? "หยุดฉุกเฉิน" : "Emergency"}</span>
                     <span className="text-[10px] text-red-500">E-STOP</span>
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
                   {[
                     { label: t.metrics.ph.title, value: stablePhValue != null ? stablePhValue.toFixed(2) : "--", unit: "", icon: Beaker, accent: "emerald", note: stablePhOk ? (language === "TH" ? "เหมาะสม" : "Suitable") : (language === "TH" ? "รอตรวจสอบ" : "Waiting") },
                     { label: t.metrics.temp.title, value: stableTempValue != null ? stableTempValue.toFixed(1) : "--", unit: "°C", icon: Thermometer, accent: "blue", note: stableTempValue != null ? (language === "TH" ? "ปกติ" : "Normal") : "Waiting" },
@@ -603,7 +803,7 @@ export function DashboardPage({
                     const Icon = metric.icon;
                     const accent = metric.accent === "blue" ? "bg-blue-50 text-blue-600" : metric.accent === "cyan" ? "bg-cyan-50 text-cyan-600" : "bg-emerald-50 text-emerald-600";
                     return (
-                      <div key={metric.label} className="rounded-2xl border border-sky-100 bg-[#fbfdff] p-4">
+                      <div key={metric.label} className="rounded-2xl border border-slate-100 bg-[#f8faf9] p-4">
                         <div className={`grid h-9 w-9 place-items-center rounded-full ${accent}`}><Icon className="h-4 w-4" /></div>
                         <p className="mt-3 truncate text-[11px] font-semibold text-slate-500">{metric.label}</p>
                         <div className="mt-1 flex items-end gap-1"><span className="font-mono text-2xl font-black text-[#082a54]">{metric.value}</span><span className="pb-1 text-[10px] text-slate-500">{metric.unit}</span></div>
@@ -613,7 +813,7 @@ export function DashboardPage({
                   })}
                 </div>
 
-                <div className="flex items-center justify-between rounded-xl border border-sky-100 bg-sky-50/70 px-4 py-3">
+                <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-[#f8faf9] px-4 py-3">
                   <div className="flex items-center gap-3">
                     <span className={`grid h-9 w-9 place-items-center rounded-full ${!boardConnected ? "bg-slate-100 text-slate-400" : locked || floatAlarm ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}><Cpu className="h-4 w-4" /></span>
                     <div><p className="text-xs font-bold text-slate-800">{t.sensorNetwork}</p><p className="text-[10px] text-slate-500">{boardConnected ? t.sensorsOk : (language === "TH" ? "รอสัญญาณจากอุปกรณ์" : "Waiting for device")}</p></div>
@@ -626,11 +826,107 @@ export function DashboardPage({
         </div>
         
         {/* Charts Row */}
-        <div className="mb-10">
-            <MetricsChart />
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(500px,1.15fr)_minmax(320px,0.72fr)]">
+          <div className="overflow-hidden rounded-[24px] border border-white/80 bg-white/90 p-1 shadow-none">
+            <MetricsChart compact />
+          </div>
+          <Card className="min-h-[340px] rounded-[24px] border-white/80 bg-white/90 shadow-none">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg text-slate-900">
+                {language === "TH" ? "ภาพรวมการทำงานวันนี้" : "Today's operation overview"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 min-[1680px]:grid-cols-3">
+              <section className="rounded-2xl border border-slate-100 bg-[#f8faf9] p-4">
+                <p className="text-sm font-bold text-slate-800">
+                  {language === "TH" ? "สุขภาพระบบ" : "System health"}
+                </p>
+                <div className="mt-4 space-y-3 text-xs text-slate-500">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5"><span className={`h-1.5 w-1.5 rounded-full ${availableSensorCount === 3 ? "bg-emerald-500" : "bg-amber-400"}`} />{language === "TH" ? "เซนเซอร์" : "Sensors"}</span>
+                    <strong className="text-slate-700">{availableSensorCount}/3</strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5"><span className={`h-1.5 w-1.5 rounded-full ${boardConnected ? "bg-emerald-500" : "bg-slate-300"}`} />{language === "TH" ? "ปั๊มทำงาน" : "Active pumps"}</span>
+                    <strong className="text-slate-700">{activePumpCount}/2</strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5"><span className={`h-1.5 w-1.5 rounded-full ${liveSignal ? "bg-emerald-500" : "bg-slate-300"}`} />{language === "TH" ? "การเชื่อมต่อ" : "Connection"}</span>
+                    <strong className={liveSignal ? "text-emerald-600" : "text-slate-500"}>{liveSignal ? (language === "TH" ? "ออนไลน์" : "Online") : (language === "TH" ? "ออฟไลน์" : "Offline")}</strong>
+                  </div>
+                </div>
+                <div className="mx-auto mt-4 grid h-24 w-24 place-items-center rounded-full p-[7px]" style={{ background: `conic-gradient(#10b981 ${systemHealthPercent * 3.6}deg, #e2e8f0 0deg)` }}>
+                  <div className="grid h-full w-full place-items-center rounded-full bg-white text-center">
+                    <div><p className="text-2xl font-black leading-none text-emerald-600">{systemHealthPercent}%</p><p className="mt-1 text-[10px] text-slate-500">{language === "TH" ? "สุขภาพระบบ" : "Health"}</p></div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-slate-100 bg-[#f8faf9] p-4">
+                <p className="text-sm font-bold text-slate-800">
+                  {language === "TH" ? "สูตรสารละลาย" : "Nutrient targets"}
+                </p>
+                {[
+                  { label: "pH", target: "6.5–7.5", value: stablePhValue, max: 14, color: "bg-emerald-500" },
+                  { label: "EC", target: "1.5–2.0", value: stableEcValue, max: 4, color: "bg-cyan-500" },
+                ].map((metric) => {
+                  const percentage = metric.value == null ? 0 : Math.min(100, Math.max(0, (metric.value / metric.max) * 100));
+                  return (
+                    <div key={metric.label} className="mt-5">
+                      <div className="flex items-end justify-between gap-2">
+                        <div><p className="text-xs font-bold text-slate-700">{metric.label}</p><p className="text-[10px] text-slate-400">{language === "TH" ? "เป้าหมาย" : "Target"} {metric.target}</p></div>
+                        <div className="text-right"><p className="text-[10px] text-slate-400">{language === "TH" ? "ปัจจุบัน" : "Current"}</p><p className="text-lg font-black text-slate-800">{metric.value != null ? metric.value.toFixed(metric.label === "pH" ? 2 : 2) : "--"}</p></div>
+                      </div>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                        <div className={`h-full rounded-full transition-all duration-500 ${metric.color}`} style={{ width: `${percentage}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
+
+              <section className="rounded-2xl border border-slate-100 bg-[#f8faf9] p-4">
+                <p className="text-sm font-bold text-slate-800">
+                  {language === "TH" ? "ประสิทธิภาพวันนี้" : "Today's performance"}
+                </p>
+                <div className="mt-4 space-y-3">
+                  {[
+                    { icon: Droplets, label: language === "TH" ? "อัตราการไหล" : "Flow rate", value: flowRate > 0 ? `${flowRate.toFixed(1)} L/min` : "--" },
+                    { icon: Power, label: language === "TH" ? "เวลาออนไลน์" : "Online time", value: formatUptime(uptimeSeconds) },
+                    { icon: Bell, label: language === "TH" ? "การแจ้งเตือน" : "Alerts", value: String(activeAlertCount), danger: activeAlertCount > 0 },
+                  ].map(({ icon: Icon, label, value, danger }) => (
+                    <div key={label} className="flex items-center gap-3 rounded-xl border border-white bg-white/80 p-3">
+                      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${danger ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-600"}`}><Icon className="h-4 w-4" /></span>
+                      <div className="min-w-0"><p className="text-[10px] text-slate-400">{label}</p><p className={`truncate text-sm font-black ${danger ? "text-red-600" : "text-slate-800"}`}>{value}</p></div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </CardContent>
+          </Card>
+          <Card className="rounded-[24px] border-white/80 bg-white/90 shadow-none">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">{language === "TH" ? "กิจกรรมระบบล่าสุด" : "Recent activity"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              {[
+                { icon: Power, label: language === "TH" ? `ระบบ ${liveSignal ? "พร้อมทำงาน" : "รอสัญญาณ"}` : `System ${liveSignal ? "ready" : "waiting"}`, active: liveSignal },
+                { icon: Droplets, label: language === "TH" ? `ระดับน้ำ ${wls2 ? "เหมาะสม" : "กำลังตรวจสอบ"}` : `Water level ${wls2 ? "normal" : "checking"}`, active: wls2 },
+                { icon: Beaker, label: language === "TH" ? `ค่า pH ${stablePhOk ? "อยู่ในเกณฑ์" : "รอตรวจสอบ"}` : `pH ${stablePhOk ? "in range" : "waiting"}`, active: stablePhOk },
+                { icon: Zap, label: language === "TH" ? `ค่า EC ${stableEcValue != null ? "ได้รับข้อมูลแล้ว" : "รอตรวจสอบ"}` : `EC ${stableEcValue != null ? "received" : "waiting"}`, active: stableEcValue != null },
+              ].map(({ icon: Icon, label, active }, index) => (
+                <div key={label} className="flex items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-slate-50">
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${active ? "bg-emerald-500" : "bg-slate-300"}`} />
+                  <Icon className="h-4 w-4 shrink-0 text-slate-400" />
+                  <p className="min-w-0 flex-1 truncate text-xs font-medium text-slate-600">{String(label)}</p>
+                  <span className="text-[10px] text-slate-400">{index === 0 ? "now" : "—"}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </div>
 
-
+        </div>
       </main>
     </>
   );

@@ -145,98 +145,112 @@ export function SensorIntelligencePage({
   }, [activeDeviceId]);
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-y-auto">
-      <header className="sticky top-0 z-10 border-b border-border/60 bg-card/80 px-4 py-4 backdrop-blur-xl md:px-8 md:py-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div className="relative min-h-0 flex-1 overflow-y-auto bg-[#f2f5f3] dark:bg-slate-950">
+      <header className="sticky top-0 z-10 border-b border-white/80 bg-white/90 px-4 py-4 shadow-[0_12px_35px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl md:px-8 md:py-5">
+        <div className="mx-auto flex max-w-[1840px] flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-300">
-              <BrainCircuit className="h-4 w-4" />
-              {isTH ? "ระบบเซนเซอร์อัจฉริยะ" : "Sensor Intelligence"}
+            <div className="flex items-center gap-4">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-cyan-50 text-emerald-600 shadow-sm">
+                <BrainCircuit className="h-6 w-6" />
+              </span>
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-600">
+                  {isTH ? "ระบบเซนเซอร์อัจฉริยะ" : "Sensor Intelligence"}
+                </div>
+                <h1 className="mt-0.5 text-2xl font-black tracking-tight text-slate-900 md:text-3xl">
+                  {isTH ? "AI วิเคราะห์สุขภาพระบบ" : "AI System Health Analysis"}
+                </h1>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {isTH
+                    ? "ประเมินความเสี่ยง แนวโน้ม และคำแนะนำจากข้อมูลจริงแบบเรียลไทม์"
+                    : "Real-time risk, trend, and recommendation analysis from live telemetry"}
+                </p>
+              </div>
             </div>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-              {isTH ? "AI วิเคราะห์สุขภาพระบบ" : "AI System Health Analysis"}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {isTH
-                ? "สรุปความเสี่ยงและคำแนะนำจากข้อมูล sensor ล่าสุดและประวัติย้อนหลัง"
-                : "Risk summary and recommendations from live telemetry and historical data"}
-            </p>
           </div>
-          <Badge variant="outline" className={`w-fit gap-2 px-3 py-1.5 ${severityClass[report.severity]}`}>
+          <Badge variant="outline" className={`w-fit gap-2 rounded-full px-4 py-2 text-xs font-bold shadow-sm ${severityClass[report.severity]}`}>
             <span className={`h-2 w-2 rounded-full ${severityDotClass[report.severity]}`} />
             {report.statusText}
           </Badge>
         </div>
       </header>
 
-      <main className="space-y-5 p-4 md:p-8">
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.45fr)]">
-          <Card className="overflow-hidden border-border/70 bg-card/90 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardDescription>{isTH ? "คะแนนสุขภาพ AI" : "AI Health Score"}</CardDescription>
-              <CardTitle className="flex items-end gap-3">
-                <span className="text-5xl font-black tracking-tight">{report.healthScore}</span>
-                <span className="pb-2 text-base text-muted-foreground">/100</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-3 overflow-hidden rounded-full bg-muted">
-                <div
-                  className={`h-full rounded-full ${
+      <main className="mx-auto max-w-[1840px] space-y-4 p-4 md:p-6">
+        <section className="grid gap-4 xl:grid-cols-[minmax(340px,0.72fr)_minmax(0,1.55fr)]">
+          <Card className="overflow-hidden rounded-[28px] border-white/80 bg-gradient-to-br from-white via-white to-emerald-50/60 shadow-[0_24px_60px_-42px_rgba(15,23,42,.45)]">
+            <CardContent className="flex h-full flex-col items-center justify-center p-6 text-center">
+              <CardDescription className="font-semibold uppercase tracking-[0.14em]">
+                {isTH ? "คะแนนสุขภาพ AI" : "AI Health Score"}
+              </CardDescription>
+              <div
+                className="mt-5 grid h-44 w-44 place-items-center rounded-full p-[10px] shadow-[0_18px_45px_-28px_rgba(5,150,105,.75)]"
+                style={{
+                  background: `conic-gradient(${
                     report.severity === "critical"
-                      ? "bg-red-500"
+                      ? "#ef4444"
                       : report.severity === "warning"
-                        ? "bg-amber-500"
+                        ? "#f59e0b"
                         : report.severity === "offline"
-                          ? "bg-slate-400"
-                          : "bg-emerald-500"
-                  }`}
-                  style={{ width: `${report.healthScore}%` }}
-                />
-              </div>
-              <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-                <div className="flex items-center justify-between gap-3">
-                  <span>{isTH ? "ข้อมูลล่าสุด" : "Last telemetry"}</span>
-                  <span className="text-right font-medium text-foreground">{report.lastTelemetryLabel}</span>
+                          ? "#94a3b8"
+                          : "#10b981"
+                  } ${report.healthScore * 3.6}deg, #e2e8f0 0deg)`,
+                }}
+              >
+                <div className="grid h-full w-full place-items-center rounded-full border border-white bg-white">
+                  <div>
+                    <div className="flex items-end justify-center">
+                      <span className="text-5xl font-black leading-none tracking-tight text-slate-900">{report.healthScore}</span>
+                      <span className="pb-1 text-sm font-bold text-slate-400">/100</span>
+                    </div>
+                    <p className="mt-2 text-xs font-bold text-emerald-600">{report.statusText}</p>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between gap-3">
+              </div>
+              <div className="mt-6 grid w-full grid-cols-2 divide-x divide-slate-200 rounded-2xl border border-white bg-white/80 p-3 text-sm shadow-sm">
+                <div className="px-2">
+                  <span>{isTH ? "ข้อมูลล่าสุด" : "Last telemetry"}</span>
+                  <span className="mt-1 block truncate font-bold text-slate-800">{report.lastTelemetryLabel}</span>
+                </div>
+                <div className="px-2">
                   <span>{isTH ? "ตัวอย่างย้อนหลัง" : "History samples"}</span>
-                  <span className="font-medium text-foreground">{report.sampleCount.toLocaleString()}</span>
+                  <span className="mt-1 block text-lg font-black text-slate-800">{report.sampleCount.toLocaleString()}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-border/70 bg-card/90 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Lightbulb className="h-5 w-5 text-amber-500" />
+          <Card className="rounded-[28px] border-white/80 bg-white/95 shadow-[0_24px_60px_-42px_rgba(15,23,42,.45)]">
+            <CardHeader className="border-b border-slate-100 pb-4">
+              <CardTitle className="flex items-center gap-3 text-xl text-slate-900">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-500"><Lightbulb className="h-5 w-5" /></span>
                 {isTH ? "สรุปจาก AI" : "AI Summary"}
               </CardTitle>
-              <CardDescription>{report.summary}</CardDescription>
+              <CardDescription className="text-sm leading-6">{report.summary}</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <div>
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+            <CardContent className="grid gap-4 pt-5 md:grid-cols-2">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/55 p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-bold text-amber-800">
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
                   {isTH ? "จุดที่ควรดู" : "What to watch"}
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {report.risks.map((risk) => (
-                    <div key={risk} className="rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm">
+                    <div key={risk} className="flex gap-2 rounded-xl border border-white bg-white/85 px-3 py-3 text-sm leading-5 text-slate-700 shadow-sm">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
                       {risk}
                     </div>
                   ))}
                 </div>
               </div>
-              <div>
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/55 p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-bold text-emerald-800">
                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                   {isTH ? "คำแนะนำถัดไป" : "Next steps"}
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {report.recommendations.map((item) => (
-                    <div key={item} className="rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm">
+                    <div key={item} className="flex gap-2 rounded-xl border border-white bg-white/85 px-3 py-3 text-sm leading-5 text-slate-700 shadow-sm">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
                       {item}
                     </div>
                   ))}
@@ -250,14 +264,14 @@ export function SensorIntelligencePage({
           {report.metrics.map((metric) => {
             const Icon = metricIcon[metric.id];
             return (
-              <Card key={metric.id} className="border-border/70 bg-card/90 shadow-sm">
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className={`grid h-11 w-11 place-items-center rounded-lg border ${severityClass[metric.severity]}`}>
+              <Card key={metric.id} className="rounded-2xl border-white/80 bg-white/95 shadow-[0_16px_38px_-32px_rgba(15,23,42,.5)] transition-transform duration-200 hover:-translate-y-0.5">
+                <CardContent className="flex items-center gap-4 p-5">
+                  <div className={`grid h-12 w-12 place-items-center rounded-2xl border ${severityClass[metric.severity]}`}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm text-muted-foreground">{metric.label}</div>
-                    <div className="truncate text-lg font-bold">{metric.value}</div>
+                    <div className="truncate text-xl font-black text-slate-900">{metric.value}</div>
                     <div className="truncate text-xs text-muted-foreground">{metric.detail}</div>
                   </div>
                   <span className={`h-2.5 w-2.5 rounded-full ${severityDotClass[metric.severity]}`} />
@@ -268,7 +282,7 @@ export function SensorIntelligencePage({
         </section>
 
         <section>
-          <Card className="border-border/70 bg-card/90 shadow-sm">
+          <Card className="rounded-[28px] border-white/80 bg-white/95 shadow-[0_24px_60px_-42px_rgba(15,23,42,.45)]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <LineChart className="h-5 w-5 text-sky-500" />
@@ -282,7 +296,7 @@ export function SensorIntelligencePage({
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-3">
               {report.trends.map((trend) => (
-                <div key={trend.id} className="rounded-lg border border-border/70 bg-background/70 p-4">
+                <div key={trend.id} className="rounded-2xl border border-slate-100 bg-[#f8faf9] p-5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="font-semibold">{trend.label}</div>
                     <Badge variant="outline">
@@ -303,7 +317,7 @@ export function SensorIntelligencePage({
         </section>
 
         <section>
-          <Card className="border-border/70 bg-card/90 shadow-sm">
+          <Card className="rounded-[28px] border-white/80 bg-white/95 shadow-[0_24px_60px_-42px_rgba(15,23,42,.45)]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <BrainCircuit className="h-5 w-5 text-emerald-500" />
@@ -316,7 +330,7 @@ export function SensorIntelligencePage({
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/25 dark:text-emerald-100">
+              <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-cyan-50 p-5 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/25 dark:text-emerald-100">
                 <div className="text-sm font-semibold opacity-75">
                   {isTH ? "Sample ที่สะสม" : "Collected samples"}
                 </div>

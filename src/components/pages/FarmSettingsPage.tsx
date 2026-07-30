@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -27,7 +27,7 @@ import {
   Trash2,
   Star
 } from "lucide-react";
-import { AdminDbDeviceRow } from "@/features/auth/services/authService";
+import { AdminDbDeviceRow, AdminDbSessionRow, authService } from "@/features/auth/services/authService";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +52,16 @@ function formatDeviceTime(value?: string) {
   return date.toLocaleString();
 }
 
+function formatSessionStatus(session: AdminDbSessionRow, isTH: boolean) {
+  if (String(session.status || "").toLowerCase() === "active") {
+    return isTH ? "กำลังใช้งาน" : "Active";
+  }
+  if (session.logout_time) {
+    return `${isTH ? "ออกจากระบบ" : "Logged out"} ${formatDeviceTime(session.logout_time)}`;
+  }
+  return session.status || (isTH ? "ไม่ใช้งาน" : "Inactive");
+}
+
 export function FarmSettingsPage({
   devices = [],
   onOpenDevicePairing,
@@ -61,19 +71,31 @@ export function FarmSettingsPage({
   language = "TH",
 }: FarmSettingsPageProps) {
   const isTH = language === "TH";
-  const [sessions, setSessions] = useState([
-    { device: "MacBook Pro M4", type: "Web Dashboard", location: "Chiang Mai, TH", status: "Active Now", active: true },
-    { device: "iPhone 15 Plus", type: "Mobile App", location: "Bangkok, TH", status: "Active 2m ago", active: true },
-    { device: "iPad Air 6", type: "Field Monitor", location: "Farm Site A", status: "Active Now", active: true },
-    { device: "MacBook Air M2", type: "Web Dashboard", location: "Phuket, TH", status: "Idle for 1h", active: false },
-    { device: "iPhone 11", type: "Mobile App", location: "Chiang Rai, TH", status: "Last active yesterday", active: false },
-    { device: "Notebook (Windows)", type: "Web Dashboard", location: "Office HQ", status: "Active Now", active: true },
-    { device: "iPhone 14 Pro", type: "Mobile App", location: "Bangkok, TH", status: "Last active 5m ago", active: false },
-  ]);
+  const [sessions, setSessions] = useState<AdminDbSessionRow[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsError, setSessionsError] = useState("");
 
-  const handleRevoke = (index: number) => {
-    setSessions(sessions.filter((_, i) => i !== index));
-  };
+  useEffect(() => {
+    let mounted = true;
+    setSessionsLoading(true);
+    setSessionsError("");
+    authService.getMyLoginSessions()
+      .then((rows) => {
+        if (mounted) setSessions(rows);
+      })
+      .catch((error) => {
+        if (mounted) {
+          setSessions([]);
+          setSessionsError(error instanceof Error ? error.message : (isTH ? "โหลดข้อมูล session ไม่สำเร็จ" : "Failed to load sessions"));
+        }
+      })
+      .finally(() => {
+        if (mounted) setSessionsLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [isTH]);
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingDevice, setEditingDevice] = useState<AdminDbDeviceRow | null>(null);
@@ -428,40 +450,53 @@ export function FarmSettingsPage({
                 <CardDescription className="text-muted-foreground">Manage devices currently accessing your farm dashboard</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                 {sessions.map((session, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border">
+                 {sessionsLoading && (
+                   <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+                     <RefreshCw className="h-4 w-4 animate-spin" />
+                     {isTH ? "กำลังโหลดประวัติการเข้าสู่ระบบ..." : "Loading login sessions..."}
+                   </div>
+                 )}
+                 {!sessionsLoading && sessionsError && (
+                   <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-700">
+                     {sessionsError}
+                   </div>
+                 )}
+                 {!sessionsLoading && !sessionsError && sessions.map((session) => {
+                   const active = String(session.status || "").toLowerCase() === "active";
+                   const deviceLabel = session.device_name || session.device_type || (isTH ? "อุปกรณ์ไม่ทราบชื่อ" : "Unknown device");
+                   const platformLabel = [session.browser, session.os].filter(Boolean).join(" • ") || session.device_type || "Web";
+                   const connectionLabel = [session.ip_address, session.login_time ? `${isTH ? "เข้าสู่ระบบ" : "Login"} ${formatDeviceTime(session.login_time)}` : ""].filter(Boolean).join(" • ");
+                   const isDesktop = /desktop|laptop|mac|windows|linux|notebook/i.test(`${session.device_type || ""} ${deviceLabel} ${session.os || ""}`);
+                   return (
+                    <div key={String(session.id)} className="flex flex-col justify-between gap-4 rounded-xl border border-border bg-muted/30 p-4 sm:flex-row sm:items-center">
                        <div className="flex items-center gap-4">
-                          <div className={`p-2 rounded-lg ${session.active ? 'bg-emerald-500/10' : 'bg-muted/50'}`}>
-                             {session.device.toLowerCase().includes("mac") || session.device.toLowerCase().includes("notebook") ? (
-                                <Laptop className={`w-6 h-6 ${session.active ? 'text-emerald-500' : 'text-muted-foreground'}`} />
+                          <div className={`rounded-xl p-3 ${active ? 'bg-emerald-500/10' : 'bg-muted/50'}`}>
+                             {isDesktop ? (
+                                <Laptop className={`h-6 w-6 ${active ? 'text-emerald-500' : 'text-muted-foreground'}`} />
                              ) : (
-                                <Smartphone className={`w-6 h-6 ${session.active ? 'text-emerald-500' : 'text-muted-foreground'}`} />
+                                <Smartphone className={`h-6 w-6 ${active ? 'text-emerald-500' : 'text-muted-foreground'}`} />
                              )}
                           </div>
-                          <div>
+                          <div className="min-w-0">
                              <div className="flex items-center gap-2">
-                                <h4 className="font-medium text-foreground">{session.device}</h4>
-                                {session.active && <span className="flex h-2 w-2 rounded-full bg-emerald-500"></span>}
+                                <h4 className="truncate font-semibold text-foreground">{deviceLabel}</h4>
+                                {active && <span className="flex h-2 w-2 shrink-0 rounded-full bg-emerald-500"></span>}
                              </div>
-                             <p className="text-sm text-muted-foreground">{session.type} • {session.location}</p>
+                             <p className="mt-0.5 text-sm text-muted-foreground">{platformLabel}</p>
+                             {connectionLabel && <p className="mt-1 text-xs text-muted-foreground/80">{connectionLabel}</p>}
                           </div>
                        </div>
-                       <div className="flex items-center gap-4">
-                          <span className="text-xs text-muted-foreground">{session.status}</span>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-300"
-                            onClick={() => handleRevoke(i)}
-                          >
-                             Revoke
-                          </Button>
+                       <div className="flex shrink-0 items-center gap-3">
+                          <Badge variant="outline" className={active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-500"}>
+                            {formatSessionStatus(session, isTH)}
+                          </Badge>
                        </div>
                     </div>
-                 ))}
-                 {sessions.length === 0 && (
+                   );
+                 })}
+                 {!sessionsLoading && !sessionsError && sessions.length === 0 && (
                    <div className="text-center py-8 text-muted-foreground">
-                     <p>No active sessions found.</p>
+                     <p>{isTH ? "ยังไม่พบประวัติการเข้าสู่ระบบของบัญชีนี้" : "No login sessions found for this account."}</p>
                    </div>
                  )}
               </CardContent>
