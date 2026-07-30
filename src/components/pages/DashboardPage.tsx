@@ -719,8 +719,8 @@ export function DashboardPage({
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 overflow-auto bg-[#f2f5f3] p-3 dark:bg-slate-950 md:p-5">
-        <div className="w-full rounded-2xl border border-slate-200/80 bg-[#e9eeeb] p-3 shadow-[0_24px_70px_-46px_rgba(15,23,42,0.42)] dark:border-slate-800 dark:bg-slate-900/55 md:p-4">
+      <main className="relative z-10 flex-1 overflow-auto bg-[#dfe5ec] p-3 dark:bg-slate-950 md:p-5">
+        <div className="w-full rounded-[30px] border border-white/80 bg-[#edf1f5] p-3 shadow-[0_30px_90px_-52px_rgba(15,23,42,0.55)] dark:border-slate-800 dark:bg-slate-900/55 md:p-4">
 
         <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
           {[
@@ -734,9 +734,9 @@ export function DashboardPage({
             const Icon = item.icon;
             const tone = item.iconClass || (item.tone === "blue" ? "bg-blue-50 text-blue-600" : item.tone === "cyan" ? "bg-cyan-50 text-cyan-600" : "bg-emerald-50 text-emerald-600");
             return (
-              <Card key={item.label} className={`rounded-2xl border-white/70 bg-white/90 shadow-none ${item.cardClass || ""}`}>
+              <Card key={item.label} className={`group rounded-[18px] border-white/90 bg-white/95 shadow-[0_16px_36px_-28px_rgba(15,23,42,.48)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_-26px_rgba(37,99,235,.3)] ${item.cardClass || ""}`}>
                 <CardContent className="flex items-center gap-3 p-3">
-                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${tone}`}>
+                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-[14px] transition-transform duration-300 group-hover:scale-105 ${tone}`}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -754,8 +754,8 @@ export function DashboardPage({
         <div className="mb-3 grid grid-cols-1 gap-3 xl:grid-cols-12">
           
           {/* Left Column: Visual Model */}
-          <div className="space-y-3 xl:col-span-8">
-            <Card className="h-full min-h-[400px] overflow-hidden rounded-[24px] border-white/80 bg-white/75 shadow-none sm:min-h-[540px] xl:min-h-[640px]">
+          <div className="space-y-3 xl:col-span-9">
+            <Card className="h-full min-h-[400px] overflow-hidden rounded-[26px] border-white bg-white shadow-[0_26px_64px_-40px_rgba(15,23,42,.4)] sm:min-h-[580px] xl:min-h-[650px]">
               <CardContent className="p-0">
                 <DigitalTwinModel
                   language={language}
@@ -777,8 +777,8 @@ export function DashboardPage({
           </div>
 
           {/* Right Column: Controls and live readings */}
-          <div className="xl:col-span-4">
-            <Card className="h-full rounded-[24px] border-white/80 bg-white/90 shadow-none">
+          <div className="xl:col-span-3">
+            <Card className="h-full rounded-[26px] border-white bg-white shadow-[0_26px_64px_-40px_rgba(15,23,42,.4)]">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between text-slate-900">
                   <span className="flex items-center gap-2"><Power className="h-5 w-5 text-emerald-600" />{t.masterControl}</span>
@@ -804,7 +804,7 @@ export function DashboardPage({
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
                   {[
                     { label: t.metrics.ph.title, value: stablePhValue != null ? stablePhValue.toFixed(2) : "--", unit: "", icon: Beaker, accent: "emerald", note: stablePhOk ? (language === "TH" ? "เหมาะสม" : "Suitable") : (language === "TH" ? "รอตรวจสอบ" : "Waiting") },
                     { label: t.metrics.temp.title, value: stableTempValue != null ? stableTempValue.toFixed(1) : "--", unit: "°C", icon: Thermometer, accent: "blue", note: stableTempValue != null ? (language === "TH" ? "ปกติ" : "Normal") : "Waiting" },
@@ -837,10 +837,10 @@ export function DashboardPage({
         
         {/* Charts Row */}
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(500px,1.15fr)_minmax(320px,0.72fr)]">
-          <div className="overflow-hidden rounded-[24px] border border-white/80 bg-white/90 p-1 shadow-none">
+          <div className="overflow-hidden rounded-[24px] border border-white bg-white p-1 shadow-[0_20px_50px_-38px_rgba(15,23,42,.42)]">
             <MetricsChart compact />
           </div>
-          <Card className="min-h-[340px] rounded-[24px] border-white/80 bg-white/90 shadow-none">
+          <Card className="min-h-[340px] rounded-[24px] border-white bg-white shadow-[0_20px_50px_-38px_rgba(15,23,42,.42)]">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg text-slate-900">
                 {language === "TH" ? "ภาพรวมการทำงานวันนี้" : "Today's operation overview"}
@@ -914,7 +914,7 @@ export function DashboardPage({
               </section>
             </CardContent>
           </Card>
-          <Card className="rounded-[24px] border-white/80 bg-white/90 shadow-none">
+          <Card className="rounded-[24px] border-white bg-white shadow-[0_20px_50px_-38px_rgba(15,23,42,.42)]">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">{language === "TH" ? "กิจกรรมระบบล่าสุด" : "Recent activity"}</CardTitle>
             </CardHeader>
