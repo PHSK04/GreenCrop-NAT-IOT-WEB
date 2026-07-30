@@ -212,7 +212,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   return (
     <>
       <header className="animate-in border-b border-white/80 bg-white/90 px-4 py-5 shadow-[0_12px_35px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl fade-in slide-in-from-bottom-2 duration-700 motion-reduce:animate-none md:px-8">
-        <div className="mx-auto flex max-w-[1840px] items-center justify-between">
+        <div className="flex w-full items-center justify-between">
           <div>
             <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900">
               <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-50 to-lime-50 text-emerald-600 shadow-sm"><Sprout className="h-6 w-6" /></span>
@@ -237,7 +237,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
       </header>
 
       <main className="page-solid-cards flex-1 overflow-auto bg-[#f2f5f3] p-4 dark:bg-slate-950 md:p-6">
-        <div className="mx-auto max-w-[1840px]">
+        <div className="w-full">
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 motion-reduce:animate-none">
           <Card className="mb-6 rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>

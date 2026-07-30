@@ -195,7 +195,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
   return (
     <>
       <header className="border-b border-white/80 bg-white/90 px-4 py-5 shadow-[0_12px_35px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl md:px-8">
-        <div className="mx-auto flex max-w-[1840px] items-center justify-between">
+        <div className="flex w-full items-center justify-between">
           <div>
             <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900">
               <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 shadow-sm"><Scale className="h-6 w-6" /></span>
@@ -276,7 +276,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
       </Dialog>
 
       <main className="page-solid-cards flex-1 overflow-auto bg-[#f2f5f3] p-4 dark:bg-slate-950 md:p-6">
-        <div className="mx-auto max-w-[1840px]">
+        <div className="w-full">
         <ExportFiltersCard
           startDate={exportStart}
           endDate={exportEnd}

@@ -575,7 +575,7 @@ export function DashboardPage({
 
       {/* Header */}
       <header className="sticky top-0 z-20 flex min-h-[102px] items-center border-b border-border/60 bg-white/90 px-4 text-foreground backdrop-blur-xl dark:bg-slate-950/90 md:px-6">
-        <div className="mx-auto flex w-full max-w-[1840px] flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="flex w-full flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <div>
             <h1 className="flex items-center gap-3 text-lg font-semibold tracking-tight text-foreground sm:text-xl">
               <span className="grid h-11 w-11 place-items-center rounded-2xl border border-emerald-500/10 bg-emerald-500/10 text-emerald-600">
@@ -710,7 +710,7 @@ export function DashboardPage({
       </header>
 
       <main className="relative z-10 flex-1 overflow-auto bg-[#f2f5f3] p-3 dark:bg-slate-950 md:p-5">
-        <div className="mx-auto max-w-[1840px] rounded-[28px] border border-slate-200/80 bg-[#e9eeeb] p-3 shadow-[0_24px_70px_-46px_rgba(15,23,42,0.42)] dark:border-slate-800 dark:bg-slate-900/55 md:p-4">
+        <div className="w-full rounded-2xl border border-slate-200/80 bg-[#e9eeeb] p-3 shadow-[0_24px_70px_-46px_rgba(15,23,42,0.42)] dark:border-slate-800 dark:bg-slate-900/55 md:p-4">
 
         <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
           {[

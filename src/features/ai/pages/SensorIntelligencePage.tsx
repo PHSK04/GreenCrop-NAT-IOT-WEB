@@ -147,7 +147,7 @@ export function SensorIntelligencePage({
   return (
     <div className="relative min-h-0 flex-1 overflow-y-auto bg-[#f2f5f3] dark:bg-slate-950">
       <header className="sticky top-0 z-10 border-b border-white/80 bg-white/90 px-4 py-4 shadow-[0_12px_35px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl md:px-8 md:py-5">
-        <div className="mx-auto flex max-w-[1840px] flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="flex items-center gap-4">
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-cyan-50 text-emerald-600 shadow-sm">
@@ -175,7 +175,7 @@ export function SensorIntelligencePage({
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1840px] space-y-4 p-4 md:p-6">
+      <main className="w-full space-y-4 p-4 md:p-6">
         <section className="grid gap-4 xl:grid-cols-[minmax(340px,0.72fr)_minmax(0,1.55fr)]">
           <Card className="overflow-hidden rounded-[28px] border-white/80 bg-gradient-to-br from-white via-white to-emerald-50/60 shadow-[0_24px_60px_-42px_rgba(15,23,42,.45)]">
             <CardContent className="flex h-full flex-col items-center justify-center p-6 text-center">
