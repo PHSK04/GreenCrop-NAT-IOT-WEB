@@ -37,7 +37,7 @@ interface DashboardPageProps {
   devices?: AdminDbDeviceRow[];
   activeDeviceId?: string;
   onDeviceChange?: (deviceId: string) => void;
-  user?: { name: string; email?: string; role?: string };
+  user?: { name: string; email?: string; role?: string; avatar?: string };
   onOpenProfile?: () => void;
   onLogout?: () => void;
 }
@@ -306,7 +306,12 @@ export function DashboardPage({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
   const [notificationsRead, setNotificationsRead] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const liveWeather = useLiveWeather();
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.avatar]);
   const currentWeather = liveWeather.weather;
   const dashboardNotifications = [
     {
@@ -684,8 +689,17 @@ export function DashboardPage({
               className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-border bg-white/85 px-2.5 text-left shadow-sm transition hover:border-emerald-200 hover:bg-white dark:bg-slate-900"
               aria-label={language === "TH" ? "บัญชีผู้ใช้งาน" : "User account"}
             >
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
-                <UserRound className="h-4 w-4" />
+              <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full border border-emerald-200 bg-emerald-500 text-white shadow-sm">
+                {user?.avatar && !avatarLoadFailed ? (
+                  <img
+                    src={user.avatar}
+                    alt={user.name || (language === "TH" ? "รูปโปรไฟล์ผู้ใช้งาน" : "User profile")}
+                    className="h-full w-full object-cover"
+                    onError={() => setAvatarLoadFailed(true)}
+                  />
+                ) : (
+                  <UserRound className="h-4 w-4" />
+                )}
               </span>
               <span className="hidden min-w-0 sm:block">
                 <span className="block max-w-28 truncate text-xs font-semibold text-slate-800 dark:text-slate-100">

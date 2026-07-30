@@ -138,7 +138,7 @@ const navTranslations = {
 
 interface DashboardProps {
   onLogout: () => void;
-  user?: { id?: string | number; name: string; email: string; role?: string }; // Made optional to be safe, but generic
+  user?: { id?: string | number; name: string; email: string; role?: string; avatar?: string };
 }
 
 interface SidebarContentProps {
