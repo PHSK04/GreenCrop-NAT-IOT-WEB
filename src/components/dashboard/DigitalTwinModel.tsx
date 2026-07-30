@@ -1,4 +1,4 @@
-import { Activity, Droplets, Gauge, Maximize2 } from "lucide-react";
+import { Activity, Beaker, Droplets, Gauge, Maximize2, Thermometer, Zap } from "lucide-react";
 import waterSystemModel from "../../assets/images/generated/water_system_model_tall.png";
 
 type DigitalTwinModelProps = {
@@ -61,6 +61,10 @@ export function DigitalTwinModel({
   wls2,
   pump1On,
   pump2On,
+  phValue,
+  ecValue,
+  tempValue,
+  phOk,
 }: DigitalTwinModelProps) {
   const isTH = language === "TH";
   const alarm = locked || floatAlarm || redOn;
@@ -68,10 +72,10 @@ export function DigitalTwinModel({
   const level2 = liveSignal ? (wls2 ? 76 : 24) : null;
 
   return (
-    <section className="overflow-hidden rounded-[24px] border border-white/90 bg-white shadow-[0_26px_65px_-42px_rgba(7,55,92,.52)]">
-      <header className="flex items-center justify-between border-b border-slate-100 bg-white/95 px-4 py-3 sm:px-5">
+    <section className="overflow-hidden rounded-[26px] border border-white bg-white shadow-[0_28px_70px_-38px_rgba(15,23,42,.35)]">
+      <header className="flex items-center justify-between border-b border-slate-100 bg-white/95 px-4 py-3.5 sm:px-5">
         <div className="flex items-center gap-3">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-sky-50 text-blue-600">
+          <span className="grid h-10 w-10 place-items-center rounded-[14px] bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-[0_10px_24px_-12px_rgba(37,99,235,.8)]">
             <Gauge className="h-5 w-5" />
           </span>
           <div>
@@ -89,7 +93,7 @@ export function DigitalTwinModel({
         </div>
       </header>
 
-      <div className="relative min-h-[430px] overflow-hidden bg-[radial-gradient(circle_at_52%_36%,#ffffff_0%,#f3fbff_44%,#e7f5fb_100%)] px-4 py-6 sm:min-h-[520px]">
+      <div className="relative min-h-[430px] overflow-hidden bg-[radial-gradient(circle_at_52%_36%,#ffffff_0%,#f3fbff_44%,#e7f5fb_100%)] px-4 py-6 sm:min-h-[560px]">
         <div className="absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(125,180,205,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(125,180,205,.18)_1px,transparent_1px)] [background-size:44px_44px]" />
         <div className="absolute inset-x-[18%] bottom-6 h-20 rounded-[50%] bg-cyan-200/25 blur-2xl" />
         <div className="absolute left-[28%] top-5 font-mono text-[9px] tracking-[0.2em] text-cyan-500/55">GREENCROP DIGITAL TWIN / LIVE TOPOLOGY</div>
@@ -101,18 +105,37 @@ export function DigitalTwinModel({
           <p className="mt-1 flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-red-500" />{isTH ? "แจ้งเตือน" : "Alarm"}</p>
         </div>
 
-        <div className="relative mx-auto flex min-h-[380px] max-w-4xl items-center justify-center sm:min-h-[470px]">
+        <div className="relative mx-auto flex min-h-[380px] max-w-4xl items-center justify-center sm:min-h-[500px]">
           <div className={`absolute h-[68%] w-[58%] rounded-full blur-3xl ${alarm ? "bg-red-100/70" : "bg-cyan-100/65"}`} />
           <img
             src={waterSystemModel}
             alt={isTH ? "อุปกรณ์ระบบปลูกพืช GreenCropNAT" : "GreenCropNAT growing system"}
-            className="relative z-[2] max-h-[430px] w-full object-contain drop-shadow-[0_28px_28px_rgba(7,42,76,.2)] transition-transform duration-700 hover:scale-[1.015] sm:max-h-[520px]"
+            className="relative z-[2] max-h-[430px] w-full object-contain drop-shadow-[0_30px_32px_rgba(7,42,76,.24)] transition-transform duration-700 hover:scale-[1.015] sm:max-h-[500px]"
           />
 
           <StatusCallout code="WLS-02" side="right" className="right-[1%] top-[14%]" title={isTH ? "ระดับน้ำบ่อปลูก" : "Grow bed level"} value={level2 == null ? "--" : `${level2}%`} active={liveSignal && wls2} />
           <StatusCallout code="WLS-01" side="left" className="left-[1%] bottom-[15%]" title={isTH ? "ระดับน้ำถัง 1" : "Tank 1 level"} value={level1 == null ? "--" : `${level1}%`} active={liveSignal && wls1} />
           <StatusCallout code="PUMP-02" side="right" className="right-0 top-[46%]" title={isTH ? "ปั๊มน้ำ #2" : "Water pump #2"} value={pump2On ? (isTH ? "กำลังทำงาน" : "Running") : (isTH ? "พร้อมทำงาน" : "Ready")} active={liveSignal && pump2On} />
-          <StatusCallout code="PUMP-01" side="right" className="right-[5%] bottom-[6%]" title={isTH ? "ปั๊มน้ำ #1" : "Water pump #1"} value={pump1On ? (isTH ? "กำลังทำงาน" : "Running") : "OFF"} active={liveSignal && pump1On} />
+          <StatusCallout code="PUMP-01" side="right" className="right-[5%] bottom-[14%]" title={isTH ? "ปั๊มน้ำ #1" : "Water pump #1"} value={pump1On ? (isTH ? "กำลังทำงาน" : "Running") : "OFF"} active={liveSignal && pump1On} />
+        </div>
+
+        <div className="absolute inset-x-5 bottom-4 z-20 hidden grid-cols-4 overflow-hidden rounded-2xl border border-white/90 bg-white/88 shadow-[0_18px_50px_-30px_rgba(15,23,42,.55)] backdrop-blur-xl sm:grid">
+          {[
+            { icon: Beaker, label: "pH", value: phValue == null ? "--" : phValue.toFixed(2), active: phOk },
+            { icon: Zap, label: "EC", value: ecValue == null ? "--" : `${ecValue.toFixed(2)} mS/cm`, active: ecValue != null },
+            { icon: Thermometer, label: isTH ? "อุณหภูมิน้ำ" : "Water temp", value: tempValue == null ? "--" : `${tempValue.toFixed(1)} °C`, active: tempValue != null },
+            { icon: Activity, label: isTH ? "สถานะระบบ" : "System", value: liveSignal ? (isTH ? "ออนไลน์" : "Online") : (isTH ? "รอสัญญาณ" : "Waiting"), active: liveSignal },
+          ].map(({ icon: Icon, label, value, active }, index) => (
+            <div key={label} className={`flex items-center gap-3 px-4 py-3 ${index > 0 ? "border-l border-slate-100" : ""}`}>
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${active ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
+                <Icon className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-400">{label}</p>
+                <p className={`truncate text-xs font-black ${active ? "text-slate-900" : "text-slate-500"}`}>{value}</p>
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="relative z-10 grid grid-cols-3 gap-2 sm:hidden">
