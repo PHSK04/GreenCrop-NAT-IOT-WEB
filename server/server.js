@@ -13,6 +13,7 @@ const { parseUserAgent, getClientIP } = require('./deviceDetector');
 const { backfillTenantSensorSamples, getTenantLearningSummary, recordAiSensorSample } = require('./services/ai_training');
 const { OPENAI_MAX_OUTPUT_TOKENS, buildNatAiContext, generateNatAiReply, saveAiExchange } = require('./services/nat_ai_chat');
 const { buildBrainAssessment } = require('./services/nat_ai_brain');
+const { synthesizeLocalSpeech, getLocalTtsStatus } = require('./services/local_tts');
 
 // Start MQTT Listener for IoT Data Recording
 startMqttListener();
@@ -1305,6 +1306,42 @@ function requireAdmin(req, res, next) {
     }
     return next();
 }
+
+app.get('/api/ai/voice/status', (req, res) => {
+    if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+    const status = getLocalTtsStatus();
+    res.json({
+        enabled: status.enabled,
+        running: status.running,
+        model: status.model,
+        max_text_chars: status.maxTextChars,
+    });
+});
+
+app.post('/api/ai/voice/synthesize', async (req, res) => {
+    try {
+        if (!req.user?.id || !req.tenant) return res.status(401).json({ error: 'Unauthorized' });
+        const text = String(req.body?.text || '').replace(/\s+/g, ' ').trim();
+        const rate = Math.max(0.75, Math.min(1.25, Number(req.body?.rate || 1)));
+        if (!text) return res.status(400).json({ error: 'text is required' });
+
+        const result = await synthesizeLocalSpeech(text, { rate });
+        res.set({
+            'Content-Type': result.contentType,
+            'Content-Length': String(result.audio.length),
+            'Cache-Control': 'private, no-store',
+            'X-NAT-AI-Voice-Model': result.model,
+        });
+        return res.send(result.audio);
+    } catch (err) {
+        console.error('[local-tts] synthesis failed:', err.message);
+        const status = getLocalTtsStatus();
+        return res.status(status.enabled ? 503 : 501).json({
+            error: err.message || 'Local voice synthesis failed',
+            fallback: 'browser-speech-synthesis',
+        });
+    }
+});
 
 function maskContact(value) {
     const text = String(value || '');

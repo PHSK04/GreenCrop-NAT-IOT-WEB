@@ -45,6 +45,7 @@ type UseNatVoiceAssistantOptions = {
   latestAssistantMessage?: AssistantVoiceMessage;
   onTranscript: (transcript: string) => void;
   onSubmit: (transcript: string) => Promise<void> | void;
+  onSynthesizeSpeech?: (text: string, rate: number) => Promise<Blob>;
 };
 
 const WAKE_WORD_PATTERNS = [
@@ -101,6 +102,7 @@ export function useNatVoiceAssistant({
   latestAssistantMessage,
   onTranscript,
   onSubmit,
+  onSynthesizeSpeech,
 }: UseNatVoiceAssistantOptions) {
   const [enabled, setEnabled] = useState(readStoredEnabled);
   const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(readStoredVoiceReplyEnabled);
@@ -119,10 +121,13 @@ export function useNatVoiceAssistant({
   const lastSpokenMessageIdRef = useRef<string | null>(latestAssistantMessage?.id || null);
   const lastSpokenTextRef = useRef(latestAssistantMessage?.text || "");
   const voiceRateRef = useRef(voiceRate);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
   const startListeningRef = useRef<() => void>(() => {});
-  const speakTextRef = useRef<(text: string) => void>(() => {});
+  const speakTextRef = useRef<(text: string) => Promise<void>>(async () => {});
   const onTranscriptRef = useRef(onTranscript);
   const onSubmitRef = useRef(onSubmit);
+  const onSynthesizeSpeechRef = useRef(onSynthesizeSpeech);
 
   useEffect(() => {
     enabledRef.current = enabled;
@@ -132,7 +137,8 @@ export function useNatVoiceAssistant({
     voiceRateRef.current = voiceRate;
     onTranscriptRef.current = onTranscript;
     onSubmitRef.current = onSubmit;
-  }, [enabled, isAssistantMode, isOpen, isSending, onSubmit, onTranscript, voiceRate]);
+    onSynthesizeSpeechRef.current = onSynthesizeSpeech;
+  }, [enabled, isAssistantMode, isOpen, isSending, onSubmit, onSynthesizeSpeech, onTranscript, voiceRate]);
 
   const canRun = useCallback(
     () => enabledRef.current && openRef.current && assistantModeRef.current,
@@ -209,7 +215,7 @@ export function useNatVoiceAssistant({
       }
       if (REPEAT_PATTERN.test(command)) {
         recognition.stop();
-        if (lastSpokenTextRef.current) speakTextRef.current(lastSpokenTextRef.current);
+        if (lastSpokenTextRef.current) void speakTextRef.current(lastSpokenTextRef.current);
         return;
       }
       if (SLOWER_PATTERN.test(command) || NORMAL_RATE_PATTERN.test(command) || FASTER_PATTERN.test(command)) {
@@ -274,6 +280,10 @@ export function useNatVoiceAssistant({
     window.localStorage.setItem(STORAGE_KEY, "false");
     recognitionRef.current?.abort();
     recognitionRef.current = null;
+    audioRef.current?.pause();
+    audioRef.current = null;
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    audioUrlRef.current = null;
     window.speechSynthesis?.cancel();
   }, []);
 
@@ -297,6 +307,10 @@ export function useNatVoiceAssistant({
 
   const toggleVoiceReply = useCallback(() => {
     if (voiceReplyEnabled) {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
       window.speechSynthesis?.cancel();
       speakingRef.current = false;
       setVoiceReplyEnabled(false);
@@ -310,9 +324,9 @@ export function useNatVoiceAssistant({
     toast.success(isThai ? "เปิดเสียงตอบกลับแล้ว" : "Voice replies enabled");
   }, [isThai, latestAssistantMessage?.id, scheduleRestart, voiceReplyEnabled]);
 
-  const speakText = useCallback((text: string) => {
+  const speakText = useCallback(async (text: string) => {
     const cleanText = text.replace(/[*#`_>-]/g, " ").replace(/\s+/g, " ").trim();
-    if (!cleanText || !voiceReplyEnabled || !("speechSynthesis" in window)) {
+    if (!cleanText || !voiceReplyEnabled) {
       if (enabledRef.current) scheduleRestart();
       return;
     }
@@ -322,15 +336,46 @@ export function useNatVoiceAssistant({
     speakingRef.current = true;
     lastSpokenTextRef.current = text;
     setPhase("speaking");
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = isThai ? "th-TH" : "en-US";
-    utterance.rate = voiceRateRef.current;
-    utterance.onend = () => {
+    const finishSpeaking = () => {
       speakingRef.current = false;
       commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS;
       setPhase("listening-command");
       scheduleRestart(250);
     };
+
+    if (onSynthesizeSpeechRef.current) {
+      try {
+        const audioBlob = await onSynthesizeSpeechRef.current(cleanText, voiceRateRef.current);
+        if (!speakingRef.current) return;
+        if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        audioUrlRef.current = audioUrl;
+        audioRef.current = audio;
+        audio.onended = finishSpeaking;
+        audio.onerror = () => {
+          audioRef.current = null;
+          if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+          audioUrlRef.current = null;
+          finishSpeaking();
+        };
+        await audio.play();
+        return;
+      } catch {
+        audioRef.current = null;
+        if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
+      }
+    }
+
+    if (!("speechSynthesis" in window)) {
+      finishSpeaking();
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = isThai ? "th-TH" : "en-US";
+    utterance.rate = voiceRateRef.current;
+    utterance.onend = finishSpeaking;
     utterance.onerror = () => {
       speakingRef.current = false;
       scheduleRestart();
@@ -342,7 +387,7 @@ export function useNatVoiceAssistant({
   speakTextRef.current = speakText;
 
   const repeatLastReply = useCallback(() => {
-    if (lastSpokenTextRef.current) speakTextRef.current(lastSpokenTextRef.current);
+    if (lastSpokenTextRef.current) void speakTextRef.current(lastSpokenTextRef.current);
   }, []);
 
   const cycleVoiceRate = useCallback(() => {
@@ -354,6 +399,10 @@ export function useNatVoiceAssistant({
   }, []);
 
   const stopSpeaking = useCallback(() => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    audioUrlRef.current = null;
     window.speechSynthesis?.cancel();
     speakingRef.current = false;
     commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS;
@@ -374,11 +423,13 @@ export function useNatVoiceAssistant({
       if (enabledRef.current) scheduleRestart();
       return;
     }
-    speakText(latestAssistantMessage.text);
+    void speakText(latestAssistantMessage.text);
   }, [latestAssistantMessage, scheduleRestart, speakText, voiceReplyEnabled]);
 
   useEffect(() => () => {
     recognitionRef.current?.abort();
+    audioRef.current?.pause();
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
     window.speechSynthesis?.cancel();
   }, []);
 

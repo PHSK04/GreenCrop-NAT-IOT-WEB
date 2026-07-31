@@ -1103,6 +1103,7 @@ export function CustomerChatWidget({
     latestAssistantMessage: latestVoiceAssistantMessage,
     onTranscript: setDraft,
     onSubmit: submitAssistantMessage,
+    onSynthesizeSpeech: chatService.synthesizeAiSpeech,
   });
 
   const submitChatbotMessage = async () => {

@@ -27,6 +27,7 @@ pnpm-debug.log*
 coverage/
 .runtime/
 ai/.venv/
+.venv-tts/
 ai/exports/
 ai/models/
 node_modules

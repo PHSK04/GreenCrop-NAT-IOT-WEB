@@ -216,6 +216,19 @@ const parseJson = async <T>(response: Response, fallback: string): Promise<T> =>
 };
 
 export const chatService = {
+  async synthesizeAiSpeech(text: string, rate = 1): Promise<Blob> {
+    const response = await fetch(buildApiUrl("/ai/voice/synthesize"), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ text, rate }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error?.error || "Local NAT AI voice is unavailable");
+    }
+    return response.blob();
+  },
+
   async listMyAiSessions(query?: Pick<AiChatQuery, "deviceId">): Promise<{ sessions: AiChatSession[] }> {
     const response = await fetch(buildApiUrl(`/ai-chat/sessions/me${toQueryString(query)}`), {
       headers: getAuthHeaders(),
