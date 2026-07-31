@@ -11,6 +11,7 @@ import {
   MicOff,
   Pencil,
   Reply,
+  RotateCcw,
   Send,
   ShieldCheck,
   Sparkles,
@@ -1088,8 +1089,12 @@ export function CustomerChatWidget({
     isListening,
     phase: voiceAssistantPhase,
     voiceReplyEnabled,
+    voiceRate,
     toggleHandsFree: toggleVoiceInput,
     toggleVoiceReply,
+    repeatLastReply,
+    cycleVoiceRate,
+    stopSpeaking,
   } = useNatVoiceAssistant({
     isOpen,
     isAssistantMode: mode === "assistant",
@@ -2506,6 +2511,32 @@ export function CustomerChatWidget({
             title={voiceReplyEnabled ? (isTH ? "AI จะพูดคำตอบ" : "AI will speak replies") : (isTH ? "เปิดให้ AI พูดตอบ" : "Enable spoken replies")}
           >
             {voiceReplyEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-12 w-12 shrink-0 rounded-2xl"
+            onClick={voiceAssistantPhase === "speaking" ? stopSpeaking : repeatLastReply}
+            disabled={!latestVoiceAssistantMessage}
+            aria-label={voiceAssistantPhase === "speaking"
+              ? (isTH ? "หยุดพูด" : "Stop speaking")
+              : (isTH ? "พูดคำตอบล่าสุดซ้ำ" : "Repeat the latest reply")}
+            title={voiceAssistantPhase === "speaking"
+              ? (isTH ? "หยุดเสียง NAT AI" : "Stop NAT AI voice")
+              : (isTH ? "พูดคำตอบล่าสุดซ้ำ" : "Repeat latest reply")}
+          >
+            {voiceAssistantPhase === "speaking" ? <VolumeX className="h-5 w-5" /> : <RotateCcw className="h-5 w-5" />}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 shrink-0 rounded-2xl px-3 text-xs font-semibold"
+            onClick={cycleVoiceRate}
+            aria-label={isTH ? `ปรับความเร็วเสียง ปัจจุบัน ${voiceRate} เท่า` : `Change voice speed, currently ${voiceRate}x`}
+            title={isTH ? "ปรับความเร็วเสียง: ช้า ปกติ เร็ว" : "Voice speed: slow, normal, fast"}
+          >
+            {voiceRate}x
           </Button>
         </div>
         <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
