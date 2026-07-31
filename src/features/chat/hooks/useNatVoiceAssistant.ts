@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const STORAGE_KEY = "nat_ai_hands_free_enabled";
+const VOICE_REPLY_STORAGE_KEY = "nat_ai_voice_reply_enabled";
+const VOICE_RATE_STORAGE_KEY = "nat_ai_voice_rate";
 const ACTIVE_CONVERSATION_MS = 45_000;
+const VOICE_RATES = [0.8, 1, 1.15] as const;
 
 type SpeechRecognitionEventLike = Event & {
   results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>;
@@ -53,6 +56,12 @@ const WAKE_WORD_PATTERNS = [
 const SLEEP_PATTERN =
   /^(?:พอแล้ว|หยุดฟัง|พักก่อน|ไปพัก|ขอบคุณ(?:ครับ|ค่ะ)?|stop listening|go to sleep|that's all)$/i;
 
+const REPEAT_PATTERN = /^(?:พูดซ้ำ|พูดอีกครั้ง|ทวนอีกครั้ง|repeat(?: that)?|say that again)$/i;
+const SLOWER_PATTERN = /^(?:พูดช้าลง|ช้าลง|slow down|speak slower)$/i;
+const NORMAL_RATE_PATTERN = /^(?:พูดปกติ|ความเร็วปกติ|normal speed)$/i;
+const FASTER_PATTERN = /^(?:พูดเร็วขึ้น|เร็วขึ้น|speed up|speak faster)$/i;
+const STOP_SPEAKING_PATTERN = /^(?:หยุดพูด|พอแล้ว|เงียบก่อน|stop speaking|be quiet)$/i;
+
 const extractWakeWordCommand = (transcript: string) => {
   for (const pattern of WAKE_WORD_PATTERNS) {
     const match = pattern.exec(transcript);
@@ -72,6 +81,18 @@ const readStoredEnabled = () => {
   return window.localStorage.getItem(STORAGE_KEY) === "true";
 };
 
+const readStoredVoiceReplyEnabled = () => {
+  if (typeof window === "undefined") return false;
+  const stored = window.localStorage.getItem(VOICE_REPLY_STORAGE_KEY);
+  return stored == null ? readStoredEnabled() : stored === "true";
+};
+
+const readStoredVoiceRate = () => {
+  if (typeof window === "undefined") return 1;
+  const stored = Number(window.localStorage.getItem(VOICE_RATE_STORAGE_KEY));
+  return VOICE_RATES.includes(stored as (typeof VOICE_RATES)[number]) ? stored : 1;
+};
+
 export function useNatVoiceAssistant({
   isOpen,
   isAssistantMode,
@@ -82,7 +103,8 @@ export function useNatVoiceAssistant({
   onSubmit,
 }: UseNatVoiceAssistantOptions) {
   const [enabled, setEnabled] = useState(readStoredEnabled);
-  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(readStoredEnabled);
+  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(readStoredVoiceReplyEnabled);
+  const [voiceRate, setVoiceRate] = useState(readStoredVoiceRate);
   const [isListening, setIsListening] = useState(false);
   const [phase, setPhase] = useState<VoiceAssistantPhase>(
     readStoredEnabled() ? "waiting-wake-word" : "off",
@@ -95,7 +117,10 @@ export function useNatVoiceAssistant({
   const speakingRef = useRef(false);
   const commandWindowUntilRef = useRef(0);
   const lastSpokenMessageIdRef = useRef<string | null>(latestAssistantMessage?.id || null);
+  const lastSpokenTextRef = useRef(latestAssistantMessage?.text || "");
+  const voiceRateRef = useRef(voiceRate);
   const startListeningRef = useRef<() => void>(() => {});
+  const speakTextRef = useRef<(text: string) => void>(() => {});
   const onTranscriptRef = useRef(onTranscript);
   const onSubmitRef = useRef(onSubmit);
 
@@ -104,9 +129,10 @@ export function useNatVoiceAssistant({
     openRef.current = isOpen;
     assistantModeRef.current = isAssistantMode;
     sendingRef.current = isSending;
+    voiceRateRef.current = voiceRate;
     onTranscriptRef.current = onTranscript;
     onSubmitRef.current = onSubmit;
-  }, [enabled, isAssistantMode, isOpen, isSending, onSubmit, onTranscript]);
+  }, [enabled, isAssistantMode, isOpen, isSending, onSubmit, onTranscript, voiceRate]);
 
   const canRun = useCallback(
     () => enabledRef.current && openRef.current && assistantModeRef.current,
@@ -171,6 +197,26 @@ export function useNatVoiceAssistant({
         commandWindowUntilRef.current = 0;
         onTranscriptRef.current("");
         setPhase("waiting-wake-word");
+        recognition.stop();
+        return;
+      }
+      if (STOP_SPEAKING_PATTERN.test(command)) {
+        window.speechSynthesis?.cancel();
+        speakingRef.current = false;
+        setPhase("listening-command");
+        recognition.stop();
+        return;
+      }
+      if (REPEAT_PATTERN.test(command)) {
+        recognition.stop();
+        if (lastSpokenTextRef.current) speakTextRef.current(lastSpokenTextRef.current);
+        return;
+      }
+      if (SLOWER_PATTERN.test(command) || NORMAL_RATE_PATTERN.test(command) || FASTER_PATTERN.test(command)) {
+        const nextRate = SLOWER_PATTERN.test(command) ? 0.8 : FASTER_PATTERN.test(command) ? 1.15 : 1;
+        voiceRateRef.current = nextRate;
+        setVoiceRate(nextRate);
+        window.localStorage.setItem(VOICE_RATE_STORAGE_KEY, String(nextRate));
         recognition.stop();
         return;
       }
@@ -239,6 +285,7 @@ export function useNatVoiceAssistant({
     enabledRef.current = true;
     setEnabled(true);
     setVoiceReplyEnabled(true);
+    window.localStorage.setItem(VOICE_REPLY_STORAGE_KEY, "true");
     setPhase("waiting-wake-word");
     window.localStorage.setItem(STORAGE_KEY, "true");
     lastSpokenMessageIdRef.current = latestAssistantMessage?.id || null;
@@ -253,13 +300,66 @@ export function useNatVoiceAssistant({
       window.speechSynthesis?.cancel();
       speakingRef.current = false;
       setVoiceReplyEnabled(false);
+      window.localStorage.setItem(VOICE_REPLY_STORAGE_KEY, "false");
       scheduleRestart();
       return;
     }
     lastSpokenMessageIdRef.current = latestAssistantMessage?.id || null;
     setVoiceReplyEnabled(true);
+    window.localStorage.setItem(VOICE_REPLY_STORAGE_KEY, "true");
     toast.success(isThai ? "เปิดเสียงตอบกลับแล้ว" : "Voice replies enabled");
   }, [isThai, latestAssistantMessage?.id, scheduleRestart, voiceReplyEnabled]);
+
+  const speakText = useCallback((text: string) => {
+    const cleanText = text.replace(/[*#`_>-]/g, " ").replace(/\s+/g, " ").trim();
+    if (!cleanText || !voiceReplyEnabled || !("speechSynthesis" in window)) {
+      if (enabledRef.current) scheduleRestart();
+      return;
+    }
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+    setIsListening(false);
+    speakingRef.current = true;
+    lastSpokenTextRef.current = text;
+    setPhase("speaking");
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = isThai ? "th-TH" : "en-US";
+    utterance.rate = voiceRateRef.current;
+    utterance.onend = () => {
+      speakingRef.current = false;
+      commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS;
+      setPhase("listening-command");
+      scheduleRestart(250);
+    };
+    utterance.onerror = () => {
+      speakingRef.current = false;
+      scheduleRestart();
+    };
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }, [isThai, scheduleRestart, voiceReplyEnabled]);
+
+  speakTextRef.current = speakText;
+
+  const repeatLastReply = useCallback(() => {
+    if (lastSpokenTextRef.current) speakTextRef.current(lastSpokenTextRef.current);
+  }, []);
+
+  const cycleVoiceRate = useCallback(() => {
+    const currentIndex = VOICE_RATES.indexOf(voiceRateRef.current as (typeof VOICE_RATES)[number]);
+    const nextRate = VOICE_RATES[(currentIndex + 1) % VOICE_RATES.length];
+    voiceRateRef.current = nextRate;
+    setVoiceRate(nextRate);
+    window.localStorage.setItem(VOICE_RATE_STORAGE_KEY, String(nextRate));
+  }, []);
+
+  const stopSpeaking = useCallback(() => {
+    window.speechSynthesis?.cancel();
+    speakingRef.current = false;
+    commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS;
+    setPhase(enabledRef.current ? "listening-command" : "off");
+    scheduleRestart(100);
+  }, [scheduleRestart]);
 
   useEffect(() => {
     if (!enabled || !isOpen || !isAssistantMode || isSending) return;
@@ -274,30 +374,8 @@ export function useNatVoiceAssistant({
       if (enabledRef.current) scheduleRestart();
       return;
     }
-
-    recognitionRef.current?.abort();
-    recognitionRef.current = null;
-    setIsListening(false);
-    speakingRef.current = true;
-    setPhase("speaking");
-    const utterance = new SpeechSynthesisUtterance(
-      latestAssistantMessage.text.replace(/[*#`_>-]/g, " ").replace(/\s+/g, " ").trim(),
-    );
-    utterance.lang = isThai ? "th-TH" : "en-US";
-    utterance.rate = isThai ? 1 : 0.95;
-    utterance.onend = () => {
-      speakingRef.current = false;
-      commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS;
-      setPhase("listening-command");
-      scheduleRestart(250);
-    };
-    utterance.onerror = () => {
-      speakingRef.current = false;
-      scheduleRestart();
-    };
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  }, [isThai, latestAssistantMessage, scheduleRestart, voiceReplyEnabled]);
+    speakText(latestAssistantMessage.text);
+  }, [latestAssistantMessage, scheduleRestart, speakText, voiceReplyEnabled]);
 
   useEffect(() => () => {
     recognitionRef.current?.abort();
@@ -309,7 +387,11 @@ export function useNatVoiceAssistant({
     isListening,
     phase,
     voiceReplyEnabled,
+    voiceRate,
     toggleHandsFree,
     toggleVoiceReply,
+    repeatLastReply,
+    cycleVoiceRate,
+    stopSpeaking,
   };
 }
