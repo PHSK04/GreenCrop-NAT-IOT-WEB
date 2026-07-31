@@ -84,7 +84,15 @@ test('stale telemetry is not misreported as pH out of range', () => {
             },
         },
     });
-    const result = spawnSync('python3', [script], { input: payload, encoding: 'utf8' });
+    const result = spawnSync('python3', [script], {
+        input: payload,
+        encoding: 'utf8',
+        env: {
+            ...process.env,
+            PYTHONIOENCODING: 'utf-8',
+            PYTHONUTF8: '1',
+        },
+    });
     assert.equal(result.status, 0, result.stderr);
     const response = JSON.parse(result.stdout);
     assert.equal(response.risk.severity, 'offline');

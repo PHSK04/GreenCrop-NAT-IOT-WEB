@@ -119,6 +119,24 @@ export interface AiSensorLearningSummary {
   };
 }
 
+export interface NatAiBrainAssessment {
+  version: string;
+  confidence: number;
+  data_quality: {
+    telemetry_available: boolean;
+    telemetry_fresh: boolean;
+    telemetry_age_minutes: number | null;
+    evidence_count: number;
+  };
+  safety: {
+    mode: "read-only" | "confirmation-required";
+    hardware_changed: boolean;
+    reason: string;
+  };
+  evidence: Array<{ source: string; score?: number }>;
+  plan: Array<{ id: string; label: string; status: string }>;
+}
+
 type ChatThreadListQuery = {
   mine?: boolean;
   unread?: boolean;
@@ -244,6 +262,7 @@ export const chatService = {
     controller_intent?: string;
     controller_risk?: unknown;
     controller_actions?: unknown[];
+    brain?: NatAiBrainAssessment;
     max_output_tokens?: number;
   }> {
     const response = await fetch(buildApiUrl("/ai-chat/session/me/respond"), {

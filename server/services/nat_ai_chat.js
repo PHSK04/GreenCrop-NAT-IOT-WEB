@@ -682,6 +682,11 @@ function runPythonController(context) {
         const child = spawn(NAT_AI_PYTHON_BIN, [NAT_AI_PYTHON_SCRIPT], {
             cwd: path.resolve(__dirname, '../..'),
             stdio: ['pipe', 'pipe', 'pipe'],
+            env: {
+                ...process.env,
+                PYTHONIOENCODING: 'utf-8',
+                PYTHONUTF8: '1',
+            },
         });
         let stdout = '';
         let stderr = '';

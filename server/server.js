@@ -12,6 +12,7 @@ const { startMqttListener, getMqttListenerStatus } = require('./mqtt_listener');
 const { parseUserAgent, getClientIP } = require('./deviceDetector');
 const { backfillTenantSensorSamples, getTenantLearningSummary, recordAiSensorSample } = require('./services/ai_training');
 const { OPENAI_MAX_OUTPUT_TOKENS, buildNatAiContext, generateNatAiReply, saveAiExchange } = require('./services/nat_ai_chat');
+const { buildBrainAssessment } = require('./services/nat_ai_brain');
 
 // Start MQTT Listener for IoT Data Recording
 startMqttListener();
@@ -2028,6 +2029,7 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
         });
         const generated = await generateNatAiReply(context, fallbackText);
         const aiText = generated.text;
+        const brain = buildBrainAssessment(context, generated);
 
         await saveAiExchange(db, {
             sessionId: session.id,
@@ -2048,6 +2050,7 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
             controller_intent: generated.intent,
             controller_risk: generated.risk,
             controller_actions: generated.actions,
+            brain,
             ai_context_chars: generated.context_chars,
             ai_context_budget_chars: generated.context_budget_chars,
             ai_context_truncated: generated.context_truncated,
