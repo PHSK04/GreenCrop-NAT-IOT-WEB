@@ -8,6 +8,7 @@ WORKFLOW_FILE="${ROOT_DIR}/.github/workflows/deploy-pages.yml"
 STACK_SCRIPT="${ROOT_DIR}/scripts/server_public_stable.sh"
 
 mkdir -p "${RUNTIME_DIR}"
+: > "${TUNNEL_URL_FILE}"
 
 publish_url() {
   local tunnel_url="$1"
@@ -17,7 +18,11 @@ publish_url() {
 
   before_hash="$(shasum "${WORKFLOW_FILE}" | awk '{print $1}')"
 
-  perl -0777 -i -pe "s#(VITE_API_URL:\\s*\\$\\{\\{\\s*secrets\\.VITE_API_URL\\s*\\|\\|\\s*')[^']+(' \\}\\})#\\1${api_url}\\2#g" "${WORKFLOW_FILE}"
+  API_URL="${api_url}" perl -i -pe '
+    if (/^(\s*VITE_API_URL:\s*).*/) {
+      $_ = $1 . $ENV{API_URL} . "\n";
+    }
+  ' "${WORKFLOW_FILE}"
 
   after_hash="$(shasum "${WORKFLOW_FILE}" | awk '{print $1}')"
   if [[ "${before_hash}" == "${after_hash}" ]]; then
