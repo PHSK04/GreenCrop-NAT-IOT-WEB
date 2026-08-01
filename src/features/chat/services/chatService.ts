@@ -137,6 +137,16 @@ export interface NatAiBrainAssessment {
   plan: Array<{ id: string; label: string; status: string }>;
 }
 
+export type VoiceControlAction = "system_on" | "system_off" | "pump1_on" | "pump1_off" | "pump2_on" | "pump2_off";
+export interface VoiceControlPreparation {
+  deviceId: string;
+  action: VoiceControlAction;
+  requiresConfirmation: boolean;
+  confirmationToken?: string | null;
+  prompt?: string | null;
+}
+export interface VoiceToolProposal { tool: "none" | "read_device_context" | "control_device"; action?: VoiceControlAction | null }
+
 type ChatThreadListQuery = {
   mine?: boolean;
   unread?: boolean;
@@ -196,6 +206,12 @@ const getAuthHeaders = () => {
   };
 };
 
+const getAuthOnlyHeaders = () => {
+  const headers = getAuthHeaders();
+  const { "Content-Type": _contentType, ...authOnly } = headers;
+  return authOnly;
+};
+
 const toQueryString = (query?: Record<string, string | number | boolean | undefined>) => {
   if (!query) return "";
   const params = new URLSearchParams();
@@ -216,6 +232,59 @@ const parseJson = async <T>(response: Response, fallback: string): Promise<T> =>
 };
 
 export const chatService = {
+  async transcribeLocalAudio(audio: Blob, language = "th"): Promise<string> {
+    const response = await fetch(buildApiUrl(`/ai/voice/local/transcribe${toQueryString({ language })}`), {
+      method: "POST",
+      headers: { ...getAuthOnlyHeaders(), "Content-Type": audio.type || "application/octet-stream" },
+      body: audio,
+    });
+    const result = await parseJson<{ text?: string }>(response, "Local STT is unavailable");
+    return String(result.text || "").trim();
+  },
+  async getLocalVoiceStatus(): Promise<Record<string, unknown>> {
+    const response = await fetch(buildApiUrl("/ai/voice/local/status"), { headers: getAuthHeaders() });
+    return parseJson(response, "Failed to load local voice status");
+  },
+
+  async getVoiceDeviceContext(deviceId: string): Promise<Record<string, unknown>> {
+    const response = await fetch(buildApiUrl(`/ai/voice/tools/context${toQueryString({ deviceId })}`), { headers: getAuthHeaders() });
+    return parseJson(response, "Failed to read device context");
+  },
+
+  async routeVoiceTool(userMessage: string, deviceId?: string): Promise<VoiceToolProposal> {
+    const response = await fetch(buildApiUrl("/ai/voice/tools/route"), {
+      method: "POST", headers: getAuthHeaders(), body: JSON.stringify({ userMessage, deviceId }),
+    });
+    return parseJson(response, "Local tool routing failed");
+  },
+
+  async prepareVoiceControl(deviceId: string, action: VoiceControlAction): Promise<VoiceControlPreparation> {
+    const response = await fetch(buildApiUrl("/ai/voice/tools/control/prepare"), {
+      method: "POST", headers: getAuthHeaders(), body: JSON.stringify({ deviceId, action }),
+    });
+    return parseJson(response, "Failed to prepare device command");
+  },
+
+  async executeVoiceControl(prepared: VoiceControlPreparation): Promise<{ ok: boolean; correlationId?: string; state?: string }> {
+    const response = await fetch(buildApiUrl("/ai/voice/tools/control/execute"), {
+      method: "POST", headers: getAuthHeaders(), body: JSON.stringify({
+        deviceId: prepared.deviceId, action: prepared.action, confirmationToken: prepared.confirmationToken,
+      }),
+    });
+    return parseJson(response, "Failed to execute device command");
+  },
+
+  async waitForVoiceControl(correlationId: string, timeoutMs = 8500): Promise<Record<string, unknown>> {
+    const deadline = Date.now() + timeoutMs;
+    let latest: Record<string, unknown> = { correlationId, state: "published" };
+    while (Date.now() < deadline) {
+      const response = await fetch(buildApiUrl(`/ai/voice/tools/control/status/${encodeURIComponent(correlationId)}`), { headers: getAuthHeaders() });
+      latest = await parseJson(response, "Failed to read command acknowledgement");
+      if (["confirmed", "rejected", "timeout", "failed"].includes(String(latest.state || ""))) return latest;
+      await new Promise((resolve) => window.setTimeout(resolve, 500));
+    }
+    return latest;
+  },
   async synthesizeAiSpeech(text: string, rate = 1): Promise<Blob> {
     const response = await fetch(buildApiUrl("/ai/voice/synthesize"), {
       method: "POST",

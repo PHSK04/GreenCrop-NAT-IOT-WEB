@@ -9,6 +9,8 @@ const KNOWLEDGE_FILES = [
     'docs/GreenCropNAT_Admin_System_Spec.md',
     'docs/guides/IOT_GUIDE.md',
     'docs/guides/PROJECT_STRUCTURE.md',
+    'docs/guides/LOCAL_VOICE_AI_SETUP.md',
+    'docs/reference/PROJECT_FEATURE_INDEX.md',
 ];
 
 let cachedChunks = null;

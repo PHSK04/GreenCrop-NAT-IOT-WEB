@@ -1,4 +1,5 @@
 const mqtt = require('mqtt');
+const crypto = require('crypto');
 const db = require('./database');
 const { recordAiSensorSample } = require('./services/ai_training');
 
@@ -43,6 +44,9 @@ const SENSOR_DATA_SELECT_COLUMNS = [
 ].join(', ');
 
 let client;
+const commandStates = new Map();
+const idempotencyIndex = new Map();
+const COMMAND_STATE_TTL_MS = 10 * 60 * 1000;
 const mqttStatus = {
     connected: false,
     subscribedTopics: [],
@@ -57,6 +61,49 @@ function getMqttListenerStatus() {
         ...mqttStatus,
         clientConnected: Boolean(client?.connected),
     };
+}
+
+function cleanCommandStates() {
+    const cutoff = Date.now() - COMMAND_STATE_TTL_MS;
+    for (const [id, state] of commandStates) if (state.createdAtMs < cutoff) commandStates.delete(id);
+}
+
+function getDeviceCommandStatus(correlationId, scope = {}) {
+    const state = commandStates.get(String(correlationId || ''));
+    if (!state) return null;
+    if (scope.tenantId && String(state.tenantId) !== String(scope.tenantId)) return null;
+    if (scope.userId && String(state.userId) !== String(scope.userId)) return null;
+    return { ...state, createdAtMs: undefined, timeoutHandle: undefined };
+}
+
+async function publishDeviceCommand({ tenantId, deviceId, userId, command, idempotencyKey, timeoutMs = 8000, retries = 1 }) {
+    if (!client?.connected) {
+        throw new Error('MQTT broker is not connected');
+    }
+    const safeTenant = String(tenantId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    const safeDevice = String(deviceId || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    if (!safeTenant || !safeDevice) throw new Error('Invalid tenant or device id');
+    cleanCommandStates();
+    const safeIdempotencyKey = String(idempotencyKey || '').trim().slice(0, 120);
+    const indexKey = safeIdempotencyKey ? `${safeTenant}|${userId}|${safeDevice}|${safeIdempotencyKey}` : '';
+    const existingId = indexKey && idempotencyIndex.get(indexKey);
+    if (existingId && commandStates.has(existingId)) return getDeviceCommandStatus(existingId, { tenantId: safeTenant, userId });
+    const correlationId = crypto.randomUUID();
+    const topic = `tenants/${safeTenant}/devices/${safeDevice}/commands`;
+    const payload = JSON.stringify({ ...command, correlation_id: correlationId, idempotency_key: safeIdempotencyKey || correlationId, device_id: safeDevice, timestamp: new Date().toISOString() });
+    const state = { correlationId, idempotencyKey: safeIdempotencyKey || correlationId, tenantId: safeTenant, userId: String(userId || ''), deviceId: safeDevice, action: command.action, state: 'accepted', attempts: 0, topic, createdAt: new Date().toISOString(), createdAtMs: Date.now(), publishedAt: null, confirmedAt: null, error: null };
+    commandStates.set(correlationId, state);
+    if (indexKey) idempotencyIndex.set(indexKey, correlationId);
+    const publishOnce = () => new Promise((resolve, reject) => client.publish(topic, payload, { qos: 1 }, (error) => error ? reject(error) : resolve()));
+    let lastError;
+    for (let attempt = 0; attempt <= Math.max(0, retries); attempt += 1) {
+        state.attempts += 1;
+        try { await publishOnce(); lastError = null; break; } catch (error) { lastError = error; }
+    }
+    if (lastError) { state.state = 'failed'; state.error = lastError.message; throw lastError; }
+    state.state = 'published'; state.publishedAt = new Date().toISOString();
+    state.timeoutHandle = setTimeout(() => { if (state.state === 'published') { state.state = 'timeout'; state.error = 'Hardware acknowledgement timeout'; } }, Math.max(1000, Number(timeoutMs) || 8000));
+    return getDeviceCommandStatus(correlationId, { tenantId: safeTenant, userId });
 }
 
 function asBool(value) {
@@ -229,8 +276,8 @@ function startMqttListener() {
         mqttStatus.lastError = null;
 
         const subscriptions = ACCEPT_LEGACY_SENSOR_TOPIC
-            ? [TOPIC_LEGACY, TOPIC_TENANT_PATTERN]
-            : [TOPIC_TENANT_PATTERN];
+            ? [TOPIC_LEGACY, TOPIC_TENANT_PATTERN, 'tenants/+/devices/+/acks']
+            : [TOPIC_TENANT_PATTERN, 'tenants/+/devices/+/acks'];
 
         client.subscribe(subscriptions, (err, granted) => {
             if (!err) {
@@ -261,7 +308,18 @@ function startMqttListener() {
             }
 
             const payload = JSON.parse(message.toString());
-            console.log(`[MQTT] Received data on ${topic}:`, payload);
+            if (segments[4] === 'acks') {
+                const correlationId = String(payload.correlation_id || payload.correlationId || '');
+                const state = commandStates.get(correlationId);
+                if (state && state.tenantId === tenantId && state.deviceId === String(deviceId || '').toUpperCase()) {
+                    if (state.timeoutHandle) clearTimeout(state.timeoutHandle);
+                    state.state = payload.ok === false ? 'rejected' : 'confirmed';
+                    state.confirmedAt = new Date().toISOString();
+                    state.hardware = payload.state || payload.hardware_state || null;
+                    state.error = payload.error || null;
+                }
+                return;
+            }
 
             if (!hasMeaningfulSensorSignal(payload)) {
                 console.log(`[MQTT] Suppressed empty/no-trigger payload on ${topic}`);
@@ -423,4 +481,4 @@ function startMqttListener() {
     });
 }
 
-module.exports = { startMqttListener, getMqttListenerStatus };
+module.exports = { startMqttListener, getMqttListenerStatus, publishDeviceCommand, getDeviceCommandStatus };

@@ -14,7 +14,12 @@ function sanitizePdfText(input: string) {
     .replace(/[–—]/g, "-")
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
-    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "");
+    .split("")
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return character === "\t" || character === "\n" || character === "\r" || (code >= 32 && code <= 126);
+    })
+    .join("");
 }
 
 function parseCsvLine(line: string) {

@@ -2,42 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const STORAGE_KEY = "nat_ai_hands_free_enabled";
+const ONBOARDED_KEY = "nat_ai_local_voice_onboarded";
 const VOICE_REPLY_STORAGE_KEY = "nat_ai_voice_reply_enabled";
 const VOICE_RATE_STORAGE_KEY = "nat_ai_voice_rate";
 const ACTIVE_CONVERSATION_MS = 45_000;
+const WAKE_CAPTURE_MS = 3_500;
+const COMMAND_CAPTURE_MS = 5_500;
 const VOICE_RATES = [0.8, 1, 1.15] as const;
 
-type SpeechRecognitionEventLike = Event & {
-  results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>;
-};
-
-type SpeechRecognitionLike = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onend: (() => void) | null;
-  onerror: ((event: Event & { error?: string }) => void) | null;
-};
-
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
-
-export type VoiceAssistantPhase =
-  | "off"
-  | "waiting-wake-word"
-  | "listening-command"
-  | "thinking"
-  | "speaking";
-
-type AssistantVoiceMessage = {
-  id: string;
-  text: string;
-};
-
-type UseNatVoiceAssistantOptions = {
+export type VoiceAssistantPhase = "off" | "waiting-wake-word" | "listening-command" | "thinking" | "speaking";
+type AssistantVoiceMessage = { id: string; text: string };
+type Options = {
   isOpen: boolean;
   isAssistantMode: boolean;
   isSending: boolean;
@@ -46,403 +21,252 @@ type UseNatVoiceAssistantOptions = {
   onTranscript: (transcript: string) => void;
   onSubmit: (transcript: string) => Promise<void> | void;
   onSynthesizeSpeech?: (text: string, rate: number) => Promise<Blob>;
+  onTranscribeAudio?: (audio: Blob, language: string) => Promise<string>;
 };
 
 const WAKE_WORD_PATTERNS = [
-  /(?:เฮ้|เฮ|โอเค|สวัสดี)\s*(?:แนท|nat|เอ็นเอที)/i,
-  /\b(?:hey|hi|okay|ok)\s+nat\b/i,
-  /(?:แนท|nat|เอ็นเอที)\s*(?:เอไอ|ai)?/i,
+  /(?:เฮ้|เฮ|โอเค|สวัสดี)\s*(?:กรีน|green)/i,
+  /\b(?:hey|hi|okay|ok)\s+green\b/i,
 ];
-
-const SLEEP_PATTERN =
-  /^(?:พอแล้ว|หยุดฟัง|พักก่อน|ไปพัก|ขอบคุณ(?:ครับ|ค่ะ)?|stop listening|go to sleep|that's all)$/i;
-
+const SLEEP_PATTERN = /^(?:พอแล้ว|หยุดฟัง|พักก่อน|ไปพัก|ขอบคุณ(?:ครับ|ค่ะ)?|stop listening|go to sleep|that's all)$/i;
 const REPEAT_PATTERN = /^(?:พูดซ้ำ|พูดอีกครั้ง|ทวนอีกครั้ง|repeat(?: that)?|say that again)$/i;
-const SLOWER_PATTERN = /^(?:พูดช้าลง|ช้าลง|slow down|speak slower)$/i;
-const NORMAL_RATE_PATTERN = /^(?:พูดปกติ|ความเร็วปกติ|normal speed)$/i;
-const FASTER_PATTERN = /^(?:พูดเร็วขึ้น|เร็วขึ้น|speed up|speak faster)$/i;
 const STOP_SPEAKING_PATTERN = /^(?:หยุดพูด|พอแล้ว|เงียบก่อน|stop speaking|be quiet)$/i;
 
-const extractWakeWordCommand = (transcript: string) => {
+function extractWakeWordCommand(transcript: string) {
   for (const pattern of WAKE_WORD_PATTERNS) {
     const match = pattern.exec(transcript);
-    if (!match) continue;
-    return {
+    if (match) return {
       woke: true,
       command: `${transcript.slice(0, match.index)} ${transcript.slice(match.index + match[0].length)}`
-        .replace(/^[\s,.;:!?ๆ]+|[\s,.;:!?ๆ]+$/g, "")
-        .trim(),
+        .replace(/^[\s,.;:!?ๆ]+|[\s,.;:!?ๆ]+$/g, "").trim(),
     };
   }
   return { woke: false, command: "" };
-};
+}
 
-const readStoredEnabled = () => {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(STORAGE_KEY) === "true";
-};
+const storedBool = (key: string, fallback = false) => typeof window === "undefined"
+  ? fallback
+  : (window.localStorage.getItem(key) == null ? fallback : window.localStorage.getItem(key) === "true");
 
-const readStoredVoiceReplyEnabled = () => {
-  if (typeof window === "undefined") return false;
-  const stored = window.localStorage.getItem(VOICE_REPLY_STORAGE_KEY);
-  return stored == null ? readStoredEnabled() : stored === "true";
-};
-
-const readStoredVoiceRate = () => {
-  if (typeof window === "undefined") return 1;
-  const stored = Number(window.localStorage.getItem(VOICE_RATE_STORAGE_KEY));
-  return VOICE_RATES.includes(stored as (typeof VOICE_RATES)[number]) ? stored : 1;
-};
-
-export function useNatVoiceAssistant({
-  isOpen,
-  isAssistantMode,
-  isSending,
-  isThai,
-  latestAssistantMessage,
-  onTranscript,
-  onSubmit,
-  onSynthesizeSpeech,
-}: UseNatVoiceAssistantOptions) {
-  const [enabled, setEnabled] = useState(readStoredEnabled);
-  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(readStoredVoiceReplyEnabled);
-  const [voiceRate, setVoiceRate] = useState(readStoredVoiceRate);
+export function useNatVoiceAssistant(options: Options) {
+  const { isOpen, isAssistantMode, isSending, isThai, latestAssistantMessage, onTranscript, onSubmit, onSynthesizeSpeech, onTranscribeAudio } = options;
+  const [enabled, setEnabled] = useState(() => storedBool(STORAGE_KEY));
+  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(() => storedBool(VOICE_REPLY_STORAGE_KEY, storedBool(STORAGE_KEY)));
+  const [voiceRate, setVoiceRate] = useState(() => {
+    const value = Number(typeof window === "undefined" ? 1 : window.localStorage.getItem(VOICE_RATE_STORAGE_KEY));
+    return VOICE_RATES.includes(value as (typeof VOICE_RATES)[number]) ? value : 1;
+  });
   const [isListening, setIsListening] = useState(false);
-  const [phase, setPhase] = useState<VoiceAssistantPhase>(
-    readStoredEnabled() ? "waiting-wake-word" : "off",
-  );
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const [phase, setPhase] = useState<VoiceAssistantPhase>(enabled ? "waiting-wake-word" : "off");
+  const [permissionState, setPermissionState] = useState<PermissionState | "unknown">("unknown");
   const enabledRef = useRef(enabled);
-  const openRef = useRef(isOpen);
-  const assistantModeRef = useRef(isAssistantMode);
-  const sendingRef = useRef(isSending);
-  const speakingRef = useRef(false);
+  const runtimeRef = useRef({ isOpen, isAssistantMode, isSending });
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const captureTimerRef = useRef<number | null>(null);
+  const retryCountRef = useRef(0);
   const commandWindowUntilRef = useRef(0);
-  const lastSpokenMessageIdRef = useRef<string | null>(latestAssistantMessage?.id || null);
-  const lastSpokenTextRef = useRef(latestAssistantMessage?.text || "");
-  const voiceRateRef = useRef(voiceRate);
+  const lastWakeAtRef = useRef(0);
+  const speakingRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
-  const startListeningRef = useRef<() => void>(() => {});
+  const speechQueueRef = useRef<string[]>([]);
+  const bargeMonitorRef = useRef<{ context: AudioContext; frame: number } | null>(null);
+  const lastSpokenTextRef = useRef(latestAssistantMessage?.text || "");
+  const lastSpokenMessageIdRef = useRef<string | null>(latestAssistantMessage?.id || null);
+  const callbacksRef = useRef({ onTranscript, onSubmit, onSynthesizeSpeech, onTranscribeAudio });
+  const startCaptureRef = useRef<() => void>(() => {});
   const speakTextRef = useRef<(text: string) => Promise<void>>(async () => {});
-  const onTranscriptRef = useRef(onTranscript);
-  const onSubmitRef = useRef(onSubmit);
-  const onSynthesizeSpeechRef = useRef(onSynthesizeSpeech);
 
   useEffect(() => {
     enabledRef.current = enabled;
-    openRef.current = isOpen;
-    assistantModeRef.current = isAssistantMode;
-    sendingRef.current = isSending;
-    voiceRateRef.current = voiceRate;
-    onTranscriptRef.current = onTranscript;
-    onSubmitRef.current = onSubmit;
-    onSynthesizeSpeechRef.current = onSynthesizeSpeech;
-  }, [enabled, isAssistantMode, isOpen, isSending, onSubmit, onSynthesizeSpeech, onTranscript, voiceRate]);
+    runtimeRef.current = { isOpen, isAssistantMode, isSending };
+    callbacksRef.current = { onTranscript, onSubmit, onSynthesizeSpeech, onTranscribeAudio };
+  }, [enabled, isAssistantMode, isOpen, isSending, onSubmit, onSynthesizeSpeech, onTranscript, onTranscribeAudio]);
 
-  const canRun = useCallback(
-    () => enabledRef.current && openRef.current && assistantModeRef.current,
-    [],
-  );
-
-  const scheduleRestart = useCallback((delay = 350) => {
+  const canRun = useCallback(() => enabledRef.current && runtimeRef.current.isOpen && runtimeRef.current.isAssistantMode, []);
+  const scheduleRestart = useCallback((delay = 300) => {
     window.setTimeout(() => {
-      if (canRun() && !sendingRef.current && !speakingRef.current) {
-        startListeningRef.current();
-      }
+      if (canRun() && !runtimeRef.current.isSending && !speakingRef.current) startCaptureRef.current();
     }, delay);
   }, [canRun]);
 
-  const startListening = useCallback(() => {
-    if (!canRun() || sendingRef.current || speakingRef.current || recognitionRef.current) return;
-    const speechWindow = window as typeof window & {
-      SpeechRecognition?: SpeechRecognitionConstructor;
-      webkitSpeechRecognition?: SpeechRecognitionConstructor;
-    };
-    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
-    if (!Recognition) {
-      setEnabled(false);
-      enabledRef.current = false;
-      setPhase("off");
-      toast.error(isThai
-        ? "เบราว์เซอร์นี้ยังไม่รองรับผู้ช่วยเสียง กรุณาใช้ Chrome หรือ Edge"
-        : "Voice assistant is not supported. Try Chrome or Edge.");
+  const processTranscript = useCallback((raw: string) => {
+    const clean = raw.replace(/\s+/g, " ").trim();
+    if (!clean) return;
+    const active = Date.now() < commandWindowUntilRef.current;
+    const wake = extractWakeWordCommand(clean);
+    if (!active && !wake.woke) return;
+    if (!active && wake.woke && Date.now() - lastWakeAtRef.current < 2_500) return;
+    if (!active && wake.woke) lastWakeAtRef.current = Date.now();
+    const command = active ? clean : wake.command;
+    commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS;
+    if (!command) { setPhase("listening-command"); return; }
+    if (SLEEP_PATTERN.test(command)) { commandWindowUntilRef.current = 0; setPhase("waiting-wake-word"); return; }
+    if (STOP_SPEAKING_PATTERN.test(command)) { audioRef.current?.pause(); speakingRef.current = false; return; }
+    if (REPEAT_PATTERN.test(command)) { if (lastSpokenTextRef.current) void speakTextRef.current(lastSpokenTextRef.current); return; }
+    callbacksRef.current.onTranscript(command);
+    setPhase("thinking");
+    void Promise.resolve(callbacksRef.current.onSubmit(command)).catch(() => undefined);
+  }, []);
+
+  const startCapture = useCallback(async () => {
+    if (!canRun() || runtimeRef.current.isSending || speakingRef.current || recorderRef.current) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setEnabled(false); enabledRef.current = false; setPhase("off");
+      toast.error(isThai ? "เบราว์เซอร์นี้ไม่รองรับ Local Voice Capture" : "This browser cannot capture audio locally.");
       return;
     }
-
-    const recognition = new Recognition();
-    let handledFinalResult = false;
-    recognition.lang = isThai ? "th-TH" : "en-US";
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.onresult = (event) => {
-      let transcript = "";
-      for (let index = 0; index < event.results.length; index += 1) {
-        transcript += event.results[index]?.[0]?.transcript || "";
-      }
-      const cleanTranscript = transcript.trim();
-      const finalResult = event.results[event.results.length - 1];
-      if (!finalResult?.isFinal || !cleanTranscript || handledFinalResult) return;
-      handledFinalResult = true;
-
-      const activeConversation = Date.now() < commandWindowUntilRef.current;
-      const wakeResult = extractWakeWordCommand(cleanTranscript);
-      if (!activeConversation && !wakeResult.woke) {
-        recognition.stop();
-        return;
-      }
-
-      const command = activeConversation ? cleanTranscript : wakeResult.command;
-      commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS;
-      if (!command) {
-        setPhase("listening-command");
-        recognition.stop();
-        return;
-      }
-      if (SLEEP_PATTERN.test(command)) {
-        commandWindowUntilRef.current = 0;
-        onTranscriptRef.current("");
-        setPhase("waiting-wake-word");
-        recognition.stop();
-        return;
-      }
-      if (STOP_SPEAKING_PATTERN.test(command)) {
-        window.speechSynthesis?.cancel();
-        speakingRef.current = false;
-        setPhase("listening-command");
-        recognition.stop();
-        return;
-      }
-      if (REPEAT_PATTERN.test(command)) {
-        recognition.stop();
-        if (lastSpokenTextRef.current) void speakTextRef.current(lastSpokenTextRef.current);
-        return;
-      }
-      if (SLOWER_PATTERN.test(command) || NORMAL_RATE_PATTERN.test(command) || FASTER_PATTERN.test(command)) {
-        const nextRate = SLOWER_PATTERN.test(command) ? 0.8 : FASTER_PATTERN.test(command) ? 1.15 : 1;
-        voiceRateRef.current = nextRate;
-        setVoiceRate(nextRate);
-        window.localStorage.setItem(VOICE_RATE_STORAGE_KEY, String(nextRate));
-        recognition.stop();
-        return;
-      }
-
-      onTranscriptRef.current(command);
-      setPhase("thinking");
-      recognition.stop();
-      window.setTimeout(() => Promise.resolve(onSubmitRef.current(command)).catch(() => {}), 0);
-    };
-    recognition.onerror = (event) => {
-      recognitionRef.current = null;
-      setIsListening(false);
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-        setEnabled(false);
-        enabledRef.current = false;
-        setPhase("off");
-        window.localStorage.setItem(STORAGE_KEY, "false");
-        toast.error(isThai
-          ? "กรุณาอนุญาตใช้ไมโครโฟนเพื่อเปิด NAT AI แบบไม่ใช้มือ"
-          : "Allow microphone access to use hands-free NAT AI.");
-        return;
-      }
-      if (event.error !== "aborted" && event.error !== "no-speech") {
-        toast.error(isThai ? "ระบบฟังเสียงสะดุด กำลังลองใหม่" : "Voice listening was interrupted. Retrying.");
-      }
-    };
-    recognition.onend = () => {
-      if (recognitionRef.current === recognition) recognitionRef.current = null;
-      setIsListening(false);
-      if (canRun() && !sendingRef.current && !speakingRef.current) {
-        setPhase(Date.now() < commandWindowUntilRef.current ? "listening-command" : "waiting-wake-word");
-        scheduleRestart();
-      }
-    };
-    recognitionRef.current = recognition;
-    setIsListening(true);
-    setPhase(Date.now() < commandWindowUntilRef.current ? "listening-command" : "waiting-wake-word");
-    try {
-      recognition.start();
-    } catch {
-      recognitionRef.current = null;
-      setIsListening(false);
-      scheduleRestart(700);
+    if (!callbacksRef.current.onTranscribeAudio) {
+      setEnabled(false); enabledRef.current = false; setPhase("off");
+      toast.error(isThai ? "ยังไม่ได้เชื่อม local STT" : "Local STT is not connected.");
+      return;
     }
-  }, [canRun, isThai, scheduleRestart]);
+    try {
+      const stream = streamRef.current?.active
+        ? streamRef.current
+        : await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
+      streamRef.current = stream;
+      setPermissionState("granted");
+      window.localStorage.setItem(ONBOARDED_KEY, "true");
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((type) => MediaRecorder.isTypeSupported(type));
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 32_000 } : undefined);
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+      recorder.onstop = async () => {
+        recorderRef.current = null;
+        setIsListening(false);
+        if (!canRun()) return;
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        try {
+          const text = await callbacksRef.current.onTranscribeAudio!(blob, isThai ? "th" : "en");
+          retryCountRef.current = 0;
+          processTranscript(text);
+        } catch (error) {
+          retryCountRef.current += 1;
+          if (retryCountRef.current === 1 || retryCountRef.current % 5 === 0) {
+            toast.error(isThai ? "Local STT ขาดการเชื่อมต่อ กำลังลองใหม่" : "Local STT disconnected. Retrying.");
+          }
+        } finally {
+          if (canRun() && !runtimeRef.current.isSending && !speakingRef.current) {
+            const backoff = Math.min(5_000, 300 * Math.max(1, retryCountRef.current));
+            scheduleRestart(backoff);
+          }
+        }
+      };
+      recorderRef.current = recorder;
+      setIsListening(true);
+      const active = Date.now() < commandWindowUntilRef.current;
+      setPhase(active ? "listening-command" : "waiting-wake-word");
+      recorder.start(500);
+      captureTimerRef.current = window.setTimeout(() => {
+        if (recorder.state === "recording") recorder.stop();
+      }, active ? COMMAND_CAPTURE_MS : WAKE_CAPTURE_MS);
+    } catch (error) {
+      const denied = error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError");
+      setPermissionState(denied ? "denied" : "prompt");
+      if (denied) { setEnabled(false); enabledRef.current = false; setPhase("off"); window.localStorage.setItem(STORAGE_KEY, "false"); }
+      toast.error(isThai ? "กรุณาอนุญาตไมโครโฟนสำหรับ Local Voice AI" : "Allow microphone access for Local Voice AI.");
+    }
+  }, [canRun, isThai, processTranscript, scheduleRestart]);
+  startCaptureRef.current = () => { void startCapture(); };
 
-  startListeningRef.current = startListening;
+  const stopCapture = useCallback(() => {
+    if (captureTimerRef.current) window.clearTimeout(captureTimerRef.current);
+    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+    recorderRef.current = null;
+    setIsListening(false);
+  }, []);
+
+  const stopBargeMonitor = useCallback(() => {
+    const monitor = bargeMonitorRef.current;
+    if (!monitor) return;
+    cancelAnimationFrame(monitor.frame);
+    void monitor.context.close();
+    bargeMonitorRef.current = null;
+  }, []);
+
+  const startBargeMonitor = useCallback(() => {
+    stopBargeMonitor();
+    const stream = streamRef.current;
+    if (!stream?.active) return;
+    const context = new AudioContext();
+    const analyser = context.createAnalyser(); analyser.fftSize = 1024;
+    context.createMediaStreamSource(stream).connect(analyser);
+    const values = new Float32Array(analyser.fftSize);
+    const startedAt = performance.now(); let speechFrames = 0;
+    const tick = () => {
+      analyser.getFloatTimeDomainData(values);
+      const rms = Math.sqrt(values.reduce((sum, value) => sum + value * value, 0) / values.length);
+      // Grace period and sustained high threshold reduce self-trigger from the assistant speaker.
+      speechFrames = performance.now() - startedAt > 900 && rms > 0.075 ? speechFrames + 1 : 0;
+      if (speechFrames >= 8 && speakingRef.current) {
+        speechQueueRef.current = []; audioRef.current?.pause(); window.speechSynthesis?.cancel(); speakingRef.current = false;
+        commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS; stopBargeMonitor(); scheduleRestart(50); return;
+      }
+      const frame = requestAnimationFrame(tick);
+      if (bargeMonitorRef.current) bargeMonitorRef.current.frame = frame;
+    };
+    bargeMonitorRef.current = { context, frame: requestAnimationFrame(tick) };
+  }, [scheduleRestart, stopBargeMonitor]);
 
   const disable = useCallback(() => {
-    enabledRef.current = false;
-    setEnabled(false);
-    setPhase("off");
-    setIsListening(false);
-    commandWindowUntilRef.current = 0;
-    window.localStorage.setItem(STORAGE_KEY, "false");
-    recognitionRef.current?.abort();
-    recognitionRef.current = null;
-    audioRef.current?.pause();
-    audioRef.current = null;
-    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
-    audioUrlRef.current = null;
-    window.speechSynthesis?.cancel();
-  }, []);
+    enabledRef.current = false; setEnabled(false); setPhase("off"); commandWindowUntilRef.current = 0;
+    window.localStorage.setItem(STORAGE_KEY, "false"); stopCapture();
+    streamRef.current?.getTracks().forEach((track) => track.stop()); streamRef.current = null;
+    audioRef.current?.pause(); window.speechSynthesis?.cancel();
+  }, [stopCapture]);
 
   const toggleHandsFree = useCallback(() => {
-    if (enabledRef.current) {
-      disable();
-      return;
-    }
-    enabledRef.current = true;
-    setEnabled(true);
-    setVoiceReplyEnabled(true);
-    window.localStorage.setItem(VOICE_REPLY_STORAGE_KEY, "true");
-    setPhase("waiting-wake-word");
-    window.localStorage.setItem(STORAGE_KEY, "true");
-    lastSpokenMessageIdRef.current = latestAssistantMessage?.id || null;
-    window.setTimeout(() => startListeningRef.current(), 0);
-    toast.success(isThai
-      ? "เปิด NAT AI แบบไม่ใช้มือแล้ว พูดว่า “เฮ้ NAT” เพื่อเริ่ม"
-      : "Hands-free NAT AI is on. Say “Hey NAT” to begin.");
-  }, [disable, isThai, latestAssistantMessage?.id]);
-
-  const toggleVoiceReply = useCallback(() => {
-    if (voiceReplyEnabled) {
-      audioRef.current?.pause();
-      audioRef.current = null;
-      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
-      audioUrlRef.current = null;
-      window.speechSynthesis?.cancel();
-      speakingRef.current = false;
-      setVoiceReplyEnabled(false);
-      window.localStorage.setItem(VOICE_REPLY_STORAGE_KEY, "false");
-      scheduleRestart();
-      return;
-    }
-    lastSpokenMessageIdRef.current = latestAssistantMessage?.id || null;
-    setVoiceReplyEnabled(true);
-    window.localStorage.setItem(VOICE_REPLY_STORAGE_KEY, "true");
-    toast.success(isThai ? "เปิดเสียงตอบกลับแล้ว" : "Voice replies enabled");
-  }, [isThai, latestAssistantMessage?.id, scheduleRestart, voiceReplyEnabled]);
+    if (enabledRef.current) { disable(); return; }
+    enabledRef.current = true; setEnabled(true); setVoiceReplyEnabled(true); setPhase("waiting-wake-word");
+    window.localStorage.setItem(STORAGE_KEY, "true"); window.localStorage.setItem(VOICE_REPLY_STORAGE_KEY, "true");
+    toast.success(isThai ? "กำลังเปิดไมค์ Local AI ครั้งแรก จากนั้นพูด “เฮ้ Green” ได้เลย" : "Enabling the local microphone. Then say “Hey Green”.");
+    void startCapture();
+  }, [disable, isThai, startCapture]);
 
   const speakText = useCallback(async (text: string) => {
-    const cleanText = text.replace(/[*#`_>-]/g, " ").replace(/\s+/g, " ").trim();
-    if (!cleanText || !voiceReplyEnabled) {
-      if (enabledRef.current) scheduleRestart();
+    const clean = text.replace(/[*#`_>-]/g, " ").replace(/\s+/g, " ").trim();
+    if (!clean || !voiceReplyEnabled) { scheduleRestart(); return; }
+    if (speakingRef.current) {
+      if (!speechQueueRef.current.includes(text)) speechQueueRef.current.push(text);
       return;
     }
-    recognitionRef.current?.abort();
-    recognitionRef.current = null;
-    setIsListening(false);
-    speakingRef.current = true;
-    lastSpokenTextRef.current = text;
-    setPhase("speaking");
-    const finishSpeaking = () => {
+    stopCapture(); speakingRef.current = true; lastSpokenTextRef.current = text; setPhase("speaking"); startBargeMonitor();
+    const finish = () => {
       speakingRef.current = false;
-      commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS;
-      setPhase("listening-command");
-      scheduleRestart(250);
+      stopBargeMonitor();
+      const next = speechQueueRef.current.shift();
+      if (next) { window.setTimeout(() => { void speakTextRef.current(next); }, 0); return; }
+      commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS; setPhase("listening-command"); scheduleRestart(250);
     };
-
-    if (onSynthesizeSpeechRef.current) {
-      try {
-        const audioBlob = await onSynthesizeSpeechRef.current(cleanText, voiceRateRef.current);
-        if (!speakingRef.current) return;
-        if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        audioUrlRef.current = audioUrl;
-        audioRef.current = audio;
-        audio.onended = finishSpeaking;
-        audio.onerror = () => {
-          audioRef.current = null;
-          if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
-          audioUrlRef.current = null;
-          finishSpeaking();
-        };
-        await audio.play();
-        return;
-      } catch {
-        audioRef.current = null;
-        if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
-        audioUrlRef.current = null;
-      }
+    try {
+      if (!callbacksRef.current.onSynthesizeSpeech) throw new Error("No local TTS");
+      const blob = await callbacksRef.current.onSynthesizeSpeech(clean, voiceRate);
+      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrlRef.current); audioRef.current = audio; audio.onended = finish; audio.onerror = finish;
+      await audio.play();
+    } catch {
+      if (!("speechSynthesis" in window)) { finish(); return; }
+      const utterance = new SpeechSynthesisUtterance(clean); utterance.lang = isThai ? "th-TH" : "en-US"; utterance.rate = voiceRate; utterance.onend = finish; utterance.onerror = finish;
+      window.speechSynthesis.cancel(); window.speechSynthesis.speak(utterance);
     }
-
-    if (!("speechSynthesis" in window)) {
-      finishSpeaking();
-      return;
-    }
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = isThai ? "th-TH" : "en-US";
-    utterance.rate = voiceRateRef.current;
-    utterance.onend = finishSpeaking;
-    utterance.onerror = () => {
-      speakingRef.current = false;
-      scheduleRestart();
-    };
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  }, [isThai, scheduleRestart, voiceReplyEnabled]);
-
+  }, [isThai, scheduleRestart, startBargeMonitor, stopBargeMonitor, stopCapture, voiceRate, voiceReplyEnabled]);
   speakTextRef.current = speakText;
 
-  const repeatLastReply = useCallback(() => {
-    if (lastSpokenTextRef.current) void speakTextRef.current(lastSpokenTextRef.current);
-  }, []);
+  const toggleVoiceReply = useCallback(() => { const next = !voiceReplyEnabled; setVoiceReplyEnabled(next); window.localStorage.setItem(VOICE_REPLY_STORAGE_KEY, String(next)); }, [voiceReplyEnabled]);
+  const repeatLastReply = useCallback(() => { if (lastSpokenTextRef.current) void speakText(lastSpokenTextRef.current); }, [speakText]);
+  const cycleVoiceRate = useCallback(() => { const next = VOICE_RATES[(VOICE_RATES.indexOf(voiceRate as never) + 1) % VOICE_RATES.length]; setVoiceRate(next); window.localStorage.setItem(VOICE_RATE_STORAGE_KEY, String(next)); }, [voiceRate]);
+  const stopSpeaking = useCallback(() => { speechQueueRef.current = []; audioRef.current?.pause(); window.speechSynthesis?.cancel(); speakingRef.current = false; stopBargeMonitor(); scheduleRestart(100); }, [scheduleRestart, stopBargeMonitor]);
 
-  const cycleVoiceRate = useCallback(() => {
-    const currentIndex = VOICE_RATES.indexOf(voiceRateRef.current as (typeof VOICE_RATES)[number]);
-    const nextRate = VOICE_RATES[(currentIndex + 1) % VOICE_RATES.length];
-    voiceRateRef.current = nextRate;
-    setVoiceRate(nextRate);
-    window.localStorage.setItem(VOICE_RATE_STORAGE_KEY, String(nextRate));
-  }, []);
-
-  const stopSpeaking = useCallback(() => {
-    audioRef.current?.pause();
-    audioRef.current = null;
-    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
-    audioUrlRef.current = null;
-    window.speechSynthesis?.cancel();
-    speakingRef.current = false;
-    commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS;
-    setPhase(enabledRef.current ? "listening-command" : "off");
-    scheduleRestart(100);
-  }, [scheduleRestart]);
-
+  useEffect(() => { if (enabled && isOpen && isAssistantMode && !isSending) void startCapture(); }, [enabled, isAssistantMode, isOpen, isSending, startCapture]);
   useEffect(() => {
-    if (!enabled || !isOpen || !isAssistantMode || isSending) return;
-    startListeningRef.current();
-  }, [enabled, isAssistantMode, isOpen, isSending]);
-
-  useEffect(() => {
-    if (!latestAssistantMessage || latestAssistantMessage.id === lastSpokenMessageIdRef.current) return;
-    if (latestAssistantMessage.id.includes("thinking")) return;
+    if (!latestAssistantMessage || latestAssistantMessage.id === lastSpokenMessageIdRef.current || latestAssistantMessage.id.includes("thinking")) return;
     lastSpokenMessageIdRef.current = latestAssistantMessage.id;
-    if (!voiceReplyEnabled || !("speechSynthesis" in window)) {
-      if (enabledRef.current) scheduleRestart();
-      return;
-    }
-    void speakText(latestAssistantMessage.text);
+    if (voiceReplyEnabled) void speakText(latestAssistantMessage.text); else scheduleRestart();
   }, [latestAssistantMessage, scheduleRestart, speakText, voiceReplyEnabled]);
+  useEffect(() => () => { stopCapture(); stopBargeMonitor(); streamRef.current?.getTracks().forEach((track) => track.stop()); audioRef.current?.pause(); if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current); }, [stopBargeMonitor, stopCapture]);
 
-  useEffect(() => () => {
-    recognitionRef.current?.abort();
-    audioRef.current?.pause();
-    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
-    window.speechSynthesis?.cancel();
-  }, []);
-
-  return {
-    enabled,
-    isListening,
-    phase,
-    voiceReplyEnabled,
-    voiceRate,
-    toggleHandsFree,
-    toggleVoiceReply,
-    repeatLastReply,
-    cycleVoiceRate,
-    stopSpeaking,
-  };
+  return { enabled, isListening, phase, permissionState, needsOnboarding: !storedBool(ONBOARDED_KEY), voiceReplyEnabled, voiceRate, toggleHandsFree, toggleVoiceReply, repeatLastReply, cycleVoiceRate, stopSpeaking };
 }

@@ -1,0 +1,3 @@
+# Install only when local microphone transcription is required.
+faster-whisper==1.2.1
+# Optional voice cloning: install Coqui XTTS separately after reviewing its model license.

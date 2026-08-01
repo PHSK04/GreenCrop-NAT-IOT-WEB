@@ -1036,6 +1036,31 @@ export function CustomerChatWidget({
     ]);
 
     try {
+      const toolProposal = await chatService.routeVoiceTool(body, activeDeviceId || undefined).catch(() => ({ tool: "none" as const }));
+      if (toolProposal.tool === "control_device" && toolProposal.action) {
+        if (!activeDeviceId) throw new Error(isTH ? "กรุณาเลือกอุปกรณ์ก่อนสั่งงาน" : "Select a device before controlling it");
+        const prepared = await chatService.prepareVoiceControl(activeDeviceId, toolProposal.action);
+        if (prepared.requiresConfirmation) {
+          const accepted = window.confirm(prepared.prompt || (isTH ? "ยืนยันคำสั่งควบคุมอุปกรณ์หรือไม่?" : "Confirm this device command?"));
+          if (!accepted) {
+            setAssistantMessages((current) => current.filter((message) => message.id !== `ai-thinking-${now}`).concat({
+              id: `ai-control-cancelled-${now}`, sender: "ai", text: isTH ? "ยกเลิกคำสั่งแล้วครับ" : "Command cancelled.", createdAt: new Date().toISOString(),
+            }));
+            return;
+          }
+        }
+        const published = await chatService.executeVoiceControl(prepared);
+        const acknowledgement = published.correlationId
+          ? await chatService.waitForVoiceControl(published.correlationId)
+          : { state: published.state || "published" };
+        const commandState = String(acknowledgement.state || "published");
+        setAssistantMessages((current) => current.filter((message) => message.id !== `ai-thinking-${now}`).concat({
+          id: `ai-control-ok-${now}`, sender: "ai", text: commandState === "confirmed"
+            ? (isTH ? `อุปกรณ์ ${activeDeviceId} ยืนยันคำสั่ง ${toolProposal.action} แล้วครับ` : `${activeDeviceId} confirmed ${toolProposal.action}.`)
+            : (isTH ? `เผยแพร่คำสั่งแล้ว แต่ฮาร์ดแวร์ยังไม่ยืนยัน สถานะ: ${commandState}` : `Command published, but hardware has not confirmed it. State: ${commandState}.`), createdAt: new Date().toISOString(),
+        }));
+        return;
+      }
       const { messages, brain } = await chatService.generateAiReply({
         deviceId: activeDeviceId || undefined,
         userMessage: body,
@@ -1088,6 +1113,7 @@ export function CustomerChatWidget({
     enabled: handsFreeEnabled,
     isListening,
     phase: voiceAssistantPhase,
+    permissionState: voicePermissionState,
     voiceReplyEnabled,
     voiceRate,
     toggleHandsFree: toggleVoiceInput,
@@ -1104,6 +1130,7 @@ export function CustomerChatWidget({
     onTranscript: setDraft,
     onSubmit: submitAssistantMessage,
     onSynthesizeSpeech: chatService.synthesizeAiSpeech,
+    onTranscribeAudio: chatService.transcribeLocalAudio,
   });
 
   const submitChatbotMessage = async () => {
@@ -2481,7 +2508,7 @@ export function CustomerChatWidget({
             }`}
             onClick={toggleVoiceInput}
             aria-label={handsFreeEnabled ? (isTH ? "ปิด NAT AI แบบไม่ใช้มือ" : "Disable hands-free NAT AI") : (isTH ? "เปิด NAT AI แบบไม่ใช้มือ" : "Enable hands-free NAT AI")}
-            title={handsFreeEnabled ? (isTH ? "เปิดอยู่—พูดว่า เฮ้ NAT" : "Active—say Hey NAT") : (isTH ? "เปิดใช้งานครั้งแรก" : "Enable hands-free mode")}
+            title={handsFreeEnabled ? (isTH ? "Local STT เปิดอยู่—พูดว่า เฮ้ Green" : "Local STT active—say Hey Green") : (isTH ? "อนุญาตไมค์ Local AI ครั้งแรก" : "Allow the local AI microphone once")}
           >
             {handsFreeEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
           </Button>
@@ -2541,15 +2568,20 @@ export function CustomerChatWidget({
           </Button>
         </div>
         <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+          {handsFreeEnabled && voicePermissionState !== "granted" && (
+            <span className="mr-2 text-amber-600 dark:text-amber-400">
+              {isTH ? "Local voice degraded—กำลังรอสิทธิ์ไมค์หรือ local STT" : "Local voice degraded—waiting for microphone permission or local STT."}
+            </span>
+          )}
           {voiceAssistantPhase === "waiting-wake-word"
-            ? (isTH ? "พร้อมใช้งาน—พูดว่า “เฮ้ NAT” แล้วตามด้วยคำถาม" : "Ready—say “Hey NAT” followed by your question.")
+            ? (isTH ? "Local AI พร้อม—พูดว่า “เฮ้ Green” แล้วตามด้วยคำถาม" : "Local AI ready—say “Hey Green” followed by your question.")
             : voiceAssistantPhase === "listening-command"
               ? (isTH ? "NAT ฟังอยู่ พูดต่อได้เลยโดยไม่ต้องเรียกซ้ำ" : "NAT is listening—continue without repeating the wake word.")
               : voiceAssistantPhase === "thinking"
                 ? (isTH ? "รับคำถามแล้ว กำลังคิดคำตอบ" : "Question received—thinking.")
                 : voiceAssistantPhase === "speaking"
                   ? (isTH ? "NAT กำลังพูดคำตอบ" : "NAT is speaking.")
-                  : (isTH ? "เปิดโหมดไม่ใช้มือหนึ่งครั้ง แล้วเรียก “เฮ้ NAT” ได้ตลอดที่หน้าเว็บเปิด" : "Enable hands-free once, then say “Hey NAT” while this page is open.")}
+                  : (isTH ? "อนุญาตไมค์ครั้งแรกหนึ่งครั้ง แล้วระบบ Local AI จะฟังต่อเนื่องขณะหน้าเว็บเปิด" : "Allow the microphone once; local listening then continues while this page is open.")}
         </div>
       </div>
     </>

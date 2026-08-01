@@ -149,6 +149,8 @@ function getLocalTtsStatus() {
         enabled: ENABLED,
         running: Boolean(worker),
         model: MODEL,
+        engine: process.env.NAT_AI_TTS_ENGINE || 'mms',
+        voiceCloneConfigured: Boolean(process.env.NAT_AI_XTTS_SPEAKER_WAV),
         python: defaultPythonBin(),
         maxTextChars: MAX_TEXT_CHARS,
     };

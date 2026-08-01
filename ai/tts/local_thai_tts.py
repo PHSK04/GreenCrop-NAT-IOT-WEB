@@ -21,10 +21,9 @@ import traceback
 import numpy as np
 import torch
 from scipy.io import wavfile
-from transformers import AutoModelForTextToWaveform, AutoTokenizer
-
-
+ENGINE = os.getenv("NAT_AI_TTS_ENGINE", "mms").lower()
 MODEL_ID = os.getenv("NAT_AI_TTS_MODEL", "facebook/mms-tts-tha")
+SPEAKER_WAV = os.getenv("NAT_AI_XTTS_SPEAKER_WAV", "")
 MAX_TEXT_CHARS = max(100, min(2400, int(os.getenv("NAT_AI_TTS_MAX_TEXT_CHARS", "1200"))))
 
 
@@ -61,13 +60,26 @@ def encode_wav(audio: np.ndarray, sample_rate: int) -> str:
 
 
 def main() -> None:
-    log(f"loading model {MODEL_ID}")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
-    model = AutoModelForTextToWaveform.from_pretrained(MODEL_ID)
-    model.eval()
-    sample_rate = int(getattr(model.config, "sampling_rate", 16000))
-    log(f"ready model={MODEL_ID} sample_rate={sample_rate}")
-    write_message({"type": "ready", "model": MODEL_ID, "sample_rate": sample_rate})
+    if ENGINE == "xtts":
+        if not SPEAKER_WAV or not os.path.isfile(SPEAKER_WAV):
+            raise RuntimeError("NAT_AI_XTTS_SPEAKER_WAV must point to a protected WAV file")
+        from TTS.api import TTS
+        model_id = os.getenv("NAT_AI_XTTS_MODEL", "tts_models/multilingual/multi-dataset/xtts_v2")
+        log(f"loading reviewed XTTS model {model_id}")
+        xtts = TTS(model_id)
+        sample_rate = int(xtts.synthesizer.output_sample_rate)
+        tokenizer = model = None
+    else:
+        from transformers import AutoModelForTextToWaveform, AutoTokenizer
+        model_id = MODEL_ID
+        log(f"loading model {model_id}")
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        model = AutoModelForTextToWaveform.from_pretrained(model_id)
+        model.eval()
+        sample_rate = int(getattr(model.config, "sampling_rate", 16000))
+        xtts = None
+    log(f"ready engine={ENGINE} model={model_id} sample_rate={sample_rate}")
+    write_message({"type": "ready", "engine": ENGINE, "model": model_id, "sample_rate": sample_rate})
 
     for raw_line in sys.stdin:
         line = raw_line.strip()
@@ -85,16 +97,19 @@ def main() -> None:
             if len(text) > MAX_TEXT_CHARS:
                 raise ValueError(f"text exceeds {MAX_TEXT_CHARS} characters")
             rate = float(request.get("rate") or 1.0)
-            inputs = tokenizer(text, return_tensors="pt")
-            with torch.inference_mode():
-                waveform = model(**inputs).waveform[0].detach().cpu().numpy()
+            if ENGINE == "xtts":
+                waveform = np.asarray(xtts.tts(text=text, speaker_wav=SPEAKER_WAV, language="th"), dtype=np.float32)
+            else:
+                inputs = tokenizer(text, return_tensors="pt")
+                with torch.inference_mode():
+                    waveform = model(**inputs).waveform[0].detach().cpu().numpy()
             waveform = adjust_rate(waveform, rate)
             write_message(
                 {
                     "id": request_id,
                     "audio_base64": encode_wav(waveform, sample_rate),
                     "content_type": "audio/wav",
-                    "model": MODEL_ID,
+                    "model": model_id,
                 }
             )
         except Exception as exc:  # keep the worker alive for later requests

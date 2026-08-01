@@ -2,10 +2,11 @@ const { spawn } = require('child_process');
 const path = require('path');
 const { searchProjectKnowledge } = require('./project_knowledge');
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+// This deployment is intentionally local-only. Keep the legacy provider code unreachable.
+const OPENAI_API_KEY = '';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 const OPENAI_MAX_OUTPUT_TOKENS = Math.max(120, Math.min(1200, Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 700)));
-const NAT_AI_OPENAI_GENERAL_ENABLED = String(process.env.NAT_AI_OPENAI_GENERAL_ENABLED || 'true').toLowerCase() !== 'false';
+const NAT_AI_OPENAI_GENERAL_ENABLED = false;
 const NAT_AI_LLM_FIRST = String(process.env.NAT_AI_LLM_FIRST || 'true').toLowerCase() !== 'false';
 const NAT_AI_GENERATIVE_CHAT_REQUIRED = String(process.env.NAT_AI_GENERATIVE_CHAT_REQUIRED || 'false').toLowerCase() === 'true';
 const NAT_AI_OLLAMA_ENABLED = String(process.env.NAT_AI_OLLAMA_ENABLED || 'true').toLowerCase() !== 'false';
