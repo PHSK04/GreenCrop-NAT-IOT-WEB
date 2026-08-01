@@ -216,6 +216,28 @@ async function initDb() {
         CREATE INDEX IF NOT EXISTS ix_sensor_data_tenant_ts
         ON sensor_data(tenant_id, timestamp DESC);
 
+        CREATE TABLE IF NOT EXISTS crop_yield_entries (
+            id VARCHAR(64) PRIMARY KEY,
+            tenant_id VARCHAR(64) NOT NULL,
+            user_id INTEGER NOT NULL,
+            device_id VARCHAR(64) NOT NULL,
+            harvest_date DATE NOT NULL,
+            harvest_time VARCHAR(5) NOT NULL,
+            yield_grams DOUBLE PRECISION NOT NULL,
+            ph_value DOUBLE PRECISION DEFAULT 0,
+            oxygen_value DOUBLE PRECISION DEFAULT 0,
+            ec_value DOUBLE PRECISION DEFAULT 0,
+            temp_c DOUBLE PRECISION DEFAULT 0,
+            note TEXT,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_crop_yield_user_device_date
+        ON crop_yield_entries(user_id, device_id, harvest_date DESC, harvest_time DESC);
+
+        CREATE INDEX IF NOT EXISTS ix_crop_yield_tenant_date
+        ON crop_yield_entries(tenant_id, harvest_date DESC);
+
         ALTER TABLE sensor_data
         ADD COLUMN IF NOT EXISTS source VARCHAR(32);
 

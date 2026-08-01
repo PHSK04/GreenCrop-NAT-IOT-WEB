@@ -14,11 +14,10 @@ import { MinimalDatePicker } from "../ui/minimal-date-picker";
 import { MinimalMonthPicker } from "../ui/minimal-month-picker";
 import { MinimalTimePicker } from "../ui/minimal-time-picker";
 import {
-  addCropYieldEntry,
+  createMyCropYieldEntry,
   CropYieldEntry,
-  deleteCropYieldEntry,
-  readCropYieldEntries,
-  subscribeCropYieldEntries,
+  deleteMyCropYieldEntry,
+  loadMyCropYieldEntries,
 } from "@/utils/cropYieldStore";
 import { useMachine } from "@/contexts/MachineContext";
 
@@ -49,7 +48,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [selectedFields, setSelectedFields] = useState<string[]>(["yield", "ph", "oxygen", "ec", "temp"]);
-  const [deviceReportData, setDeviceReportData] = useState<CropYieldEntry[]>(() => readCropYieldEntries(activeDeviceId));
+  const [deviceReportData, setDeviceReportData] = useState<CropYieldEntry[]>([]);
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
     time: currentTimeValue(),
@@ -62,9 +61,11 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   });
 
   useEffect(() => {
-    const refresh = () => setDeviceReportData(readCropYieldEntries(activeDeviceId));
-    refresh();
-    return subscribeCropYieldEntries(refresh);
+    let active = true;
+    loadMyCropYieldEntries(activeDeviceId)
+      .then((rows) => { if (active) setDeviceReportData(rows); })
+      .catch(() => { if (active) setDeviceReportData([]); });
+    return () => { active = false; };
   }, [activeDeviceId, seed]);
 
   useEffect(() => {
@@ -139,7 +140,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
     });
   }, [filteredReportData, selectedFields]);
 
-  const handleSaveManualEntry = () => {
+  const handleSaveManualEntry = async () => {
     const yieldValue = Number(form.yield);
     const phValue = Number(form.ph);
     const oxygenValue = Number(form.oxygen);
@@ -153,17 +154,25 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
       return;
     }
 
-    addCropYieldEntry({
-      deviceId: activeDeviceId,
-      date: form.date,
-      time: form.time,
-      yield: yieldValue,
-      ph: Number.isFinite(phValue) ? phValue : 7,
-      oxygen: Number.isFinite(oxygenValue) ? oxygenValue : 0,
-      ec: Number.isFinite(ecValue) ? ecValue : 0,
-      temp: Number.isFinite(tempValue) ? tempValue : 0,
-      note: form.note,
-    });
+    try {
+      const saved = await createMyCropYieldEntry({
+        deviceId: activeDeviceId,
+        date: form.date,
+        time: form.time,
+        yield: yieldValue,
+        ph: Number.isFinite(phValue) ? phValue : 7,
+        oxygen: Number.isFinite(oxygenValue) ? oxygenValue : 0,
+        ec: Number.isFinite(ecValue) ? ecValue : 0,
+        temp: Number.isFinite(tempValue) ? tempValue : 0,
+        note: form.note,
+      });
+      setDeviceReportData((rows) => [saved, ...rows]);
+    } catch (error) {
+      toast.error(isTH ? "บันทึกไม่สำเร็จ" : "Save failed", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+      return;
+    }
 
     setForm((prev) => ({
       ...prev,
@@ -176,9 +185,16 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
     });
   };
 
-  const handleDeleteEntry = (entryId: string) => {
-    deleteCropYieldEntry(entryId);
-    toast.success(isTH ? "ลบรายการแล้ว" : "Entry deleted");
+  const handleDeleteEntry = async (entryId: string) => {
+    try {
+      await deleteMyCropYieldEntry(entryId);
+      setDeviceReportData((rows) => rows.filter((entry) => entry.id !== entryId));
+      toast.success(isTH ? "ลบรายการแล้ว" : "Entry deleted");
+    } catch (error) {
+      toast.error(isTH ? "ลบไม่สำเร็จ" : "Delete failed", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
   };
 
   const handleDownload = async (data: any[], filename: string, format: "csv" | "pdf") => {

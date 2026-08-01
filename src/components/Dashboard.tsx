@@ -172,7 +172,10 @@ function SidebarContent({
   onToggleCompact
 }: SidebarContentProps & { user?: { name: string; role?: string } }) {
   const { isOn } = useMachine();
-  const [isCompactHovered, setIsCompactHovered] = useState(false);
+  // Keep the compact rail at a fixed width. Expanding it on hover used to place
+  // a 224px overlay over every page while the content only reserved 112px.
+  // The explicit toggle remains available for users who want the full sidebar.
+  const isCompactHovered = false;
   const isAdmin = isAdminUser ?? (String(user?.role || "").toLowerCase() === "admin");
   const brandName = isAdmin ? "GreenCropNAT Admin" : "GreenCropNAT";
   const t = (navTranslations as any)[language] || navTranslations.EN;
@@ -218,8 +221,6 @@ function SidebarContent({
 
   return (
     <div
-      onMouseEnter={() => compact && setIsCompactHovered(true)}
-      onMouseLeave={() => compact && setIsCompactHovered(false)}
       className={`flex flex-col transition-[width,border-radius] duration-300 ${compact ? `pointer-events-auto mx-auto h-[calc(100%-2rem)] overflow-hidden border border-white/80 bg-white/90 shadow-[0_28px_70px_-34px_rgba(15,23,42,0.5)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/92 ${isCompactHovered ? "w-56 rounded-[24px]" : "w-20 rounded-[40px]"}` : "h-full border-r border-border/70 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/92"}`}
     >
       <div 

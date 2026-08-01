@@ -12,8 +12,7 @@ import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
 import { rotateBy, seededInt } from "@/utils/deviceData";
 import {
   CropYieldEntry,
-  readCropYieldEntries,
-  subscribeCropYieldEntries,
+  loadMyCropYieldEntries,
 } from "@/utils/cropYieldStore";
 
 type MachinePerformancePageProps = {
@@ -85,7 +84,7 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
-  const [cropYieldEntries, setCropYieldEntries] = useState<CropYieldEntry[]>(() => readCropYieldEntries(activeDeviceId));
+  const [cropYieldEntries, setCropYieldEntries] = useState<CropYieldEntry[]>([]);
   const [predictiveAnalysis, setPredictiveAnalysis] = useState<PredictiveAnalysis | null>(null);
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([
     "production",
@@ -102,9 +101,11 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
   ];
 
   useEffect(() => {
-    const refresh = () => setCropYieldEntries(readCropYieldEntries(activeDeviceId));
-    refresh();
-    return subscribeCropYieldEntries(refresh);
+    let active = true;
+    loadMyCropYieldEntries(activeDeviceId)
+      .then((rows) => { if (active) setCropYieldEntries(rows); })
+      .catch(() => { if (active) setCropYieldEntries([]); });
+    return () => { active = false; };
   }, [activeDeviceId]);
 
   const productionDataDevice = useMemo(() => {

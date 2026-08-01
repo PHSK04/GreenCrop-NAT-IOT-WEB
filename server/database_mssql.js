@@ -319,6 +319,30 @@ async function initDb() {
         `);
         console.log('✅ Sensor Data table validated');
 
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='crop_yield_entries' and xtype='U')
+            BEGIN
+                CREATE TABLE crop_yield_entries (
+                    id NVARCHAR(64) PRIMARY KEY,
+                    tenant_id NVARCHAR(64) NOT NULL,
+                    user_id INT NOT NULL,
+                    device_id NVARCHAR(64) NOT NULL,
+                    harvest_date DATE NOT NULL,
+                    harvest_time NVARCHAR(5) NOT NULL,
+                    yield_grams FLOAT NOT NULL,
+                    ph_value FLOAT DEFAULT 0,
+                    oxygen_value FLOAT DEFAULT 0,
+                    ec_value FLOAT DEFAULT 0,
+                    temp_c FLOAT DEFAULT 0,
+                    note NVARCHAR(MAX) NULL,
+                    created_at DATETIME DEFAULT GETDATE()
+                );
+                CREATE INDEX ix_crop_yield_user_device_date ON crop_yield_entries(user_id, device_id, harvest_date, harvest_time);
+                CREATE INDEX ix_crop_yield_tenant_date ON crop_yield_entries(tenant_id, harvest_date);
+            END
+        `);
+        console.log('✅ Crop yield entries table ready');
+
         // Create Login Sessions Table (Device Tracking)
         await pool.request().query(`
             IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='login_sessions' and xtype='U')

@@ -394,6 +394,7 @@ export function CustomerChatWidget({
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [voiceInputError, setVoiceInputError] = useState("");
   const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -435,7 +436,6 @@ export function CustomerChatWidget({
   const typingTimeoutRef = useRef<number | null>(null);
   const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const lastSpokenAssistantMessageRef = useRef<string | null>(null);
-  const handsFreeConversationRef = useRef(false);
   const localChatDateKey = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -1037,6 +1037,7 @@ export function CustomerChatWidget({
 
   const stopListening = () => {
     speechRecognitionRef.current?.stop();
+    speechRecognitionRef.current = null;
     setIsListening(false);
   };
 
@@ -1047,13 +1048,15 @@ export function CustomerChatWidget({
     };
     const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!Recognition) {
-      toast.error(isTH ? "เบราว์เซอร์นี้ยังไม่รองรับการฟังเสียง กรุณาใช้ Chrome หรือ Edge" : "Voice input is not supported. Try Chrome or Edge.");
+      const message = isTH ? "เบราว์เซอร์นี้ยังไม่รองรับการฟังเสียง กรุณาใช้ Chrome หรือ Edge" : "Voice input is not supported. Try Chrome or Edge.";
+      setVoiceInputError(message);
+      toast.error(message);
       return;
     }
 
     window.speechSynthesis?.cancel();
+    setVoiceInputError("");
     const recognition = new Recognition();
-    let submittedFinalResult = false;
     recognition.lang = isTH ? "th-TH" : "en-US";
     recognition.continuous = false;
     recognition.interimResults = true;
@@ -1065,24 +1068,22 @@ export function CustomerChatWidget({
       const cleanTranscript = transcript.trim();
       setDraft(cleanTranscript);
       const finalResult = event.results[event.results.length - 1];
-      if (finalResult?.isFinal && cleanTranscript && handsFreeConversationRef.current && !submittedFinalResult) {
-        submittedFinalResult = true;
+      if (finalResult?.isFinal && cleanTranscript) {
         recognition.stop();
-        window.setTimeout(() => submitAssistantMessage(cleanTranscript).catch(() => {}), 0);
       }
     };
     recognition.onerror = (event) => {
       setIsListening(false);
+      speechRecognitionRef.current = null;
       if (event.error !== "aborted" && event.error !== "no-speech") {
-        handsFreeConversationRef.current = false;
-        toast.error(isTH ? "ฟังเสียงไม่สำเร็จ กรุณาอนุญาตใช้ไมโครโฟนแล้วลองใหม่" : "Could not listen. Allow microphone access and try again.");
+        const message = isTH ? "ฟังเสียงไม่สำเร็จ กรุณาอนุญาตใช้ไมโครโฟนแล้วลองใหม่" : "Could not listen. Allow microphone access and try again.";
+        setVoiceInputError(message);
+        toast.error(message);
       }
     };
     recognition.onend = () => {
       setIsListening(false);
-      if (handsFreeConversationRef.current && !submittedFinalResult) {
-        window.setTimeout(() => startVoiceInput(), 350);
-      }
+      speechRecognitionRef.current = null;
     };
     speechRecognitionRef.current = recognition;
     setIsListening(true);
@@ -1094,15 +1095,10 @@ export function CustomerChatWidget({
   };
 
   const toggleVoiceInput = () => {
-    if (isListening || handsFreeConversationRef.current) {
-      handsFreeConversationRef.current = false;
+    if (isListening) {
       stopListening();
-      window.speechSynthesis?.cancel();
       return;
     }
-    handsFreeConversationRef.current = true;
-    lastSpokenAssistantMessageRef.current = [...assistantMessages].reverse().find((message) => message.sender === "ai")?.id || null;
-    setVoiceReplyEnabled(true);
     startVoiceInput();
   };
 
@@ -1126,22 +1122,9 @@ export function CustomerChatWidget({
     const utterance = new SpeechSynthesisUtterance(latest.text.replace(/[*#`_>-]/g, " ").replace(/\s+/g, " ").trim());
     utterance.lang = isTH ? "th-TH" : "en-US";
     utterance.rate = isTH ? 1 : 0.95;
-    utterance.onend = () => {
-      if (handsFreeConversationRef.current && isOpen && mode === "assistant") {
-        startVoiceInput();
-      }
-    };
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
   }, [assistantMessages, isOpen, isTH, mode, voiceReplyEnabled]);
-
-  useEffect(() => {
-    if (!isOpen || mode !== "assistant" || isSending || isListening || handsFreeConversationRef.current) return;
-    handsFreeConversationRef.current = true;
-    lastSpokenAssistantMessageRef.current = [...assistantMessages].reverse().find((message) => message.sender === "ai")?.id || null;
-    setVoiceReplyEnabled(true);
-    startVoiceInput();
-  }, [isOpen, mode]);
 
   useEffect(() => () => {
     speechRecognitionRef.current?.abort();
@@ -2594,7 +2577,11 @@ export function CustomerChatWidget({
         <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
           {isListening
             ? (isTH ? "กำลังฟังอยู่ พูดได้เลยครับ" : "Listening—go ahead.")
-            : (isTH ? "กดไมค์เพื่อพูด และตรวจข้อความก่อนส่งคำสั่ง" : "Tap the mic to speak and review commands before sending.")}
+            : voiceInputError
+              ? voiceInputError
+              : draft.trim()
+                ? (isTH ? "ตรวจข้อความที่ได้จากเสียง แล้วกดส่งเพื่อยืนยันคำสั่ง" : "Review the transcript, then press Send to confirm.")
+                : (isTH ? "กดไมค์เพื่อพูด และตรวจข้อความก่อนส่งคำสั่ง" : "Tap the mic to speak and review commands before sending.")}
         </div>
       </div>
     </>

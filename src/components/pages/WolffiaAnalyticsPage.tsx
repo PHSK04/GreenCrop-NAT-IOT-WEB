@@ -13,9 +13,8 @@ import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
 import {
   CropYieldEntry,
   getMonthlyYieldSummaries,
+  loadMyCropYieldEntries,
   MonthlyYieldSummary,
-  readCropYieldEntries,
-  subscribeCropYieldEntries,
 } from "@/utils/cropYieldStore";
 
 type WolffiaAnalyticsPageProps = {
@@ -34,7 +33,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
   const [exportEnd, setExportEnd] = useState("");
   const [exportStartTime, setExportStartTime] = useState("");
   const [exportEndTime, setExportEndTime] = useState("");
-  const [entries, setEntries] = useState<CropYieldEntry[]>(() => readCropYieldEntries(activeDeviceId));
+  const [entries, setEntries] = useState<CropYieldEntry[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<MonthlyYieldSummary | null>(null);
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([
     "monthly",
@@ -49,9 +48,11 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
   ];
 
   useEffect(() => {
-    const refresh = () => setEntries(readCropYieldEntries(activeDeviceId));
-    refresh();
-    return subscribeCropYieldEntries(refresh);
+    let active = true;
+    loadMyCropYieldEntries(activeDeviceId)
+      .then((rows) => { if (active) setEntries(rows); })
+      .catch(() => { if (active) setEntries([]); });
+    return () => { active = false; };
   }, [activeDeviceId, seed]);
 
   const filteredEntries = useMemo(() => {

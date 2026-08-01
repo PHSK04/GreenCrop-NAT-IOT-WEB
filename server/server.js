@@ -3382,6 +3382,90 @@ app.get('/api/login-sessions/active', async (req, res) => {
     }
 });
 
+// --- Crop reports (strictly scoped to the authenticated user and tenant)
+app.get('/api/crop-yields/me', async (req, res) => {
+    try {
+        const userId = Number(req.user?.id);
+        const tenantId = String(req.tenant || '');
+        if (!Number.isInteger(userId) || !tenantId) return res.status(403).json({ error: 'Invalid account scope' });
+
+        const deviceId = req.query.device_id ? String(req.query.device_id).trim().toUpperCase() : '';
+        const params = [tenantId, userId];
+        let deviceClause = '';
+        if (deviceId) {
+            deviceClause = ' AND device_id = ?';
+            params.push(deviceId);
+        }
+        const rows = await db.all(
+            `SELECT id, device_id, harvest_date, harvest_time, yield_grams, ph_value,
+                    oxygen_value, ec_value, temp_c, note, created_at
+             FROM crop_yield_entries
+             WHERE tenant_id = ? AND user_id = ?${deviceClause}
+             ORDER BY harvest_date DESC, harvest_time DESC, created_at DESC`,
+            params
+        );
+        res.json(rows);
+    } catch (err) {
+        console.error('GET Crop Yield Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/crop-yields/me', async (req, res) => {
+    try {
+        const userId = Number(req.user?.id);
+        const tenantId = String(req.tenant || '');
+        if (!Number.isInteger(userId) || !tenantId) return res.status(403).json({ error: 'Invalid account scope' });
+
+        const id = String(req.body.id || '').trim().slice(0, 64);
+        const deviceId = String(req.body.device_id || '').trim().toUpperCase().slice(0, 64);
+        const harvestDate = String(req.body.date || '').trim();
+        const harvestTime = String(req.body.time || '').trim();
+        const yieldGrams = Number(req.body.yield);
+        if (!id || !deviceId || !/^\d{4}-\d{2}-\d{2}$/.test(harvestDate) || !/^\d{2}:\d{2}$/.test(harvestTime) || !Number.isFinite(yieldGrams) || yieldGrams <= 0) {
+            return res.status(400).json({ error: 'Invalid crop yield entry' });
+        }
+
+        // Legacy browser migration can safely retry after a network interruption.
+        const existing = await db.get(
+            'SELECT id FROM crop_yield_entries WHERE id = ? AND tenant_id = ? AND user_id = ?',
+            [id, tenantId, userId]
+        );
+        if (existing) return res.json({ ok: true, id, existing: true });
+
+        const numberOrZero = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
+        await db.run(
+            `INSERT INTO crop_yield_entries
+             (id, tenant_id, user_id, device_id, harvest_date, harvest_time, yield_grams,
+              ph_value, oxygen_value, ec_value, temp_c, note, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, tenantId, userId, deviceId, harvestDate, harvestTime, yieldGrams,
+             numberOrZero(req.body.ph), numberOrZero(req.body.oxygen), numberOrZero(req.body.ec),
+             numberOrZero(req.body.temp), String(req.body.note || '').slice(0, 4000), new Date()]
+        );
+        res.status(201).json({ ok: true, id });
+    } catch (err) {
+        console.error('POST Crop Yield Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/crop-yields/me/:id', async (req, res) => {
+    try {
+        const userId = Number(req.user?.id);
+        const tenantId = String(req.tenant || '');
+        if (!Number.isInteger(userId) || !tenantId) return res.status(403).json({ error: 'Invalid account scope' });
+        await db.run(
+            'DELETE FROM crop_yield_entries WHERE id = ? AND tenant_id = ? AND user_id = ?',
+            [String(req.params.id), tenantId, userId]
+        );
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('DELETE Crop Yield Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- Sensor Data Endpoints (tenant-aware via middleware/session context)
 // --- Sensor Data Endpoints (Strict User/Tenant Specific)
 app.get('/api/sensor-data', async (req, res) => {

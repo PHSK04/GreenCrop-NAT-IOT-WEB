@@ -30,6 +30,10 @@ export type MonthlyYieldSummary = {
 const STORAGE_KEY = "greencrop_crop_yield_entries_v1";
 const CHANGE_EVENT = "greencrop_crop_yield_entries_changed";
 const LEGACY_DEVICE_IDS = new Set(["", "default", "UNKNOWN"]);
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+const LEGACY_OWNER_KEY = "greencrop_crop_yield_legacy_owner_v2";
+const LEGACY_MIGRATION_KEY_PREFIX = "greencrop_crop_yield_migrated_v2";
+let legacyMigrationPromise: Promise<void> | null = null;
 
 const safeNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
@@ -108,6 +112,144 @@ export const subscribeCropYieldEntries = (callback: () => void) => {
     window.removeEventListener(CHANGE_EVENT, callback);
     window.removeEventListener("storage", callback);
   };
+};
+
+const getAuthToken = () => {
+  if (typeof window === "undefined") return "";
+  try {
+    const session = JSON.parse(window.localStorage.getItem("smart_iot_session") || "null");
+    return String(session?.token || session?.user?.token || "");
+  } catch {
+    return "";
+  }
+};
+
+const getSessionUserId = () => {
+  if (typeof window === "undefined") return "";
+  try {
+    const session = JSON.parse(window.localStorage.getItem("smart_iot_session") || "null");
+    return String(session?.user?.id || "");
+  } catch {
+    return "";
+  }
+};
+
+const cropYieldRequest = async (path: string, init: RequestInit = {}) => {
+  const token = getAuthToken();
+  if (!token) throw new Error("Authentication is required");
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...(init.headers || {}),
+    },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload?.error || `Crop yield request failed (${response.status})`);
+  }
+  return response.json();
+};
+
+const fromApiRow = (row: any): CropYieldEntry | null => normalizeEntry({
+  id: row.id,
+  deviceId: row.device_id,
+  date: String(row.harvest_date || "").slice(0, 10),
+  time: String(row.harvest_time || "").slice(0, 5),
+  yield: row.yield_grams,
+  ph: row.ph_value,
+  oxygen: row.oxygen_value,
+  ec: row.ec_value,
+  temp: row.temp_c,
+  note: row.note,
+  createdAt: row.created_at,
+});
+
+const postCropYieldEntry = (entry: CropYieldEntry) => cropYieldRequest("/crop-yields/me", {
+  method: "POST",
+  body: JSON.stringify({
+    id: entry.id,
+    device_id: entry.deviceId,
+    date: entry.date,
+    time: entry.time,
+    yield: entry.yield,
+    ph: entry.ph,
+    oxygen: entry.oxygen,
+    ec: entry.ec,
+    temp: entry.temp,
+    note: entry.note || "",
+  }),
+});
+
+const migrateLegacyCropYieldEntries = async (fallbackDeviceId?: string) => {
+  if (typeof window === "undefined") return;
+  const userId = getSessionUserId();
+  if (!userId) return;
+
+  const migrationKey = `${LEGACY_MIGRATION_KEY_PREFIX}:${userId}`;
+  if (window.localStorage.getItem(migrationKey) === "done") return;
+
+  const legacyRows = readCropYieldEntries();
+  if (!legacyRows.length) {
+    window.localStorage.setItem(migrationKey, "done");
+    return;
+  }
+
+  // Old localStorage rows had no owner field. The first authenticated account
+  // claims them once so a shared browser cannot copy the same history to others.
+  const claimedOwner = window.localStorage.getItem(LEGACY_OWNER_KEY);
+  if (claimedOwner && claimedOwner !== userId) return;
+
+  const currentRows = await cropYieldRequest("/crop-yields/me");
+  const existingIds = new Set(
+    (Array.isArray(currentRows) ? currentRows : []).map((row: any) => String(row.id)),
+  );
+  const resolvedFallback = String(fallbackDeviceId || "default");
+
+  for (const legacyRow of legacyRows) {
+    if (existingIds.has(legacyRow.id)) continue;
+    const deviceId = LEGACY_DEVICE_IDS.has(legacyRow.deviceId)
+      ? resolvedFallback
+      : legacyRow.deviceId;
+    await postCropYieldEntry({ ...legacyRow, deviceId });
+  }
+
+  window.localStorage.setItem(LEGACY_OWNER_KEY, userId);
+  window.localStorage.setItem(migrationKey, "done");
+};
+
+export const loadMyCropYieldEntries = async (deviceId?: string): Promise<CropYieldEntry[]> => {
+  if (!legacyMigrationPromise) {
+    legacyMigrationPromise = migrateLegacyCropYieldEntries(deviceId).catch((error) => {
+      legacyMigrationPromise = null;
+      throw error;
+    });
+  }
+  await legacyMigrationPromise;
+  const query = deviceId && deviceId !== "default"
+    ? `?device_id=${encodeURIComponent(deviceId)}`
+    : "";
+  const rows = await cropYieldRequest(`/crop-yields/me${query}`);
+  return (Array.isArray(rows) ? rows : [])
+    .map(fromApiRow)
+    .filter((entry): entry is CropYieldEntry => Boolean(entry));
+};
+
+export const createMyCropYieldEntry = async (
+  entry: Omit<CropYieldEntry, "id" | "createdAt">,
+): Promise<CropYieldEntry> => {
+  const nextEntry: CropYieldEntry = {
+    ...entry,
+    id: crypto?.randomUUID?.() || `${entry.deviceId}-${entry.date}-${entry.time}-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+  };
+  await postCropYieldEntry(nextEntry);
+  return nextEntry;
+};
+
+export const deleteMyCropYieldEntry = async (entryId: string): Promise<void> => {
+  await cropYieldRequest(`/crop-yields/me/${encodeURIComponent(entryId)}`, { method: "DELETE" });
 };
 
 export const getMonthlyYieldSummaries = (
