@@ -7,19 +7,14 @@ import {
   Download,
   FileText,
   MessageCircleMore,
-  Mic,
-  MicOff,
   Pencil,
   Reply,
-  RotateCcw,
   Send,
   ShieldCheck,
   Sparkles,
   Trash2,
   UserCheck,
   UserRoundX,
-  Volume2,
-  VolumeX,
   X,
 } from "lucide-react";
 import natAssistantImage from "@/assets/images/generated/nat_ai_assistant_full.png";
@@ -1111,24 +1106,24 @@ export function CustomerChatWidget({
   );
   const {
     enabled: handsFreeEnabled,
-    isListening,
     phase: voiceAssistantPhase,
     permissionState: voicePermissionState,
-    voiceReplyEnabled,
-    voiceRate,
-    toggleHandsFree: toggleVoiceInput,
-    toggleVoiceReply,
-    repeatLastReply,
-    cycleVoiceRate,
-    stopSpeaking,
   } = useNatVoiceAssistant({
     isOpen,
     isAssistantMode: mode === "assistant",
     isSending,
     isThai: isTH,
     latestAssistantMessage: latestVoiceAssistantMessage,
-    onTranscript: setDraft,
-    onSubmit: submitAssistantMessage,
+    onTranscript: (transcript) => {
+      setMode("assistant");
+      setIsOpen(true);
+      setDraft(transcript);
+    },
+    onSubmit: async (transcript) => {
+      setMode("assistant");
+      setIsOpen(true);
+      await submitAssistantMessage(transcript);
+    },
     onSynthesizeSpeech: chatService.synthesizeAiSpeech,
     onTranscribeAudio: chatService.transcribeLocalAudio,
   });
@@ -2495,23 +2490,6 @@ export function CustomerChatWidget({
 
       <div className="border-t border-slate-200/80 bg-white/96 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/96">
         <div className="flex items-end gap-2">
-          <Button
-            type="button"
-            variant={handsFreeEnabled ? "default" : "outline"}
-            size="icon"
-            className={`h-12 w-12 shrink-0 rounded-2xl ${
-              handsFreeEnabled
-                ? isListening
-                  ? "animate-pulse bg-emerald-600 hover:bg-emerald-700"
-                  : "bg-emerald-600 hover:bg-emerald-700"
-                : ""
-            }`}
-            onClick={toggleVoiceInput}
-            aria-label={handsFreeEnabled ? (isTH ? "ปิด NAT AI แบบไม่ใช้มือ" : "Disable hands-free NAT AI") : (isTH ? "เปิด NAT AI แบบไม่ใช้มือ" : "Enable hands-free NAT AI")}
-            title={handsFreeEnabled ? (isTH ? "Local STT เปิดอยู่—พูดว่า เฮ้ Green" : "Local STT active—say Hey Green") : (isTH ? "อนุญาตไมค์ Local AI ครั้งแรก" : "Allow the local AI microphone once")}
-          >
-            {handsFreeEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-          </Button>
           <Input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
@@ -2528,43 +2506,6 @@ export function CustomerChatWidget({
           <Button className="h-12 rounded-2xl px-4" onClick={() => submitAssistantMessage().catch(() => {})} disabled={isSending || !draft.trim()}>
             <Send className="mr-2 h-4 w-4" />
             {isSending ? (isTH ? "กำลังคิด" : "Thinking") : isTH ? "ส่ง" : "Send"}
-          </Button>
-          <Button
-            type="button"
-            variant={voiceReplyEnabled ? "default" : "outline"}
-            size="icon"
-            className="h-12 w-12 shrink-0 rounded-2xl"
-            onClick={toggleVoiceReply}
-            aria-label={voiceReplyEnabled ? (isTH ? "ปิดเสียงตอบกลับ" : "Disable voice replies") : (isTH ? "เปิดเสียงตอบกลับ" : "Enable voice replies")}
-            title={voiceReplyEnabled ? (isTH ? "AI จะพูดคำตอบ" : "AI will speak replies") : (isTH ? "เปิดให้ AI พูดตอบ" : "Enable spoken replies")}
-          >
-            {voiceReplyEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-12 w-12 shrink-0 rounded-2xl"
-            onClick={voiceAssistantPhase === "speaking" ? stopSpeaking : repeatLastReply}
-            disabled={!latestVoiceAssistantMessage}
-            aria-label={voiceAssistantPhase === "speaking"
-              ? (isTH ? "หยุดพูด" : "Stop speaking")
-              : (isTH ? "พูดคำตอบล่าสุดซ้ำ" : "Repeat the latest reply")}
-            title={voiceAssistantPhase === "speaking"
-              ? (isTH ? "หยุดเสียง NAT AI" : "Stop NAT AI voice")
-              : (isTH ? "พูดคำตอบล่าสุดซ้ำ" : "Repeat latest reply")}
-          >
-            {voiceAssistantPhase === "speaking" ? <VolumeX className="h-5 w-5" /> : <RotateCcw className="h-5 w-5" />}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-12 shrink-0 rounded-2xl px-3 text-xs font-semibold"
-            onClick={cycleVoiceRate}
-            aria-label={isTH ? `ปรับความเร็วเสียง ปัจจุบัน ${voiceRate} เท่า` : `Change voice speed, currently ${voiceRate}x`}
-            title={isTH ? "ปรับความเร็วเสียง: ช้า ปกติ เร็ว" : "Voice speed: slow, normal, fast"}
-          >
-            {voiceRate}x
           </Button>
         </div>
         <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">

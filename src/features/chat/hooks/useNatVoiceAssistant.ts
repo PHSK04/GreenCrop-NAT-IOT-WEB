@@ -12,6 +12,16 @@ const VOICE_RATES = [0.8, 1, 1.15] as const;
 
 export type VoiceAssistantPhase = "off" | "waiting-wake-word" | "listening-command" | "thinking" | "speaking";
 type AssistantVoiceMessage = { id: string; text: string };
+type BrowserSpeechRecognition = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  abort: () => void;
+  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
 type Options = {
   isOpen: boolean;
   isAssistantMode: boolean;
@@ -50,8 +60,8 @@ const storedBool = (key: string, fallback = false) => typeof window === "undefin
 
 export function useNatVoiceAssistant(options: Options) {
   const { isOpen, isAssistantMode, isSending, isThai, latestAssistantMessage, onTranscript, onSubmit, onSynthesizeSpeech, onTranscribeAudio } = options;
-  const [enabled, setEnabled] = useState(() => storedBool(STORAGE_KEY));
-  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(() => storedBool(VOICE_REPLY_STORAGE_KEY, storedBool(STORAGE_KEY)));
+  const [enabled, setEnabled] = useState(true);
+  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(true);
   const [voiceRate, setVoiceRate] = useState(() => {
     const value = Number(typeof window === "undefined" ? 1 : window.localStorage.getItem(VOICE_RATE_STORAGE_KEY));
     return VOICE_RATES.includes(value as (typeof VOICE_RATES)[number]) ? value : 1;
@@ -65,6 +75,8 @@ export function useNatVoiceAssistant(options: Options) {
   const streamRef = useRef<MediaStream | null>(null);
   const captureTimerRef = useRef<number | null>(null);
   const retryCountRef = useRef(0);
+  const browserFallbackRef = useRef(false);
+  const browserRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const commandWindowUntilRef = useRef(0);
   const lastWakeAtRef = useRef(0);
   const speakingRef = useRef(false);
@@ -84,7 +96,9 @@ export function useNatVoiceAssistant(options: Options) {
     callbacksRef.current = { onTranscript, onSubmit, onSynthesizeSpeech, onTranscribeAudio };
   }, [enabled, isAssistantMode, isOpen, isSending, onSubmit, onSynthesizeSpeech, onTranscript, onTranscribeAudio]);
 
-  const canRun = useCallback(() => enabledRef.current && runtimeRef.current.isOpen && runtimeRef.current.isAssistantMode, []);
+  // The widget stays mounted in the authenticated application shell. Voice capture must
+  // therefore follow the signed-in session, not the visual open/closed state of the panel.
+  const canRun = useCallback(() => enabledRef.current, []);
   const scheduleRestart = useCallback((delay = 300) => {
     window.setTimeout(() => {
       if (canRun() && !runtimeRef.current.isSending && !speakingRef.current) startCaptureRef.current();
@@ -110,8 +124,52 @@ export function useNatVoiceAssistant(options: Options) {
     void Promise.resolve(callbacksRef.current.onSubmit(command)).catch(() => undefined);
   }, []);
 
+  const startBrowserFallback = useCallback(() => {
+    if (!canRun() || runtimeRef.current.isSending || speakingRef.current || browserRecognitionRef.current) return;
+    const speechWindow = window as typeof window & {
+      SpeechRecognition?: new () => BrowserSpeechRecognition;
+      webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
+    };
+    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      setPhase("off");
+      toast.error(isThai
+        ? "อุปกรณ์นี้ต้องเชื่อม Local STT จึงจะใช้ Hey Green ได้"
+        : "This device needs Local STT to use Hey Green.");
+      return;
+    }
+    const recognition = new Recognition();
+    browserRecognitionRef.current = recognition;
+    recognition.lang = isThai ? "th-TH" : "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .filter((result) => result.isFinal)
+        .map((result) => result[0]?.transcript || "")
+        .join(" ");
+      processTranscript(transcript);
+    };
+    recognition.onerror = () => { retryCountRef.current += 1; };
+    recognition.onend = () => {
+      browserRecognitionRef.current = null;
+      setIsListening(false);
+      if (canRun() && !runtimeRef.current.isSending && !speakingRef.current) scheduleRestart(500);
+    };
+    try {
+      recognition.start();
+      setPermissionState("granted");
+      setIsListening(true);
+      setPhase(Date.now() < commandWindowUntilRef.current ? "listening-command" : "waiting-wake-word");
+    } catch {
+      browserRecognitionRef.current = null;
+      scheduleRestart(1_000);
+    }
+  }, [canRun, isThai, processTranscript, scheduleRestart]);
+
   const startCapture = useCallback(async () => {
     if (!canRun() || runtimeRef.current.isSending || speakingRef.current || recorderRef.current) return;
+    if (browserFallbackRef.current) { startBrowserFallback(); return; }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setEnabled(false); enabledRef.current = false; setPhase("off");
       toast.error(isThai ? "เบราว์เซอร์นี้ไม่รองรับ Local Voice Capture" : "This browser cannot capture audio locally.");
@@ -144,8 +202,11 @@ export function useNatVoiceAssistant(options: Options) {
           processTranscript(text);
         } catch (error) {
           retryCountRef.current += 1;
-          if (retryCountRef.current === 1 || retryCountRef.current % 5 === 0) {
-            toast.error(isThai ? "Local STT ขาดการเชื่อมต่อ กำลังลองใหม่" : "Local STT disconnected. Retrying.");
+          if (retryCountRef.current === 1) {
+            browserFallbackRef.current = true;
+            toast.info(isThai
+              ? "Local STT ไม่พร้อม—สลับเป็นระบบฟังเสียงของเบราว์เซอร์อัตโนมัติ"
+              : "Local STT unavailable—using the browser speech fallback automatically.");
           }
         } finally {
           if (canRun() && !runtimeRef.current.isSending && !speakingRef.current) {
@@ -168,13 +229,15 @@ export function useNatVoiceAssistant(options: Options) {
       if (denied) { setEnabled(false); enabledRef.current = false; setPhase("off"); window.localStorage.setItem(STORAGE_KEY, "false"); }
       toast.error(isThai ? "กรุณาอนุญาตไมโครโฟนสำหรับ Local Voice AI" : "Allow microphone access for Local Voice AI.");
     }
-  }, [canRun, isThai, processTranscript, scheduleRestart]);
+  }, [canRun, isThai, processTranscript, scheduleRestart, startBrowserFallback]);
   startCaptureRef.current = () => { void startCapture(); };
 
   const stopCapture = useCallback(() => {
     if (captureTimerRef.current) window.clearTimeout(captureTimerRef.current);
     if (recorderRef.current?.state === "recording") recorderRef.current.stop();
     recorderRef.current = null;
+    browserRecognitionRef.current?.abort();
+    browserRecognitionRef.current = null;
     setIsListening(false);
   }, []);
 
@@ -260,7 +323,11 @@ export function useNatVoiceAssistant(options: Options) {
   const cycleVoiceRate = useCallback(() => { const next = VOICE_RATES[(VOICE_RATES.indexOf(voiceRate as never) + 1) % VOICE_RATES.length]; setVoiceRate(next); window.localStorage.setItem(VOICE_RATE_STORAGE_KEY, String(next)); }, [voiceRate]);
   const stopSpeaking = useCallback(() => { speechQueueRef.current = []; audioRef.current?.pause(); window.speechSynthesis?.cancel(); speakingRef.current = false; stopBargeMonitor(); scheduleRestart(100); }, [scheduleRestart, stopBargeMonitor]);
 
-  useEffect(() => { if (enabled && isOpen && isAssistantMode && !isSending) void startCapture(); }, [enabled, isAssistantMode, isOpen, isSending, startCapture]);
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEY, "true");
+    window.localStorage.setItem(VOICE_REPLY_STORAGE_KEY, "true");
+    if (enabled && !isSending) void startCapture();
+  }, [enabled, isSending, startCapture]);
   useEffect(() => {
     if (!latestAssistantMessage || latestAssistantMessage.id === lastSpokenMessageIdRef.current || latestAssistantMessage.id.includes("thinking")) return;
     lastSpokenMessageIdRef.current = latestAssistantMessage.id;
