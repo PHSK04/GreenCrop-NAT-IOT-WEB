@@ -1,7 +1,19 @@
 const { spawn } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 
+const PROJECT_ROOT = path.resolve(__dirname, '../..');
+
 const enabled = (name, fallback = false) => String(process.env[name] ?? fallback).toLowerCase() === 'true';
+
+function normalizeToolProposal(proposal = {}) {
+  if (!['none', 'read_device_context', 'control_device'].includes(proposal.tool)) return { tool: 'none', action: null };
+  if (proposal.tool !== 'control_device') return { tool: proposal.tool, action: null };
+  const allowedActions = ['system_on', 'system_off', 'pump1_on', 'pump1_off', 'pump2_on', 'pump2_off'];
+  return allowedActions.includes(proposal.action)
+    ? { tool: proposal.tool, action: proposal.action }
+    : { tool: 'none', action: null };
+}
 
 function getLocalVoiceAiStatus() {
   return {
@@ -31,11 +43,16 @@ function transcribeLocalAudio(audio, { language = 'th' } = {}) {
     return Promise.resolve({ text: process.env.NAT_AI_STT_MOCK_TEXT, language, mock: true });
   }
   if (!enabled('NAT_AI_LOCAL_STT_ENABLED')) throw new Error('Local STT is disabled');
-  const python = process.env.NAT_AI_STT_PYTHON_BIN || 'python3';
-  const script = path.resolve(process.env.NAT_AI_STT_SCRIPT || 'ai/stt/local_transcribe.py');
+  const configuredPython = process.env.NAT_AI_STT_PYTHON_BIN || '';
+  const localPython = path.join(PROJECT_ROOT, 'ai', '.venv', 'bin', 'python');
+  const python = configuredPython
+    ? (path.isAbsolute(configuredPython) ? configuredPython : path.resolve(PROJECT_ROOT, configuredPython))
+    : (fs.existsSync(localPython) ? localPython : 'python3');
+  const configuredScript = process.env.NAT_AI_STT_SCRIPT || 'ai/stt/local_transcribe.py';
+  const script = path.isAbsolute(configuredScript) ? configuredScript : path.resolve(PROJECT_ROOT, configuredScript);
   const args = [script, '--stdin', '--model', process.env.NAT_AI_STT_MODEL || 'small', '--language', language];
   return new Promise((resolve, reject) => {
-    const child = spawn(python, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(python, args, { cwd: PROJECT_ROOT, stdio: ['pipe', 'pipe', 'pipe'] });
     const chunks = []; const errors = [];
     const timeout = setTimeout(() => child.kill('SIGKILL'), Number(process.env.NAT_AI_STT_TIMEOUT_MS || 90000));
     child.stdout.on('data', (value) => chunks.push(value));
@@ -54,7 +71,7 @@ function transcribeLocalAudio(audio, { language = 'th' } = {}) {
 async function proposeLocalTool({ userMessage, recentConversation = [] }) {
   if (process.env.NAT_AI_OLLAMA_TOOL_MOCK_JSON) {
     const parsed = JSON.parse(process.env.NAT_AI_OLLAMA_TOOL_MOCK_JSON);
-    return { tool: parsed.tool || 'none', action: parsed.action || null, mock: true };
+    return { ...normalizeToolProposal(parsed), mock: true };
   }
   if (!enabled('NAT_AI_OLLAMA_ENABLED', true)) return { tool: 'none' };
   const baseUrl = String(process.env.NAT_AI_OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
@@ -82,9 +99,8 @@ async function proposeLocalTool({ userMessage, recentConversation = [] }) {
     if (!response.ok) throw new Error(`Ollama tool router failed (${response.status})`);
     const payload = await response.json();
     const parsed = JSON.parse(payload?.message?.content || '{}');
-    if (!['none', 'read_device_context', 'control_device'].includes(parsed.tool)) return { tool: 'none' };
-    return { tool: parsed.tool, action: parsed.action || null };
+    return normalizeToolProposal(parsed);
   } finally { clearTimeout(timeout); }
 }
 
-module.exports = { getLocalVoiceAiStatus, transcribeLocalAudio, proposeLocalTool };
+module.exports = { getLocalVoiceAiStatus, transcribeLocalAudio, proposeLocalTool, normalizeToolProposal };

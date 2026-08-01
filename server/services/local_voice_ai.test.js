@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { getLocalVoiceAiStatus, transcribeLocalAudio, proposeLocalTool } = require('./local_voice_ai');
+const { getLocalVoiceAiStatus, transcribeLocalAudio, proposeLocalTool, normalizeToolProposal } = require('./local_voice_ai');
 
 test('local voice status never advertises a cloud provider', () => {
   const status = getLocalVoiceAiStatus();
@@ -37,4 +37,18 @@ test('structured local tool mock keeps control as a proposal only', async () => 
   });
   assert.deepEqual({ tool: result.tool, action: result.action }, { tool: 'control_device', action: 'pump1_on' });
   delete process.env.NAT_AI_OLLAMA_TOOL_MOCK_JSON;
+});
+
+test('read-only tool proposals cannot carry a device action', () => {
+  assert.deepEqual(
+    normalizeToolProposal({ tool: 'read_device_context', action: 'system_off' }),
+    { tool: 'read_device_context', action: null },
+  );
+});
+
+test('unknown device actions are rejected before authorization', () => {
+  assert.deepEqual(
+    normalizeToolProposal({ tool: 'control_device', action: 'factory_reset' }),
+    { tool: 'none', action: null },
+  );
 });
