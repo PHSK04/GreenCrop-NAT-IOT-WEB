@@ -36,7 +36,7 @@ jobs:
           # GitHub Pages must never be built against a developer's localhost.
           # Keep the production API explicit so a stale repository secret cannot
           # silently override the deployed bundle.
-          VITE_API_URL: https://veteran-anymore-charity-federation.trycloudflare.com/api
+          VITE_API_URL: https://mandatory-peter-reach-surgeons.trycloudflare.com/api
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID || '1019464337354-1k37hufgsrc5sj8aa00bqb54uuk9olce.apps.googleusercontent.com' }}
           VITE_FACEBOOK_APP_ID: ${{ secrets.VITE_FACEBOOK_APP_ID }}
           VITE_APPLE_CLIENT_ID: ${{ secrets.VITE_APPLE_CLIENT_ID }}
