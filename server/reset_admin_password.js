@@ -6,10 +6,10 @@ const dbPath = path.resolve(__dirname, 'database.sqlite');
 const db = new sqlite3.Database(dbPath);
 
 async function resetPassword() {
-    const userId = 2; // ID ของคุณ
+    const userId = 2; 
     const newPassword = '123456';
     
-    // Hash ใหม่ให้ถูกต้อง
+   
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     
     console.log(`Resetting password for User ID ${userId} to '${newPassword}'...`);

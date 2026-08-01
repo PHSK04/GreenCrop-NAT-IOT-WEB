@@ -97,8 +97,8 @@ function LoginForm({ onClose, onRegister }: { onClose: () => void; onRegister: (
       </button>
 
       <div className="relative mb-5 text-center">
-        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full border border-emerald-200 bg-emerald-100">
-          <img src={BRAND_LOGO_URL} alt="GreenCrop NAT" className="h-6 w-6 object-contain" />
+        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center">
+          <img src={BRAND_LOGO_URL} alt="GreenCrop NAT" className="h-14 w-14 object-contain" />
         </div>
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-700">GreenCrop NAT IoT</p>
         <h2 className="text-3xl font-semibold leading-none tracking-tight text-slate-900">Login</h2>
@@ -214,8 +214,8 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
       </button>
 
       <div className="relative mb-5 text-center">
-        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full border border-emerald-200 bg-emerald-100">
-          <img src={BRAND_LOGO_URL} alt="GreenCrop NAT" className="h-6 w-6 object-contain" />
+        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center">
+          <img src={BRAND_LOGO_URL} alt="GreenCrop NAT" className="h-14 w-14 object-contain" />
         </div>
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-700">GreenCrop NAT IoT</p>
         <h2 className="text-3xl font-semibold leading-none tracking-tight text-slate-900">สมัครสมาชิก</h2>

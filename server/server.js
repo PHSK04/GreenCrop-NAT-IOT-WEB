@@ -8,10 +8,15 @@ const db = require('./database');
 const jwt = require('jsonwebtoken');
 const https = require('https');
 const crypto = require('crypto');
-const { startMqttListener, getMqttListenerStatus } = require('./mqtt_listener');
+const { startMqttListener, getMqttListenerStatus, publishDeviceCommand, getDeviceCommandStatus } = require('./mqtt_listener');
+const { getLocalVoiceAiStatus, transcribeLocalAudio, proposeLocalTool } = require('./services/local_voice_ai');
+const { recordLatency, getLatencyMetrics } = require('./services/ai_metrics');
+const { clearProjectKnowledgeCache } = require('./services/project_knowledge');
 const { parseUserAgent, getClientIP } = require('./deviceDetector');
 const { backfillTenantSensorSamples, getTenantLearningSummary, recordAiSensorSample } = require('./services/ai_training');
 const { OPENAI_MAX_OUTPUT_TOKENS, buildNatAiContext, generateNatAiReply, saveAiExchange } = require('./services/nat_ai_chat');
+const { buildBrainAssessment } = require('./services/nat_ai_brain');
+const { synthesizeLocalSpeech, getLocalTtsStatus } = require('./services/local_tts');
 
 // Start MQTT Listener for IoT Data Recording
 startMqttListener();
@@ -1305,6 +1310,148 @@ function requireAdmin(req, res, next) {
     return next();
 }
 
+app.post('/api/admin/ai/knowledge/reindex', requireAdmin, (req, res) => {
+    clearProjectKnowledgeCache();
+    logAudit(req.user.name, 'AI_KNOWLEDGE_REINDEX', 'Server', 'SUCCESS', 'Reloaded safe project documentation whitelist');
+    res.json({ ok: true, scope: 'safe-document-whitelist' });
+});
+
+app.get('/api/ai/voice/status', (req, res) => {
+    if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+    const status = getLocalTtsStatus();
+    res.json({
+        enabled: status.enabled,
+        running: status.running,
+        model: status.model,
+        engine: status.engine,
+        voice_clone_configured: status.voiceCloneConfigured,
+        max_text_chars: status.maxTextChars,
+    });
+});
+
+app.get('/api/ai/voice/local/status', (req, res) => {
+    if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+    res.json(getLocalVoiceAiStatus());
+});
+
+app.post('/api/ai/voice/local/transcribe', express.raw({ type: ['audio/*', 'application/octet-stream'], limit: '20mb' }), async (req, res) => {
+    const startedAt = Date.now();
+    try {
+        if (!req.user?.id || !req.tenant) return res.status(401).json({ error: 'Unauthorized' });
+        if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Audio body is required' });
+        const result = await transcribeLocalAudio(req.body, { language: String(req.query.language || 'th') });
+        await logAudit(req.user.name, 'AI_VOICE_TRANSCRIBE', auditDeviceFromRequest(req), 'SUCCESS', `Local STT user=${req.user.id} tenant=${req.tenant}`);
+        recordLatency('stt', startedAt); res.json(result);
+    } catch (err) {
+        await logAudit(req.user?.name, 'AI_VOICE_TRANSCRIBE', auditDeviceFromRequest(req), 'FAILED', String(err.message || err).slice(0, 300));
+        recordLatency('stt', startedAt, { ok: false }); res.status(503).json({ error: err.message || 'Local STT failed' });
+    }
+});
+
+const VOICE_CONTROL_ACTIONS = new Set(['system_on', 'system_off', 'pump1_on', 'pump1_off', 'pump2_on', 'pump2_off']);
+const HIGH_RISK_VOICE_ACTIONS = new Set(['system_on', 'system_off', 'pump1_on', 'pump2_on']);
+
+async function requireOwnedVoiceDevice(req, res) {
+    const deviceId = String(req.body?.deviceId || req.query?.deviceId || '').trim().toUpperCase();
+    if (!deviceId) { res.status(400).json({ error: 'deviceId is required' }); return null; }
+    if (!await userCanUseDevice(req.user, deviceId)) { res.status(403).json({ error: 'Device is not paired with this user' }); return null; }
+    return deviceId;
+}
+
+app.post('/api/ai/voice/tools/route', async (req, res) => {
+    const startedAt = Date.now();
+    try {
+        if (!req.user?.id || !req.tenant) return res.status(401).json({ error: 'Unauthorized' });
+        const userMessage = String(req.body?.userMessage || '').trim();
+        if (!userMessage) return res.status(400).json({ error: 'userMessage is required' });
+        const session = await ensureAiChatSessionForUser(req.user, req.body?.deviceId);
+        const rows = await loadAiChatMessages(session.id, 12);
+        const recentConversation = rows.map((item) => ({ role: item.sender_role === 'ai' ? 'assistant' : 'user', content: item.body }));
+        const proposal = await proposeLocalTool({ userMessage, recentConversation });
+        if (proposal.tool === 'control_device' && !VOICE_CONTROL_ACTIONS.has(proposal.action)) proposal.tool = 'none';
+        await logAudit(req.user.name, 'AI_VOICE_TOOL_ROUTE', 'Local Ollama', 'SUCCESS', `tool=${proposal.tool} user=${req.user.id} tenant=${req.tenant}`);
+        recordLatency('tool_router_llm', startedAt); res.json(proposal);
+    } catch (err) {
+        recordLatency('tool_router_llm', startedAt, { ok: false }); res.status(503).json({ error: err.message || 'Local tool router failed' });
+    }
+});
+
+app.get('/api/ai/voice/tools/context', async (req, res) => {
+    try {
+        const deviceId = await requireOwnedVoiceDevice(req, res); if (!deviceId) return;
+        const tenantIds = await getSensorTenantCandidates(req, String(req.tenant), deviceId);
+        const sensors = await loadLatestSensorRows(tenantIds, deviceId);
+        const device = await db.get('SELECT id, device_id, device_name, location, status, last_seen FROM device_pairings WHERE device_id = ? AND user_id = ?', [deviceId, req.user.id]);
+        await logAudit(req.user.name, 'AI_VOICE_READ_CONTEXT', deviceId, 'SUCCESS', `user=${req.user.id} tenant=${req.tenant}`);
+        res.json({ device, sensors: sensors.map(mergeSensorRowWithRawPayload), isolation: { user_id: req.user.id, tenant_id: req.tenant } });
+    } catch (err) { res.status(500).json({ error: err.message || 'Failed to read device context' }); }
+});
+
+app.post('/api/ai/voice/tools/control/prepare', async (req, res) => {
+    try {
+        const deviceId = await requireOwnedVoiceDevice(req, res); if (!deviceId) return;
+        const action = String(req.body?.action || '').toLowerCase();
+        if (!VOICE_CONTROL_ACTIONS.has(action)) return res.status(400).json({ error: 'Unsupported control action' });
+        const requiresConfirmation = HIGH_RISK_VOICE_ACTIONS.has(action);
+        const confirmationToken = requiresConfirmation ? jwt.sign({ purpose: 'voice-control', user_id: req.user.id, tenant_id: req.tenant, device_id: deviceId, action }, JWT_SECRET, { expiresIn: '2m' }) : null;
+        await logAudit(req.user.name, 'AI_VOICE_CONTROL_PREPARE', deviceId, 'SUCCESS', `action=${action} confirmation=${requiresConfirmation}`);
+        res.json({ deviceId, action, requiresConfirmation, confirmationToken, prompt: requiresConfirmation ? `ยืนยันคำสั่ง ${action} สำหรับ ${deviceId}` : null });
+    } catch (err) { res.status(500).json({ error: err.message || 'Failed to prepare command' }); }
+});
+
+app.post('/api/ai/voice/tools/control/execute', async (req, res) => {
+    const startedAt = Date.now();
+    const deviceId = await requireOwnedVoiceDevice(req, res); if (!deviceId) return;
+    const action = String(req.body?.action || '').toLowerCase();
+    if (!VOICE_CONTROL_ACTIONS.has(action)) return res.status(400).json({ error: 'Unsupported control action' });
+    try {
+        if (HIGH_RISK_VOICE_ACTIONS.has(action)) {
+            const proof = jwt.verify(String(req.body?.confirmationToken || ''), JWT_SECRET);
+            if (proof.purpose !== 'voice-control' || String(proof.user_id) !== String(req.user.id) || String(proof.tenant_id) !== String(req.tenant) || proof.device_id !== deviceId || proof.action !== action) throw new Error('Confirmation does not match this command');
+        }
+        const result = await publishDeviceCommand({ tenantId: req.tenant, deviceId, userId: req.user.id, idempotencyKey: req.body?.idempotencyKey, timeoutMs: Number(process.env.MQTT_COMMAND_ACK_TIMEOUT_MS || 8000), retries: Number(process.env.MQTT_COMMAND_PUBLISH_RETRIES || 1), command: { type: 'control', action, requested_by: req.user.id } });
+        await logAudit(req.user.name, 'AI_VOICE_CONTROL_EXECUTE', deviceId, 'SUCCESS', `action=${action} user=${req.user.id} tenant=${req.tenant}`);
+        recordLatency('device_publish', startedAt); res.json({ ok: true, deviceId, action, ...result });
+    } catch (err) {
+        await logAudit(req.user.name, 'AI_VOICE_CONTROL_EXECUTE', deviceId, 'FAILED', `action=${action} error=${String(err.message || err).slice(0, 200)}`);
+        recordLatency('device_publish', startedAt, { ok: false }); res.status(/confirmation|jwt|token/i.test(String(err.message)) ? 403 : 503).json({ error: err.message || 'Command failed' });
+    }
+});
+
+app.get('/api/ai/voice/tools/control/status/:correlationId', (req, res) => {
+    const status = getDeviceCommandStatus(req.params.correlationId, { tenantId: req.tenant, userId: req.user?.id });
+    if (!status) return res.status(404).json({ error: 'Command not found in this user/tenant scope' });
+    res.json(status);
+});
+
+app.get('/api/ai/voice/metrics', (req, res) => res.json(getLatencyMetrics()));
+
+app.post('/api/ai/voice/synthesize', async (req, res) => {
+    const startedAt = Date.now();
+    try {
+        if (!req.user?.id || !req.tenant) return res.status(401).json({ error: 'Unauthorized' });
+        const text = String(req.body?.text || '').replace(/\s+/g, ' ').trim();
+        const rate = Math.max(0.75, Math.min(1.25, Number(req.body?.rate || 1)));
+        if (!text) return res.status(400).json({ error: 'text is required' });
+
+        const result = await synthesizeLocalSpeech(text, { rate });
+        res.set({
+            'Content-Type': result.contentType,
+            'Content-Length': String(result.audio.length),
+            'Cache-Control': 'private, no-store',
+            'X-NAT-AI-Voice-Model': result.model,
+        });
+        recordLatency('tts', startedAt); return res.send(result.audio);
+    } catch (err) {
+        console.error('[local-tts] synthesis failed:', err.message);
+        const status = getLocalTtsStatus();
+        recordLatency('tts', startedAt, { ok: false }); return res.status(status.enabled ? 503 : 501).json({
+            error: err.message || 'Local voice synthesis failed',
+            fallback: 'browser-speech-synthesis',
+        });
+    }
+});
+
 function maskContact(value) {
     const text = String(value || '');
     if (!text) return '';
@@ -2028,6 +2175,7 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
         });
         const generated = await generateNatAiReply(context, fallbackText);
         const aiText = generated.text;
+        const brain = buildBrainAssessment(context, generated);
 
         await saveAiExchange(db, {
             sessionId: session.id,
@@ -2048,6 +2196,7 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
             controller_intent: generated.intent,
             controller_risk: generated.risk,
             controller_actions: generated.actions,
+            brain,
             ai_context_chars: generated.context_chars,
             ai_context_budget_chars: generated.context_budget_chars,
             ai_context_truncated: generated.context_truncated,

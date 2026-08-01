@@ -11,6 +11,7 @@ import {
   MicOff,
   Pencil,
   Reply,
+  RotateCcw,
   Send,
   ShieldCheck,
   Sparkles,
@@ -34,7 +35,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { chatService, AiChatMessage, AiChatSession, AiSensorLearningSummary, ChatMessage, ChatThread } from "@/features/chat/services/chatService";
+import { chatService, AiChatMessage, AiChatSession, AiSensorLearningSummary, ChatMessage, ChatThread, type NatAiBrainAssessment } from "@/features/chat/services/chatService";
+import { useNatVoiceAssistant } from "@/features/chat/hooks/useNatVoiceAssistant";
 import { toast } from "sonner";
 import { useActiveDeviceId } from "@/hooks/useActiveDeviceId";
 import { useMachine } from "@/contexts/MachineContext";
@@ -87,24 +89,6 @@ type LauncherPosition = {
   x: number;
   y: number;
 };
-
-type BrowserSpeechRecognitionEvent = Event & {
-  results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>;
-};
-
-type BrowserSpeechRecognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
-  onend: (() => void) | null;
-  onerror: ((event: Event & { error?: string }) => void) | null;
-};
-
-type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
 
 const safeSenderLabel = (message: Pick<ChatMessage, "sender_name" | "sender_role">, isTH: boolean) => {
   if (message.sender_role === "admin") {
@@ -393,9 +377,6 @@ export function CustomerChatWidget({
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [voiceInputError, setVoiceInputError] = useState("");
-  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [messagePendingDelete, setMessagePendingDelete] = useState<ChatMessage | null>(null);
@@ -404,6 +385,7 @@ export function CustomerChatWidget({
   const [isAdminTyping, setIsAdminTyping] = useState(false);
   const [typingAdminName, setTypingAdminName] = useState("");
   const [learningSummary, setLearningSummary] = useState<AiSensorLearningSummary | null>(null);
+  const [brainAssessment, setBrainAssessment] = useState<NatAiBrainAssessment | null>(null);
   const [cropYieldEntries, setCropYieldEntries] = useState<CropYieldEntry[]>(() => readCropYieldEntries(activeDeviceId || "default"));
   const [launcherPosition, setLauncherPosition] = useState<LauncherPosition | null>(null);
   const [isDraggingLauncher, setIsDraggingLauncher] = useState(false);
@@ -434,8 +416,6 @@ export function CustomerChatWidget({
   const previousChatbotMessageCountRef = useRef(chatbotMessages.length);
   const previousAgentMessageCountRef = useRef(agentMessages.length);
   const typingTimeoutRef = useRef<number | null>(null);
-  const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
-  const lastSpokenAssistantMessageRef = useRef<string | null>(null);
   const localChatDateKey = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -1035,102 +1015,6 @@ export function CustomerChatWidget({
     setSelectedThreadId((current) => current ?? items[0]?.id ?? null);
   };
 
-  const stopListening = () => {
-    speechRecognitionRef.current?.stop();
-    speechRecognitionRef.current = null;
-    setIsListening(false);
-  };
-
-  const startVoiceInput = () => {
-    const speechWindow = window as typeof window & {
-      SpeechRecognition?: SpeechRecognitionConstructor;
-      webkitSpeechRecognition?: SpeechRecognitionConstructor;
-    };
-    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
-    if (!Recognition) {
-      const message = isTH ? "เบราว์เซอร์นี้ยังไม่รองรับการฟังเสียง กรุณาใช้ Chrome หรือ Edge" : "Voice input is not supported. Try Chrome or Edge.";
-      setVoiceInputError(message);
-      toast.error(message);
-      return;
-    }
-
-    window.speechSynthesis?.cancel();
-    setVoiceInputError("");
-    const recognition = new Recognition();
-    recognition.lang = isTH ? "th-TH" : "en-US";
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.onresult = (event) => {
-      let transcript = "";
-      for (let index = 0; index < event.results.length; index += 1) {
-        transcript += event.results[index]?.[0]?.transcript || "";
-      }
-      const cleanTranscript = transcript.trim();
-      setDraft(cleanTranscript);
-      const finalResult = event.results[event.results.length - 1];
-      if (finalResult?.isFinal && cleanTranscript) {
-        recognition.stop();
-      }
-    };
-    recognition.onerror = (event) => {
-      setIsListening(false);
-      speechRecognitionRef.current = null;
-      if (event.error !== "aborted" && event.error !== "no-speech") {
-        const message = isTH ? "ฟังเสียงไม่สำเร็จ กรุณาอนุญาตใช้ไมโครโฟนแล้วลองใหม่" : "Could not listen. Allow microphone access and try again.";
-        setVoiceInputError(message);
-        toast.error(message);
-      }
-    };
-    recognition.onend = () => {
-      setIsListening(false);
-      speechRecognitionRef.current = null;
-    };
-    speechRecognitionRef.current = recognition;
-    setIsListening(true);
-    try {
-      recognition.start();
-    } catch {
-      setIsListening(false);
-    }
-  };
-
-  const toggleVoiceInput = () => {
-    if (isListening) {
-      stopListening();
-      return;
-    }
-    startVoiceInput();
-  };
-
-  const toggleVoiceReply = () => {
-    if (voiceReplyEnabled) {
-      window.speechSynthesis?.cancel();
-      setVoiceReplyEnabled(false);
-      return;
-    }
-    const latest = [...assistantMessages].reverse().find((message) => message.sender === "ai");
-    lastSpokenAssistantMessageRef.current = latest?.id || null;
-    setVoiceReplyEnabled(true);
-    toast.success(isTH ? "เปิดเสียงตอบกลับแล้ว" : "Voice replies enabled");
-  };
-
-  useEffect(() => {
-    if (!voiceReplyEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const latest = [...assistantMessages].reverse().find((message) => message.sender === "ai" && !message.id.includes("thinking"));
-    if (!latest || latest.id === lastSpokenAssistantMessageRef.current) return;
-    lastSpokenAssistantMessageRef.current = latest.id;
-    const utterance = new SpeechSynthesisUtterance(latest.text.replace(/[*#`_>-]/g, " ").replace(/\s+/g, " ").trim());
-    utterance.lang = isTH ? "th-TH" : "en-US";
-    utterance.rate = isTH ? 1 : 0.95;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  }, [assistantMessages, isOpen, isTH, mode, voiceReplyEnabled]);
-
-  useEffect(() => () => {
-    speechRecognitionRef.current?.abort();
-    window.speechSynthesis?.cancel();
-  }, []);
-
   const submitAssistantMessage = async (voiceTranscript?: string) => {
     const body = String(voiceTranscript ?? draft).trim();
     if (!body || isSending) return;
@@ -1152,7 +1036,32 @@ export function CustomerChatWidget({
     ]);
 
     try {
-      const { messages } = await chatService.generateAiReply({
+      const toolProposal = await chatService.routeVoiceTool(body, activeDeviceId || undefined).catch(() => ({ tool: "none" as const }));
+      if (toolProposal.tool === "control_device" && toolProposal.action) {
+        if (!activeDeviceId) throw new Error(isTH ? "กรุณาเลือกอุปกรณ์ก่อนสั่งงาน" : "Select a device before controlling it");
+        const prepared = await chatService.prepareVoiceControl(activeDeviceId, toolProposal.action);
+        if (prepared.requiresConfirmation) {
+          const accepted = window.confirm(prepared.prompt || (isTH ? "ยืนยันคำสั่งควบคุมอุปกรณ์หรือไม่?" : "Confirm this device command?"));
+          if (!accepted) {
+            setAssistantMessages((current) => current.filter((message) => message.id !== `ai-thinking-${now}`).concat({
+              id: `ai-control-cancelled-${now}`, sender: "ai", text: isTH ? "ยกเลิกคำสั่งแล้วครับ" : "Command cancelled.", createdAt: new Date().toISOString(),
+            }));
+            return;
+          }
+        }
+        const published = await chatService.executeVoiceControl(prepared);
+        const acknowledgement = published.correlationId
+          ? await chatService.waitForVoiceControl(published.correlationId)
+          : { state: published.state || "published" };
+        const commandState = String(acknowledgement.state || "published");
+        setAssistantMessages((current) => current.filter((message) => message.id !== `ai-thinking-${now}`).concat({
+          id: `ai-control-ok-${now}`, sender: "ai", text: commandState === "confirmed"
+            ? (isTH ? `อุปกรณ์ ${activeDeviceId} ยืนยันคำสั่ง ${toolProposal.action} แล้วครับ` : `${activeDeviceId} confirmed ${toolProposal.action}.`)
+            : (isTH ? `เผยแพร่คำสั่งแล้ว แต่ฮาร์ดแวร์ยังไม่ยืนยัน สถานะ: ${commandState}` : `Command published, but hardware has not confirmed it. State: ${commandState}.`), createdAt: new Date().toISOString(),
+        }));
+        return;
+      }
+      const { messages, brain } = await chatService.generateAiReply({
         deviceId: activeDeviceId || undefined,
         userMessage: body,
         fallbackAiMessage: fallbackAiText,
@@ -1162,6 +1071,7 @@ export function CustomerChatWidget({
         intent,
         shouldEscalate,
       });
+      setBrainAssessment(brain || null);
       const nextMessages = messages.map(mapAiMessageToAssistantMessage);
       if (nextMessages.length > 0) {
         skipAssistantHistoryPersistRef.current = true;
@@ -1192,6 +1102,36 @@ export function CustomerChatWidget({
       setIsSending(false);
     }
   };
+
+  const latestVoiceAssistantMessage = useMemo(
+    () => [...assistantMessages]
+      .reverse()
+      .find((message) => message.sender === "ai" && !message.id.includes("thinking")),
+    [assistantMessages],
+  );
+  const {
+    enabled: handsFreeEnabled,
+    isListening,
+    phase: voiceAssistantPhase,
+    permissionState: voicePermissionState,
+    voiceReplyEnabled,
+    voiceRate,
+    toggleHandsFree: toggleVoiceInput,
+    toggleVoiceReply,
+    repeatLastReply,
+    cycleVoiceRate,
+    stopSpeaking,
+  } = useNatVoiceAssistant({
+    isOpen,
+    isAssistantMode: mode === "assistant",
+    isSending,
+    isThai: isTH,
+    latestAssistantMessage: latestVoiceAssistantMessage,
+    onTranscript: setDraft,
+    onSubmit: submitAssistantMessage,
+    onSynthesizeSpeech: chatService.synthesizeAiSpeech,
+    onTranscribeAudio: chatService.transcribeLocalAudio,
+  });
 
   const submitChatbotMessage = async () => {
     const body = draft.trim();
@@ -2508,6 +2448,28 @@ export function CustomerChatWidget({
 
         </div>
 
+        {brainAssessment && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3 text-xs text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
+            <div className="flex flex-wrap items-center gap-2 font-semibold">
+              <Badge variant="outline">Brain v2</Badge>
+              <span>{isTH ? "ความมั่นใจ" : "Confidence"} {Math.round(brainAssessment.confidence * 100)}%</span>
+              <span>•</span>
+              <span>
+                {brainAssessment.data_quality.telemetry_fresh
+                  ? (isTH ? "ข้อมูลล่าสุดพร้อมใช้" : "Telemetry is fresh")
+                  : (isTH ? "ข้อมูลอาจเก่าหรือยังไม่มี" : "Telemetry is stale or unavailable")}
+              </span>
+            </div>
+            <div className="mt-2 text-[11px] opacity-80">
+              {isTH ? "ความปลอดภัย:" : "Safety:"} {brainAssessment.safety.mode === "confirmation-required"
+                ? (isTH ? "ต้องยืนยันก่อนสั่งเครื่อง" : "confirmation required before control")
+                : (isTH ? "อ่านและวิเคราะห์เท่านั้น" : "read-only analysis")}
+              {" • "}
+              {isTH ? "หลักฐาน" : "Evidence"} {brainAssessment.data_quality.evidence_count}
+            </div>
+          </div>
+        )}
+
         {assistantMessages.map((message) => (
           <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"} animate-in fade-in-0 slide-in-from-bottom-1 duration-200`}>
             <div className={`max-w-[88%] rounded-[1.35rem] px-4 py-3 shadow-sm ${message.sender === "user" ? "bg-emerald-600 text-white" : "border border-emerald-100 bg-white text-slate-900 dark:border-emerald-950 dark:bg-slate-900 dark:text-slate-100"}`}>
@@ -2535,15 +2497,20 @@ export function CustomerChatWidget({
         <div className="flex items-end gap-2">
           <Button
             type="button"
-            variant={isListening ? "default" : "outline"}
+            variant={handsFreeEnabled ? "default" : "outline"}
             size="icon"
-            className={`h-12 w-12 shrink-0 rounded-2xl ${isListening ? "animate-pulse bg-red-500 hover:bg-red-600" : ""}`}
+            className={`h-12 w-12 shrink-0 rounded-2xl ${
+              handsFreeEnabled
+                ? isListening
+                  ? "animate-pulse bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-emerald-600 hover:bg-emerald-700"
+                : ""
+            }`}
             onClick={toggleVoiceInput}
-            disabled={isSending}
-            aria-label={isListening ? (isTH ? "หยุดฟัง" : "Stop listening") : (isTH ? "พูดกับ NAT AI" : "Talk to NAT AI")}
-            title={isListening ? (isTH ? "กำลังฟัง—กดเพื่อหยุด" : "Listening—click to stop") : (isTH ? "พูดกับ NAT AI" : "Talk to NAT AI")}
+            aria-label={handsFreeEnabled ? (isTH ? "ปิด NAT AI แบบไม่ใช้มือ" : "Disable hands-free NAT AI") : (isTH ? "เปิด NAT AI แบบไม่ใช้มือ" : "Enable hands-free NAT AI")}
+            title={handsFreeEnabled ? (isTH ? "Local STT เปิดอยู่—พูดว่า เฮ้ Green" : "Local STT active—say Hey Green") : (isTH ? "อนุญาตไมค์ Local AI ครั้งแรก" : "Allow the local AI microphone once")}
           >
-            {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            {handsFreeEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
           </Button>
           <Input
             value={draft}
@@ -2573,15 +2540,48 @@ export function CustomerChatWidget({
           >
             {voiceReplyEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-12 w-12 shrink-0 rounded-2xl"
+            onClick={voiceAssistantPhase === "speaking" ? stopSpeaking : repeatLastReply}
+            disabled={!latestVoiceAssistantMessage}
+            aria-label={voiceAssistantPhase === "speaking"
+              ? (isTH ? "หยุดพูด" : "Stop speaking")
+              : (isTH ? "พูดคำตอบล่าสุดซ้ำ" : "Repeat the latest reply")}
+            title={voiceAssistantPhase === "speaking"
+              ? (isTH ? "หยุดเสียง NAT AI" : "Stop NAT AI voice")
+              : (isTH ? "พูดคำตอบล่าสุดซ้ำ" : "Repeat latest reply")}
+          >
+            {voiceAssistantPhase === "speaking" ? <VolumeX className="h-5 w-5" /> : <RotateCcw className="h-5 w-5" />}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 shrink-0 rounded-2xl px-3 text-xs font-semibold"
+            onClick={cycleVoiceRate}
+            aria-label={isTH ? `ปรับความเร็วเสียง ปัจจุบัน ${voiceRate} เท่า` : `Change voice speed, currently ${voiceRate}x`}
+            title={isTH ? "ปรับความเร็วเสียง: ช้า ปกติ เร็ว" : "Voice speed: slow, normal, fast"}
+          >
+            {voiceRate}x
+          </Button>
         </div>
         <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-          {isListening
-            ? (isTH ? "กำลังฟังอยู่ พูดได้เลยครับ" : "Listening—go ahead.")
-            : voiceInputError
-              ? voiceInputError
-              : draft.trim()
-                ? (isTH ? "ตรวจข้อความที่ได้จากเสียง แล้วกดส่งเพื่อยืนยันคำสั่ง" : "Review the transcript, then press Send to confirm.")
-                : (isTH ? "กดไมค์เพื่อพูด และตรวจข้อความก่อนส่งคำสั่ง" : "Tap the mic to speak and review commands before sending.")}
+          {handsFreeEnabled && voicePermissionState !== "granted" && (
+            <span className="mr-2 text-amber-600 dark:text-amber-400">
+              {isTH ? "Local voice degraded—กำลังรอสิทธิ์ไมค์หรือ local STT" : "Local voice degraded—waiting for microphone permission or local STT."}
+            </span>
+          )}
+          {voiceAssistantPhase === "waiting-wake-word"
+            ? (isTH ? "Local AI พร้อม—พูดว่า “เฮ้ Green” แล้วตามด้วยคำถาม" : "Local AI ready—say “Hey Green” followed by your question.")
+            : voiceAssistantPhase === "listening-command"
+              ? (isTH ? "NAT ฟังอยู่ พูดต่อได้เลยโดยไม่ต้องเรียกซ้ำ" : "NAT is listening—continue without repeating the wake word.")
+              : voiceAssistantPhase === "thinking"
+                ? (isTH ? "รับคำถามแล้ว กำลังคิดคำตอบ" : "Question received—thinking.")
+                : voiceAssistantPhase === "speaking"
+                  ? (isTH ? "NAT กำลังพูดคำตอบ" : "NAT is speaking.")
+                  : (isTH ? "อนุญาตไมค์ครั้งแรกหนึ่งครั้ง แล้วระบบ Local AI จะฟังต่อเนื่องขณะหน้าเว็บเปิด" : "Allow the microphone once; local listening then continues while this page is open.")}
         </div>
       </div>
     </>

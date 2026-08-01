@@ -21,3 +21,12 @@ test('retrieves authenticated device API documentation', () => {
     assert.ok(results.some((item) => item.source === 'docs/reference/API.md'));
     assert.ok(results.some((item) => item.text.includes('/api/devices/pair')));
 });
+
+test('retrieves user-facing page knowledge with a source label', () => {
+    const results = searchProjectKnowledge('หน้า Tank Levels ใช้ทำอะไร');
+    assert.ok(results.some((item) => item.source === 'docs/reference/PROJECT_FEATURE_INDEX.md'));
+});
+
+test('unsupported unrelated question returns no invented project evidence', () => {
+    assert.deepEqual(searchProjectKnowledge('quantum chromodynamics penguin theorem'), []);
+});

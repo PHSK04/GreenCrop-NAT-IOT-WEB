@@ -93,6 +93,26 @@ NAT AI should answer the user's request directly first instead of asking the use
 to choose between separate Chatbot or Agent modes. Any action that can affect
 hardware must still require explicit confirmation before execution.
 
+### Hands-free voice assistant
+
+The customer assistant includes an optional hands-free mode implemented in
+`src/features/chat/hooks/useNatVoiceAssistant.ts`.
+
+1. Open NAT AI and enable the microphone once.
+2. Allow microphone access in Chrome or Edge.
+3. Say `เฮ้ NAT` or `Hey NAT`, followed by a question.
+4. After NAT AI replies, continue speaking for 45 seconds without repeating the
+   wake word.
+5. Say `หยุดฟัง`, `พักก่อน`, or `stop listening` to return to wake-word mode.
+
+The preference is stored in the browser and listening only runs while the
+GreenCrop page is open in assistant mode. Browser permission and background-tab
+policies still apply. Voice commands do not bypass the existing confirmation
+requirement for machine-impacting actions.
+
+On Windows, the Node backend forces UTF-8 when launching the Python controller.
+On macOS, keep `NAT_AI_PYTHON_BIN=python3` in `server/.env`.
+
 ## Data Scope
 
 Training data must always come from `/api/ai/sensor-learning/me`.

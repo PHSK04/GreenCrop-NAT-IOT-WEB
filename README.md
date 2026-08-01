@@ -92,6 +92,7 @@ Notes:
 - Keep `server/.env` with local DB credentials ready before demo.
 - For social login production usage, set provider credentials in both frontend and backend env.
 - Documentation is grouped under `docs/` (see `docs/DOCS_INDEX.md`).
+- Local/self-hosted voice assistant setup: `docs/guides/LOCAL_VOICE_AI_SETUP.md`.
 
 ## Status
 - Build: passing (`npm run build`)

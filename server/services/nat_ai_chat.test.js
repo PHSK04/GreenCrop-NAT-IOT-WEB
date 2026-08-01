@@ -22,6 +22,20 @@ test('generative chat sends recent turns as real conversation roles', () => {
     assert.doesNotMatch(result.messages.at(-1).content, /recent_conversation/);
 });
 
+test('generative chat is grounded in Wolffia cultivation instead of generic plant care', () => {
+    const result = buildModelMessages({
+        user_message: 'วันนี้ไข่ผำเป็นอย่างไรบ้าง',
+        recent_conversation: [],
+        data_scope: { tenant_id: 'user-1' },
+    });
+    const systemPrompt = result.messages[0].content;
+
+    assert.match(systemPrompt, /Wolffia cultivation system/);
+    assert.match(systemPrompt, /ไข่ผำ/);
+    assert.match(systemPrompt, /aquatic cultivation system/);
+    assert.match(systemPrompt, /Do not drift into generic tree/);
+});
+
 test('short follow-up inherits the previous topic for data routing', async () => {
     const context = await buildNatAiContext({
         req: { user: { id: 1, role: 'user' }, tenant: 'tenant-1' },
@@ -84,7 +98,15 @@ test('stale telemetry is not misreported as pH out of range', () => {
             },
         },
     });
-    const result = spawnSync('python3', [script], { input: payload, encoding: 'utf8' });
+    const result = spawnSync('python3', [script], {
+        input: payload,
+        encoding: 'utf8',
+        env: {
+            ...process.env,
+            PYTHONIOENCODING: 'utf-8',
+            PYTHONUTF8: '1',
+        },
+    });
     assert.equal(result.status, 0, result.stderr);
     const response = JSON.parse(result.stdout);
     assert.equal(response.risk.severity, 'offline');
