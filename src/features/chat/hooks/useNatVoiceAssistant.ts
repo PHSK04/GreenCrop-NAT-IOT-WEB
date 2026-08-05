@@ -19,7 +19,7 @@ type BrowserSpeechRecognition = {
   start: () => void;
   abort: () => void;
   onresult: ((event: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
   onend: (() => void) | null;
 };
 type Options = {
@@ -58,6 +58,15 @@ const storedBool = (key: string, fallback = false) => typeof window === "undefin
   ? fallback
   : (window.localStorage.getItem(key) == null ? fallback : window.localStorage.getItem(key) === "true");
 
+const getBrowserSpeechRecognition = () => {
+  if (typeof window === "undefined") return undefined;
+  const speechWindow = window as typeof window & {
+    SpeechRecognition?: new () => BrowserSpeechRecognition;
+    webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
+  };
+  return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+};
+
 export function useNatVoiceAssistant(options: Options) {
   const { isOpen, isAssistantMode, isSending, isThai, latestAssistantMessage, onTranscript, onSubmit, onSynthesizeSpeech, onTranscribeAudio } = options;
   const [enabled, setEnabled] = useState(true);
@@ -75,7 +84,9 @@ export function useNatVoiceAssistant(options: Options) {
   const streamRef = useRef<MediaStream | null>(null);
   const captureTimerRef = useRef<number | null>(null);
   const retryCountRef = useRef(0);
-  const browserFallbackRef = useRef(false);
+  // Prefer the browser engine when it exists. The hosted API intentionally does not
+  // bundle a Whisper model, so probing that endpoint first only produces a 503 loop.
+  const browserFallbackRef = useRef(Boolean(getBrowserSpeechRecognition()));
   const browserRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const commandWindowUntilRef = useRef(0);
   const lastWakeAtRef = useRef(0);
@@ -126,16 +137,11 @@ export function useNatVoiceAssistant(options: Options) {
 
   const startBrowserFallback = useCallback(() => {
     if (!canRun() || runtimeRef.current.isSending || speakingRef.current || browserRecognitionRef.current) return;
-    const speechWindow = window as typeof window & {
-      SpeechRecognition?: new () => BrowserSpeechRecognition;
-      webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
-    };
-    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    const Recognition = getBrowserSpeechRecognition();
     if (!Recognition) {
+      enabledRef.current = false;
+      setEnabled(false);
       setPhase("off");
-      toast.error(isThai
-        ? "อุปกรณ์นี้ต้องเชื่อม Local STT จึงจะใช้ Hey Green ได้"
-        : "This device needs Local STT to use Hey Green.");
       return;
     }
     const recognition = new Recognition();
@@ -150,7 +156,15 @@ export function useNatVoiceAssistant(options: Options) {
         .join(" ");
       processTranscript(transcript);
     };
-    recognition.onerror = () => { retryCountRef.current += 1; };
+    recognition.onerror = (event) => {
+      retryCountRef.current += 1;
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        enabledRef.current = false;
+        setEnabled(false);
+        setPermissionState("denied");
+        setPhase("off");
+      }
+    };
     recognition.onend = () => {
       browserRecognitionRef.current = null;
       setIsListening(false);
@@ -203,10 +217,15 @@ export function useNatVoiceAssistant(options: Options) {
         } catch (error) {
           retryCountRef.current += 1;
           if (retryCountRef.current === 1) {
-            browserFallbackRef.current = true;
-            toast.info(isThai
-              ? "Local STT ไม่พร้อม—สลับเป็นระบบฟังเสียงของเบราว์เซอร์อัตโนมัติ"
-              : "Local STT unavailable—using the browser speech fallback automatically.");
+            browserFallbackRef.current = Boolean(getBrowserSpeechRecognition());
+            if (!browserFallbackRef.current) {
+              enabledRef.current = false;
+              setEnabled(false);
+              setPhase("off");
+              toast.error(isThai
+                ? "เบราว์เซอร์นี้ยังไม่รองรับการฟังเสียงอัตโนมัติ กรุณาใช้ Safari หรือ Chrome บนคอมพิวเตอร์"
+                : "Automatic listening is not supported here. Use Safari or desktop Chrome.");
+            }
           }
         } finally {
           if (canRun() && !runtimeRef.current.isSending && !speakingRef.current) {
