@@ -90,6 +90,114 @@ body {
   background-attachment: fixed;
 }
 
+.scada-pipe {
+  fill: none;
+  stroke: #e2e8f0;
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.scada-pipe--active {
+  stroke: #22d3ee;
+  stroke-dasharray: 18 13;
+  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.65));
+  animation: scada-flow 0.9s linear infinite;
+}
+
+.scada-label { fill: #f8fafc; font-size: 14px; font-weight: 800; }
+.scada-code { fill: #67e8f9; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: .06em; }
+.scada-panel-label { fill: #67e8f9; font-family: ui-monospace, monospace; font-size: 9px; font-weight: 800; letter-spacing: .16em; }
+.scada-panel-value { fill: #f8fafc; font-size: 11px; font-weight: 700; }
+.scada-kicker { fill: #94a3b8; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
+.scada-header-status { fill: #cbd5e1; font-family: ui-monospace, monospace; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
+.scada-readout { fill: #e2e8f0; font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; }
+.scada-rotor { transform-box: fill-box; transform-origin: center; animation: scada-spin .7s linear infinite; }
+
+@keyframes scada-flow { to { stroke-dashoffset: -31; } }
+@keyframes scada-spin { to { transform: rotate(360deg); } }
+
+.model-flow {
+  fill: none;
+  stroke: rgba(226, 232, 240, 0.18);
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.model-flow--active,
+.model-flow--return {
+  stroke: #22d3ee;
+  stroke-width: 11;
+  stroke-dasharray: 13 11;
+  filter: url(#flowGlow);
+  animation: model-water-flow 0.85s linear infinite;
+}
+
+.model-flow--return {
+  stroke: #34d399;
+  animation-direction: reverse;
+}
+
+.model-status-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: model-device-pulse 1.8s ease-out infinite;
+}
+
+.model-device-tag {
+  fill: #67e8f9;
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.model-pump-rotor {
+  transform-box: view-box;
+  transform-origin: center;
+  animation: model-pump-spin .7s linear infinite;
+}
+
+.model-stage {
+  fill: rgba(15, 23, 42, .9);
+  stroke: #475569;
+}
+
+.model-stage-text {
+  fill: #cbd5e1;
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+
+.model-stage--running {
+  fill: rgba(8, 47, 73, .94);
+  stroke: #22d3ee;
+  filter: drop-shadow(0 0 6px rgba(34, 211, 238, .55));
+}
+
+.model-stage--returning {
+  fill: rgba(6, 78, 59, .94);
+  stroke: #34d399;
+  filter: drop-shadow(0 0 6px rgba(52, 211, 153, .5));
+}
+
+.model-stage--1 { animation: model-stage-1 8s ease-in-out infinite; }
+.model-stage--2 { animation: model-stage-2 8s ease-in-out infinite; }
+.model-stage--3 { animation: model-stage-3 8s ease-in-out infinite; }
+.model-flow--stage-1 { animation: model-water-flow .85s linear infinite, model-stage-1 8s ease-in-out infinite; }
+.model-flow--stage-2 { animation: model-water-flow .85s linear infinite, model-stage-2 8s ease-in-out infinite; }
+.model-flow--stage-3 { animation: model-water-flow .85s linear infinite reverse, model-stage-3 8s ease-in-out infinite; }
+
+@keyframes model-water-flow { to { stroke-dashoffset: -24; } }
+@keyframes model-device-pulse { 0% { transform: scale(.65); opacity: 1; } 100% { transform: scale(1.55); opacity: 0; } }
+@keyframes model-pump-spin { to { transform: rotate(360deg); } }
+@keyframes model-stage-1 { 0%, 30% { opacity: 1; stroke: #22d3ee; } 35%, 100% { opacity: .28; } }
+@keyframes model-stage-2 { 0%, 30%, 68%, 100% { opacity: .28; } 35%, 63% { opacity: 1; stroke: #22d3ee; } }
+@keyframes model-stage-3 { 0%, 63%, 100% { opacity: .28; } 68%, 95% { opacity: 1; stroke: #34d399; } }
+
 @keyframes landing-night-drift {
   0% { transform: scale(1.015) translate3d(0, 0, 0); }
   50% { transform: scale(1.045) translate3d(-0.35%, -0.55%, 0); }

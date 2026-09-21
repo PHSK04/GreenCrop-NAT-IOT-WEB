@@ -15,6 +15,7 @@ import {
   Trash2,
   UserCheck,
   UserRoundX,
+  Volume2,
   X,
 } from "lucide-react";
 import natAssistantImage from "@/assets/images/generated/nat_ai_assistant_full.png";
@@ -30,7 +31,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { chatService, AiChatMessage, AiChatSession, AiSensorLearningSummary, ChatMessage, ChatThread, type NatAiBrainAssessment } from "@/features/chat/services/chatService";
+import { chatService, AiChatMessage, AiChatSession, AiSensorLearningSummary, ChatMessage, ChatThread, type NatAiBrainAssessment, type VoiceControlAction, type VoiceControlPreparation, type VoiceToolProposal } from "@/features/chat/services/chatService";
 import { useNatVoiceAssistant } from "@/features/chat/hooks/useNatVoiceAssistant";
 import { toast } from "sonner";
 import { useActiveDeviceId } from "@/hooks/useActiveDeviceId";
@@ -79,6 +80,8 @@ const CHATBOT_HISTORY_PREFIX = `nat_chatbot_history_${ASSISTANT_CONTEXT_VERSION}
 const AGENT_HISTORY_PREFIX = `nat_ai_agent_history_${ASSISTANT_CONTEXT_VERSION}`;
 const LAUNCHER_BASE_WIDTH = 144;
 const LAUNCHER_BASE_HEIGHT = 184;
+const VOICE_CONFIRM_PATTERN = /^(?:ยืนยัน|ตกลง|โอเค|ได้|ใช่|ทำเลย|confirm|yes|okay|ok)$/i;
+const VOICE_CANCEL_PATTERN = /^(?:ยกเลิก|ไม่|ไม่เอา|หยุด|cancel|no|stop)$/i;
 
 type LauncherPosition = {
   x: number;
@@ -411,6 +414,11 @@ export function CustomerChatWidget({
   const previousChatbotMessageCountRef = useRef(chatbotMessages.length);
   const previousAgentMessageCountRef = useRef(agentMessages.length);
   const typingTimeoutRef = useRef<number | null>(null);
+  const pendingVoiceControlRef = useRef<{
+    prepared: VoiceControlPreparation;
+    action: VoiceControlAction;
+    deviceId: string;
+  } | null>(null);
   const localChatDateKey = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -1031,18 +1039,70 @@ export function CustomerChatWidget({
     ]);
 
     try {
-      const toolProposal = await chatService.routeVoiceTool(body, activeDeviceId || undefined).catch(() => ({ tool: "none" as const }));
+      const pendingControl = pendingVoiceControlRef.current;
+      if (pendingControl) {
+        if (VOICE_CANCEL_PATTERN.test(body)) {
+          pendingVoiceControlRef.current = null;
+          setAssistantMessages((current) => current.filter((message) => message.id !== `ai-thinking-${now}`).concat({
+            id: `ai-control-cancelled-${now}`,
+            sender: "ai",
+            text: isTH ? "ยกเลิกคำสั่งแล้วครับ" : "Command cancelled.",
+            createdAt: new Date().toISOString(),
+          }));
+          return;
+        }
+        if (!VOICE_CONFIRM_PATTERN.test(body)) {
+          setAssistantMessages((current) => current.filter((message) => message.id !== `ai-thinking-${now}`).concat({
+            id: `ai-control-confirm-again-${now}`,
+            sender: "ai",
+            text: isTH ? "ขอคำตอบว่า “ยืนยัน” หรือ “ยกเลิก” ครับ" : "Please say “confirm” or “cancel”.",
+            createdAt: new Date().toISOString(),
+          }));
+          return;
+        }
+
+        pendingVoiceControlRef.current = null;
+        const published = await chatService.executeVoiceControl(pendingControl.prepared);
+        const acknowledgement = published.correlationId
+          ? await chatService.waitForVoiceControl(published.correlationId)
+          : { state: published.state || "published" };
+        const commandState = String(acknowledgement.state || "published");
+        setAssistantMessages((current) => current.filter((message) => message.id !== `ai-thinking-${now}`).concat({
+          id: `ai-control-ok-${now}`,
+          sender: "ai",
+          text: commandState === "confirmed"
+            ? (isTH ? `อุปกรณ์ ${pendingControl.deviceId} ยืนยันคำสั่ง ${pendingControl.action} แล้วครับ` : `${pendingControl.deviceId} confirmed ${pendingControl.action}.`)
+            : (isTH ? `ส่งคำสั่งแล้ว แต่ฮาร์ดแวร์ยังไม่ยืนยัน สถานะ: ${commandState}` : `Command sent, but hardware has not confirmed it. State: ${commandState}.`),
+          createdAt: new Date().toISOString(),
+        }));
+        return;
+      }
+
+      const toolProposal = await chatService.routeVoiceTool(body, activeDeviceId || undefined).catch(() => ({ tool: "none" } as VoiceToolProposal));
+      if (toolProposal.needs_clarification && toolProposal.clarification) {
+        setAssistantMessages((current) => current.filter((message) => message.id !== `ai-thinking-${now}`).concat({
+          id: `ai-agent-clarify-${now}`,
+          sender: "ai",
+          text: toolProposal.clarification,
+          createdAt: new Date().toISOString(),
+        }));
+        return;
+      }
       if (toolProposal.tool === "control_device" && toolProposal.action) {
         if (!activeDeviceId) throw new Error(isTH ? "กรุณาเลือกอุปกรณ์ก่อนสั่งงาน" : "Select a device before controlling it");
+        if (toolProposal.steps?.some((step) => step.tool === "read_device_context")) {
+          await chatService.getVoiceDeviceContext(activeDeviceId);
+        }
         const prepared = await chatService.prepareVoiceControl(activeDeviceId, toolProposal.action);
         if (prepared.requiresConfirmation) {
-          const accepted = window.confirm(prepared.prompt || (isTH ? "ยืนยันคำสั่งควบคุมอุปกรณ์หรือไม่?" : "Confirm this device command?"));
-          if (!accepted) {
-            setAssistantMessages((current) => current.filter((message) => message.id !== `ai-thinking-${now}`).concat({
-              id: `ai-control-cancelled-${now}`, sender: "ai", text: isTH ? "ยกเลิกคำสั่งแล้วครับ" : "Command cancelled.", createdAt: new Date().toISOString(),
-            }));
-            return;
-          }
+          pendingVoiceControlRef.current = { prepared, action: toolProposal.action, deviceId: activeDeviceId };
+          setAssistantMessages((current) => current.filter((message) => message.id !== `ai-thinking-${now}`).concat({
+            id: `ai-control-confirm-${now}`,
+            sender: "ai",
+            text: `${prepared.prompt || (isTH ? "ยืนยันคำสั่งควบคุมอุปกรณ์หรือไม่?" : "Confirm this device command?")} ${isTH ? "พูดว่า “ยืนยัน” หรือ “ยกเลิก” ได้เลยครับ" : "Say “confirm” or “cancel”."}`,
+            createdAt: new Date().toISOString(),
+          }));
+          return;
         }
         const published = await chatService.executeVoiceControl(prepared);
         const acknowledgement = published.correlationId
@@ -1065,6 +1125,7 @@ export function CustomerChatWidget({
         projectSnapshot: buildAssistantProjectSnapshot(),
         intent,
         shouldEscalate,
+        interactionMode: voiceTranscript ? "voice" : "text",
       });
       setBrainAssessment(brain || null);
       const nextMessages = messages.map(mapAiMessageToAssistantMessage);
@@ -1075,7 +1136,8 @@ export function CustomerChatWidget({
       }
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Unable to reach NAT AI";
-      const isAuthError = /unauthorized|no token|invalid token/i.test(reason);
+      const isExpiredSession = /session expired/i.test(reason);
+      const isAuthError = /unauthorized|no token|invalid token|session expired/i.test(reason);
       setAssistantMessages((current) => [
         ...current.filter((message) => message.id !== `ai-thinking-${now}`),
         {
@@ -1083,10 +1145,14 @@ export function CustomerChatWidget({
           sender: "ai",
           text: isTH
             ? (isAuthError
-              ? "NAT AI ต้องเข้าสู่ระบบก่อนจึงจะอ่านข้อมูลบัญชีและตอบได้ครับ กรุณาเข้าสู่ระบบใหม่ แล้วลองส่งคำถามอีกครั้ง"
+              ? (isExpiredSession
+                ? "เซสชันเข้าสู่ระบบหมดอายุแล้วครับ กรุณาเข้าสู่ระบบใหม่หนึ่งครั้ง แล้ว NAT AI จะกลับมาใช้งานได้ตามปกติ"
+                : "NAT AI ไม่พบข้อมูลการเข้าสู่ระบบครับ กรุณาเข้าสู่ระบบใหม่ แล้วลองส่งคำถามอีกครั้ง")
               : `ตอนนี้ NAT AI ติดต่อ backend ไม่สำเร็จ: ${reason}\nกรุณาตรวจว่า server ทำงานอยู่ที่พอร์ต 3001 แล้วลองใหม่ครับ`)
             : (isAuthError
-              ? "NAT AI needs an active sign-in before it can read account data. Please sign in again and retry."
+              ? (isExpiredSession
+                ? "Your session has expired. Sign in once more to restore NAT AI access."
+                : "NAT AI cannot find an active sign-in. Please sign in again and retry.")
               : `NAT AI could not reach the backend: ${reason}\nCheck that the server is running on port 3001 and try again.`),
           createdAt: new Date(now + 1).toISOString(),
           canEscalate: false,
@@ -1108,6 +1174,8 @@ export function CustomerChatWidget({
     enabled: handsFreeEnabled,
     phase: voiceAssistantPhase,
     permissionState: voicePermissionState,
+    voiceProfile,
+    cycleVoiceProfile,
   } = useNatVoiceAssistant({
     isOpen,
     isAssistantMode: mode === "assistant",
@@ -2509,6 +2577,10 @@ export function CustomerChatWidget({
           </Button>
         </div>
         <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+          <Button type="button" variant="outline" size="sm" className="mb-2 mr-2 h-7 rounded-full px-2 text-[10px]" onClick={cycleVoiceProfile}>
+            <Volume2 className="mr-1 h-3 w-3" />
+            {isTH ? `เสียง: ${voiceProfile === "nat-clone" ? "NAT" : "ระบบ"}` : `Voice: ${voiceProfile === "nat-clone" ? "NAT" : "System"}`}
+          </Button>
           {handsFreeEnabled && voicePermissionState !== "granted" && (
             <span className="mr-2 text-amber-600 dark:text-amber-400">
               {isTH ? "Local voice degraded—กำลังรอสิทธิ์ไมค์หรือ local STT" : "Local voice degraded—waiting for microphone permission or local STT."}

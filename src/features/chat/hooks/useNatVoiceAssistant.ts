@@ -5,13 +5,16 @@ const STORAGE_KEY = "nat_ai_hands_free_enabled";
 const ONBOARDED_KEY = "nat_ai_local_voice_onboarded";
 const VOICE_REPLY_STORAGE_KEY = "nat_ai_voice_reply_enabled";
 const VOICE_RATE_STORAGE_KEY = "nat_ai_voice_rate";
-const ACTIVE_CONVERSATION_MS = 45_000;
+const VOICE_PROFILE_STORAGE_KEY = "nat_ai_voice_profile";
+const ACTIVE_CONVERSATION_MS = 120_000;
 const WAKE_CAPTURE_MS = 3_500;
 const COMMAND_CAPTURE_MS = 5_500;
-const VOICE_RATES = [0.8, 1, 1.15] as const;
+const VOICE_RATES = [0.85, 0.95, 1.05] as const;
+const DEFAULT_VOICE_RATE = 0.95;
 
 export type VoiceAssistantPhase = "off" | "waiting-wake-word" | "listening-command" | "thinking" | "speaking";
 type AssistantVoiceMessage = { id: string; text: string };
+export type VoiceProfile = "nat-clone" | "system";
 type BrowserSpeechRecognition = {
   lang: string;
   continuous: boolean;
@@ -35,7 +38,7 @@ type Options = {
 };
 
 const WAKE_WORD_PATTERNS = [
-  /(?:เฮ้|เฮ|โอเค|สวัสดี)\s*(?:กรีน|green)/i,
+  /(?:เฮ้|เฮ|เฮย์|โอเค|สวัสดี|หวัดดี)\s*(?:โลก\s*)?(?:กรีน|กีน|กิน|green)/i,
   /\b(?:hey|hi|okay|ok)\s+green\b/i,
 ];
 const SLEEP_PATTERN = /^(?:พอแล้ว|หยุดฟัง|พักก่อน|ไปพัก|ขอบคุณ(?:ครับ|ค่ะ)?|stop listening|go to sleep|that's all)$/i;
@@ -67,14 +70,52 @@ const getBrowserSpeechRecognition = () => {
   return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
 };
 
+const prepareTextForSpeech = (text: string, isThai: boolean) => {
+  let spoken = text
+    .replace(/https?:\/\/\S+/gi, isThai ? " ลิงก์ " : " link ")
+    .replace(/[*#`_>|~]/g, " ")
+    .replace(/\s*[-–—]\s*/g, ", ")
+    .replace(/([.!?。！？])/g, "$1 ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (isThai) {
+    spoken = spoken
+      .replace(/NAT\s*AI/gi, "แนท เอไอ")
+      .replace(/IoT/gi, "ไอโอที")
+      .replace(/MQTT/gi, "เอ็ม คิว ที ที")
+      .replace(/API/gi, "เอ พี ไอ")
+      .replace(/pH/gi, "พี เอช")
+      .replace(/(\d+(?:\.\d+)?)\s*°C\b/gi, "$1 องศาเซลเซียส")
+      .replace(/(\d+(?:\.\d+)?)\s*%/g, "$1 เปอร์เซ็นต์")
+      .replace(/\s*([,;:])\s*/g, "$1 ");
+  }
+  return spoken;
+};
+
+const getPreferredSpeechVoice = (isThai: boolean) => {
+  const voices = window.speechSynthesis?.getVoices() || [];
+  const locale = isThai ? "th" : "en";
+  const matching = voices.filter((voice) => voice.lang.toLowerCase().startsWith(locale));
+  return matching.sort((a, b) => {
+    const quality = (voice: SpeechSynthesisVoice) =>
+      (/premium|enhanced|natural/i.test(voice.name) ? 4 : 0)
+      + (voice.localService ? 2 : 0)
+      + (voice.default ? 1 : 0);
+    return quality(b) - quality(a);
+  })[0];
+};
+
 export function useNatVoiceAssistant(options: Options) {
   const { isOpen, isAssistantMode, isSending, isThai, latestAssistantMessage, onTranscript, onSubmit, onSynthesizeSpeech, onTranscribeAudio } = options;
   const [enabled, setEnabled] = useState(true);
   const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(true);
   const [voiceRate, setVoiceRate] = useState(() => {
-    const value = Number(typeof window === "undefined" ? 1 : window.localStorage.getItem(VOICE_RATE_STORAGE_KEY));
-    return VOICE_RATES.includes(value as (typeof VOICE_RATES)[number]) ? value : 1;
+    const value = Number(typeof window === "undefined" ? DEFAULT_VOICE_RATE : window.localStorage.getItem(VOICE_RATE_STORAGE_KEY));
+    return VOICE_RATES.includes(value as (typeof VOICE_RATES)[number]) ? value : DEFAULT_VOICE_RATE;
   });
+  const [voiceProfile, setVoiceProfile] = useState<VoiceProfile>(() =>
+    typeof window !== "undefined" && window.localStorage.getItem(VOICE_PROFILE_STORAGE_KEY) === "system" ? "system" : "nat-clone"
+  );
   const [isListening, setIsListening] = useState(false);
   const [phase, setPhase] = useState<VoiceAssistantPhase>(enabled ? "waiting-wake-word" : "off");
   const [permissionState, setPermissionState] = useState<PermissionState | "unknown">("unknown");
@@ -84,6 +125,8 @@ export function useNatVoiceAssistant(options: Options) {
   const streamRef = useRef<MediaStream | null>(null);
   const captureTimerRef = useRef<number | null>(null);
   const retryCountRef = useRef(0);
+  const noSpeechCountRef = useRef(0);
+  const lastClarificationAtRef = useRef(0);
   // Prefer the browser engine when it exists. The hosted API intentionally does not
   // bundle a Whisper model, so probing that endpoint first only produces a 503 loop.
   const browserFallbackRef = useRef(Boolean(getBrowserSpeechRecognition()));
@@ -126,16 +169,20 @@ export function useNatVoiceAssistant(options: Options) {
     if (!active && wake.woke) lastWakeAtRef.current = Date.now();
     const command = active ? clean : wake.command;
     commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS;
-    if (!command) { setPhase("listening-command"); return; }
+    if (!command) {
+      setPhase("listening-command");
+      void speakTextRef.current(isThai ? "ครับ ผมฟังอยู่" : "I'm listening.");
+      return;
+    }
     if (SLEEP_PATTERN.test(command)) { commandWindowUntilRef.current = 0; setPhase("waiting-wake-word"); return; }
     if (STOP_SPEAKING_PATTERN.test(command)) { audioRef.current?.pause(); speakingRef.current = false; return; }
     if (REPEAT_PATTERN.test(command)) { if (lastSpokenTextRef.current) void speakTextRef.current(lastSpokenTextRef.current); return; }
     callbacksRef.current.onTranscript(command);
     setPhase("thinking");
     void Promise.resolve(callbacksRef.current.onSubmit(command)).catch(() => undefined);
-  }, []);
+  }, [isThai]);
 
-  const startBrowserFallback = useCallback(() => {
+  const startBrowserFallback = useCallback(async () => {
     if (!canRun() || runtimeRef.current.isSending || speakingRef.current || browserRecognitionRef.current) return;
     const Recognition = getBrowserSpeechRecognition();
     if (!Recognition) {
@@ -144,12 +191,29 @@ export function useNatVoiceAssistant(options: Options) {
       setPhase("off");
       return;
     }
+    try {
+      if (!streamRef.current?.active && navigator.mediaDevices?.getUserMedia) {
+        streamRef.current = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: false,
+        });
+        window.localStorage.setItem(ONBOARDED_KEY, "true");
+      }
+    } catch (error) {
+      const denied = error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError");
+      setPermissionState(denied ? "denied" : "prompt");
+      if (denied) { enabledRef.current = false; setEnabled(false); setPhase("off"); }
+      toast.error(isThai ? "กรุณาอนุญาตไมโครโฟน แล้วเปิดโหมดเสียงอีกครั้ง" : "Allow microphone access, then enable voice mode again.");
+      return;
+    }
     const recognition = new Recognition();
     browserRecognitionRef.current = recognition;
     recognition.lang = isThai ? "th-TH" : "en-US";
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.onresult = (event) => {
+      noSpeechCountRef.current = 0;
+      retryCountRef.current = 0;
       const transcript = Array.from(event.results)
         .filter((result) => result.isFinal)
         .map((result) => result[0]?.transcript || "")
@@ -163,6 +227,18 @@ export function useNatVoiceAssistant(options: Options) {
         setEnabled(false);
         setPermissionState("denied");
         setPhase("off");
+        toast.error(isThai ? "ไมโครโฟนถูกปิด กรุณาอนุญาตไมโครโฟนแล้วเปิดเสียงอีกครั้ง" : "Microphone access is blocked. Allow it and enable voice again.");
+      } else if (event.error === "no-speech") {
+        noSpeechCountRef.current += 1;
+        const activeConversation = Date.now() < commandWindowUntilRef.current;
+        const canClarify = Date.now() - lastClarificationAtRef.current > 20_000;
+        if (activeConversation && noSpeechCountRef.current >= 2 && canClarify) {
+          noSpeechCountRef.current = 0;
+          lastClarificationAtRef.current = Date.now();
+          void speakTextRef.current(isThai ? "เมื่อกี้ผมได้ยินไม่ชัด พูดอีกครั้งได้เลยครับ" : "I didn't catch that. Please say it again.");
+        }
+      } else if (retryCountRef.current === 1) {
+        toast.error(isThai ? `ระบบฟังเสียงขัดข้อง (${event.error || "unknown"}) กำลังลองใหม่` : `Voice recognition failed (${event.error || "unknown"}); retrying.`);
       }
     };
     recognition.onend = () => {
@@ -183,7 +259,7 @@ export function useNatVoiceAssistant(options: Options) {
 
   const startCapture = useCallback(async () => {
     if (!canRun() || runtimeRef.current.isSending || speakingRef.current || recorderRef.current) return;
-    if (browserFallbackRef.current) { startBrowserFallback(); return; }
+    if (browserFallbackRef.current) { void startBrowserFallback(); return; }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setEnabled(false); enabledRef.current = false; setPhase("off");
       toast.error(isThai ? "เบราว์เซอร์นี้ไม่รองรับ Local Voice Capture" : "This browser cannot capture audio locally.");
@@ -308,7 +384,7 @@ export function useNatVoiceAssistant(options: Options) {
   }, [disable, isThai, startCapture]);
 
   const speakText = useCallback(async (text: string) => {
-    const clean = text.replace(/[*#`_>-]/g, " ").replace(/\s+/g, " ").trim();
+    const clean = prepareTextForSpeech(text, isThai);
     if (!clean || !voiceReplyEnabled) { scheduleRestart(); return; }
     if (speakingRef.current) {
       if (!speechQueueRef.current.includes(text)) speechQueueRef.current.push(text);
@@ -323,6 +399,7 @@ export function useNatVoiceAssistant(options: Options) {
       commandWindowUntilRef.current = Date.now() + ACTIVE_CONVERSATION_MS; setPhase("listening-command"); scheduleRestart(250);
     };
     try {
+      if (voiceProfile === "system") throw new Error("Use system voice");
       if (!callbacksRef.current.onSynthesizeSpeech) throw new Error("No local TTS");
       const blob = await callbacksRef.current.onSynthesizeSpeech(clean, voiceRate);
       if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
@@ -331,15 +408,30 @@ export function useNatVoiceAssistant(options: Options) {
       await audio.play();
     } catch {
       if (!("speechSynthesis" in window)) { finish(); return; }
-      const utterance = new SpeechSynthesisUtterance(clean); utterance.lang = isThai ? "th-TH" : "en-US"; utterance.rate = voiceRate; utterance.onend = finish; utterance.onerror = finish;
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.lang = isThai ? "th-TH" : "en-US";
+      utterance.voice = getPreferredSpeechVoice(isThai) || null;
+      utterance.rate = voiceRate;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      utterance.onend = finish;
+      utterance.onerror = finish;
       window.speechSynthesis.cancel(); window.speechSynthesis.speak(utterance);
     }
-  }, [isThai, scheduleRestart, startBargeMonitor, stopBargeMonitor, stopCapture, voiceRate, voiceReplyEnabled]);
+  }, [isThai, scheduleRestart, startBargeMonitor, stopBargeMonitor, stopCapture, voiceProfile, voiceRate, voiceReplyEnabled]);
   speakTextRef.current = speakText;
 
   const toggleVoiceReply = useCallback(() => { const next = !voiceReplyEnabled; setVoiceReplyEnabled(next); window.localStorage.setItem(VOICE_REPLY_STORAGE_KEY, String(next)); }, [voiceReplyEnabled]);
   const repeatLastReply = useCallback(() => { if (lastSpokenTextRef.current) void speakText(lastSpokenTextRef.current); }, [speakText]);
   const cycleVoiceRate = useCallback(() => { const next = VOICE_RATES[(VOICE_RATES.indexOf(voiceRate as never) + 1) % VOICE_RATES.length]; setVoiceRate(next); window.localStorage.setItem(VOICE_RATE_STORAGE_KEY, String(next)); }, [voiceRate]);
+  const cycleVoiceProfile = useCallback(() => {
+    const next: VoiceProfile = voiceProfile === "nat-clone" ? "system" : "nat-clone";
+    setVoiceProfile(next);
+    window.localStorage.setItem(VOICE_PROFILE_STORAGE_KEY, next);
+    toast.success(isThai
+      ? `เปลี่ยนเสียงเป็น ${next === "nat-clone" ? "เสียง NAT" : "เสียงระบบ"} แล้ว`
+      : `Voice changed to ${next === "nat-clone" ? "NAT voice" : "system voice"}.`);
+  }, [isThai, voiceProfile]);
   const stopSpeaking = useCallback(() => { speechQueueRef.current = []; audioRef.current?.pause(); window.speechSynthesis?.cancel(); speakingRef.current = false; stopBargeMonitor(); scheduleRestart(100); }, [scheduleRestart, stopBargeMonitor]);
 
   useEffect(() => {
@@ -354,5 +446,5 @@ export function useNatVoiceAssistant(options: Options) {
   }, [latestAssistantMessage, scheduleRestart, speakText, voiceReplyEnabled]);
   useEffect(() => () => { stopCapture(); stopBargeMonitor(); streamRef.current?.getTracks().forEach((track) => track.stop()); audioRef.current?.pause(); if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current); }, [stopBargeMonitor, stopCapture]);
 
-  return { enabled, isListening, phase, permissionState, needsOnboarding: !storedBool(ONBOARDED_KEY), voiceReplyEnabled, voiceRate, toggleHandsFree, toggleVoiceReply, repeatLastReply, cycleVoiceRate, stopSpeaking };
+  return { enabled, isListening, phase, permissionState, needsOnboarding: !storedBool(ONBOARDED_KEY), voiceReplyEnabled, voiceRate, voiceProfile, toggleHandsFree, toggleVoiceReply, repeatLastReply, cycleVoiceRate, cycleVoiceProfile, stopSpeaking };
 }

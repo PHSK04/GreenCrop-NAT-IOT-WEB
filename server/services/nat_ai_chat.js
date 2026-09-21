@@ -245,6 +245,13 @@ function compactProjectSnapshot(snapshot, route = detectNatAiRoute('')) {
         scope: snapshot.scope,
         page: snapshot.page,
         language: snapshot.language,
+        nat_ai_voice: snapshot.nat_ai_voice && typeof snapshot.nat_ai_voice === 'object' ? {
+            listening_enabled: Boolean(snapshot.nat_ai_voice.listening_enabled),
+            listening_engine: snapshot.nat_ai_voice.listening_engine || null,
+            speech_enabled: Boolean(snapshot.nat_ai_voice.speech_enabled),
+            speech_engine: snapshot.nat_ai_voice.speech_engine || null,
+            speech_service_running: Boolean(snapshot.nat_ai_voice.speech_service_running),
+        } : undefined,
         devices: snapshot.devices ? {
             active_device_id: snapshot.devices.active_device_id,
             loaded_device_count: snapshot.devices.loaded_device_count,
@@ -354,6 +361,7 @@ function buildOpenAiContext(context, toolResult = null) {
         } : null,
         data_scope: context.data_scope,
         page: context.page,
+        interaction_mode: context.interaction_mode || 'text',
         machine_status_label: context.machine_status_label,
         active_device_id: context.active_device_id,
         latest_sensor: route.needsLiveMachine || route.needsSensorHistory ? context.latest_sensor : undefined,
@@ -365,6 +373,7 @@ function buildOpenAiContext(context, toolResult = null) {
         project_evidence: Array.isArray(context.project_evidence) ? context.project_evidence.slice(0, 4) : [],
         learning_summary: route.needsLearningSummary ? context.learning_summary : undefined,
         recent_conversation: Array.isArray(context.recent_conversation) ? context.recent_conversation.slice(-10) : [],
+        long_term_conversation: Array.isArray(context.long_term_conversation) ? context.long_term_conversation.slice(-16) : [],
         user_message: context.user_message,
         current_datetime: context.current_datetime,
         project: {
@@ -402,18 +411,24 @@ function buildNatAiSystemPrompt() {
         'Reply in the same language as the user, usually Thai.',
         'You can answer broad questions. When the user asks about GreenCropNAT data, use the authenticated context and tool result only.',
         'Be conversational, calm, practical, and direct like a capable agricultural technology assistant.',
+        'For spoken-style conversation, lead with the useful answer in one or two short natural sentences. Continue only when detail is necessary or requested.',
+        'When interaction_mode is voice, answer for speech: use at most two short sentences, no headings, no markdown, no source-path footer, and no generic closing question. When interaction_mode is text, normal structured detail is allowed.',
+        'Avoid headings, long lists, and formal filler for simple conversational questions. Sound like a present, attentive assistant rather than a report generator.',
+        'When speech or wording appears imperfect, infer the most likely meaning from recent dialogue. Ask one brief clarification instead of silently refusing or changing the subject.',
         'Treat the conversation as an ongoing dialogue. Resolve short follow-ups such as "แล้วล่ะ", "ทำยังไงต่อ", pronouns, and omitted subjects from the recent turns.',
         'Adapt to the user\'s tone and level of detail. Natural informal Thai is welcome when the user writes informally; do not sound like a call-center script.',
         'Vary wording naturally. Do not repeat greetings, introductions, disclaimers, or the user\'s question unless repetition helps clarity.',
         'Do not force the user into predefined choices. Ask at most one focused follow-up question only when a missing fact materially changes the answer.',
         'Acknowledge corrections and preferences briefly, then apply them in later turns.',
         'Remember user-provided facts and preferences from recent turns. If the user corrects the subject or terminology, use the correction immediately without defending the previous answer.',
+        'The long_term_conversation field contains the authenticated user\'s recent dialogue across earlier chat sessions. Use it to preserve their stated name, preferred form of address, working style, and ongoing goals. Never treat an old assistant guess as a verified user fact.',
         'For ambiguous cultivation words, first interpret them in the Wolffia/GreenCropNAT context. Ask one short clarification only when acting on the wrong interpretation could materially change the answer or affect hardware.',
         'Answer the exact user question first.',
         'For GreenCropNAT, machine, sensor, pump, account, or project questions, use only the provided authenticated user context and be explicit when data is missing.',
         'Never mix data between users or tenants. If the context is scoped to one user, say "ของบัญชีนี้" / "this account" when summarizing project data.',
         'For general knowledge, coding, writing, learning, brainstorming, or everyday questions, answer from your general knowledge without pretending that machine context contains the answer.',
         'If a tool_result is provided, treat it as verified account data. Use its facts, but rewrite the answer naturally instead of copying a template.',
+        'The authenticated context field page_project_snapshot.nat_ai_voice is the verified voice runtime status. When its listening_enabled, speech_enabled, and speech_service_running values are true, say voice listening and speaking are ready. Do not invent an additional disabled setting.',
         'Project evidence contains excerpts retrieved from approved repository documentation. Prefer it over general memory for project facts.',
         'For project-specific facts, do not add implementation details that are absent from project_evidence. If evidence is incomplete, say what is not documented.',
         'When project_evidence supports the answer, end with a short "อ้างอิงในโปรเจกต์:" or "Project references:" line listing only the source paths you actually used.',
@@ -568,6 +583,21 @@ async function buildNatAiContext({
             role: message.sender_role === 'user' ? 'user' : 'assistant',
             text: String(message.body || '').slice(0, 700),
         }));
+    const longTermRows = await db.all(
+        `SELECT TOP 24 m.sender_role, m.body, m.created_at
+         FROM ai_chat_messages m
+         INNER JOIN ai_chat_sessions s ON s.id = m.session_id
+         WHERE s.user_id = ? AND m.sender_role = 'user'
+         ORDER BY m.created_at DESC, m.id DESC`,
+        [req.user?.id]
+    ).catch(() => []);
+    const longTermConversation = longTermRows
+        .reverse()
+        .filter((message) => /(?:จำ(?:ไว้)?|เรียก(?:ฉัน|ผม|หนู|เรา)|ชอบ|ไม่ชอบ|ต้องการ|อยาก(?:ได้)?|เป้าหมาย|ประจำ|prefer|remember|call me|my goal|i want)/i.test(String(message.body || '')))
+        .map((message) => ({
+            role: 'user',
+            text: String(message.body || '').slice(0, 500),
+        }));
     const recentUserContext = recentMessages
         .filter((message) => message.role === 'user')
         .slice(-3)
@@ -621,6 +651,7 @@ async function buildNatAiContext({
             rule: 'Use only this authenticated account context. Do not infer or reveal another user tenant.',
         },
         page: options.currentPage || null,
+        interaction_mode: options.interactionMode === 'voice' ? 'voice' : 'text',
         machine_status_label: options.machineStatus || null,
         active_device_id: deviceId || null,
         project_knowledge: route.intent === 'general' ? buildProjectKnowledge() : null,
@@ -663,6 +694,7 @@ async function buildNatAiContext({
             })),
         } : null,
         recent_conversation: recentMessages,
+        long_term_conversation: longTermConversation,
         user_message: userMessage,
         current_datetime: new Date().toISOString(),
     };

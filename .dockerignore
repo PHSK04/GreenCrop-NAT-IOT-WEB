@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+server/node_modules
+ai/.venv
+ai/.venv-*
+ai/**/__pycache__
+dist
+coverage
+*.log
+.env
+.env.*
+server/.env
+!server/.env.example

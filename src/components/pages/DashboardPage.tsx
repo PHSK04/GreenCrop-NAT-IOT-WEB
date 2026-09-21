@@ -279,9 +279,11 @@ export function DashboardPage({
   const [dismissedWaterFullAlarm, setDismissedWaterFullAlarm] = useState(false);
   const waterFullAlarm = boardConnected && redOn;
   const showWaterFullAlarm = waterFullAlarm && !dismissedWaterFullAlarm;
-  const stablePhValue = useStablePositiveValue(phValue, boardConnected);
-  const stableTempValue = useStablePositiveValue(tempValue, boardConnected);
-  const stableEcValue = useStablePositiveValue(ecValue, boardConnected);
+  // Sensor cards are display-only: keep the last valid readings visible even
+  // when the board briefly goes offline. This does not change any controls.
+  const stablePhValue = useStablePositiveValue(phValue);
+  const stableTempValue = useStablePositiveValue(tempValue);
+  const stableEcValue = useStablePositiveValue(ecValue);
   const stablePhOk =
     stablePhValue != null ? stablePhValue >= 6.5 && stablePhValue <= 7.5 : phOk;
   const liveSignal = mqttStatus === "connected" && boardConnected;
@@ -819,22 +821,39 @@ export function DashboardPage({
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                  {[
-                    { label: t.metrics.ph.title, value: stablePhValue != null ? stablePhValue.toFixed(2) : "--", unit: "", icon: Beaker, accent: "emerald", note: stablePhOk ? (language === "TH" ? "เหมาะสม" : "Suitable") : (language === "TH" ? "รอตรวจสอบ" : "Waiting") },
-                    { label: t.metrics.temp.title, value: stableTempValue != null ? stableTempValue.toFixed(1) : "--", unit: "°C", icon: Thermometer, accent: "blue", note: stableTempValue != null ? (language === "TH" ? "ปกติ" : "Normal") : "Waiting" },
-                    { label: t.metrics.ec.title, value: stableEcValue != null ? stableEcValue.toFixed(2) : "--", unit: "mS/cm", icon: Zap, accent: "cyan", note: stableEcValue != null ? (language === "TH" ? "เหมาะสม" : "Suitable") : "Waiting" },
-                  ].map((metric) => {
-                    const Icon = metric.icon;
-                    const accent = metric.accent === "blue" ? "bg-blue-50 text-blue-600" : metric.accent === "cyan" ? "bg-cyan-50 text-cyan-600" : "bg-emerald-50 text-emerald-600";
-                    return (
-                      <div key={metric.label} className="rounded-2xl border border-slate-100 bg-[#f8faf9] p-4">
-                        <div className={`grid h-9 w-9 place-items-center rounded-full ${accent}`}><Icon className="h-4 w-4" /></div>
-                        <p className="mt-3 truncate text-[11px] font-semibold text-slate-500">{metric.label}</p>
-                        <div className="mt-1 flex items-end gap-1"><span className="font-mono text-2xl font-black text-[#082a54]">{metric.value}</span><span className="pb-1 text-[10px] text-slate-500">{metric.unit}</span></div>
-                        <p className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{metric.note}</p>
-                      </div>
-                    );
-                  })}
+                  <RealtimeMetricCard
+                    title={t.metrics.ph.title}
+                    value={stablePhValue != null ? stablePhValue.toFixed(2) : "--"}
+                    unit=""
+                    status={stablePhOk ? (language === "TH" ? "เหมาะสม" : "Suitable") : (language === "TH" ? "รอตรวจสอบ" : "Waiting")}
+                    icon={Beaker}
+                    color="text-emerald-600"
+                    bgColor="bg-emerald-50"
+                    data={sensorTrend}
+                    dataKey="ph"
+                  />
+                  <RealtimeMetricCard
+                    title={t.metrics.temp.title}
+                    value={stableTempValue != null ? stableTempValue.toFixed(1) : "--"}
+                    unit="°C"
+                    status={stableTempValue != null ? (language === "TH" ? "ปกติ" : "Normal") : "Waiting"}
+                    icon={Thermometer}
+                    color="text-blue-600"
+                    bgColor="bg-blue-50"
+                    data={sensorTrend}
+                    dataKey="temp"
+                  />
+                  <RealtimeMetricCard
+                    title={t.metrics.ec.title}
+                    value={stableEcValue != null ? stableEcValue.toFixed(2) : "--"}
+                    unit="mS/cm"
+                    status={stableEcValue != null ? (language === "TH" ? "เหมาะสม" : "Suitable") : "Waiting"}
+                    icon={Zap}
+                    color="text-cyan-600"
+                    bgColor="bg-cyan-50"
+                    data={sensorTrend}
+                    dataKey="ec"
+                  />
                 </div>
 
                 <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-[#f8faf9] px-4 py-3">

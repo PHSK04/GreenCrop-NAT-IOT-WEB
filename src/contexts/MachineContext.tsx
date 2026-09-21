@@ -8,7 +8,6 @@ import React, {
   useRef,
 } from 'react';
 import { toast } from 'sonner';
-import mqtt from 'mqtt';
 import { ACTIVE_DEVICE_EVENT_NAME, getActiveDeviceIdValue } from '@/hooks/useActiveDeviceId';
 
 interface MachineContextType {
@@ -61,13 +60,7 @@ type TelemetrySnapshot = {
 
 const MachineContext = createContext<MachineContextType | undefined>(undefined);
 
-const MQTT_BROKER = 'wss://862ddab18768410486982f71e1ac75bb.s1.eu.hivemq.cloud:8884/mqtt';
-const MQTT_USERNAME = 'GreenCropnat';
-const MQTT_PASSWORD = 'GreenCropnat123456';
-const TOPIC_SENSORS_LEGACY = 'smartfarm/sensors';
-const TOPIC_CONTROL_LEGACY = 'smartfarm/control';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
-const ACCEPT_LEGACY_MQTT = import.meta.env.VITE_ACCEPT_LEGACY_MQTT === 'true';
 const HISTORY_LIMIT = 50000;
 const HISTORY_FETCH_LIMIT = 50000;
 const HISTORY_CACHE_LIMIT = 5000;
@@ -75,22 +68,8 @@ const HISTORY_CACHE_KEY_PREFIX = 'smart_iot_telemetry_history';
 const API_POLL_INTERVAL_MS = 2000;
 const BOARD_TELEMETRY_STALE_MS = 10000;
 
-const safeTopicSegment = (value: string) =>
-  value.trim().replace(/[^A-Za-z0-9_-]/g, '');
-
 const getActiveDeviceId = () => {
   return getActiveDeviceIdValue();
-};
-
-const getDeviceTopic = (
-  tenantId: string,
-  deviceId: string,
-  channel: 'control' | 'sensors',
-) => {
-  const safeTenant = safeTopicSegment(tenantId);
-  const safeDevice = safeTopicSegment(deviceId);
-  if (!safeTenant || !safeDevice) return '';
-  return `tenants/${safeTenant}/devices/${safeDevice}/${channel}`;
 };
 
 const getSessionAuth = () => {
@@ -304,7 +283,6 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   const [boardConnected, setBoardConnected] = useState(false);
   const [telemetryHistory, setTelemetryHistory] = useState<TelemetrySnapshot[]>([]);
 
-  const [client, setClient] = useState<mqtt.MqttClient | null>(null);
   const [mqttStatus, setMqttStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   const [isSendingControl, setIsSendingControl] = useState(false);
   const [activeDeviceId, setActiveDeviceId] = useState(getActiveDeviceId);
@@ -748,131 +726,99 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 	  }, []);
 
 	  useEffect(() => {
-	    if (!client || mqttStatus !== 'connected') return;
-	    const { tenantId } = getSessionAuth();
-	    const deviceSensorsTopic = getDeviceTopic(tenantId, activeDeviceId, 'sensors');
-	    if (deviceSensorsTopic) {
-	      client.subscribe(deviceSensorsTopic);
-	    }
-		    fetchApiData();
-		    fetchApiHistory();
-		  }, [activeDeviceId, client, fetchApiData, fetchApiHistory, mqttStatus]);
+    let cancelled = false;
 
-	  useEffect(() => {
-	    const mqttClient = mqtt.connect(MQTT_BROKER, {
-      clientId: `smartfarm_web_${Math.random().toString(16).substr(2, 8)}`,
-      clean: true,
-      connectTimeout: 8000,
-      username: MQTT_USERNAME,
-      password: MQTT_PASSWORD,
-    });
-
-    mqttClient.on('connect', () => {
-      setMqttStatus('connected');
-      if (ACCEPT_LEGACY_MQTT) {
-        mqttClient.subscribe(TOPIC_SENSORS_LEGACY);
+    const refreshFromBackend = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/health`, { cache: 'no-store' });
+        const health = response.ok ? await response.json() : null;
+        if (!cancelled) {
+          setMqttStatus(health?.mqtt?.connected || health?.mqtt?.clientConnected ? 'connected' : 'disconnected');
+        }
+      } catch {
+        if (!cancelled) setMqttStatus('disconnected');
       }
+      await fetchApiData();
+    };
 
-      const { tenantId } = getSessionAuth();
-      const activeDeviceId = getActiveDeviceId();
-      const deviceSensorsTopic = getDeviceTopic(tenantId, activeDeviceId, 'sensors');
-      if (deviceSensorsTopic) {
-        mqttClient.subscribe(deviceSensorsTopic);
-      }
-    });
-
-    mqttClient.on('error', (err) => {
-      console.error('MQTT Error:', err);
-      setMqttStatus('disconnected');
-    });
-
-    mqttClient.on('message', (incomingTopic, payload) => {
-      const raw = payload.toString();
-      const parsed = parseMqttPayload(raw);
-      if (!parsed) return;
-
-      const selectedDeviceId = getActiveDeviceId();
-      const incomingDeviceId = String(parsed.device_id || '').trim();
-      if (selectedDeviceId && incomingDeviceId && incomingDeviceId !== selectedDeviceId) {
-        return;
-      }
-
-      const topic = incomingTopic.toString();
-      const { tenantId } = getSessionAuth();
-      const deviceTopic = getDeviceTopic(tenantId, selectedDeviceId, 'sensors');
-      if (topic === TOPIC_SENSORS_LEGACY && !ACCEPT_LEGACY_MQTT) {
-        return;
-      }
-      if (selectedDeviceId && topic !== TOPIC_SENSORS_LEGACY && deviceTopic && topic !== deviceTopic) {
-        return;
-      }
-
-      const snapshot: TelemetrySnapshot = {
-        timestamp: typeof parsed.timestamp === 'string' && parsed.timestamp
-          ? parsed.timestamp
-          : new Date().toISOString(),
-        deviceId: incomingDeviceId || selectedDeviceId || 'UNKNOWN',
-        phValue: asNumber(firstDefined(parsed.ph_value, parsed.phValue, parsed.ph)),
-        ecValue: asNumber(firstDefined(parsed.ec_value, parsed.ecValue, parsed.ec)),
-        tempValue: asNumber(firstDefined(parsed.temp_c, parsed.tempValue, parsed.temperature)),
-        wls1: asBool(firstDefined(parsed.wls1, parsed.WLS1)),
-        wls2: asBool(firstDefined(parsed.wls2, parsed.WLS2)),
-        floatAlarm: asBool(firstDefined(parsed.float_alarm, parsed.floatAlarm, parsed.float)),
-        locked: asBool(firstDefined(parsed.locked, parsed.lock, parsed.reed, parsed.reed_switch)),
-        pump1On: asBool(firstDefined(parsed.pump1_on, parsed.pump1On)),
-        pump2On: asBool(firstDefined(parsed.pump2_on, parsed.pump2On)),
-        greenOn: asBool(firstDefined(parsed.green_on, parsed.greenOn)),
-        redOn: asBool(firstDefined(parsed.red_on, parsed.redOn)),
-        isOn: asBool(firstDefined(parsed.is_on, parsed.isOn)),
-      };
-
-      setPressure(asNumber(parsed.pressure));
-      setFlowRate(asNumber(firstDefined(parsed.flow_rate, parsed.flow)));
-      const carriedSnapshot = carryTelemetrySnapshot(snapshot);
-      if (carriedSnapshot) {
-        applyTelemetrySnapshot(carriedSnapshot);
-      }
-    });
-
-    setClient(mqttClient);
-
-    const pollId = setInterval(fetchApiData, API_POLL_INTERVAL_MS);
-    fetchApiData();
-    fetchApiHistory();
+    setMqttStatus('connecting');
+    refreshFromBackend().catch(() => {});
+    fetchApiHistory().catch(() => {});
+    const pollId = window.setInterval(() => {
+      refreshFromBackend().catch(() => {});
+    }, API_POLL_INTERVAL_MS);
 
     return () => {
-      mqttClient.end();
-      clearInterval(pollId);
+      cancelled = true;
+      window.clearInterval(pollId);
     };
-  }, [carryTelemetrySnapshot, fetchApiData, fetchApiHistory]);
+  }, [activeDeviceId, fetchApiData, fetchApiHistory]);
 
   const publishCommand = useCallback(async (command: string, pump?: number, state?: 'ON' | 'OFF') => {
-    if (!client || mqttStatus !== 'connected') {
+    if (mqttStatus !== 'connected') {
       toast.error('Command Failed', {
-        description: 'MQTT is not connected, so the board did not receive the command.',
+        description: 'The secure MQTT gateway is not connected, so the board did not receive the command.',
       });
       return false;
     }
 
-    const { tenantId } = getSessionAuth();
+    const { tenantId, token } = getSessionAuth();
     const activeDeviceId = getActiveDeviceId();
-    const payload = JSON.stringify({
-      command,
-      pump,
-      state,
-      tenant_id: tenantId,
-      device_id: activeDeviceId || undefined,
-      timestamp: Date.now(),
-    });
-    const deviceControlTopic = getDeviceTopic(tenantId, activeDeviceId, 'control');
-
-    client.publish(TOPIC_CONTROL_LEGACY, payload);
-    if (deviceControlTopic) {
-      client.publish(deviceControlTopic, payload);
+    if (!tenantId || !token || !activeDeviceId) {
+      toast.error('Command Failed', { description: 'Select a paired device before sending a command.' });
+      return false;
     }
 
-    return true;
-  }, [client, mqttStatus]);
+    const normalized = command.toUpperCase();
+    const action = normalized === 'START'
+      ? (pump === 2 ? 'pump2_on' : 'system_on')
+      : normalized === 'STOP'
+        ? 'system_off'
+        : normalized === 'PUMP1_ON' ? 'pump1_on'
+          : normalized === 'PUMP1_OFF' ? 'pump1_off'
+            : normalized === 'PUMP2_ON' ? 'pump2_on'
+              : normalized === 'PUMP2_OFF' ? 'pump2_off'
+                : state && pump ? `pump${pump}_${state.toLowerCase()}` : '';
+
+    if (!action) {
+      if (normalized === 'ACK_ALARM') return true;
+      toast.error('Command Failed', { description: `Unsupported control command: ${command}` });
+      return false;
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-tenant-id': tenantId,
+      Authorization: `Bearer ${token}`,
+    };
+
+    try {
+      const prepareResponse = await fetch(`${API_BASE_URL}/ai/voice/tools/control/prepare`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ deviceId: activeDeviceId, action }),
+      });
+      const prepared = await prepareResponse.json();
+      if (!prepareResponse.ok) throw new Error(prepared?.error || 'Could not prepare command');
+
+      const executeResponse = await fetch(`${API_BASE_URL}/ai/voice/tools/control/execute`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          deviceId: activeDeviceId,
+          action,
+          confirmationToken: prepared.confirmationToken || undefined,
+          idempotencyKey: `${activeDeviceId}-${action}-${Date.now()}`,
+        }),
+      });
+      const result = await executeResponse.json();
+      if (!executeResponse.ok) throw new Error(result?.error || 'Command gateway rejected the request');
+      return true;
+    } catch (error) {
+      toast.error('Command Failed', { description: error instanceof Error ? error.message : 'Secure gateway error' });
+      return false;
+    }
+  }, [mqttStatus]);
 
   const resetUptime = async () => {
     if (isSendingControl) return;

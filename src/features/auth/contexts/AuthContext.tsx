@@ -56,8 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = async (data: Partial<User>) => {
     if (!user) return;
     try {
-      await authService.updateUser(user.id, data);
-      setUser({ ...user, ...data });
+      const updatedUser = await authService.updateUser(user.id, data);
+      setUser(updatedUser);
       toast.success("Profile Updated");
     } catch (error: any) {
       toast.error("Update Failed", { description: error.message });

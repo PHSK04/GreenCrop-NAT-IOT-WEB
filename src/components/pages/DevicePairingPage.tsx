@@ -10,12 +10,6 @@ import { authService } from "@/features/auth/services/authService";
 import QRCode from "qrcode";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { useRef } from "react";
-import mqtt from "mqtt";
-
-const MQTT_BROKER = "wss://862ddab18768410486982f71e1ac75bb.s1.eu.hivemq.cloud:8884/mqtt";
-const MQTT_USERNAME = "GreenCropnat";
-const MQTT_PASSWORD = "GreenCropnat123456";
-const MQTT_SENSOR_TOPIC = "smartfarm/sensors";
 
 const showPairingSosToast = (title: string, description?: string) => {
   toast.custom((toastId) => (
@@ -46,135 +40,11 @@ const showPairingSosToast = (title: string, description?: string) => {
   });
 };
 
-const getSessionTenantId = () => {
-  const raw = localStorage.getItem("smart_iot_session");
-  if (!raw) return "";
-
-  try {
-    const parsed = JSON.parse(raw);
-    return String(parsed?.user?.id || parsed?.id || "");
-  } catch {
-    return "";
-  }
-};
-
 type PairingConnectionState =
   | { status: "idle" }
   | { status: "checking"; title: string; description: string }
   | { status: "connected"; title: string; description: string; deviceId: string; pairingCode: string }
   | { status: "failed"; title: string; description: string; deviceId: string; pairingCode: string };
-
-const parseMqttJson = (raw: string) => {
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
-  } catch {
-    return null;
-  }
-};
-
-const matchesPairingAck = (
-  incomingTopic: string,
-  raw: string,
-  statusTopic: string,
-  deviceId: string,
-  pairingCode: string,
-) => {
-  const parsed = parseMqttJson(raw);
-  const status = String(parsed?.status || parsed?.pairing_status || "").toUpperCase();
-  const incomingDeviceId = String(parsed?.device_id || "").toUpperCase();
-  const incomingPairingCode = String(parsed?.pairing_code || "");
-
-  if (incomingTopic === MQTT_SENSOR_TOPIC && incomingDeviceId === deviceId) {
-    return true;
-  }
-
-  if (
-    incomingDeviceId === deviceId &&
-    (!incomingPairingCode || incomingPairingCode === pairingCode) &&
-    (status === "PAIRED" || status === "PAIRING_PAIRED")
-  ) {
-    return incomingTopic === statusTopic || incomingTopic === MQTT_SENSOR_TOPIC;
-  }
-
-  return incomingTopic === statusTopic &&
-    raw.includes("PAIRED") &&
-    raw.includes(deviceId) &&
-    raw.includes(pairingCode);
-};
-
-const publishPairingAck = (deviceId: string, pairingCode: string) => {
-  const tenantId = getSessionTenantId();
-  if (!tenantId) return Promise.resolve(false);
-
-  const topic = `greencrop/devices/${deviceId}/pairing`;
-  const statusTopic = `${topic}/status`;
-  const responseTopics = [statusTopic, MQTT_SENSOR_TOPIC];
-  const payload = JSON.stringify({
-    project: "GreenCrop NAT IoT",
-    status: "PAIRED",
-    tenant_id: tenantId,
-    device_id: deviceId,
-    pairing_code: pairingCode,
-    timestamp: Date.now(),
-  });
-
-  return new Promise<boolean>((resolve) => {
-    // eslint-disable-next-line prefer-const
-    let timeoutId: number | undefined;
-    const client = mqtt.connect(MQTT_BROKER, {
-      clientId: `greencrop_pairing_${Math.random().toString(16).slice(2, 10)}`,
-      clean: true,
-      connectTimeout: 8000,
-      reconnectPeriod: 0,
-      username: MQTT_USERNAME,
-      password: MQTT_PASSWORD,
-    });
-    let finished = false;
-
-    const finish = (ok: boolean) => {
-      if (finished) return;
-      finished = true;
-      if (timeoutId) window.clearTimeout(timeoutId);
-      client.end(true);
-      resolve(ok);
-    };
-
-    timeoutId = window.setTimeout(() => finish(false), 15000);
-
-    client.on("connect", () => {
-      client.subscribe(responseTopics, { qos: 0 }, (subscribeErr) => {
-        if (subscribeErr) {
-          finish(false);
-          return;
-        }
-
-        client.publish(topic, payload, { qos: 0, retain: false }, (err) => {
-          if (err) {
-            finish(false);
-          }
-        });
-
-        window.setTimeout(() => {
-          if (!finished) {
-            client.publish(topic, payload, { qos: 0, retain: false });
-          }
-        }, 1000);
-      });
-    });
-
-    client.on("message", (incomingTopic, message) => {
-      const raw = message.toString();
-      if (matchesPairingAck(incomingTopic, raw, statusTopic, deviceId, pairingCode)) {
-        finish(true);
-      }
-    });
-
-    client.on("error", () => {
-      finish(false);
-    });
-  });
-};
 
 type DevicePairingPageProps = {
   user?: { name?: string; email?: string };
@@ -330,25 +200,8 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
       setConnectionState({
         status: "checking",
         title: t("กำลังตรวจสอบบอร์ด", "Checking board"),
-        description: t("ระบบกำลังส่งสัญญาณไปที่บอร์ดและรอการตอบกลับก่อนบันทึกการจับคู่", "Sending a signal to the board and waiting for acknowledgement before saving the pairing"),
+        description: t("ระบบกำลังตรวจสอบ Device ID และ Pairing Code ผ่านเซิร์ฟเวอร์", "Validating Device ID and Pairing Code through the secure server"),
       });
-      const ackSent = await publishPairingAck(normalizedDeviceId, normalizedPairingCode);
-      if (!ackSent) {
-        const alertTitle = t("บอร์ดหรืออุปกรณ์ยังไม่ได้ทำงาน", "Board or device is not running");
-        const alertDescription = t(
-          "ยังไม่บันทึกการจับคู่ กรุณาเปิด NodeMCU ตรวจ Wi‑Fi/MQTT แล้วลองอีกครั้ง",
-          "Pairing was not saved. Please power on the NodeMCU, check Wi‑Fi/MQTT, and try again",
-        );
-        setConnectionState({
-          status: "failed",
-          title: alertTitle,
-          description: alertDescription,
-          deviceId: normalizedDeviceId,
-          pairingCode: normalizedPairingCode,
-        });
-        showPairingSosToast(alertTitle, alertDescription);
-        return;
-      }
       await authService.pairDevice({
         device_id: normalizedDeviceId,
         pairing_code: normalizedPairingCode,
@@ -359,7 +212,7 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
       setConnectionState({
         status: "connected",
         title: t("เชื่อมต่อบอร์ดสำเร็จ", "Board connected successfully"),
-        description: t("บอร์ดตอบกลับแล้ว ระบบพร้อมเข้าสู่แดชบอร์ด", "The board acknowledged the pairing and is ready for the dashboard"),
+        description: t("เซิร์ฟเวอร์ยืนยันการจับคู่แล้ว ระบบพร้อมเข้าสู่แดชบอร์ด", "The server confirmed pairing and the dashboard is ready"),
         deviceId: normalizedDeviceId,
         pairingCode: normalizedPairingCode,
       });

@@ -479,13 +479,21 @@ export const authService = {
     if (!response.ok) throw new Error("Failed to update user");
   },
 
-  updateUser: async (id: string, data: Partial<User>): Promise<void> => {
+  updateUser: async (id: string, data: Partial<User>): Promise<User> => {
     const response = await fetchWithApiFallback(`/users/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    if (!response.ok) throw new Error("Failed to update user details");
+    if (!response.ok) await throwHttpError(response, 'Failed to update user details');
+
+    const payload = await response.json();
+    const currentSession = readSession();
+    const updatedUser = { ...currentSession.user, ...data, ...(payload.user || {}) } as User;
+    if (currentSession.user && String(currentSession.user.id) === String(id)) {
+      writeSession({ token: currentSession.token, user: updatedUser });
+    }
+    return updatedUser;
   },
 
   getAdminDbSummary: async (): Promise<AdminDbSummary> => {

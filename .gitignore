@@ -28,6 +28,7 @@ coverage/
 .runtime/
 ai/.venv/
 .venv-tts/
+.venv-f5/
 ai/exports/
 ai/models/
 node_modules

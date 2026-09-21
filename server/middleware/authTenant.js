@@ -50,7 +50,8 @@ module.exports = function (db) {
       next();
     } catch (err) {
       console.error('Auth error:', err);
-      return res.status(401).json({ error: 'Invalid token' });
+      const expired = err?.name === 'TokenExpiredError';
+      return res.status(401).json({ error: expired ? 'Session expired' : 'Invalid token' });
     }
   };
 };

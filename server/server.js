@@ -9,7 +9,7 @@ const jwt = require('jsonwebtoken');
 const https = require('https');
 const crypto = require('crypto');
 const { startMqttListener, getMqttListenerStatus, publishDeviceCommand, getDeviceCommandStatus } = require('./mqtt_listener');
-const { getLocalVoiceAiStatus, transcribeLocalAudio, proposeLocalTool } = require('./services/local_voice_ai');
+const { getLocalVoiceAiStatus, transcribeLocalAudio, proposeLocalTool, planLocalAgent } = require('./services/local_voice_ai');
 const { recordLatency, getLatencyMetrics } = require('./services/ai_metrics');
 const { clearProjectKnowledgeCache } = require('./services/project_knowledge');
 const { parseUserAgent, getClientIP } = require('./deviceDetector');
@@ -26,6 +26,7 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.API_HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || 'public';
 const SHARED_SENSOR_TENANT = String(process.env.SHARED_SENSOR_TENANT || 'false').toLowerCase() === 'true';
 const SENSOR_DATA_STALE_MS = Math.max(1000, Number(process.env.SENSOR_DATA_STALE_MS || 10000));
@@ -77,6 +78,15 @@ const MICROSOFT_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET || '';
 const MICROSOFT_TENANT_ID = process.env.MICROSOFT_TENANT_ID || 'common';
 const MICROSOFT_REDIRECT_URI = process.env.MICROSOFT_REDIRECT_URI || '';
 const APPLE_JWKS_CACHE_MS = 6 * 60 * 60 * 1000;
+
+function formatVoiceReply(text) {
+    return String(text || '')
+        .replace(/[*#`_>|~]/g, ' ')
+        .replace(/\s*(?:ยังไงครับ\??\s*)?(?:มีอะไร(?:ที่ผม)?(?:สามารถ)?ช่วย.*|ถ้ามีคำถามเพิ่มเติม.*)$/i, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 420);
+}
 let appleJwksCache = { fetchedAt: 0, keys: [] };
 const MICROSOFT_JWKS_CACHE_MS = 6 * 60 * 60 * 1000;
 let microsoftJwksCache = { fetchedAt: 0, keys: [] };
@@ -417,7 +427,7 @@ function appTokenForUser(user) {
     return jwt.sign(
         { id: user.id, name: user.name, email: user.email, role: user.role, tenant_id: user.id },
         JWT_SECRET,
-        { expiresIn: '24h' }
+        { expiresIn: JWT_EXPIRES_IN }
     );
 }
 
@@ -1376,6 +1386,25 @@ app.post('/api/ai/voice/tools/route', async (req, res) => {
     }
 });
 
+app.post('/api/ai/agent/plan', async (req, res) => {
+    const startedAt = Date.now();
+    try {
+        if (!req.user?.id || !req.tenant) return res.status(401).json({ error: 'Unauthorized' });
+        const userMessage = String(req.body?.userMessage || '').trim();
+        if (!userMessage) return res.status(400).json({ error: 'userMessage is required' });
+        const session = await ensureAiChatSessionForUser(req.user, req.body?.deviceId);
+        const rows = await loadAiChatMessages(session.id, 16);
+        const recentConversation = rows.map((item) => ({ role: item.sender_role === 'ai' ? 'assistant' : 'user', content: item.body }));
+        const plan = await planLocalAgent({ userMessage, recentConversation });
+        await logAudit(req.user.name, 'AI_AGENT_PLAN', 'Local Ollama', 'SUCCESS', `steps=${plan.steps.length} user=${req.user.id} tenant=${req.tenant}`);
+        recordLatency('agent_plan_llm', startedAt);
+        res.json(plan);
+    } catch (err) {
+        recordLatency('agent_plan_llm', startedAt, { ok: false });
+        res.status(503).json({ error: err.message || 'Agent planner failed' });
+    }
+});
+
 app.get('/api/ai/voice/tools/context', async (req, res) => {
     try {
         const deviceId = await requireOwnedVoiceDevice(req, res); if (!deviceId) return;
@@ -2070,6 +2099,7 @@ app.post('/api/ai-chat/session/me/messages', async (req, res) => {
             projectSnapshot,
             intent,
             shouldEscalate,
+            interactionMode,
         } = req.body || {};
 
         const userText = String(userMessage || '').trim();
@@ -2140,6 +2170,7 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
             projectSnapshot,
             intent,
             shouldEscalate,
+            interactionMode,
         } = req.body || {};
 
         const userText = String(userMessage || '').trim();
@@ -2154,6 +2185,8 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
 
         const session = await ensureAiChatSessionForUser(req.user, deviceId);
         await maybeSetAiSessionTitle(session, userText);
+        const ttsRuntime = getLocalTtsStatus();
+        const voiceRuntime = getLocalVoiceAiStatus();
         const context = await buildNatAiContext({
             req,
             db,
@@ -2163,7 +2196,17 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
                 deviceId,
                 currentPage,
                 machineStatus,
-                projectSnapshot,
+                projectSnapshot: {
+                    ...(projectSnapshot && typeof projectSnapshot === 'object' ? projectSnapshot : {}),
+                    nat_ai_voice: {
+                        listening_enabled: Boolean(voiceRuntime?.stt?.enabled),
+                        listening_engine: voiceRuntime?.stt?.engine || null,
+                        speech_enabled: Boolean(ttsRuntime?.enabled),
+                        speech_engine: ttsRuntime?.provider || ttsRuntime?.engine || null,
+                        speech_service_running: Boolean(ttsRuntime?.running || ttsRuntime?.provider === 'local-f5-voice-clone'),
+                    },
+                },
+                interactionMode: interactionMode === 'voice' ? 'voice' : 'text',
             },
             defaultTenantId: DEFAULT_TENANT_ID,
             getSensorTenantCandidates,
@@ -2174,7 +2217,7 @@ app.post('/api/ai-chat/session/me/respond', async (req, res) => {
             getDevicesForUser,
         });
         const generated = await generateNatAiReply(context, fallbackText);
-        const aiText = generated.text;
+        const aiText = interactionMode === 'voice' ? formatVoiceReply(generated.text) : generated.text;
         const brain = buildBrainAssessment(context, generated);
 
         await saveAiExchange(db, {
@@ -3334,62 +3377,54 @@ app.put('/api/users/:id/role', async (req, res) => {
 
 // 6. UPDATE USER DETAILS (New Feature + Title + Password + Notes)
 app.put('/api/users/:id', async (req, res) => {
-    const { name, email, location, bio, avatar, title, password, notes } = req.body;
     try {
-        // Prevent generic/empty updates
-        if (!name && !email && !location && !bio && !avatar && !title && !password && !notes) {
+        const body = req.body || {};
+        const editableFields = ['name', 'email', 'location', 'bio', 'avatar', 'title', 'notes'];
+        const providedFields = editableFields.filter((field) => Object.prototype.hasOwnProperty.call(body, field));
+        const hasPassword = typeof body.password === 'string' && body.password.length > 0;
+
+        if (providedFields.length === 0 && !hasPassword) {
             return res.status(400).json({ error: "Nothing to update" });
         }
 
-        let query = "UPDATE users SET ";
-        let params = [];
-        
-        if (name) {
-            query += "name = ?, ";
-            params.push(name);
+        if (providedFields.includes('name') && !String(body.name || '').trim()) {
+            return res.status(400).json({ error: 'Name is required' });
         }
-        if (email) {
-            query += "email = ?, ";
-            params.push(email);
+        if (providedFields.includes('email') && !String(body.email || '').trim()) {
+            return res.status(400).json({ error: 'Email is required' });
         }
-        if (location) {
-            query += "location = ?, ";
-            params.push(location);
-        }
-        if (bio) {
-            query += "bio = ?, ";
-            params.push(bio);
-        }
-        if (avatar) {
-            query += "avatar = ?, ";
-            params.push(avatar);
-        }
-        if (title) {
-            query += "title = ?, ";
-            params.push(title);
-        }
-        if (password) {
-            // Hash the new password and store both
-            const hash = await bcrypt.hash(password, 10);
-            query += "password = ?, plain_password = ?, ";
-            params.push(hash);
-            params.push(password);
-        }
-        if (notes) {
-            query += "notes = ?, ";
-            params.push(notes);
-        }
-        
-        // Remove trailing comma
-        query = query.slice(0, -2);
-        query += " WHERE id = ?";
-        params.push(req.params.id);
 
-        const result = await db.run(query, params);
-        logAudit(name || 'Unknown', 'UPDATE_PROFILE', 'Web', 'SUCCESS', `Updated user ID: ${req.params.id}`);
-        res.json({ message: "User Updated Successfully", changes: result.changes });
+        const assignments = [];
+        const params = [];
+        for (const field of providedFields) {
+            assignments.push(`${field} = ?`);
+            const value = field === 'name' || field === 'email'
+                ? String(body[field]).trim()
+                : (body[field] ?? '');
+            params.push(value);
+        }
+        if (hasPassword) {
+            // Hash the new password and store both
+            const hash = await bcrypt.hash(body.password, 10);
+            assignments.push('password = ?', 'plain_password = ?');
+            params.push(hash, body.password);
+        }
+
+        params.push(req.params.id);
+        const result = await db.run(`UPDATE users SET ${assignments.join(', ')} WHERE id = ?`, params);
+        if (!result.changes) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const user = await db.get('SELECT id, name, email, role, location, bio, avatar, title, created_at as createdAt FROM users WHERE id = ?', [req.params.id]);
+        logAudit(user?.name || 'Unknown', 'UPDATE_PROFILE', 'Web', 'SUCCESS', `Updated user ID: ${req.params.id}`);
+        res.json({ message: "User Updated Successfully", changes: result.changes, user });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        const message = String(err?.message || err);
+        const isDuplicateEmail = /unique|duplicate/i.test(message) && /email/i.test(message);
+        res.status(isDuplicateEmail ? 409 : 500).json({
+            error: isDuplicateEmail ? 'That email address is already in use' : message
+        });
     }
 });
 

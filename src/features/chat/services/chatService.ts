@@ -145,7 +145,16 @@ export interface VoiceControlPreparation {
   confirmationToken?: string | null;
   prompt?: string | null;
 }
-export interface VoiceToolProposal { tool: "none" | "read_device_context" | "control_device"; action?: VoiceControlAction | null }
+export interface AgentPlanStep { tool: "read_device_context" | "control_device"; action?: VoiceControlAction | null; risk?: string }
+export interface VoiceToolProposal {
+  tool: "none" | "read_device_context" | "control_device";
+  action?: VoiceControlAction | null;
+  intent?: string;
+  summary?: string;
+  needs_clarification?: boolean;
+  clarification?: string | null;
+  steps?: AgentPlanStep[];
+}
 
 type ChatThreadListQuery = {
   mine?: boolean;
@@ -182,6 +191,7 @@ type AiChatExchangePayload = {
 type AiChatRespondPayload = Omit<AiChatExchangePayload, "aiMessage"> & {
   fallbackAiMessage?: string;
   projectSnapshot?: Record<string, unknown>;
+  interactionMode?: "text" | "voice";
 };
 
 const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
@@ -252,10 +262,17 @@ export const chatService = {
   },
 
   async routeVoiceTool(userMessage: string, deviceId?: string): Promise<VoiceToolProposal> {
-    const response = await fetch(buildApiUrl("/ai/voice/tools/route"), {
+    const response = await fetch(buildApiUrl("/ai/agent/plan"), {
       method: "POST", headers: getAuthHeaders(), body: JSON.stringify({ userMessage, deviceId }),
     });
-    return parseJson(response, "Local tool routing failed");
+    const plan = await parseJson<Omit<VoiceToolProposal, "tool" | "action"> & { steps?: AgentPlanStep[] }>(response, "Agent planning failed");
+    const executable = [...(plan.steps || [])].reverse().find((step) => step.tool === "control_device")
+      || (plan.steps || [])[0];
+    return {
+      ...plan,
+      tool: executable?.tool || "none",
+      action: executable?.action || null,
+    };
   },
 
   async prepareVoiceControl(deviceId: string, action: VoiceControlAction): Promise<VoiceControlPreparation> {
@@ -286,16 +303,28 @@ export const chatService = {
     return latest;
   },
   async synthesizeAiSpeech(text: string, rate = 1): Promise<Blob> {
-    const response = await fetch(buildApiUrl("/ai/voice/synthesize"), {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ text, rate }),
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error?.error || "Local NAT AI voice is unavailable");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 7_000);
+    try {
+      const response = await fetch(buildApiUrl("/ai/voice/synthesize"), {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ text, rate }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error?.error || "Local NAT AI voice is unavailable");
+      }
+      return response.blob();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new Error("Voice synthesis timed out; use browser speech");
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
     }
-    return response.blob();
   },
 
   async listMyAiSessions(query?: Pick<AiChatQuery, "deviceId">): Promise<{ sessions: AiChatSession[] }> {
