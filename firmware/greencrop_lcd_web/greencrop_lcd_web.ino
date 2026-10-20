@@ -30,8 +30,8 @@
 
 // ======================== WEB TELEMETRY ========================
 // ส่วนนี้ใช้ส่งค่าเซนเซอร์ขึ้นเว็บเท่านั้น ไม่รับคำสั่งและไม่ควบคุมปั๊ม
-const char* WIFI_SSID = "ใส่ชื่อ WiFi";
-const char* WIFI_PASSWORD = "ใส่รหัส WiFi";
+const char* WIFI_SSID = "พงศกร.ร";
+const char* WIFI_PASSWORD = "Pphongsagon47.";
 const char* MQTT_SERVER = "862ddab18768410486982f71e1ac75bb.s1.eu.hivemq.cloud";
 const int MQTT_PORT = 8883;
 const char* MQTT_USERNAME = "GreenCropnat";
@@ -550,11 +550,23 @@ void runAuto(bool startEvent) {
 // ======================== WEB TELEMETRY ========================
 void connectWebTelemetry() {
   if (WiFi.status() != WL_CONNECTED) {
+    Serial.print("Connecting WiFi: ");
+    Serial.println(WIFI_SSID);
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     unsigned long started = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - started < 15000) {
       delay(250);
+      Serial.print(".");
+    }
+    Serial.println();
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.print("WiFi connected, IP: ");
+      Serial.println(WiFi.localIP());
+    } else {
+      Serial.print("WiFi failed, status: ");
+      Serial.println(WiFi.status());
+      return;
     }
   }
 
@@ -562,7 +574,13 @@ void connectWebTelemetry() {
     mqttSecureClient.setInsecure();
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
     String clientId = "GREENCROP_DISPLAY_" + String((uint32_t)ESP.getEfuseMac(), HEX);
-    mqttClient.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD);
+    Serial.print("Connecting MQTT... ");
+    if (mqttClient.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD)) {
+      Serial.println("connected");
+    } else {
+      Serial.print("failed, state: ");
+      Serial.println(mqttClient.state());
+    }
   }
 }
 
@@ -576,7 +594,11 @@ void publishWebSensorValues() {
   payload += "\"temp_c\":" + String(temperatureC, 1);
   payload += "}";
 
-  mqttClient.publish(MQTT_TOPIC, payload.c_str());
+  if (mqttClient.publish(MQTT_TOPIC, payload.c_str())) {
+    Serial.println("MQTT publish OK");
+  } else {
+    Serial.println("MQTT publish failed");
+  }
 }
 
 void updateWebTelemetry() {

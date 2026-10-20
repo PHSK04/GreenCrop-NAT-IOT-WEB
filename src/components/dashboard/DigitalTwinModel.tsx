@@ -346,6 +346,8 @@ export function DigitalTwinModel({
             </div>
           ))}
         </div>
+
+
       </div>
     </section>
   );

@@ -25,7 +25,7 @@ import {
   UserCircle
 } from "lucide-react";
 import { MetricsChart } from "../MetricsChart";
-import { DigitalTwinModel } from "../dashboard/DigitalTwinModel";
+import { SensorCharts } from "../dashboard/SensorCharts";
 import type { AdminDbDeviceRow } from "@/features/auth/services/authService";
 import type { LucideIcon } from "lucide-react";
 import { useLiveWeather } from "@/features/weather/useLiveWeather";
@@ -773,21 +773,7 @@ export function DashboardPage({
           <div className="space-y-3 xl:col-span-9">
             <Card className="h-full min-h-[400px] overflow-hidden rounded-[26px] border-white bg-white shadow-[0_26px_64px_-40px_rgba(15,23,42,.4)] sm:min-h-[580px] xl:min-h-[650px]">
               <CardContent className="p-0">
-                <DigitalTwinModel
-                  language={language}
-                  liveSignal={liveSignal}
-                  locked={locked}
-                  floatAlarm={floatAlarm}
-                  redOn={redOn}
-                  wls1={wls1}
-                  wls2={wls2}
-                  pump1On={pump1On}
-                  pump2On={pump2On}
-                  phValue={stablePhValue}
-                  ecValue={stableEcValue}
-                  tempValue={stableTempValue}
-                  phOk={stablePhOk}
-                />
+                <SensorCharts />
               </CardContent>
             </Card>
           </div>
@@ -868,22 +854,6 @@ export function DashboardPage({
           </div>
         </div>
         
-        {/* Sensor charts */}
-        <div className="mb-3 rounded-[24px] border border-white bg-white p-4 shadow-[0_20px_50px_-38px_rgba(15,23,42,.42)]">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">{language === "TH" ? "กราฟค่าคุณภาพน้ำ" : "Water quality charts"}</h2>
-              <p className="text-xs text-slate-500">{language === "TH" ? "ติดตามค่า pH, EC และอุณหภูมิแบบเรียลไทม์" : "Track pH, EC and water temperature in real time"}</p>
-            </div>
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold text-emerald-700">{language === "TH" ? "เรียลไทม์" : "REAL-TIME"}</span>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <RealtimeMetricCard title="pH" value={stablePhValue != null ? stablePhValue.toFixed(2) : "--"} unit="" status={stablePhOk ? (language === "TH" ? "เหมาะสม" : "Suitable") : (language === "TH" ? "รอตรวจสอบ" : "Waiting")} icon={Beaker} color="text-emerald-600" bgColor="bg-emerald-50" data={sensorTrend} dataKey="ph" />
-            <RealtimeMetricCard title="EC" value={stableEcValue != null ? stableEcValue.toFixed(2) : "--"} unit="mS/cm" status={stableEcValue != null ? (language === "TH" ? "เหมาะสม" : "Suitable") : "Waiting"} icon={Zap} color="text-cyan-600" bgColor="bg-cyan-50" data={sensorTrend} dataKey="ec" />
-            <RealtimeMetricCard title={language === "TH" ? "อุณหภูมิน้ำ" : "Water temperature"} value={stableTempValue != null ? stableTempValue.toFixed(1) : "--"} unit="°C" status={stableTempValue != null ? (language === "TH" ? "ปกติ" : "Normal") : "Waiting"} icon={Thermometer} color="text-blue-600" bgColor="bg-blue-50" data={sensorTrend} dataKey="temp" />
-          </div>
-        </div>
-
         {/* Charts Row */}
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(500px,1.15fr)_minmax(320px,0.72fr)]">
           <div className="overflow-hidden rounded-[24px] border border-white bg-white p-1 shadow-[0_20px_50px_-38px_rgba(15,23,42,.42)]">
