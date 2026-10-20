@@ -235,13 +235,11 @@ export function MachinePerformancePage({ language = "TH" }: MachinePerformancePa
     const avgPh = average(entriesInExportRange.map((entry) => entry.ph));
     const avgEc = average(entriesInExportRange.map((entry) => entry.ec));
     const avgTemp = average(entriesInExportRange.map((entry) => entry.temp));
-    const avgOxygen = average(entriesInExportRange.map((entry) => entry.oxygen));
 
     const phScore = Math.max(0, 100 - Math.abs(avgPh - 7) * 35);
     const ecScore = Math.max(0, 100 - Math.abs(avgEc - 1.8) * 25);
     const tempScore = Math.max(0, 100 - Math.abs(avgTemp - 25) * 6);
-    const oxygenScore = Math.max(0, 100 - Math.abs(avgOxygen - 6.5) * 12);
-    const waterScore = Math.round(average([phScore, ecScore, tempScore, oxygenScore]));
+    const waterScore = Math.round(average([phScore, ecScore, tempScore]));
 
     const confidence = Math.min(92, Math.max(48, Math.round(45 + entriesInExportRange.length * 7 + Math.min(totals.length, 7) * 3)));
     const isImproving = trendValue >= 3;

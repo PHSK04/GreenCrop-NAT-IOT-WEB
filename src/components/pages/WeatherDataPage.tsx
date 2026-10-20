@@ -115,10 +115,9 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
           time: new Date(`${day}T00:00:00`).toLocaleDateString([], { weekday: "short" }),
           ph: Number(ph.toFixed(2)),
           ec: Number(ec.toFixed(2)),
-          oxygen: Number((ph > 0 ? Math.max(0, 14 - ph) : 0).toFixed(2)),
         };
       })
-      .filter((row) => row.ph > 0 || row.ec > 0 || row.oxygen > 0);
+      .filter((row) => row.ph > 0 || row.ec > 0);
   }, [filteredTelemetry]);
 
   const currentSensorReadingsDevice = useMemo(() => {
@@ -201,7 +200,6 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
       return {
         timestamp: row.timestamp,
         ph: ph > 0 ? ph.toFixed(2) : "",
-        oxygen_mg_l: ph > 0 ? Math.max(0, 14 - ph).toFixed(2) : "",
         ec_ms_cm: row.ecValue > 0 ? row.ecValue.toFixed(2) : "",
         temp_c: row.tempValue > 0 ? row.tempValue.toFixed(1) : "",
       };
@@ -216,7 +214,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
       `date_range,${startDate || "-"} to ${endDate || "-"}`,
       "",
     ];
-    const headers = ["timestamp", "ph", "oxygen_mg_l", "ec_ms_cm", "temp_c"];
+    const headers = ["timestamp", "ph", "ec_ms_cm", "temp_c"];
     const rows = weatherExportRows.map((row) => headers.map((key) => csvCell(row[key as keyof typeof row])).join(","));
     return `${meta.join("\n")}${headers.join(",")}\n${rows.join("\n")}`;
   };
@@ -407,7 +405,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
                       {isTH ? "แนวโน้มคุณภาพน้ำ (7 วัน)" : "Water Quality Trends (7 Days)"}
                     </CardTitle>
                     <CardDescription className="text-muted-foreground">
-                      {isTH ? "เสถียรภาพของ pH, ออกซิเจน และ EC" : "pH, Oxygen, and EC stability"}
+                      {isTH ? "เสถียรภาพของ pH และ EC" : "pH and EC stability"}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -429,7 +427,6 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
                           />
                           <Legend wrapperStyle={{ paddingTop: "20px" }}/>
                           <Line type="monotone" dataKey="ph" stroke="#10b981" strokeWidth={2} name={isTH ? "ค่า pH" : "pH Level"} />
-                          <Line type="monotone" dataKey="oxygen" stroke="#0ea5e9" strokeWidth={2} name={isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)"} />
                           <Line type="monotone" dataKey="ec" stroke="#eab308" strokeWidth={2} name={isTH ? "EC (mS/cm)" : "EC (mS/cm)"} />
                         </LineChart>
                       </ResponsiveContainer>

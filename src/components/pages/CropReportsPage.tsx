@@ -5,7 +5,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
-import { Download, Eye, Calendar, Filter, FileText, Share2, Sprout, Droplets, Zap, Wind, Plus, Trash2, Thermometer } from "lucide-react";
+import { Download, Eye, Calendar, Filter, FileText, Share2, Sprout, Droplets, Zap, Plus, Trash2, Thermometer } from "lucide-react";
 import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
@@ -47,14 +47,13 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   const [endDate, setEndDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [selectedFields, setSelectedFields] = useState<string[]>(["yield", "ph", "oxygen", "ec", "temp"]);
+  const [selectedFields, setSelectedFields] = useState<string[]>(["yield", "ph", "ec", "temp"]);
   const [deviceReportData, setDeviceReportData] = useState<CropYieldEntry[]>([]);
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
     time: currentTimeValue(),
     yield: "",
     ph: "7.0",
-    oxygen: "6.5",
     ec: "1.8",
     temp: "25.0",
     note: "",
@@ -72,14 +71,12 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
     const nextPh = phValue > 0 ? phValue : null;
     const nextEc = ecValue > 0 ? ecValue : null;
     const nextTemp = tempValue > 0 ? tempValue : null;
-    const derivedOxygen = nextPh != null ? Math.max(0, 14 - nextPh) : null;
 
-    if (nextPh == null && nextEc == null && nextTemp == null && derivedOxygen == null) return;
+    if (nextPh == null && nextEc == null && nextTemp == null) return;
 
     setForm((prev) => ({
       ...prev,
       ph: nextPh != null ? nextPh.toFixed(2) : prev.ph,
-      oxygen: derivedOxygen != null ? derivedOxygen.toFixed(2) : prev.oxygen,
       ec: nextEc != null ? nextEc.toFixed(2) : prev.ec,
       temp: nextTemp != null ? nextTemp.toFixed(1) : prev.temp,
     }));
@@ -118,15 +115,10 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
     const totalYield = filteredReportData.reduce((sum, row) => sum + row.yield, 0);
     const avgPh =
       days > 0 ? filteredReportData.reduce((sum, row) => sum + row.ph, 0) / days : 0;
-    const avgOxygen =
-      days > 0
-        ? filteredReportData.reduce((sum, row) => sum + row.oxygen, 0) / days
-        : 0;
     return {
       days,
       totalYield,
       avgPh: Math.round(avgPh * 100) / 100,
-      avgOxygen: Math.round(avgOxygen * 100) / 100,
     };
   }, [filteredReportData]);
 
@@ -143,7 +135,6 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   const handleSaveManualEntry = async () => {
     const yieldValue = Number(form.yield);
     const phValue = Number(form.ph);
-    const oxygenValue = Number(form.oxygen);
     const ecValue = Number(form.ec);
     const tempValue = Number(form.temp);
 
@@ -161,7 +152,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
         time: form.time,
         yield: yieldValue,
         ph: Number.isFinite(phValue) ? phValue : 7,
-        oxygen: Number.isFinite(oxygenValue) ? oxygenValue : 0,
+        oxygen: 0, // Retained for compatibility with the existing storage schema.
         ec: Number.isFinite(ecValue) ? ecValue : 0,
         temp: Number.isFinite(tempValue) ? tempValue : 0,
         note: form.note,
@@ -300,15 +291,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                   </p>
                   <Input type="number" step="0.01" value={form.ph} readOnly className="bg-muted/40" />
                 </div>
-                <div>
-                  <p className="mb-1 flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground">
-                    <span>{isTH ? "ออกซิเจน" : "Oxygen"}</span>
-                    <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-600 dark:text-emerald-400">
-                      AUTO
-                    </Badge>
-                  </p>
-                  <Input type="number" step="0.01" value={form.oxygen} readOnly className="bg-muted/40" />
-                </div>
+
                 <div>
                   <p className="mb-1 flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground">
                     <span>EC</span>
@@ -367,7 +350,6 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
             options={[
               { key: "yield", label: isTH ? "ผลผลิต (กรัม)" : "Yield (g)" },
               { key: "ph", label: "pH" },
-              { key: "oxygen", label: isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)" },
               { key: "ec", label: isTH ? "EC (mS/cm)" : "EC (mS/cm)" },
               { key: "temp", label: isTH ? "อุณหภูมิ (°C)" : "Temperature (°C)" },
             ]}
@@ -405,12 +387,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               <div className="text-sm text-muted-foreground">{isTH ? "ค่า pH เฉลี่ย" : "Avg pH Level"}</div>
             </CardContent>
           </Card>
-          <Card className="animate-in rounded-2xl border border-white/80 bg-gradient-to-br from-white to-cyan-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5 !opacity-100 fade-in slide-in-from-bottom-6 duration-700 delay-300 motion-reduce:animate-none">
-            <CardContent className="p-6 text-center">
-              <div className="text-3xl font-bold text-cyan-600 dark:text-cyan-400 mb-1">{reportSummary.avgOxygen}</div>
-              <div className="text-sm text-muted-foreground">{isTH ? "ออกซิเจนเฉลี่ย (mg/L)" : "Avg Oxygen (mg/L)"}</div>
-            </CardContent>
-          </Card>
+
         </div>
 
         <Card className="animate-in rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100 fade-in slide-in-from-bottom-8 duration-700 delay-350 motion-reduce:animate-none">
@@ -419,7 +396,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               {isTH ? "รายงานผลผลิตและคุณภาพรายวัน" : "Daily Harvest & Quality Report"}
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              {isTH ? "สรุปผลผลิตรายวัน ค่า pH ออกซิเจน และค่าการนำไฟฟ้า" : "Breakdown of daily yield, pH, oxygen, and conductivity levels"}
+              {isTH ? "สรุปผลผลิตรายวัน ค่า pH และค่าการนำไฟฟ้า" : "Breakdown of daily yield, pH and conductivity levels"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -503,7 +480,6 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "เวลา" : "Time"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "ผลผลิต (กรัม)" : "Yield (g)"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "ค่า pH" : "pH Level"}</TableHead>
-                  <TableHead className="font-semibold text-muted-foreground">{isTH ? "ออกซิเจน (mg/L)" : "Oxygen (mg/L)"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "EC (mS/cm)" : "EC (mS/cm)"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "อุณหภูมิ" : "Temp"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground text-right">{isTH ? "การทำงาน" : "Action"}</TableHead>
@@ -542,12 +518,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                         {row.ph}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Wind className="w-4 h-4 text-cyan-500" />
-                        {row.oxygen}
-                      </div>
-                    </TableCell>
+
                     <TableCell>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Zap className="w-4 h-4 text-yellow-500" />
@@ -633,13 +604,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                   </div>
                   <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{selectedReport.ph}</p>
                 </div>
-                <div className="space-y-1 p-3 bg-muted/30 rounded-lg border border-border">
-                   <div className="flex items-center gap-2 mb-1">
-                    <Wind className="w-3 h-3 text-cyan-500" />
-                    <p className="text-xs font-medium text-muted-foreground">{isTH ? "ออกซิเจน" : "Oxygen"}</p>
-                  </div>
-                  <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{selectedReport.oxygen} <span className="text-xs text-muted-foreground font-normal">mg/L</span></p>
-                </div>
+
                 <div className="space-y-1 p-3 bg-muted/30 rounded-lg border border-border">
                    <div className="flex items-center gap-2 mb-1">
                     <Zap className="w-3 h-3 text-yellow-500" />

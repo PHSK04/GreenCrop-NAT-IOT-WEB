@@ -184,7 +184,6 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
   const pondDepth = seededInt(25, seed, 10, 2, 18, 32);
   const pondVolume = seededInt(60, seed, 11, 4, 45, 95);
   const pondTemp = seededNumber(28.0, seed, 12, 0.3, 24.0, 30.5, 1);
-  const pondOxygen = seededNumber(6.5, seed, 13, 0.08, 5.5, 8.6, 2);
   const pondLight = seededInt(4500, seed, 14, 120, 3000, 5200);
   const readiness = seededInt(95, seed, 15, 2, 82, 99);
   const t2State = tank2On ?? false; // Default false for "Auto-Dose"
@@ -574,13 +573,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
                        <div className="text-2xl font-bold text-foreground">{pondTemp} <span className="text-xs text-muted-foreground font-normal">°C</span></div>
                     </div>
 
-                    <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex flex-col justify-center">
-                       <div className="flex items-center gap-2 mb-1">
-                          <Waves className="w-5 h-5 text-cyan-500" />
-                          <span className="text-sm text-muted-foreground">Oxygen (DO)</span>
-                       </div>
-                       <div className="text-2xl font-bold text-foreground">{pondOxygen} <span className="text-xs text-muted-foreground font-normal">mg/L</span></div>
-                    </div>
+
 
                     <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 flex flex-col justify-center">
                        <div className="flex items-center gap-2 mb-1">

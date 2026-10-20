@@ -136,7 +136,6 @@ export function MetricsChart({ compact = false }: { compact?: boolean }) {
       return {
         date: new Date(`${day}T00:00:00`).toLocaleDateString([], { month: "short", day: "numeric" }),
         ph: validPh.length ? Number(avgPh.toFixed(2)) : 0,
-        oxygen: validPh.length ? Number(Math.max(0, 14 - avgPh).toFixed(2)) : 0,
         ec: validEc.length ? Number(avgEc.toFixed(2)) : 0,
         temperature: validTemp.length ? Number(avgTemp.toFixed(1)) : 0,
         cost: rows.length,
@@ -406,16 +405,6 @@ export function MetricsChart({ compact = false }: { compact?: boolean }) {
                         dot={{ fill: "#6366f1", strokeWidth: 0, r: 4 }}
                         activeDot={{ r: 6, stroke: "#6366f1", strokeWidth: 2, fill: "hsl(var(--background))" }}
                         name="pH Value"
-                      />
-                      <Line
-                        yAxisId="left"
-                        type="monotone"
-                        dataKey="oxygen"
-                        stroke="#06b6d4"
-                        strokeWidth={3}
-                        dot={{ fill: "#06b6d4", strokeWidth: 0, r: 4 }}
-                        activeDot={{ r: 6, stroke: "#06b6d4", strokeWidth: 2, fill: "hsl(var(--background))" }}
-                        name="Oxygen (DO)"
                       />
                       <Line
                         yAxisId="left"

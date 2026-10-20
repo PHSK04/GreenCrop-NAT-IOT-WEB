@@ -1649,7 +1649,6 @@ export function CustomerChatWidget({
         average_yield_g: month.averageYield,
         harvest_count: month.frequency,
         avg_ph: month.avgPh,
-        avg_oxygen: month.avgOxygen,
         avg_ec: month.avgEc,
         avg_temp: month.avgTemp,
       }));
@@ -1659,7 +1658,6 @@ export function CustomerChatWidget({
         total_yield_g: number;
         harvest_count: number;
         avg_ph_total: number;
-        avg_oxygen_total: number;
         avg_ec_total: number;
         avg_temp_total: number;
       }>>((groups, entry) => {
@@ -1671,14 +1669,12 @@ export function CustomerChatWidget({
           total_yield_g: 0,
           harvest_count: 0,
           avg_ph_total: 0,
-          avg_oxygen_total: 0,
           avg_ec_total: 0,
           avg_temp_total: 0,
         };
         current.total_yield_g += entry.yield;
         current.harvest_count += 1;
         current.avg_ph_total += entry.ph;
-        current.avg_oxygen_total += entry.oxygen;
         current.avg_ec_total += entry.ec;
         current.avg_temp_total += entry.temp;
         groups[key] = current;
@@ -1693,7 +1689,6 @@ export function CustomerChatWidget({
         harvest_count: year.harvest_count,
         average_yield_g: year.harvest_count ? Math.round((year.total_yield_g / year.harvest_count) * 100) / 100 : 0,
         avg_ph: year.harvest_count ? Math.round((year.avg_ph_total / year.harvest_count) * 100) / 100 : 0,
-        avg_oxygen: year.harvest_count ? Math.round((year.avg_oxygen_total / year.harvest_count) * 100) / 100 : 0,
         avg_ec: year.harvest_count ? Math.round((year.avg_ec_total / year.harvest_count) * 100) / 100 : 0,
         avg_temp: year.harvest_count ? Math.round((year.avg_temp_total / year.harvest_count) * 100) / 100 : 0,
       }));
@@ -1764,7 +1759,6 @@ export function CustomerChatWidget({
           time: entry.time,
           yield_g: entry.yield,
           ph: entry.ph,
-          oxygen: entry.oxygen,
           ec: entry.ec,
           temp_c: entry.temp,
           note: entry.note || "",

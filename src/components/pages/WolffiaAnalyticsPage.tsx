@@ -114,9 +114,9 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
         return;
       }
       const csvContent =
-        "month,total_yield_g,average_yield_g,harvest_count,avg_ph,avg_oxygen,avg_ec\n" +
+        "month,total_yield_g,average_yield_g,harvest_count,avg_ph,avg_ec\n" +
         wolffiaStatsDevice
-          .map((row) => `${row.monthLabel},${row.yield},${row.averageYield},${row.frequency},${row.avgPh},${row.avgOxygen},${row.avgEc}`)
+          .map((row) => `${row.monthLabel},${row.yield},${row.averageYield},${row.frequency},${row.avgPh},${row.avgEc}`)
           .join("\n");
       downloadTextFile("wolffia_monthly_report.csv", csvContent, "text/csv;charset=utf-8");
       
@@ -142,18 +142,18 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
 
     if (selectedDataTypes.includes("monthly")) {
       lines.push(`${isTH ? "ส่วน" : "Section"}, ${isTH ? "สถิติรายเดือน" : "Monthly Stats"}`);
-      lines.push("month,total_yield_g,average_yield_g,harvest_count,avg_ph,avg_oxygen,avg_ec");
+      lines.push("month,total_yield_g,average_yield_g,harvest_count,avg_ph,avg_ec");
       wolffiaStatsDevice.forEach((row) => {
-        lines.push(`${row.monthLabel},${row.yield},${row.averageYield},${row.frequency},${row.avgPh},${row.avgOxygen},${row.avgEc}`);
+        lines.push(`${row.monthLabel},${row.yield},${row.averageYield},${row.frequency},${row.avgPh},${row.avgEc}`);
       });
       lines.push("");
     }
 
     if (selectedDataTypes.includes("harvest")) {
       lines.push(`${isTH ? "ส่วน" : "Section"}, ${isTH ? "ประวัติเก็บเกี่ยว" : "Harvest History"}`);
-      lines.push("date,time,yield_g,ph,oxygen,ec,temp,note");
+      lines.push("date,time,yield_g,ph,ec,temp,note");
       filteredEntries.forEach((row) => {
-        lines.push(`${row.date},${row.time},${row.yield},${row.ph},${row.oxygen},${row.ec},${row.temp},${row.note || ""}`);
+        lines.push(`${row.date},${row.time},${row.yield},${row.ph},${row.ec},${row.temp},${row.note || ""}`);
       });
       lines.push("");
     }
@@ -532,7 +532,6 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                       <TableHead>{isTH ? "เวลา" : "Time"}</TableHead>
                       <TableHead className="text-right">{isTH ? "ผลผลิต" : "Yield"}</TableHead>
                       <TableHead className="text-right">pH</TableHead>
-                      <TableHead className="text-right">{isTH ? "ออกซิเจน" : "Oxygen"}</TableHead>
                       <TableHead className="text-right">EC</TableHead>
                       <TableHead>{isTH ? "หมายเหตุ" : "Note"}</TableHead>
                     </TableRow>
@@ -544,7 +543,6 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                         <TableCell>{entry.time}</TableCell>
                         <TableCell className="text-right font-bold text-emerald-600 dark:text-emerald-400">{entry.yield} g</TableCell>
                         <TableCell className="text-right">{entry.ph}</TableCell>
-                        <TableCell className="text-right">{entry.oxygen}</TableCell>
                         <TableCell className="text-right">{entry.ec}</TableCell>
                         <TableCell className="text-muted-foreground">{entry.note || "-"}</TableCell>
                       </TableRow>
