@@ -382,7 +382,8 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   const [devices, setDevices] = useState<AdminDbDeviceRow[]>([]);
   const [activeDeviceId, setActiveDeviceId] = useState<string>("");
   const showDeviceSelector = devices.length > 1;
-  const showDashboardChatWidget = !isAdminUser;
+  // Temporarily hide the floating AI assistant; keep its implementation for later.
+  const showDashboardChatWidget = false;
 
   // Use machine context for sidebar status
   const { isOn } = useMachine();
