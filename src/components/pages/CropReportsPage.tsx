@@ -265,7 +265,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 [&_input]:h-10 [&_input]:rounded-xl [&_p]:min-h-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 [&_input]:h-10 [&_input]:rounded-xl [&_p]:flex [&_p]:h-6 [&_p]:items-center">
                 <div>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "วันที่เก็บ" : "Date"}</p>
                   <MinimalDatePicker
