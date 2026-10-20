@@ -260,6 +260,7 @@ export function DashboardPage({
     phValue,
     tempValue,
     locked,
+    emergencyStopActive,
     wls1,
     wls2,
     floatAlarm,
@@ -277,10 +278,11 @@ export function DashboardPage({
     .filter(Boolean)
     .join(", ");
   const [controlMode, setControlMode] = useState<"manual" | "auto">("manual");
-  const controlsDisabled = controlMode === "auto";
+  const emergencyLocked = emergencyStopActive || locked;
+  const controlsDisabled = controlMode === "auto" || emergencyLocked;
   const [dismissedWaterFullAlarm, setDismissedWaterFullAlarm] = useState(false);
   const waterFullAlarm = boardConnected && redOn;
-  const showWaterFullAlarm = waterFullAlarm && !dismissedWaterFullAlarm;
+  const showWaterFullAlarm = waterFullAlarm && !dismissedWaterFullAlarm && !emergencyLocked;
   // Sensor cards are display-only: keep the last valid readings visible even
   // when the board briefly goes offline. This does not change any controls.
   const stablePhValue = useStablePositiveValue(phValue);
@@ -500,7 +502,7 @@ export function DashboardPage({
                 <div className="mx-auto mt-6 max-w-sm"><div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/50 p-1" role="group" aria-label={language === "TH" ? "โหมดควบคุมบนเว็บ" : "Web control mode"}>
                     {(["auto", "manual"] as const).map((mode) => (
-                      <Button key={mode} type="button" variant={controlMode === mode ? "default" : "ghost"} aria-pressed={controlMode === mode} onClick={() => setControlMode(mode)}>
+                      <Button key={mode} type="button" variant={controlMode === mode ? "default" : "ghost"} disabled={emergencyLocked} aria-pressed={controlMode === mode} onClick={() => setControlMode(mode)}>
                         {mode === "auto" ? "Auto" : "Manual"}
                       </Button>
                     ))}
@@ -542,6 +544,21 @@ export function DashboardPage({
   return (
     <>
       <style>{`
+        .machine-action:disabled {
+          background: #e2e8f0 !important;
+          border-color: #cbd5e1 !important;
+          color: #64748b !important;
+          box-shadow: none !important;
+          filter: grayscale(1);
+          opacity: .5;
+        }
+        .machine-action:disabled span {
+          background: transparent !important;
+          border-color: #cbd5e1 !important;
+          color: #64748b !important;
+          box-shadow: none !important;
+        }
+
         @keyframes dashboardAlarmPulse {
           0%, 100% {
             transform: scale(1);
@@ -790,7 +807,7 @@ export function DashboardPage({
         <div className="mb-3 grid grid-cols-1 gap-3 xl:grid-cols-12">
 
           {/* Left Column: Visual Model */}
-          <div className="space-y-3 xl:col-span-9">
+          <div className="space-y-3 xl:col-span-8">
             <Card className="h-full min-h-[400px] overflow-hidden rounded-[26px] border-white bg-white shadow-[0_26px_64px_-40px_rgba(15,23,42,.4)] sm:min-h-[580px] xl:min-h-[650px]">
               <CardContent className="p-0">
                 <SensorCharts />
@@ -799,44 +816,52 @@ export function DashboardPage({
           </div>
 
           {/* Right Column: Controls and live readings */}
-          <div className="xl:col-span-3">
-            <Card className="h-full rounded-[26px] border-white bg-white shadow-[0_26px_64px_-40px_rgba(15,23,42,.4)]">
+          <div className="xl:col-span-4">
+            <Card className={`h-full rounded-[26px] border-2 bg-white shadow-xl ${emergencyLocked ? "border-red-500 shadow-red-950/10" : "border-emerald-500/50 shadow-emerald-950/10"}`}>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between text-slate-900">
-                  <span className="flex items-center gap-2"><Power className="h-5 w-5 text-emerald-600" />{t.masterControl}</span>
+                  <span className="flex items-center gap-2 text-xl"><Power className="h-6 w-6 text-emerald-600" />{t.masterControl}</span>
                   <span className="font-mono text-xs font-medium text-slate-400">{formatUptime(uptimeSeconds)}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/50 p-1" role="group" aria-label={language === "TH" ? "โหมดควบคุมบนเว็บ" : "Web control mode"}>
-                    {(["auto", "manual"] as const).map((mode) => (
-                      <Button key={mode} type="button" variant={controlMode === mode ? "default" : "ghost"} aria-pressed={controlMode === mode} onClick={() => setControlMode(mode)}>
-                        {mode === "auto" ? "Auto" : "Manual"}
-                      </Button>
-                    ))}
+                <div className="space-y-4">
+                  <div className={`rounded-2xl px-4 py-3 ${emergencyLocked ? "bg-red-600 text-white" : controlsDisabled ? "bg-slate-800 text-white" : "bg-emerald-600 text-white"}`} role={emergencyLocked ? "alert" : "status"}>
+                    <p className="text-xs font-medium uppercase tracking-widest opacity-80">{language === "TH" ? "สถานะการควบคุม" : "CONTROL STATUS"}</p>
+                    <p className="mt-1 flex items-center gap-2 text-xl font-bold">{emergencyLocked ? <Siren className="h-6 w-6" /> : <Power className="h-6 w-6" />}{emergencyLocked ? "EMERGENCY LOCK" : controlMode === "auto" ? "AUTO" : "MANUAL"}</p>
+                    <p className="mt-2 text-sm leading-6 opacity-90">{emergencyLocked
+                      ? (language === "TH" ? "ปิดปุ่มทั้งหมด · ปลด Emergency แล้วกด Reset ที่เครื่อง รอสถานะยืนยันจากเครื่อง" : "All controls locked. Release Emergency, press cabinet Reset and wait for device confirmation.")
+                      : controlsDisabled
+                        ? (language === "TH" ? "ปุ่มควบคุมทั้งหมดปิดอยู่" : "All control buttons are disabled")
+                        : (language === "TH" ? "พร้อมรับคำสั่ง · กดปุ่มควบคุมได้ทั้งหมด" : "All control buttons are enabled")}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {controlsDisabled
-                      ? (language === "TH" ? "Auto · ปิดปุ่มควบคุมทั้งหมดบนเว็บ" : "Auto · All web control buttons are disabled")
-                      : (language === "TH" ? "Manual · เปิดใช้งานปุ่มควบคุมบนเว็บ" : "Manual · Web control buttons are enabled")}
-                  </p>
+                  <div className="grid grid-cols-2 gap-3" role="group" aria-label={language === "TH" ? "โหมดควบคุมบนเว็บ" : "Web control mode"}>
+                    {(["auto", "manual"] as const).map((mode) => {
+                      const selected = controlMode === mode;
+                      return <button key={mode} type="button" disabled={emergencyLocked} aria-pressed={selected} onClick={() => setControlMode(mode)}
+                        className={`relative flex min-h-24 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-3 py-4 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-40 ${selected ? (mode === "auto" ? "border-blue-600 bg-blue-50 text-blue-800 shadow-sm" : "border-emerald-600 bg-emerald-50 text-emerald-800 shadow-sm") : "border-slate-200 bg-white text-slate-500 hover:border-slate-400"}`}>
+                        <span className={`absolute right-3 top-3 h-3 w-3 rounded-full border-2 ${selected ? "border-emerald-600 bg-emerald-600" : "border-slate-300"}`} />
+                        <span className="text-xl font-bold">{mode === "auto" ? "AUTO" : "MANUAL"}</span>
+                        <span className="text-xs">{mode === "auto" ? (language === "TH" ? "ปิดปุ่มควบคุม" : "Controls disabled") : (language === "TH" ? "เปิดปุ่มควบคุม" : "Controls enabled")}</span>
+                      </button>;
+                    })}
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <button disabled={controlsDisabled} onClick={() => { if (!controlsDisabled) sendStartCommand(); }} className="disabled:cursor-not-allowed disabled:opacity-40 group flex min-h-24 flex-col items-center justify-center rounded-2xl border border-emerald-500 bg-emerald-600 p-3 text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,.8)] transition hover:bg-emerald-700">
+                  <button disabled={controlsDisabled} onClick={() => { if (!controlsDisabled) sendStartCommand(); }} className="machine-action disabled:cursor-not-allowed group flex min-h-24 flex-col items-center justify-center rounded-2xl border border-emerald-500 bg-emerald-600 p-3 text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,.8)] transition hover:bg-emerald-700">
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-white text-emerald-600 shadow"><Power className="h-5 w-5" /></span>
                     <span className="mt-2 text-sm font-bold">{language === "TH" ? "เริ่มทำงาน" : "Start"}</span>
                     <span className="text-[10px] text-emerald-50">Pump 2</span>
                   </button>
-                  <button disabled={controlsDisabled} onClick={() => { if (!controlsDisabled) stopPump2FromWeb(); }} className="disabled:cursor-not-allowed disabled:opacity-40 flex min-h-24 flex-col items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-800 transition hover:bg-amber-100">
+                  <button disabled={controlsDisabled} onClick={() => { if (!controlsDisabled) stopPump2FromWeb(); }} className="machine-action disabled:cursor-not-allowed flex min-h-24 flex-col items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-800 transition hover:bg-amber-100">
                     <span className="grid h-11 w-11 place-items-center rounded-full border border-amber-300 bg-white"><Cpu className="h-5 w-5" /></span>
                     <span className="mt-2 text-sm font-bold">{language === "TH" ? "หยุดชั่วคราว" : "Pause"}</span>
                     <span className="text-[10px] text-amber-600">Pump 2</span>
                   </button>
-                  <button disabled={controlsDisabled} onClick={() => { if (!controlsDisabled) sendEmergencyStop(); }} className="disabled:cursor-not-allowed disabled:opacity-40 flex min-h-24 flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-3 text-red-700 transition hover:bg-red-100">
-                    <span className="grid h-11 w-11 place-items-center rounded-full border border-red-300 bg-white"><Siren className="h-5 w-5" /></span>
+                  <button disabled={controlsDisabled} onClick={() => { if (!controlsDisabled) sendEmergencyStop(); }} className="machine-action disabled:cursor-not-allowed flex min-h-24 flex-col items-center justify-center rounded-2xl border border-red-600 bg-red-600 p-3 text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700">
+                    <span className="grid h-11 w-11 place-items-center rounded-full border border-white/30 bg-white/15"><Siren className="h-5 w-5" /></span>
                     <span className="mt-2 text-sm font-bold">{language === "TH" ? "หยุดฉุกเฉิน" : "Emergency"}</span>
-                    <span className="text-[10px] text-red-500">E-STOP</span>
+                    <span className="text-[10px] text-red-100">E-STOP</span>
                   </button>
                 </div>
 

@@ -8,6 +8,7 @@ import React, {
   useRef,
 } from 'react';
 import { toast } from 'sonner';
+import { updateEmergencyInterlock, type EmergencyInterlock } from '@/utils/emergencyInterlock';
 import { ACTIVE_DEVICE_EVENT_NAME, getActiveDeviceIdValue } from '@/hooks/useActiveDeviceId';
 
 interface MachineContextType {
@@ -27,6 +28,7 @@ interface MachineContextType {
   phValue: number;
   tempValue: number;
   locked: boolean;
+  emergencyStopActive: boolean;
   wls1: boolean;
   wls2: boolean;
   floatAlarm: boolean;
@@ -42,6 +44,7 @@ interface MachineContextType {
 }
 
 type TelemetrySnapshot = {
+  lockReported?: boolean;
   timestamp: string;
   deviceId: string;
   phValue: number;
@@ -172,6 +175,16 @@ const parseServerTimestampMs = (raw: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const hasReportedLock = (raw: any): boolean => {
+  if (typeof raw?.lockReported === 'boolean') return raw.lockReported;
+  let payload = raw;
+  if (raw?.raw_payload != null) {
+    try { payload = typeof raw.raw_payload === 'string' ? JSON.parse(raw.raw_payload) : raw.raw_payload; }
+    catch { return false; }
+  }
+  return firstDefined(payload?.locked, payload?.lock, payload?.reed, payload?.reed_switch) != null;
+};
+
 const normalizeTelemetrySnapshot = (raw: any): TelemetrySnapshot | null => {
   if (!raw || typeof raw !== 'object') return null;
   const timestamp = typeof raw.timestamp === 'string' && raw.timestamp
@@ -193,6 +206,7 @@ const normalizeTelemetrySnapshot = (raw: any): TelemetrySnapshot | null => {
     wls2: asBool(firstDefined(raw.wls2, raw.WLS2)),
     floatAlarm: asBool(firstDefined(raw.floatAlarm, raw.float_alarm, raw.float)),
     locked: asBool(firstDefined(raw.locked, raw.lock, raw.reed, raw.reed_switch)),
+    lockReported: hasReportedLock(raw),
     pump1On: asBool(firstDefined(raw.pump1On, raw.pump1_on)),
     pump2On: asBool(firstDefined(raw.pump2On, raw.pump2_on)),
     greenOn: asBool(firstDefined(raw.greenOn, raw.green_on)),
@@ -253,6 +267,14 @@ const recordSortKey = (item: any) => {
   return 0;
 };
 
+const interlockKey = (deviceId: string) => `greencrop_emergency:${getSessionAuth().tenantId}:${deviceId}`;
+const readInterlock = (deviceId: string): EmergencyInterlock | null => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(interlockKey(deviceId)) || 'null');
+    return raw && Number.isFinite(raw.requestedAt) ? raw : null;
+  } catch { return null; }
+};
+
 export function MachineProvider({ children }: { children: ReactNode }) {
   const [isOn, setIsOn] = useState(false);
   const [uptimeBaseSeconds, setUptimeBaseSeconds] = useState(0);
@@ -286,6 +308,27 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   const [mqttStatus, setMqttStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   const [isSendingControl, setIsSendingControl] = useState(false);
   const [activeDeviceId, setActiveDeviceId] = useState(getActiveDeviceId);
+
+  const interlockRef = useRef<EmergencyInterlock | null>(readInterlock(activeDeviceId));
+  const [emergencyStopActive, setEmergencyStopActive] = useState(Boolean(interlockRef.current));
+  const saveInterlock = useCallback((value: EmergencyInterlock | null, deviceId = getActiveDeviceId()) => {
+    interlockRef.current = value;
+    setEmergencyStopActive(Boolean(value));
+    try {
+      const key = `greencrop_emergency:${getSessionAuth().tenantId}:${deviceId}`;
+      if (value) localStorage.setItem(key, JSON.stringify(value));
+      else localStorage.removeItem(key);
+    } catch { /* The in-memory lock still applies when storage is unavailable. */ }
+  }, []);
+  const acceptInterlockSample = useCallback((snapshot: TelemetrySnapshot) => {
+    if (snapshot.deviceId !== getActiveDeviceId()) return;
+    const timestamp = Date.parse(snapshot.timestamp);
+    if (Date.now() - timestamp > BOARD_TELEMETRY_STALE_MS) return;
+    const next = updateEmergencyInterlock(interlockRef.current, {
+      locked: snapshot.locked, timestamp, lockReported: snapshot.lockReported === true,
+    });
+    if (JSON.stringify(next) !== JSON.stringify(interlockRef.current)) saveInterlock(next);
+  }, [saveInterlock]);
 
   const uptimeBaseRef = useRef(0);
   const uptimeSyncedAtRef = useRef<number | null>(null);
@@ -344,6 +387,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const applyTelemetrySnapshot = useCallback((snapshot: TelemetrySnapshot) => {
+    acceptInterlockSample(snapshot);
     setPhValue(snapshot.phValue);
     setEcValue(snapshot.ecValue);
     setTempValue(snapshot.tempValue);
@@ -361,7 +405,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     setActiveTank(snapshot.wls2 ? 2 : snapshot.wls1 ? 1 : null);
     setLastTelemetryAt(snapshot.timestamp);
     persistTelemetrySnapshot(snapshot);
-  }, [persistTelemetrySnapshot]);
+  }, [persistTelemetrySnapshot, acceptInterlockSample]);
 
   useEffect(() => {
     uptimeBaseRef.current = uptimeBaseSeconds;
@@ -469,6 +513,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         wls2: asBool(firstDefined(latest.wls2, latest.WLS2)),
         floatAlarm: asBool(firstDefined(latest.float_alarm, latest.floatAlarm, latest.float)),
         locked: asBool(firstDefined(latest.locked, latest.lock, latest.reed, latest.reed_switch)),
+        lockReported: hasReportedLock(latest),
         pump1On: asBool(firstDefined(latest.pump1_on, latest.pump1On)),
         pump2On: asBool(firstDefined(latest.pump2_on, latest.pump2On)),
         greenOn: asBool(firstDefined(latest.green_on, latest.greenOn)),
@@ -488,6 +533,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       setWls2(carriedSnapshot.wls2);
       setFloatAlarm(carriedSnapshot.floatAlarm);
       setLocked(carriedSnapshot.locked);
+      acceptInterlockSample(latestSnapshot);
       setPump1On(carriedSnapshot.pump1On);
       setPump2On(carriedSnapshot.pump2On);
       setGreenOn(carriedSnapshot.greenOn);
@@ -577,7 +623,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('API Polling Error:', err);
     }
-  }, [pendingResetUntilMs, ignoreApiStateUntilMs, pendingIsOnAck, isOn, lastLocalCommandAtMs, getCurrentUptimeSeconds, carryTelemetrySnapshot, persistTelemetrySnapshot, persistTelemetrySnapshots]);
+  }, [pendingResetUntilMs, ignoreApiStateUntilMs, pendingIsOnAck, isOn, lastLocalCommandAtMs, getCurrentUptimeSeconds, carryTelemetrySnapshot, persistTelemetrySnapshot, persistTelemetrySnapshots, acceptInterlockSample]);
 
   const fetchApiHistory = useCallback(async () => {
     const { tenantId, token } = getSessionAuth();
@@ -642,11 +688,11 @@ export function MachineProvider({ children }: { children: ReactNode }) {
     };
   }, [activeDeviceId, telemetryHistory]);
 
-  const syncAfterCommand = async () => {
+  const syncAfterCommand = useCallback(async () => {
     await fetchApiData();
     await new Promise((resolve) => setTimeout(resolve, 40));
     await fetchApiData();
-  };
+  }, [fetchApiData]);
 
   const postMachineState = async (nextIsOn: boolean, nextUptimeSeconds: number) => {
     const { tenantId, token } = getSessionAuth();
@@ -690,6 +736,9 @@ export function MachineProvider({ children }: { children: ReactNode }) {
 	    const handleActiveDeviceChange = () => {
 	      const nextDeviceId = getActiveDeviceId();
 	      setActiveDeviceId(nextDeviceId);
+      const nextInterlock = readInterlock(nextDeviceId);
+      interlockRef.current = nextInterlock;
+      setEmergencyStopActive(Boolean(nextInterlock));
 	      setIsOn(false);
 	      setUptimeBaseSeconds(0);
 	      setUptimeSyncedAtMs(null);
@@ -755,6 +804,10 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   }, [activeDeviceId, fetchApiData, fetchApiHistory]);
 
   const publishCommand = useCallback(async (command: string, pump?: number, state?: 'ON' | 'OFF') => {
+    if (command.toUpperCase() !== 'STOP' && (interlockRef.current || locked)) {
+      toast.error('Emergency lock active', { description: 'Release Emergency Stop and press Reset at the cabinet first.' });
+      return false;
+    }
     if (mqttStatus !== 'connected') {
       toast.error('Command Failed', {
         description: 'The secure MQTT gateway is not connected, so the board did not receive the command.',
@@ -801,6 +854,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       const prepared = await prepareResponse.json();
       if (!prepareResponse.ok) throw new Error(prepared?.error || 'Could not prepare command');
 
+      if (command.toUpperCase() !== 'STOP' && (interlockRef.current || locked)) return false;
       const executeResponse = await fetch(`${API_BASE_URL}/ai/voice/tools/control/execute`, {
         method: 'POST',
         headers,
@@ -818,10 +872,10 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       toast.error('Command Failed', { description: error instanceof Error ? error.message : 'Secure gateway error' });
       return false;
     }
-  }, [mqttStatus]);
+  }, [mqttStatus, locked]);
 
   const resetUptime = async () => {
-    if (isSendingControl) return;
+    if (isSendingControl || interlockRef.current || locked) return;
     const nowMs = Date.now();
     setIsSendingControl(true);
     setLastLocalCommandAtMs(nowMs);
@@ -846,7 +900,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleMachine = async () => {
-    if (isSendingControl) return;
+    if (isSendingControl || interlockRef.current || locked) return;
 
     const newState = !isOn;
     const nowMs = Date.now();
@@ -884,7 +938,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   };
 
   const togglePump = async (pumpIndex: number) => {
-    if (isSendingControl) return;
+    if (isSendingControl || interlockRef.current || locked) return;
     if (pumpIndex < 0 || pumpIndex > 1) return;
 
     const nextPumpState = !pumps[pumpIndex];
@@ -918,7 +972,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
   };
 
   const sendStartCommand = useCallback(async () => {
-    if (isSendingControl) return;
+    if (isSendingControl || interlockRef.current || locked) return;
     setIsSendingControl(true);
     setLastLocalCommandAtMs(Date.now());
     const published = await publishCommand('START', 2, 'ON');
@@ -929,24 +983,31 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       });
     }
     setIsSendingControl(false);
-  }, [isSendingControl, publishCommand]);
+  }, [isSendingControl, publishCommand, locked, syncAfterCommand]);
 
+  const emergencySendingRef = useRef(false);
   const sendEmergencyStop = useCallback(async () => {
-    if (isSendingControl) return;
+    if (emergencySendingRef.current) return;
+    emergencySendingRef.current = true;
+    saveInterlock({ requestedAt: Date.now(), confirmedAt: null });
     setIsSendingControl(true);
     setLastLocalCommandAtMs(Date.now());
-    const published = await publishCommand('STOP', 2, 'OFF');
-    if (published) {
-      await syncAfterCommand();
-      toast.success('Emergency STOP sent', {
-        description: 'The board should stop all outputs and enter lock mode.',
-      });
+    try {
+      const published = await publishCommand('STOP', 2, 'OFF');
+      if (published) {
+        toast.info('Emergency STOP requested', {
+          description: 'Web controls are locked. Waiting for the board to confirm the stop.',
+        });
+        await syncAfterCommand();
+      }
+    } finally {
+      emergencySendingRef.current = false;
+      setIsSendingControl(false);
     }
-    setIsSendingControl(false);
-  }, [isSendingControl, publishCommand]);
+  }, [publishCommand, saveInterlock, syncAfterCommand]);
 
   const stopPump2FromWeb = useCallback(async () => {
-    if (isSendingControl) return;
+    if (isSendingControl || interlockRef.current || locked) return;
     setIsSendingControl(true);
     setLastLocalCommandAtMs(Date.now());
     const published = await publishCommand('PUMP2_OFF', 2, 'OFF');
@@ -958,7 +1019,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
       });
     }
     setIsSendingControl(false);
-  }, [isSendingControl, publishCommand]);
+  }, [isSendingControl, publishCommand, locked, syncAfterCommand]);
 
   return (
     <MachineContext.Provider
@@ -979,6 +1040,7 @@ export function MachineProvider({ children }: { children: ReactNode }) {
         phValue,
         tempValue,
         locked,
+        emergencyStopActive,
         wls1,
         wls2,
         floatAlarm,
