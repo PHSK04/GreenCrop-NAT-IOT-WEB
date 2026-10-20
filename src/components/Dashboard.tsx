@@ -27,7 +27,6 @@ import { DeviceMonitorPage } from "./pages/DeviceMonitorPage";
 import { FarmSettingsPage } from "./pages/FarmSettingsPage";
 import { WeatherDataPage } from "./pages/WeatherDataPage";
 import { SensorIntelligencePage } from "@/features/ai/pages/SensorIntelligencePage";
-import { MachinePerformancePage } from "./pages/MachinePerformancePage";
 import { WolffiaAnalyticsPage } from "./pages/WolffiaAnalyticsPage";
 import { MaintenancePage } from "./pages/MaintenancePage";
 import { MyProfilePage } from "./pages/MyProfilePage";
@@ -58,7 +57,6 @@ const mainNavItems = [
 
 const insightItems = [
   { icon: Sun, label: "Weather Data" },
-  { icon: Activity, label: "Machine Performance" },
 ];
 
 const analyticsItems = [
@@ -506,8 +504,6 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
         );
       case "Weather Data":
         return <WeatherDataPage language={language} />;
-      case "Machine Performance":
-        return <MachinePerformancePage language={language} />;
       case "Wolffia Analytics":
         return <WolffiaAnalyticsPage language={language} />;
       case "Maintenance":
