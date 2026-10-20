@@ -5,13 +5,12 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
-import { Download, Eye, Calendar, Filter, FileText, Share2, Sprout, Droplets, Zap, Plus, Trash2, Thermometer } from "lucide-react";
+import { Download, Eye, Calendar, FileText, Share2, Sprout, Droplets, Zap, Plus, Trash2, Thermometer } from "lucide-react";
 import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
 import { MinimalDatePicker } from "../ui/minimal-date-picker";
-import { MinimalMonthPicker } from "../ui/minimal-month-picker";
 import { MinimalTimePicker } from "../ui/minimal-time-picker";
 import {
   createMyCropYieldEntry,
@@ -219,7 +218,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   return (
     <>
       <header className="animate-in border-b border-white/80 bg-white/90 px-4 py-5 shadow-[0_12px_35px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl fade-in slide-in-from-bottom-2 duration-700 motion-reduce:animate-none md:px-8">
-        <div className="flex w-full items-center justify-between">
+        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between">
           <div>
             <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900">
               <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-50 to-lime-50 text-emerald-600 shadow-sm"><Sprout className="h-6 w-6" /></span>
@@ -234,19 +233,26 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               </Badge>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <Button variant="outline" size="sm" className="gap-2 border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground">
-              <Filter className="w-4 h-4" />
-              {isTH ? "ตัวกรอง" : "Filters"}
-            </Button>
-          </div>
+
         </div>
       </header>
 
       <main className="page-solid-cards flex-1 overflow-auto bg-[#f2f5f3] p-4 dark:bg-slate-950 md:p-6">
-        <div className="w-full">
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 motion-reduce:animate-none">
-          <Card className="mb-6 rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
+        <div className="mx-auto w-full max-w-[1440px] space-y-5">
+        <div className="grid gap-3 sm:grid-cols-3 md:gap-4">
+          {[
+            { label: isTH ? "จำนวนวันที่บันทึก" : "Days Recorded", value: reportSummary.days, unit: "", icon: Calendar },
+            { label: isTH ? "ผลผลิตรวม" : "Total Yield", value: reportSummary.totalYield, unit: "g", icon: Sprout },
+            { label: isTH ? "ค่า pH เฉลี่ย" : "Average pH", value: reportSummary.avgPh, unit: "pH", icon: Droplets },
+          ].map(({ label, value, unit, icon: Icon }) => <Card key={label} className="rounded-2xl border-border/70 bg-card">
+            <CardContent className="flex items-center justify-between gap-4 p-5">
+              <div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold tabular-nums">{value}<span className="ml-2 text-sm font-normal text-muted-foreground">{unit}</span></p></div>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40"><Icon className="h-5 w-5" /></span>
+            </CardContent>
+          </Card>)}
+        </div>
+        <div className="[&>div:last-child]:mb-0 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 motion-reduce:animate-none">
+          <Card className="mb-5 rounded-2xl border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Plus className="h-5 w-5 text-emerald-500" />
@@ -259,12 +265,13 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-8">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 [&_input]:h-10 [&_input]:rounded-xl [&_p]:min-h-5">
                 <div>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "วันที่เก็บ" : "Date"}</p>
                   <MinimalDatePicker
                     value={form.date}
                     onChange={(value) => setForm((prev) => ({ ...prev, date: value }))}
+                    className="[&_button]:rounded-xl"
                     ariaLabel={isTH ? "เลือกวันที่เก็บ" : "Select harvest date"}
                     locale={isTH ? "TH" : "EN"}
                   />
@@ -274,6 +281,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                   <MinimalTimePicker
                     value={form.time}
                     onChange={(value) => setForm((prev) => ({ ...prev, time: value }))}
+                    className="[&_button]:rounded-xl"
                     ariaLabel={isTH ? "เลือกเวลาเก็บ" : "Select harvest time"}
                     locale={isTH ? "TH" : "EN"}
                   />
@@ -310,19 +318,16 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                   </p>
                   <Input type="number" step="0.1" value={form.temp} readOnly className="bg-muted/40" />
                 </div>
-                <div className="flex items-end">
-                  <Button className="w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700" onClick={handleSaveManualEntry}>
-                    <Plus className="h-4 w-4" />
-                    {isTH ? "บันทึก" : "Save"}
-                  </Button>
-                </div>
               </div>
-              <div className="mt-3">
+              <div className="mt-4 flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center">
                 <Input
+                  className="h-10 min-w-0 flex-1 rounded-xl"
+                  aria-label={isTH ? "หมายเหตุ" : "Note"}
                   value={form.note}
                   onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
                   placeholder={isTH ? "หมายเหตุ เช่น รอบเช้า / บ่อ A / คุณภาพดี" : "Note, e.g. morning batch / pond A / good quality"}
                 />
+                <Button className="h-10 shrink-0 gap-2 rounded-xl bg-emerald-600 px-6 text-white hover:bg-emerald-700" onClick={handleSaveManualEntry}><Plus className="h-4 w-4" />{isTH ? "บันทึกผลผลิต" : "Save harvest"}</Button>
               </div>
             </CardContent>
           </Card>
@@ -368,115 +373,21 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="animate-in rounded-2xl border border-white/80 bg-gradient-to-br from-white to-slate-50 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5 !opacity-100 fade-in slide-in-from-bottom-6 duration-700 delay-150 motion-reduce:animate-none">
-            <CardContent className="p-6 text-center">
-              <div className="text-3xl font-bold text-foreground mb-1">{reportSummary.days}</div>
-              <div className="text-sm text-muted-foreground">{isTH ? "จำนวนวันที่บันทึก" : "Days Recorded"}</div>
-            </CardContent>
-          </Card>
-          <Card className="animate-in rounded-2xl border border-white/80 bg-gradient-to-br from-white to-emerald-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5 !opacity-100 fade-in slide-in-from-bottom-6 duration-700 delay-200 motion-reduce:animate-none">
-            <CardContent className="p-6 text-center">
-              <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">{reportSummary.totalYield} g</div>
-              <div className="text-sm text-muted-foreground">{isTH ? "ผลผลิตรวม" : "Total Yield"}</div>
-            </CardContent>
-          </Card>
-          <Card className="animate-in rounded-2xl border border-white/80 bg-gradient-to-br from-white to-blue-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5 !opacity-100 fade-in slide-in-from-bottom-6 duration-700 delay-250 motion-reduce:animate-none">
-            <CardContent className="p-6 text-center">
-              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">{reportSummary.avgPh}</div>
-              <div className="text-sm text-muted-foreground">{isTH ? "ค่า pH เฉลี่ย" : "Avg pH Level"}</div>
-            </CardContent>
-          </Card>
-
-        </div>
 
         <Card className="animate-in rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100 fade-in slide-in-from-bottom-8 duration-700 delay-350 motion-reduce:animate-none">
           <CardHeader>
-            <CardTitle className="text-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="text-base text-foreground">
               {isTH ? "รายงานผลผลิตและคุณภาพรายวัน" : "Daily Harvest & Quality Report"}
-            </CardTitle>
+            </CardTitle><Badge variant="secondary" className="text-xs">{resultSummary}</Badge></div>
             <CardDescription className="text-muted-foreground">
               {isTH ? "สรุปผลผลิตรายวัน ค่า pH และค่าการนำไฟฟ้า" : "Breakdown of daily yield, pH and conductivity levels"}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-              <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    {isTH ? "ค้นหาข้อมูลย้อนหลัง" : "Historical Search"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {isTH ? "เลือกวัน เดือน ปี และเวลาเพื่อกรองรายการในตารางนี้" : "Filter this table by month, date, and time."}
-                  </p>
-                </div>
-                <Badge variant="outline" className="w-fit border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
-                  {resultSummary}
-                </Badge>
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "เดือน/ปี" : "Month / Year"}</p>
-                  <MinimalMonthPicker
-                    value={selectedMonth}
-                    onChange={setSelectedMonth}
-                    ariaLabel={isTH ? "เลือกเดือนที่ต้องการค้นหา" : "Select search month"}
-                    locale={isTH ? "TH" : "EN"}
-                  />
-                </div>
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "วันที่เริ่มต้น" : "Start Date"}</p>
-                  <MinimalDatePicker
-                    value={startDate}
-                    onChange={setStartDate}
-                    ariaLabel={isTH ? "เลือกวันที่เริ่มต้น" : "Select start date"}
-                    locale={isTH ? "TH" : "EN"}
-                  />
-                </div>
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "วันที่สิ้นสุด" : "End Date"}</p>
-                  <MinimalDatePicker
-                    value={endDate}
-                    onChange={setEndDate}
-                    ariaLabel={isTH ? "เลือกวันที่สิ้นสุด" : "Select end date"}
-                    locale={isTH ? "TH" : "EN"}
-                  />
-                </div>
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "เวลาเริ่มต้น" : "Start Time"}</p>
-                  <MinimalTimePicker
-                    value={startTime}
-                    onChange={setStartTime}
-                    ariaLabel={isTH ? "เลือกเวลาเริ่มต้น" : "Select start time"}
-                    locale={isTH ? "TH" : "EN"}
-                  />
-                </div>
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">{isTH ? "เวลาสิ้นสุด" : "End Time"}</p>
-                  <div className="flex gap-2">
-                    <MinimalTimePicker
-                      value={endTime}
-                      onChange={setEndTime}
-                      ariaLabel={isTH ? "เลือกเวลาสิ้นสุด" : "Select end time"}
-                      locale={isTH ? "TH" : "EN"}
-                      className="min-w-0 flex-1"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-10 shrink-0 border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
-                      onClick={handleClearHistoryFilters}
-                    >
-                      {isTH ? "ล้าง" : "Clear"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-muted/50">
-                  <TableHead className="font-semibold text-muted-foreground w-[180px]">{isTH ? "วันที่" : "Date"}</TableHead>
+                  <TableHead className="font-semibold text-muted-foreground w-[180px] whitespace-nowrap">{isTH ? "วันที่" : "Date"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "เวลา" : "Time"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "ผลผลิต (กรัม)" : "Yield (g)"}</TableHead>
                   <TableHead className="font-semibold text-muted-foreground">{isTH ? "ค่า pH" : "pH Level"}</TableHead>
@@ -557,7 +468,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                 ))}
                 {filteredReportData.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                       {deviceReportData.length === 0
                         ? (isTH ? "ยังไม่มีข้อมูล กรุณากรอกผลผลิตด้านบน" : "No entries yet. Add a harvest entry above.")
                         : (isTH ? "ไม่มีข้อมูลที่บันทึก" : "No saved data for this filter.")}
