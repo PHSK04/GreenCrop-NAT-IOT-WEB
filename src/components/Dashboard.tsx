@@ -190,9 +190,8 @@ function SidebarContent({
       <button key={item.label} type="button" onClick={() => handleNavClick(item.label)}
         aria-label={translatedLabel} aria-current={isActive ? "page" : undefined}
         title={compact ? translatedLabel : undefined}
-        className={`group relative flex items-center rounded-xl text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${compact ? "mx-auto h-10 w-10 justify-center" : "w-full gap-3 px-3 py-2.5"} ${isActive ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"}`}>
-        {isActive && <span className="absolute -left-2 h-5 w-0.5 rounded-full bg-emerald-600" />}
-        <Icon className="h-[19px] w-[19px] shrink-0" />
+        className={`group relative flex shrink-0 items-center text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${compact ? "mx-auto h-12 w-12 justify-center rounded-full" : "w-full gap-3 rounded-xl px-3 py-2.5"} ${isActive ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700" : compact ? "border border-slate-100 bg-white text-slate-600 shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"}`}>
+        <Icon className={`${compact ? "h-[22px] w-[22px]" : "h-4 w-4"} shrink-0`} />
         {!compact && <span className="truncate">{translatedLabel}</span>}
       </button>
     );
@@ -200,7 +199,7 @@ function SidebarContent({
 
   return (
     <div
-      className={`flex flex-col transition-[width,border-radius] duration-300 ${compact ? `pointer-events-auto mx-auto my-3 h-[calc(100%_-_1.5rem)] overflow-hidden border border-slate-200/70 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${isCompactHovered ? "w-56 rounded-[24px]" : "w-[68px] rounded-2xl"}` : "h-full border-r border-border/70 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/92"}`}
+      className={`flex flex-col transition-[width,border-radius] duration-300 ${compact ? `pointer-events-auto mx-auto my-3 h-[calc(100%_-_1.5rem)] overflow-hidden border border-slate-200/70 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${isCompactHovered ? "w-56 rounded-[24px]" : "w-20 rounded-[36px]"}` : "h-full border-r border-border/70 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/92"}`}
     >
       <div 
         className={`cursor-pointer transition-colors ${compact ? "flex w-full shrink-0 items-center border-b border-border/60 px-2 py-3" : "flex min-h-[102px] items-center border-b border-border/60 px-5 hover:bg-muted/35 dark:border-slate-800"}`}
@@ -278,33 +277,33 @@ function SidebarContent({
       )}
 
       {/* Navigation */}
-      <nav className={`min-h-0 ${compact ? `flex w-full flex-1 flex-col border-y border-slate-200/55 px-2 py-3 dark:border-slate-700/60 justify-start space-y-4 overflow-y-auto overscroll-contain` : "flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-5"}`}>
+      <nav className={`min-h-0 ${compact ? `flex w-full flex-1 flex-col border-y border-slate-200/55 px-2 py-3 dark:border-slate-700/60 items-center justify-start gap-3 overflow-y-auto overscroll-contain` : "flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-5"}`}>
         {!isAdmin && (
           <>
-            <div className="space-y-1">
+            <div className={compact ? "mt-auto w-full shrink-0 space-y-2" : "space-y-1"}>
               {(!compact || isCompactHovered) && <h3 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">{t["Control Center"]}</h3>}
             {mainNavItems
               .filter((item) => !(isAdmin && item.label === "Device Pairing"))
               .map((item) => renderNavItem(item, activePage === item.label))}
             </div>
 
-            <div className="space-y-1">
+            <div className={compact ? "w-full shrink-0 border-t border-border/70 pt-3" : "space-y-1"}>
               {(!compact || isCompactHovered) && <h3 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">{t["Field Insights"]}</h3>}
-              <div className="space-y-1">
+              <div className={compact ? "space-y-2" : "space-y-1"}>
                 {insightItems.map((item) => renderNavItem(item, activePage === item.label))}
               </div>
             </div>
 
-            <div className="space-y-1">
+            <div className={compact ? "w-full shrink-0 border-t border-border/70 pt-3" : "space-y-1"}>
               {(!compact || isCompactHovered) && <h3 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">{t["Resources"]}</h3>}
-              <div className="space-y-1">
+              <div className={compact ? "space-y-2" : "space-y-1"}>
                 {analyticsItems.map((item) => renderNavItem(item, activePage === item.label))}
               </div>
             </div>
 
-            <div className="space-y-1">
+            <div className={compact ? "mb-auto w-full shrink-0 border-t border-border/70 pt-3" : "space-y-1"}>
               {(!compact || isCompactHovered) && <h3 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">{t["System"]}</h3>}
-              <div className="space-y-1">
+              <div className={compact ? "space-y-2" : "space-y-1"}>
                 {otherItems.map((item) => renderNavItem(item, activePage === item.label))}
               </div>
             </div>
