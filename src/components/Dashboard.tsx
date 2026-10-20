@@ -190,7 +190,7 @@ function SidebarContent({
       <button key={item.label} type="button" onClick={() => handleNavClick(item.label)}
         aria-label={translatedLabel} aria-current={isActive ? "page" : undefined}
         title={compact ? translatedLabel : undefined}
-        className={`group relative flex shrink-0 items-center text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${compact ? "mx-auto h-12 w-12 justify-center rounded-full" : "w-full gap-3 rounded-xl px-3 py-2.5"} ${isActive ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700" : compact ? "border border-slate-100 bg-white text-slate-600 shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"}`}>
+        className={`sidebar-item group relative flex shrink-0 items-center text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${compact ? "mx-auto h-12 w-12 justify-center rounded-full" : "w-full gap-3 rounded-xl px-3 py-2.5"} ${isActive ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700" : compact ? "border border-slate-100 bg-white text-slate-600 shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"}`}>
         <Icon className={`${compact ? "h-[22px] w-[22px]" : "h-4 w-4"} shrink-0`} />
         {!compact && <span className="truncate">{translatedLabel}</span>}
       </button>
@@ -199,7 +199,7 @@ function SidebarContent({
 
   return (
     <div
-      className={`flex flex-col transition-[width,border-radius] duration-300 ${compact ? `pointer-events-auto mx-auto my-3 h-[calc(100%_-_1.5rem)] overflow-hidden border border-slate-200/70 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${isCompactHovered ? "w-56 rounded-[24px]" : "w-20 rounded-[36px]"}` : "h-full border-r border-border/70 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/92"}`}
+      className={`sidebar-rail flex flex-col transition-[width,border-radius] duration-300 ${compact ? `pointer-events-auto mx-auto my-3 h-[calc(100%_-_1.5rem)] overflow-hidden border border-slate-200/70 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${isCompactHovered ? "w-56 rounded-[24px]" : "w-20 rounded-[36px]"}` : "h-full border-r border-border/70 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/92"}`}
     >
       <div 
         className={`cursor-pointer transition-colors ${compact ? "flex w-full shrink-0 items-center border-b border-border/60 px-2 py-3" : "flex min-h-[102px] items-center border-b border-border/60 px-5 hover:bg-muted/35 dark:border-slate-800"}`}
@@ -516,7 +516,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
   };
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-background font-sans text-foreground transition-colors duration-300 selection:bg-primary/30">
+    <div className="greencrop-workspace flex h-[100dvh] overflow-hidden bg-background font-sans text-foreground transition-colors duration-300 selection:bg-primary/30">
       {/* Desktop Sidebar */}
       <div className={`z-50 hidden h-full transition-[width] duration-300 lg:block ${
         isDesktopSidebarCompact

@@ -400,3 +400,77 @@ body {
     animation: none;
   }
 }
+
+
+/* Depth stays inside the workspace; landing and authentication keep their design. */
+.greencrop-workspace {
+  background: #edf3f0;
+}
+.greencrop-workspace main {
+  background-image: radial-gradient(ellipse at 12% 0%, rgba(16, 185, 129, .055), transparent 55%);
+}
+.greencrop-workspace [data-slot="card"] {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9),
+    0 2px 4px rgba(24, 52, 41, .025), 0 12px 28px -18px rgba(24, 52, 41, .22);
+  transition: box-shadow 180ms ease, border-color 180ms ease;
+}
+.greencrop-workspace .machine-control-panel {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .95),
+    0 3px 7px rgba(6, 78, 59, .05), 0 20px 42px -22px rgba(6, 78, 59, .28);
+}
+.greencrop-workspace .sidebar-rail {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .95),
+    0 4px 8px rgba(24, 52, 41, .025), 0 16px 32px -18px rgba(24, 52, 41, .22);
+}
+.greencrop-workspace .sidebar-item,
+.greencrop-workspace .machine-action,
+.greencrop-workspace [data-slot="button"],
+.greencrop-workspace [data-control-mode] button {
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease,
+    border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+.greencrop-workspace .machine-action:not(:disabled) {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .14), transparent 70%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35),
+    0 3px 0 rgba(15, 23, 42, .13), 0 8px 14px -9px rgba(15, 23, 42, .3);
+}
+.greencrop-workspace [data-control-mode] button[aria-pressed="true"]:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 3px 8px -4px rgba(6, 78, 59, .28);
+}
+.greencrop-workspace .sidebar-item[aria-current="page"] {
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, .16), transparent 75%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 5px 12px -5px rgba(5, 150, 105, .5);
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .greencrop-workspace .sidebar-item:not(:disabled):hover,
+  .greencrop-workspace .machine-action:not(:disabled):hover,
+  .greencrop-workspace [data-slot="button"]:not(:disabled):hover,
+  .greencrop-workspace [data-control-mode] button:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+}
+.greencrop-workspace .sidebar-item:not(:disabled):active,
+.greencrop-workspace .machine-action:not(:disabled):active,
+.greencrop-workspace [data-slot="button"]:not(:disabled):active,
+.greencrop-workspace [data-control-mode] button:not(:disabled):active {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(15, 23, 42, .12);
+}
+.greencrop-workspace .machine-action:disabled {
+  background-image: none;
+  transform: none;
+}
+.dark .greencrop-workspace { background: #020617; }
+.dark .greencrop-workspace [data-slot="card"],
+.dark .greencrop-workspace .sidebar-rail {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 10px 26px -16px rgba(0, 0, 0, .5);
+}
+@media (prefers-reduced-motion: reduce) {
+  .greencrop-workspace .sidebar-item,
+  .greencrop-workspace .machine-action,
+  .greencrop-workspace [data-slot="button"],
+  .greencrop-workspace [data-control-mode] button {
+    transition: none;
+    transform: none !important;
+  }
+}

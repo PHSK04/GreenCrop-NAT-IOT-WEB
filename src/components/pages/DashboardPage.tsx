@@ -500,7 +500,7 @@ export function DashboardPage({
                     : "After stopping, this alert closes and sends stop plus alarm acknowledgement to the cabinet."}
                 </p>
                 <div className="mx-auto mt-6 max-w-sm"><div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/50 p-1" role="group" aria-label={language === "TH" ? "โหมดควบคุมบนเว็บ" : "Web control mode"}>
+                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/50 p-1" data-control-mode role="group" aria-label={language === "TH" ? "โหมดควบคุมบนเว็บ" : "Web control mode"}>
                     {(["auto", "manual"] as const).map((mode) => (
                       <Button key={mode} type="button" variant={controlMode === mode ? "default" : "ghost"} disabled={emergencyLocked} aria-pressed={controlMode === mode} onClick={() => setControlMode(mode)}>
                         {mode === "auto" ? "Auto" : "Manual"}
@@ -772,8 +772,8 @@ export function DashboardPage({
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 overflow-auto bg-[#dfe5ec] p-3 dark:bg-slate-950 md:p-5">
-        <div className="w-full rounded-[30px] border border-white/80 bg-[#edf1f5] p-3 shadow-[0_30px_90px_-52px_rgba(15,23,42,0.55)] dark:border-slate-800 dark:bg-slate-900/55 md:p-4">
+      <main className="relative z-10 flex-1 overflow-auto bg-[#edf3f0] p-3 dark:bg-slate-950 md:p-5">
+        <div className="w-full rounded-[30px] border border-white/80 bg-[#f4f7f5] p-3 shadow-[0_30px_90px_-52px_rgba(15,23,42,0.55)] dark:border-slate-800 dark:bg-slate-900/55 md:p-4">
 
         <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
           {[
@@ -817,7 +817,7 @@ export function DashboardPage({
 
           {/* Right Column: Controls and live readings */}
           <div className="xl:col-span-4">
-            <Card className={`h-full rounded-[26px] border-2 bg-white shadow-xl ${emergencyLocked ? "border-red-500 shadow-red-950/10" : "border-emerald-500/50 shadow-emerald-950/10"}`}>
+            <Card className={`machine-control-panel h-full rounded-[26px] border-2 bg-white shadow-xl ${emergencyLocked ? "border-red-500 shadow-red-950/10" : "border-emerald-500/50 shadow-emerald-950/10"}`}>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between text-slate-900">
                   <span className="flex items-center gap-2 text-xl"><Power className="h-6 w-6 text-emerald-600" />{t.masterControl}</span>
@@ -835,7 +835,7 @@ export function DashboardPage({
                         ? (language === "TH" ? "ปุ่มควบคุมทั้งหมดปิดอยู่" : "All control buttons are disabled")
                         : (language === "TH" ? "พร้อมรับคำสั่ง · กดปุ่มควบคุมได้ทั้งหมด" : "All control buttons are enabled")}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3" role="group" aria-label={language === "TH" ? "โหมดควบคุมบนเว็บ" : "Web control mode"}>
+                  <div className="grid grid-cols-2 gap-3" data-control-mode role="group" aria-label={language === "TH" ? "โหมดควบคุมบนเว็บ" : "Web control mode"}>
                     {(["auto", "manual"] as const).map((mode) => {
                       const selected = controlMode === mode;
                       return <button key={mode} type="button" disabled={emergencyLocked} aria-pressed={selected} onClick={() => setControlMode(mode)}
