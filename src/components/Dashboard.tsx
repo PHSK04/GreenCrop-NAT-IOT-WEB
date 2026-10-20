@@ -10,8 +10,8 @@ import {
   Settings,
   LogOut,
   Scale,
-  Zap,
-  Wrench,
+  // Zap, // Used by the temporarily hidden Sensor Intelligence page.
+  // Wrench, // Used by the temporarily hidden Maintenance page.
   Menu,
   Shield,
   PanelLeftClose,
@@ -26,9 +26,9 @@ import { CropReportsPage } from "./pages/CropReportsPage";
 import { DeviceMonitorPage } from "./pages/DeviceMonitorPage";
 import { FarmSettingsPage } from "./pages/FarmSettingsPage";
 import { WeatherDataPage } from "./pages/WeatherDataPage";
-import { SensorIntelligencePage } from "@/features/ai/pages/SensorIntelligencePage";
+// import { SensorIntelligencePage } from "@/features/ai/pages/SensorIntelligencePage";
 import { WolffiaAnalyticsPage } from "./pages/WolffiaAnalyticsPage";
-import { MaintenancePage } from "./pages/MaintenancePage";
+// import { MaintenancePage } from "./pages/MaintenancePage";
 import { MyProfilePage } from "./pages/MyProfilePage";
 import { TankLevelsPage } from "./pages/TankLevelsPage";
 import { DevicePairingPage } from "./pages/DevicePairingPage";
@@ -50,7 +50,7 @@ const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
   { icon: Activity, label: "Device Monitor" },
   { icon: Droplets, label: "Tank Levels" }, 
-  { icon: Zap, label: "Sensor Intelligence" },
+  // { icon: Zap, label: "Sensor Intelligence" }, // Temporarily hidden; page code retained.
   { icon: Settings, label: "Farm Settings" },
   { icon: Cpu, label: "Device Pairing" },
 ];
@@ -65,7 +65,7 @@ const analyticsItems = [
 ];
 
 const otherItems = [
-  { icon: Wrench, label: "Maintenance" },
+  // { icon: Wrench, label: "Maintenance" }, // Temporarily hidden; page code retained.
   { icon: Headset, label: "Help Center" },
   { icon: User, label: "My Profile" },
 ];
@@ -186,43 +186,24 @@ function SidebarContent({
   const renderNavItem = (item: any, isActive: boolean) => {
     const Icon = item.icon;
     const translatedLabel = t[item.label] || item.label;
-    const navButton = (
-      <button
-        onClick={() => handleNavClick(item.label)}
-        aria-label={translatedLabel}
-        className={`
-          group flex items-center text-[13px] font-medium transition-all duration-150
-          ${compact
-            ? `mx-auto h-11 ${isCompactHovered ? "w-[200px] justify-start gap-3 rounded-xl px-4" : "w-11 justify-center rounded-full px-0"}`
-            : "w-full gap-3 rounded-2xl px-3 py-2.5"}
-          ${isActive
-            ? compact
-              ? "!bg-emerald-600 text-white !text-white shadow-[0_10px_24px_-12px_rgba(5,150,105,0.95)] hover:!bg-emerald-700 dark:!bg-emerald-500 dark:text-white dark:!text-white"
-              : "bg-emerald-600 text-white !text-white shadow-[0_5px_16px_-10px_rgba(5,150,105,0.8)]"
-            : compact
-              ? isCompactHovered
-                ? "border border-transparent bg-transparent text-slate-700 hover:bg-slate-950/[0.045] hover:text-emerald-700 dark:text-slate-200 dark:hover:bg-white/[0.07]"
-                : "border border-white/90 bg-white/95 text-slate-700 shadow-[0_7px_20px_-14px_rgba(15,23,42,0.55)] hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-              : "border border-transparent text-slate-600 hover:bg-black/[0.035] hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.06] dark:hover:text-white"
-          }
-        `}
-      >
-        <Icon className={`${compact ? "h-5 w-5" : "h-4 w-4"} shrink-0 transition-colors ${isActive ? "text-white !text-white opacity-100" : "text-slate-700 group-hover:text-emerald-700 dark:text-slate-300 dark:group-hover:text-emerald-300"}`} />
-        <span className={`truncate transition-all duration-200 ${compact ? `text-sm font-medium ${isCompactHovered ? "max-w-[150px] opacity-100" : "max-w-0 opacity-0"}` : ""} ${isActive ? "text-white !text-white" : ""}`}>
-          {translatedLabel}
-        </span>
+    return (
+      <button key={item.label} type="button" onClick={() => handleNavClick(item.label)}
+        aria-label={translatedLabel} aria-current={isActive ? "page" : undefined}
+        title={compact ? translatedLabel : undefined}
+        className={`group relative flex items-center rounded-xl text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${compact ? "mx-auto h-10 w-10 justify-center" : "w-full gap-3 px-3 py-2.5"} ${isActive ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"}`}>
+        {isActive && <span className="absolute -left-2 h-5 w-0.5 rounded-full bg-emerald-600" />}
+        <Icon className="h-[19px] w-[19px] shrink-0" />
+        {!compact && <span className="truncate">{translatedLabel}</span>}
       </button>
     );
-
-    return <div key={item.label}>{navButton}</div>;
   };
 
   return (
     <div
-      className={`flex flex-col transition-[width,border-radius] duration-300 ${compact ? `pointer-events-auto mx-auto h-[calc(100%-2rem)] overflow-hidden border border-white/80 bg-white/90 shadow-[0_28px_70px_-34px_rgba(15,23,42,0.5)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/92 ${isCompactHovered ? "w-56 rounded-[24px]" : "w-20 rounded-[40px]"}` : "h-full border-r border-border/70 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/92"}`}
+      className={`flex flex-col transition-[width,border-radius] duration-300 ${compact ? `pointer-events-auto mx-auto my-3 h-[calc(100%_-_1.5rem)] overflow-hidden border border-slate-200/70 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${isCompactHovered ? "w-56 rounded-[24px]" : "w-[68px] rounded-2xl"}` : "h-full border-r border-border/70 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/92"}`}
     >
       <div 
-        className={`cursor-pointer transition-colors ${compact ? "flex min-h-[74px] w-full items-center px-2 py-2" : "flex min-h-[102px] items-center border-b border-border/60 px-5 hover:bg-muted/35 dark:border-slate-800"}`}
+        className={`cursor-pointer transition-colors ${compact ? "flex w-full shrink-0 items-center border-b border-border/60 px-2 py-3" : "flex min-h-[102px] items-center border-b border-border/60 px-5 hover:bg-muted/35 dark:border-slate-800"}`}
         onClick={() => handleNavClick(isAdmin ? "Admin Panel" : "Dashboard")}
       >
         <div className={`flex w-full items-center ${compact ? `${isCompactHovered ? "flex-row px-1" : "flex-col"} gap-2` : "gap-3"}`}>
@@ -254,7 +235,7 @@ function SidebarContent({
             <button
               type="button"
               title={language === "TH" ? "ขยายเมนู" : "Expand menu"}
-              className={`${isCompactHovered ? "ml-auto" : ""} flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200/70 bg-white/75 text-slate-600 transition-colors hover:bg-white hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200`}
+              className={`${isCompactHovered ? "ml-auto" : ""} flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent bg-transparent text-slate-400 transition-colors hover:bg-white hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200`}
               onClick={(event) => {
                 event.stopPropagation();
                 onToggleCompact?.();
@@ -297,7 +278,7 @@ function SidebarContent({
       )}
 
       {/* Navigation */}
-      <nav className={`min-h-0 ${compact ? `flex w-full flex-1 flex-col border-y border-slate-200/55 px-2 py-3 dark:border-slate-700/60 ${isCompactHovered ? "justify-start space-y-4 overflow-y-auto overscroll-contain" : "justify-center space-y-1 overflow-hidden"}` : "flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-5"}`}>
+      <nav className={`min-h-0 ${compact ? `flex w-full flex-1 flex-col border-y border-slate-200/55 px-2 py-3 dark:border-slate-700/60 justify-start space-y-4 overflow-y-auto overscroll-contain` : "flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-5"}`}>
         {!isAdmin && (
           <>
             <div className="space-y-1">
@@ -343,7 +324,7 @@ function SidebarContent({
         )}
       </nav>
 
-      <div className={`${compact ? "mx-auto px-2 py-3" : "border-t border-border/60 p-3 dark:border-slate-800"}`}>
+      <div className={`${compact ? "mx-auto w-full shrink-0 border-t border-border/60 px-2 py-3" : "border-t border-border/60 p-3 dark:border-slate-800"}`}>
          {compact ? (
            <div className={`flex items-center justify-center ${isCompactHovered ? "w-[200px] gap-3" : "w-11 flex-col gap-2"}`}>
              <Button
@@ -463,8 +444,8 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
 	        );
       case "Crop Reports":
         return <CropReportsPage language={language} />;
-      case "Sensor Intelligence":
-        return <SensorIntelligencePage language={language} activeDeviceId={activeDeviceId} />;
+      // case "Sensor Intelligence":
+      //   return <SensorIntelligencePage language={language} activeDeviceId={activeDeviceId} />;
       case "Device Monitor":
         return <DeviceMonitorPage language={language} />;
       case "Farm Settings":
@@ -506,8 +487,8 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
         return <WeatherDataPage language={language} />;
       case "Wolffia Analytics":
         return <WolffiaAnalyticsPage language={language} />;
-      case "Maintenance":
-        return <MaintenancePage language={language} />;
+      // case "Maintenance":
+      //   return <MaintenancePage language={language} />;
       case "Help Center":
         return <SupportCenterPage language={language} />;
       case "Tank Levels":
