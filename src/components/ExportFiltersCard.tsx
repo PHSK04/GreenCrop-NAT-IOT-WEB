@@ -12,6 +12,7 @@ type ExportFilterOption = {
 };
 
 type ExportFiltersCardProps = {
+  embedded?: boolean;
   title?: string;
   description?: string;
   startDateLabel?: string;
@@ -43,6 +44,7 @@ type ExportFiltersCardProps = {
 };
 
 export function ExportFiltersCard({
+  embedded = false,
   title = "Export Filters",
   description = "Select date range and data types to download CSV/PDF",
   startDateLabel,
@@ -89,7 +91,7 @@ export function ExportFiltersCard({
   const isTH = locale === "TH";
   const [rangeMode, setRangeMode] = useState<"all" | "month" | "range">(selectedMonth ? "month" : startDate || endDate ? "range" : "all");
   const [showTimes, setShowTimes] = useState(Boolean(selectedStartTime || selectedEndTime));
-  const invalidRange = Boolean(startDate && endDate && startDate > endDate) || Boolean(selectedStartTime && selectedEndTime && selectedStartTime > selectedEndTime);
+  const invalidRange = Boolean(startDate && endDate && startDate > endDate) || Boolean(selectedStartTime && selectedEndTime && selectedStartTime > selectedEndTime && (!startDate || !endDate || startDate === endDate));
   const changeRangeMode = (mode: "all" | "month" | "range") => {
     setRangeMode(mode);
     if (mode !== "month") setMonth("");
@@ -104,7 +106,7 @@ export function ExportFiltersCard({
   const fieldClass = "[&_button]:h-9 [&_button]:rounded-lg [&_button]:px-3 [&_button]:text-xs [&_button]:shadow-none";
 
   return (
-    <Card className="mb-5 overflow-visible rounded-2xl border border-border/70 bg-card shadow-none">
+    <Card surface="toolbar" data-embedded={embedded} className="mb-5 overflow-visible rounded-2xl border border-border/70 bg-card shadow-none">
       <CardHeader className="px-4 pb-3 pt-4 md:px-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">

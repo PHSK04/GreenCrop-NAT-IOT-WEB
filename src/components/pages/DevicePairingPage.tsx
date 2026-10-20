@@ -258,7 +258,7 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
       </header>
 
       <main className="page-solid-cards mx-auto grid w-full max-w-5xl gap-6 px-6 py-10 md:grid-cols-[1.1fr_0.9fr] md:px-10">
-        <Card className="rounded-2xl border-border/70 bg-card shadow-xl">
+        <Card surface="flat" className="rounded-2xl border-border/70 bg-card shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-emerald-400" />
@@ -346,7 +346,7 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
         </Card>
 
         <div className="space-y-6">
-          <Card className="rounded-2xl border-border/60 bg-card shadow-lg">
+          <Card surface="panel" className="rounded-2xl border-border/60 bg-card shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <PlugZap className="h-5 w-5 text-amber-400" />
@@ -369,7 +369,7 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
             </CardContent>
           </Card>
 
-            <Card className="rounded-2xl border-border/60 bg-card shadow-lg">
+            <Card surface="panel" className="rounded-2xl border-border/60 bg-card shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <QrCode className="h-5 w-5 text-cyan-400" />
@@ -388,7 +388,7 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-border/60 bg-card shadow-lg">
+          <Card surface="panel" className="rounded-2xl border-border/60 bg-card shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <QrCode className="h-5 w-5 text-emerald-400" />
@@ -459,7 +459,7 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
             </DialogContent>
           </Dialog>
 
-          <Card className="rounded-2xl border-border/60 bg-card shadow-lg">
+          <Card surface="panel" className="rounded-2xl border-border/60 bg-card shadow-lg">
             <CardHeader>
               <CardTitle className="text-base">ผู้ใช้งานปัจจุบัน</CardTitle>
               <CardDescription>ข้อมูลนี้จะผูกกับบัญชี</CardDescription>

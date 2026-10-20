@@ -505,7 +505,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
       <main className="relative z-10 flex-1 overflow-auto bg-[#f2f5f3] p-4 dark:bg-slate-950 md:p-6">
         <div className="w-full">
         <div className="mb-5 grid gap-4 md:grid-cols-3">
-          <Card className="rounded-2xl border-white/80 bg-gradient-to-br from-white to-emerald-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5">
+          <Card surface="metric" className="rounded-2xl border-white/80 bg-gradient-to-br from-white to-emerald-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5">
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">{isTH ? "ค่า pH" : "pH"}</p>
               <p className="mt-2 text-3xl font-bold text-foreground">{boardConnected ? phValue.toFixed(2) : "--"}</p>
@@ -514,14 +514,14 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
               </Badge>
             </CardContent>
           </Card>
-          <Card className="rounded-2xl border-white/80 bg-gradient-to-br from-white to-cyan-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5">
+          <Card surface="metric" className="rounded-2xl border-white/80 bg-gradient-to-br from-white to-cyan-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5">
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">{isTH ? "ค่า EC" : "EC"}</p>
               <p className="mt-2 text-3xl font-bold text-foreground">{boardConnected ? ecValue.toFixed(2) : "--"}</p>
               <p className="mt-1 text-xs text-muted-foreground">mS/cm</p>
             </CardContent>
           </Card>
-          <Card className="rounded-2xl border-white/80 bg-gradient-to-br from-white to-amber-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5">
+          <Card surface="metric" className="rounded-2xl border-white/80 bg-gradient-to-br from-white to-amber-50/60 shadow-[0_18px_45px_-34px_rgba(15,23,42,.5)] transition-transform hover:-translate-y-0.5">
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">{isTH ? "อุณหภูมิ" : "Temperature"}</p>
               <p className="mt-2 text-3xl font-bold text-foreground">{boardConnected ? tempValue.toFixed(1) : "--"}</p>
@@ -597,7 +597,7 @@ export function DeviceMonitorPage({ language = "TH" }: DeviceMonitorPageProps) {
           </div>
         )}
 
-        <Card className="mt-6 rounded-[24px] border-white/80 bg-white/95 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)]">
+        <Card surface="flat" className="mt-6 rounded-[24px] border-white/80 bg-white/95 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)]">
           <CardHeader>
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>

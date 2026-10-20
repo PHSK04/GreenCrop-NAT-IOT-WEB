@@ -317,7 +317,7 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
           {quickStats.map((stat) => {
             const Icon = stat.icon;
             return (
-              <Card key={stat.label} className="border-border bg-card/80 shadow-sm">
+              <Card surface="metric" key={stat.label} className="border-border bg-card/80 shadow-sm">
                 <CardContent className="flex items-center gap-4 p-5">
                   <div className={`rounded-2xl p-3 ${stat.bg}`}>
                     <Icon className={`h-5 w-5 ${stat.tone}`} />
@@ -334,7 +334,7 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
 
         <section className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)] xl:gap-8">
           <div className="space-y-6">
-            <Card className="border-border bg-card/80">
+            <Card surface="panel" className="border-border bg-card/80">
               <CardHeader>
                 <CardTitle>{isTH ? "เลือกหมวดปัญหา" : "Issue Categories"}</CardTitle>
                 <CardDescription>
@@ -360,7 +360,7 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card/80">
+            <Card surface="panel" className="border-border bg-card/80">
               <CardHeader>
                 <CardTitle>{isTH ? "ขั้นตอนตอบลูกค้าแนะนำ" : "Recommended Response Flow"}</CardTitle>
               </CardHeader>
@@ -385,7 +385,7 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
 
           <div className="space-y-5">
             {filteredIssues.length === 0 ? (
-              <Card className="border-dashed border-border bg-card/80">
+              <Card surface="panel" className="border-dashed border-border bg-card/80">
                 <CardContent className="flex min-h-[220px] flex-col items-center justify-center gap-3 p-10 text-center">
                   <Search className="h-10 w-10 text-muted-foreground/60" />
                   <div className="text-lg font-medium text-foreground">
@@ -403,7 +403,7 @@ export function SupportCenterPage({ language = "TH" }: SupportCenterPageProps) {
                 const Icon = issue.icon;
 
                 return (
-                  <Card key={issue.id} className="overflow-hidden border-border bg-card/90 shadow-sm">
+                  <Card surface="panel" key={issue.id} className="overflow-hidden border-border bg-card/90 shadow-sm">
                     <CardHeader className="border-b border-border/70 bg-muted/20">
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex items-start gap-4">

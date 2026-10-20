@@ -180,7 +180,7 @@ export function FarmSettingsPage({
 
           {/* Automation Rules */}
           <TabsContent value="automation" className="space-y-6">
-            <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+            <Card surface="flat" className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
                   <Zap className="w-5 h-5 text-yellow-500" />
@@ -250,7 +250,7 @@ export function FarmSettingsPage({
 
           {/* Devices & Calibration */}
           <TabsContent value="devices" className="space-y-6">
-            <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+            <Card surface="flat" className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
                   <Cpu className="w-5 h-5 text-emerald-500" />
@@ -381,7 +381,7 @@ export function FarmSettingsPage({
               </DialogContent>
             </Dialog>
 
-            <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+            <Card surface="panel" className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
                   <RefreshCw className="w-5 h-5 text-emerald-500" />
@@ -412,7 +412,7 @@ export function FarmSettingsPage({
           
           {/* Notifications */}
           <TabsContent value="notifications" className="space-y-6">
-             <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+             <Card surface="flat" className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
                   <Bell className="w-5 h-5 text-amber-500" />
@@ -441,7 +441,7 @@ export function FarmSettingsPage({
 
           {/* User Management */}
           <TabsContent value="users" className="space-y-6">
-            <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+            <Card surface="panel" className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
                   <Smartphone className="w-5 h-5 text-blue-400" />

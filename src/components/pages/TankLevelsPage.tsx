@@ -24,7 +24,7 @@ import { seededInt, seededNumber } from "@/utils/deviceData";
 // Generic Tank Card Component (used for Tank 3)
 const TankCard = ({ name, type, capacity, currentLevel, status, flowRate, pressure, sensors, isFilling, onToggle }: any) => {
   return (
-    <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md overflow-hidden relative">
+    <Card surface="panel" className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md overflow-hidden relative">
       {/* Water Level Visual Background */}
       <div 
         className="absolute bottom-0 left-0 w-full bg-blue-500/10 transition-all duration-1000 ease-in-out z-0" 
@@ -225,7 +225,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
         
         {/* Water Quality Overview */}
         <div className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-3">
-           <Card className="rounded-xl border border-emerald-100 bg-card p-5 shadow-lg shadow-emerald-950/5">
+           <Card surface="metric" className="rounded-xl border border-emerald-100 bg-card p-5 shadow-lg shadow-emerald-950/5">
               <div className="flex items-start justify-between">
                  <div className="grid h-9 w-9 place-items-center rounded-full bg-blue-500/10 text-blue-500">
                     <Droplets className="h-5 w-5" />
@@ -241,7 +241,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
               </div>
            </Card>
 
-           <Card className="rounded-xl border border-border bg-card p-5 shadow-lg shadow-slate-950/5">
+           <Card surface="metric" className="rounded-xl border border-border bg-card p-5 shadow-lg shadow-slate-950/5">
               <div className="flex items-start justify-between">
                  <div className="grid h-9 w-9 place-items-center rounded-full bg-cyan-500/10 text-cyan-500">
                     <Thermometer className="h-5 w-5" />
@@ -259,7 +259,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
               </div>
            </Card>
 
-           <Card className="rounded-xl border border-border bg-card p-5 shadow-lg shadow-slate-950/5">
+           <Card surface="metric" className="rounded-xl border border-border bg-card p-5 shadow-lg shadow-slate-950/5">
               <div className="flex items-start justify-between">
                  <div className="grid h-9 w-9 place-items-center rounded-full bg-amber-500/10 text-amber-500">
                     <Zap className="h-5 w-5" />
@@ -282,7 +282,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
            
            {/* Tank 1: Raw Water - Updated Logic with Countdown */}
-           <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md overflow-hidden relative">
+           <Card surface="panel" className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md overflow-hidden relative">
               {/* Water Level Visual Background */}
               <div 
                 className="absolute bottom-0 left-0 w-full bg-blue-500/10 transition-all duration-1000 ease-in-out z-0" 
@@ -347,7 +347,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
             </Card>
 
            {/* Tank 2: Preparation Tank - Capacity 100L Logic */}
-           <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md overflow-hidden relative">
+           <Card surface="panel" className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md overflow-hidden relative">
               {/* Water Level Visual Background */}
               <div 
                 className="absolute bottom-0 left-0 w-full bg-blue-500/10 transition-all duration-1000 ease-in-out z-0" 
@@ -507,7 +507,7 @@ export function TankLevelsPage({ tank2On, setTank2On, tank3On, setTank3On, langu
            />
 
            {/* Tank 4: Cultivation Pond (New Horizontal Layout) - Volume Updated to 500L */}
-           <Card className="col-span-1 md:col-span-2 lg:col-span-3 rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md overflow-hidden">
+           <Card surface="panel" className="col-span-1 md:col-span-2 lg:col-span-3 rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md overflow-hidden">
               <CardHeader className="pb-4 border-b border-border/50">
                  <div className="flex justify-between items-center">
                     <div>

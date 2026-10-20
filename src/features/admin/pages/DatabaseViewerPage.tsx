@@ -631,23 +631,23 @@ export function DatabaseViewerPage({ language = "TH" }: DatabaseViewerPageProps)
       </div>
 
       <div className="grid gap-4 md:grid-cols-5">
-        <Card className="bg-white/75 dark:bg-slate-900/70">
+        <Card surface="metric" className="bg-white/75 dark:bg-slate-900/70">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Users</CardTitle></CardHeader>
           <CardContent><div className="text-2xl font-bold">{summary?.users ?? "-"}</div></CardContent>
         </Card>
-        <Card className="bg-white/75 dark:bg-slate-900/70">
+        <Card surface="metric" className="bg-white/75 dark:bg-slate-900/70">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Login Sessions</CardTitle></CardHeader>
           <CardContent><div className="text-2xl font-bold">{summary?.login_sessions ?? "-"}</div></CardContent>
         </Card>
-        <Card className="bg-white/75 dark:bg-slate-900/70">
+        <Card surface="metric" className="bg-white/75 dark:bg-slate-900/70">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Sensor Data</CardTitle></CardHeader>
           <CardContent><div className="text-2xl font-bold">{summary?.sensor_data ?? "-"}</div></CardContent>
         </Card>
-        <Card className="bg-white/75 dark:bg-slate-900/70">
+        <Card surface="metric" className="bg-white/75 dark:bg-slate-900/70">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Audit Logs</CardTitle></CardHeader>
           <CardContent><div className="text-2xl font-bold">{summary?.audit_logs ?? "-"}</div></CardContent>
         </Card>
-        <Card className="bg-white/75 dark:bg-slate-900/70">
+        <Card surface="metric" className="bg-white/75 dark:bg-slate-900/70">
           <CardHeader className="pb-2"><CardTitle className="text-sm">OTP Codes</CardTitle></CardHeader>
           <CardContent><div className="text-2xl font-bold">{summary?.otp_codes ?? "-"}</div></CardContent>
         </Card>
@@ -871,19 +871,19 @@ export function DatabaseViewerPage({ language = "TH" }: DatabaseViewerPageProps)
           </div>
 
           <div className="grid gap-4 md:grid-cols-4">
-            <Card className="bg-slate-50 border border-slate-200 shadow-sm dark:bg-slate-800/70 dark:border-slate-700">
+            <Card surface="panel" className="bg-slate-50 border border-slate-200 shadow-sm dark:bg-slate-800/70 dark:border-slate-700">
               <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-700 dark:text-slate-200">Login Sessions</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.sessions.length}</div></CardContent>
             </Card>
-            <Card className="bg-slate-50 border border-slate-200 shadow-sm dark:bg-slate-800/70 dark:border-slate-700">
+            <Card surface="panel" className="bg-slate-50 border border-slate-200 shadow-sm dark:bg-slate-800/70 dark:border-slate-700">
               <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-700 dark:text-slate-200">Sensor Records</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.sensor_data.length}</div></CardContent>
             </Card>
-            <Card className="bg-slate-50 border border-slate-200 shadow-sm dark:bg-slate-800/70 dark:border-slate-700">
+            <Card surface="panel" className="bg-slate-50 border border-slate-200 shadow-sm dark:bg-slate-800/70 dark:border-slate-700">
               <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-700 dark:text-slate-200">Audit Logs</CardTitle></CardHeader>
               <CardContent><div className="text-2xl font-bold">{selectedUserDetails.audit_logs.length}</div></CardContent>
             </Card>
-            <Card className="bg-slate-50 border border-slate-200 shadow-sm dark:bg-slate-800/70 dark:border-slate-700">
+            <Card surface="panel" className="bg-slate-50 border border-slate-200 shadow-sm dark:bg-slate-800/70 dark:border-slate-700">
               <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-700 dark:text-slate-200">Current Filter</CardTitle></CardHeader>
               <CardContent><div className="text-sm font-medium">{eventTypeFilter === "all" ? "All events" : eventTypeFilter}</div></CardContent>
             </Card>

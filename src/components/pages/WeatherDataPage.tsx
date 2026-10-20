@@ -355,7 +355,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Temperature Chart */}
-              <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+              <Card surface="chart" className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-foreground">
                       <Thermometer className="w-5 h-5 text-blue-400" />
@@ -398,7 +398,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
               </Card>
 
               {/* Water Quality Chart */}
-              <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+              <Card surface="chart" className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-foreground">
                       <Droplets className="w-5 h-5 text-cyan-500" />
@@ -437,7 +437,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
             </div>
 
             {/* Detailed Sensor Table */}
-            <Card className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
+            <Card surface="flat" className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
                <CardHeader>
                  <CardTitle className="text-foreground">Detailed Sensor Readings</CardTitle>
                  <CardDescription className="text-muted-foreground">Real-time values from all active field nodes</CardDescription>
@@ -482,7 +482,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
 
           <TabsContent value="weather">
             <div className="space-y-6">
-            <Card className="relative overflow-hidden rounded-[28px] border-0 bg-gradient-to-br from-emerald-950 via-emerald-800 to-teal-600 text-white shadow-[0_24px_70px_-28px_rgba(5,150,105,0.75)]">
+            <Card surface="panel" className="relative overflow-hidden rounded-[28px] border-0 bg-gradient-to-br from-emerald-950 via-emerald-800 to-teal-600 text-white shadow-[0_24px_70px_-28px_rgba(5,150,105,0.75)]">
               <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
               <div className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-cyan-300/10 blur-3xl" />
               <CardContent className="relative p-5 md:p-8">
@@ -560,7 +560,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
             </Card>
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-              <Card className="rounded-3xl border-border/70 bg-card/80 shadow-sm backdrop-blur">
+              <Card surface="flat" className="rounded-3xl border-border/70 bg-card/80 shadow-sm backdrop-blur">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <MapPin className="h-5 w-5 text-emerald-500" />
@@ -614,7 +614,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
 
               </CardContent>
             </Card>
-              <Card className="rounded-3xl border-emerald-500/20 bg-gradient-to-br from-emerald-50 to-cyan-50 shadow-sm dark:from-emerald-950/40 dark:to-cyan-950/30">
+              <Card surface="panel" className="rounded-3xl border-emerald-500/20 bg-gradient-to-br from-emerald-50 to-cyan-50 shadow-sm dark:from-emerald-950/40 dark:to-cyan-950/30">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Sparkles className="h-5 w-5 text-amber-500" />
@@ -643,7 +643,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
               </Card>
             </div>
 
-            <Card className="rounded-xl border border-border bg-card/50 shadow-lg">
+            <Card surface="flat" className="rounded-xl border border-border bg-card/50 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
                   <CloudRain className="w-5 h-5 text-blue-500" />
@@ -682,7 +682,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
             </div>
           </TabsContent>
           <TabsContent value="water">
-             <Card className="rounded-xl border border-border bg-card/50 shadow-lg">
+             <Card surface="flat" className="rounded-xl border border-border bg-card/50 shadow-lg">
                <CardHeader>
                  <CardTitle className="flex items-center gap-2 text-foreground">
                    <Droplets className="w-5 h-5 text-cyan-500" />
@@ -726,7 +726,7 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
             </Card>
           </TabsContent>
           <TabsContent value="alerts">
-             <Card className="rounded-xl border border-border bg-card/50 shadow-lg">
+             <Card surface="flat" className="rounded-xl border border-border bg-card/50 shadow-lg">
                <CardHeader>
                  <CardTitle className="flex items-center gap-2 text-foreground">
                    <AlertTriangle className="w-5 h-5 text-amber-500" />

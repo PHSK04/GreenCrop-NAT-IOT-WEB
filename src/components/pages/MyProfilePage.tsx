@@ -156,7 +156,7 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
 
             <div className="max-w-5xl mx-auto space-y-8 relative z-10">
                 {/* Profile Header */}
-                <Card className="border-border bg-card shadow-2xl rounded-[2rem] overflow-hidden transition-all hover:shadow-emerald-900/10">
+                <Card surface="flat" className="border-border bg-card shadow-2xl rounded-[2rem] overflow-hidden transition-all hover:shadow-emerald-900/10">
                     <div className="h-40 bg-gradient-to-r from-emerald-400 via-green-500 to-emerald-600 relative overflow-hidden">
                         {/* Decorative Circles */}
                         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
@@ -307,7 +307,7 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     {/* Left Column: Bio & Details */}
                     <div className="md:col-span-2 space-y-8">
-                        <Card className="rounded-[2rem] shadow-lg border-border bg-card hover:shadow-xl transition-shadow duration-300">
+                        <Card surface="panel" className="rounded-[2rem] shadow-lg border-border bg-card hover:shadow-xl transition-shadow duration-300">
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-xl flex items-center gap-3 text-foreground">
                                     <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
@@ -356,7 +356,7 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
                             </CardContent>
                         </Card>
 
-                        <Card className="rounded-[2rem] shadow-lg border-border bg-card hover:shadow-xl transition-shadow duration-300">
+                        <Card surface="panel" className="rounded-[2rem] shadow-lg border-border bg-card hover:shadow-xl transition-shadow duration-300">
                             <CardHeader>
                                 <CardTitle className="text-xl text-foreground flex items-center gap-3">
                                     <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
@@ -403,7 +403,7 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
 
                     {/* Right Column: Key Stats */}
                     <div className="space-y-8">
-                        <Card className="rounded-[2rem] shadow-lg border-0 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/20 overflow-hidden relative">
+                        <Card surface="panel" className="rounded-[2rem] shadow-lg border-0 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/20 overflow-hidden relative">
                             {/* Decorative blur */}
                             <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-400/20 rounded-full blur-3xl"></div>
                             
@@ -451,7 +451,7 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
                             </CardContent>
                         </Card>
 
-                        <Card className="rounded-[2rem] shadow-lg border-border bg-card">
+                        <Card surface="panel" className="rounded-[2rem] shadow-lg border-border bg-card">
                             <CardHeader>
                                 <CardTitle className="text-lg text-foreground flex items-center justify-between">
                                     {isTH ? "เครือข่ายเซนเซอร์บ่อ" : "Pond Sensor Network"}

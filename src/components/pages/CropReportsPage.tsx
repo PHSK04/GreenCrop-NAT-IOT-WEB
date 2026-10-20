@@ -18,20 +18,22 @@ import {
   deleteMyCropYieldEntry,
   loadMyCropYieldEntries,
 } from "@/utils/cropYieldStore";
+import { HarvestReportChart } from "../dashboard/HarvestReportChart";
+import { filterHarvestRows, summarizeHarvestRows } from "@/utils/harvestReport";
 import { useMachine } from "@/contexts/MachineContext";
 
 type CropReportsPageProps = {
   language?: string;
 };
 
+const currentDateValue = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+};
+
 const currentTimeValue = () => {
   const now = new Date();
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-};
-
-const toDateTimeValue = (date: string, time: string, fallbackTime: string) => {
-  if (!date) return "";
-  return `${date} ${time || fallbackTime}`;
 };
 
 export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
@@ -40,6 +42,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   const isTH = language === "TH";
   const activeDeviceId = deviceId || "default";
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
+  const [showEntry, setShowEntry] = useState(false);
   const [selectedReport, setSelectedReport] = useState<CropYieldEntry | null>(null);
   const [selectedMonth, setSelectedMonth] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -49,7 +52,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   const [selectedFields, setSelectedFields] = useState<string[]>(["yield", "ph", "ec", "temp"]);
   const [deviceReportData, setDeviceReportData] = useState<CropYieldEntry[]>([]);
   const [form, setForm] = useState({
-    date: new Date().toISOString().slice(0, 10),
+    date: currentDateValue(),
     time: currentTimeValue(),
     yield: "",
     ph: "7.0",
@@ -81,20 +84,9 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
     }));
   }, [ecValue, phValue, tempValue]);
 
-  const filteredReportData = useMemo(() => {
-    const startDateTime = startDate ? toDateTimeValue(startDate, startTime, "00:00") : "";
-    const endDateTime = endDate ? toDateTimeValue(endDate, endTime, "23:59") : "";
-
-    return deviceReportData.filter((row) => {
-      if (selectedMonth && !row.date.startsWith(selectedMonth)) return false;
-      const rowDateTime = toDateTimeValue(row.date, row.time, "00:00");
-      if (startDateTime && rowDateTime < startDateTime) return false;
-      if (endDateTime && rowDateTime > endDateTime) return false;
-      if (!startDate && startTime && row.time < startTime) return false;
-      if (!endDate && endTime && row.time > endTime) return false;
-      return true;
-    });
-  }, [deviceReportData, endDate, endTime, selectedMonth, startDate, startTime]);
+  const filteredReportData = useMemo(() => filterHarvestRows(deviceReportData, {
+    month: selectedMonth, startDate, endDate, startTime, endTime,
+  }), [deviceReportData, selectedMonth, startDate, endDate, startTime, endTime]);
 
   const activeFilterCount = [selectedMonth, startDate, endDate, startTime, endTime].filter(Boolean).length;
   const resultSummary = isTH
@@ -109,17 +101,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
     setEndTime("");
   };
 
-  const reportSummary = useMemo(() => {
-    const days = filteredReportData.length;
-    const totalYield = filteredReportData.reduce((sum, row) => sum + row.yield, 0);
-    const avgPh =
-      days > 0 ? filteredReportData.reduce((sum, row) => sum + row.ph, 0) / days : 0;
-    return {
-      days,
-      totalYield,
-      avgPh: Math.round(avgPh * 100) / 100,
-    };
-  }, [filteredReportData]);
+  const reportSummary = useMemo(() => summarizeHarvestRows(filteredReportData), [filteredReportData]);
 
   const exportRows = useMemo(() => {
     return filteredReportData.map((row) => {
@@ -218,11 +200,11 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   return (
     <>
       <header className="animate-in border-b border-white/80 bg-white/90 px-4 py-5 shadow-[0_12px_35px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl fade-in slide-in-from-bottom-2 duration-700 motion-reduce:animate-none md:px-8">
-        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between">
+        <div className="mx-auto flex w-full max-w-[1440px] flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900">
               <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-50 to-lime-50 text-emerald-600 shadow-sm"><Sprout className="h-6 w-6" /></span>
-              {isTH ? "รายงานผลผลิต" : "Crop Reports"}
+              {isTH ? "รายงานผลผลิตและคุณภาพรายวัน" : "Daily Harvest & Quality"}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               {isTH ? "ส่งออกและวิเคราะห์ผลผลิตรายวันและคุณภาพน้ำ" : "Export and analyze daily harvest and water quality data"}
@@ -233,26 +215,23 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               </Badge>
             </div>
           </div>
-
+          <Button aria-controls="harvest-entry-form" aria-expanded={showEntry} onClick={() => setShowEntry(value => !value)} className="shrink-0 gap-2"><Plus className="h-4 w-4" />{isTH ? (showEntry ? "ปิดฟอร์ม" : "เพิ่มผลผลิต") : (showEntry ? "Close entry" : "Add harvest")}</Button>
         </div>
       </header>
 
       <main className="page-solid-cards flex-1 overflow-auto bg-[#f2f5f3] p-4 dark:bg-slate-950 md:p-6">
         <div className="mx-auto w-full max-w-[1440px] space-y-5">
-        <div className="grid gap-3 sm:grid-cols-3 md:gap-4">
+        <section className="report-summary" aria-label={isTH ? "สรุปช่วงที่เลือก" : "Selected period summary"}>
+          <div className="report-summary-lead"><p className="workspace-eyebrow">{isTH ? "ผลผลิตรวมในช่วงที่เลือก" : "HARVEST IN SELECTED PERIOD"}</p><p className="report-summary-value">{reportSummary.totalYield.toLocaleString()}<span>g</span></p><p className="text-sm text-muted-foreground">{reportSummary.days} {isTH ? "วันที่มีการเก็บเกี่ยว" : "harvest days"}</p></div>
           {[
-            { label: isTH ? "จำนวนวันที่บันทึก" : "Days Recorded", value: reportSummary.days, unit: "", icon: Calendar },
-            { label: isTH ? "ผลผลิตรวม" : "Total Yield", value: reportSummary.totalYield, unit: "g", icon: Sprout },
-            { label: isTH ? "ค่า pH เฉลี่ย" : "Average pH", value: reportSummary.avgPh, unit: "pH", icon: Droplets },
-          ].map(({ label, value, unit, icon: Icon }) => <Card key={label} className="rounded-2xl border-border/70 bg-card">
-            <CardContent className="flex items-center justify-between gap-4 p-5">
-              <div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold tabular-nums">{value}<span className="ml-2 text-sm font-normal text-muted-foreground">{unit}</span></p></div>
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40"><Icon className="h-5 w-5" /></span>
-            </CardContent>
-          </Card>)}
-        </div>
+            { label: isTH ? "รายการเก็บเกี่ยว" : "Harvest entries", value: reportSummary.records, unit: isTH ? "รายการ" : "entries" },
+            { label: isTH ? "pH เฉลี่ย" : "Average pH", value: reportSummary.avgPh ?? "—", unit: "pH" },
+            { label: isTH ? "EC เฉลี่ย" : "Average EC", value: reportSummary.avgEc ?? "—", unit: "mS/cm" },
+            { label: isTH ? "อุณหภูมิเฉลี่ย" : "Average temperature", value: reportSummary.avgTemp ?? "—", unit: "°C" },
+          ].map(metric => <div key={metric.label} className="report-summary-item"><p className="text-sm text-muted-foreground">{metric.label}</p><p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">{metric.value}</p><p className="mt-1 text-xs text-muted-foreground">{metric.unit}</p></div>)}
+        </section>
         <div className="[&>div:last-child]:mb-0 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 motion-reduce:animate-none">
-          <Card className="mb-5 rounded-2xl border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
+          {showEntry && <Card id="harvest-entry-form" surface="flat" className="mb-5 rounded-2xl border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Plus className="h-5 w-5 text-emerald-500" />
@@ -330,9 +309,11 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                 <Button className="h-10 shrink-0 gap-2 rounded-xl bg-emerald-600 px-6 text-white hover:bg-emerald-700" onClick={handleSaveManualEntry}><Plus className="h-4 w-4" />{isTH ? "บันทึกผลผลิต" : "Save harvest"}</Button>
               </div>
             </CardContent>
-          </Card>
+          </Card>}
 
+          <section className="report-workbench">
           <ExportFiltersCard
+            embedded
             startDate={startDate}
             endDate={endDate}
             month={selectedMonth}
@@ -343,7 +324,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
             onMonthChange={setSelectedMonth}
             onStartTimeChange={setStartTime}
             onEndTimeChange={setEndTime}
-            title={isTH ? "ค้นหาข้อมูลย้อนหลัง" : "Historical Data Search"}
+            title={isTH ? "ค้นหาและดาวน์โหลดรายงาน" : "Find & download reports"}
             description={isTH ? "เลือกเดือน/ปี วันที่ และเวลา เพื่อดูข้อมูลย้อนหลังในตารางและส่งออก CSV/PDF" : "Select month/year, date, and time to review historical records and export CSV/PDF."}
             locale={isTH ? "TH" : "EN"}
             resultSummary={resultSummary}
@@ -371,10 +352,9 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
             downloadCsvLabel={isTH ? "ดาวน์โหลด CSV" : "Download CSV"}
             downloadPdfLabel={isTH ? "ดาวน์โหลด PDF" : "Download PDF"}
           />
-        </div>
+          <HarvestReportChart rows={filteredReportData} language={language} />
 
-
-        <Card className="animate-in rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100 fade-in slide-in-from-bottom-8 duration-700 delay-350 motion-reduce:animate-none">
+        <Card surface="flat" className="report-details animate-in rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100 fade-in slide-in-from-bottom-8 duration-700 delay-350 motion-reduce:animate-none">
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="text-base text-foreground">
               {isTH ? "รายงานผลผลิตและคุณภาพรายวัน" : "Daily Harvest & Quality Report"}
@@ -479,6 +459,8 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
             </Table>
           </CardContent>
         </Card>
+          </section>
+        </div>
         </div>
       </main>
 

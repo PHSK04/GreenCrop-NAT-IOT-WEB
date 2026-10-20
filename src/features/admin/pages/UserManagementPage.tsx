@@ -199,7 +199,7 @@ export function UserManagementPage({ language = "TH" }: UserManagementPageProps)
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="border-emerald-500/20 bg-card backdrop-blur">
+        <Card surface="metric" className="border-emerald-500/20 bg-card backdrop-blur">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{isTH ? "ผู้ใช้ทั้งหมด" : "Total Users"}</CardTitle>
                 <Users className="h-4 w-4 text-emerald-500" />
@@ -208,7 +208,7 @@ export function UserManagementPage({ language = "TH" }: UserManagementPageProps)
                 <div className="text-2xl font-bold">{users.length}</div>
             </CardContent>
         </Card>
-        <Card className="border-blue-500/20 bg-card backdrop-blur">
+        <Card surface="metric" className="border-blue-500/20 bg-card backdrop-blur">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{isTH ? "ผู้ดูแลระบบ" : "Admins"}</CardTitle>
                 <Shield className="h-4 w-4 text-blue-500" />

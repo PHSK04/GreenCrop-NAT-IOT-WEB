@@ -28,7 +28,7 @@ export function AdminOverview({ language = "TH" }: AdminOverviewProps) {
         </div>
 
         <div className="grid gap-6 md:grid-cols-4">
-            <Card className="border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 backdrop-blur dark:from-indigo-500/15 dark:to-purple-500/12">
+            <Card surface="metric" className="border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 backdrop-blur dark:from-indigo-500/15 dark:to-purple-500/12">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">{isTH ? "ผู้ใช้ทั้งหมด" : "Total Users"}</CardTitle>
                     <Users className="h-4 w-4 text-indigo-500" />
@@ -39,7 +39,7 @@ export function AdminOverview({ language = "TH" }: AdminOverviewProps) {
                 </CardContent>
             </Card>
             
-            <Card className="border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 backdrop-blur dark:from-emerald-500/15 dark:to-teal-500/12">
+            <Card surface="metric" className="border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 backdrop-blur dark:from-emerald-500/15 dark:to-teal-500/12">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">{isTH ? "ผู้ดูแลที่ใช้งานอยู่" : "Active Admins"}</CardTitle>
                     <User className="h-4 w-4 text-emerald-500" />
@@ -50,7 +50,7 @@ export function AdminOverview({ language = "TH" }: AdminOverviewProps) {
                 </CardContent>
             </Card>
 
-             <Card className="border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-red-500/10 backdrop-blur dark:from-orange-500/15 dark:to-red-500/12">
+             <Card surface="metric" className="border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-red-500/10 backdrop-blur dark:from-orange-500/15 dark:to-red-500/12">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">{isTH ? "สุขภาพระบบ" : "System Health"}</CardTitle>
                     <Activity className="h-4 w-4 text-orange-500" />
@@ -61,7 +61,7 @@ export function AdminOverview({ language = "TH" }: AdminOverviewProps) {
                 </CardContent>
             </Card>
 
-            <Card className="border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 backdrop-blur dark:from-blue-500/15 dark:to-cyan-500/12">
+            <Card surface="metric" className="border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 backdrop-blur dark:from-blue-500/15 dark:to-cyan-500/12">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">{isTH ? "ฐานข้อมูล" : "Database"}</CardTitle>
                     <Server className="h-4 w-4 text-blue-500" />
@@ -74,7 +74,7 @@ export function AdminOverview({ language = "TH" }: AdminOverviewProps) {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-            <Card>
+            <Card surface="panel">
                 <CardHeader>
                     <CardTitle>System Load</CardTitle>
                 </CardHeader>
@@ -103,7 +103,7 @@ export function AdminOverview({ language = "TH" }: AdminOverviewProps) {
                 </CardContent>
             </Card>
 
-            <Card>
+            <Card surface="panel">
                 <CardHeader>
                     <CardTitle>Recent Activity</CardTitle>
                 </CardHeader>

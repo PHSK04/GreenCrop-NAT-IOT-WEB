@@ -307,7 +307,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
           downloadPdfLabel={isTH ? "ดาวน์โหลด PDF" : "Download PDF"}
         />
         {/* Dual Axis Chart */}
-        <Card className="mb-8 rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
+        <Card surface="chart" className="mb-8 rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-foreground">
               <Sprout className="w-5 h-5 text-primary" />
@@ -386,7 +386,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
         {/* Metrics & Logs */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Performance Metrics */}
-          <Card className="rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
+          <Card surface="panel" className="rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Droplets className="w-5 h-5 text-blue-500" />
@@ -426,7 +426,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
           </Card>
 
           {/* Recent Harvests */}
-          <Card className="rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
+          <Card surface="flat" className="rounded-[24px] border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Timer className="w-5 h-5 text-amber-500" />

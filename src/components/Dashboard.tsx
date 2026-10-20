@@ -551,7 +551,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
            <div className="min-w-0 flex items-center gap-2">
              <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                <SheetTrigger asChild>
-                 <Button variant="ghost" size="icon" className="mr-1">
+                 <Button aria-label={language === "TH" ? "เปิดเมนูหลัก" : "Open navigation"} variant="ghost" size="icon" className="mr-1">
                    <Menu className="w-5 h-5" />
                  </Button>
                </SheetTrigger>
@@ -605,7 +605,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
            )}
          </div>
 
-        <div className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-[padding] duration-300 ${
+        <div data-workspace-page={activePage} className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-[padding] duration-300 ${
           isDesktopSidebarCompact ? "lg:pl-28" : ""
         }`}>
           {renderContent()}
