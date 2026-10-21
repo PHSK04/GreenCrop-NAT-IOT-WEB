@@ -80,7 +80,7 @@ function MiniSensorChart({
 
   if (values.length < 2) {
     return (
-      <div className="grid h-16 place-items-center rounded-xl border border-dashed border-border/70 bg-muted/20 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="grid h-16 place-items-center rounded-xl border border-dashed border-border/70 bg-muted/20 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Waiting for trend
       </div>
     );
@@ -144,12 +144,12 @@ function RealtimeMetricCard({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-muted-foreground">{title}</p>
               <div className="mt-1 flex items-end gap-2">
-                <span className="font-mono text-3xl font-black leading-none text-foreground">{value}</span>
+                <span className="font-mono text-3xl font-semibold leading-none text-foreground">{value}</span>
                 {unit && <span className="pb-0.5 text-sm font-semibold text-muted-foreground">{unit}</span>}
               </div>
             </div>
           </div>
-          <Badge variant="outline" className="shrink-0 border-border bg-background/70 px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <Badge variant="outline" className="shrink-0 border-border bg-background/70 px-3 py-1 text-xs uppercase tracking-wider text-muted-foreground">
             {status}
           </Badge>
         </div>
@@ -483,10 +483,10 @@ export function DashboardPage({
                 >
                   <AlertTriangle className="h-20 w-20 text-slate-950" />
                 </div>
-                <p className="mt-8 text-base font-black uppercase tracking-[0.24em] text-red-600">
+                <p className="mt-8 text-base font-semibold uppercase tracking-[0.24em] text-red-600">
                   {language === "TH" ? "สัญญาณเตือนระดับน้ำ" : "Water Level Alarm"}
                 </p>
-                <h2 className="mt-3 text-6xl font-black leading-none text-slate-950 sm:text-8xl md:text-9xl">
+                <h2 className="mt-3 text-6xl font-semibold leading-none text-slate-950 sm:text-8xl md:text-9xl">
                   {t.waterFull}
                 </h2>
                 <p className="mx-auto mt-7 max-w-3xl text-xl font-bold leading-9 text-slate-800 sm:text-3xl">
@@ -518,7 +518,7 @@ export function DashboardPage({
                     disabled={controlsDisabled}
                     onClick={handleStopWaterFullAlarm}
                     variant="destructive"
-                    className="h-16 min-w-72 text-xl font-black shadow-xl shadow-red-900/20"
+                    className="h-16 min-w-72 text-xl font-semibold shadow-xl shadow-red-900/20"
                   >
                     <Cpu className="mr-2 h-6 w-6" />
                     {language === "TH" ? "หยุดปั๊มน้ำ" : "Stop Water Pump"}
@@ -527,7 +527,7 @@ export function DashboardPage({
                     disabled={controlsDisabled}
                     onClick={handleEmergencyWaterFullAlarm}
                     variant="outline"
-                    className="h-16 min-w-72 border-red-500/50 bg-red-50 text-xl font-black text-red-700 hover:bg-red-100"
+                    className="h-16 min-w-72 border-red-500/50 bg-red-50 text-xl font-semibold text-red-700 hover:bg-red-100"
                   >
                     <Siren className="mr-2 h-6 w-6" />
                     {language === "TH" ? "หยุดฉุกเฉิน" : "Emergency Stop"}
@@ -621,7 +621,7 @@ export function DashboardPage({
       <header className="sticky top-0 z-20 flex min-h-[102px] items-center border-b border-border/60 bg-white/90 px-4 text-foreground backdrop-blur-xl dark:bg-slate-950/90 md:px-6">
         <div className="flex w-full flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50 to-cyan-50 shadow-[0_10px_30px_-14px_rgba(5,150,105,0.65)] dark:border-emerald-700/50 dark:from-slate-900 dark:via-emerald-950 dark:to-slate-900">
+            <span className="dashboard-logo relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50 to-cyan-50 shadow-[0_10px_30px_-14px_rgba(5,150,105,0.65)] dark:border-emerald-700/50 dark:from-slate-900 dark:via-emerald-950 dark:to-slate-900">
               <span className="absolute inset-1 rounded-xl border border-white/80 dark:border-white/10" />
               <img
                 src={greenCropLogo}
@@ -630,7 +630,7 @@ export function DashboardPage({
               />
             </span>
             <div className="min-w-0">
-              <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-[0.2em] text-emerald-600/80 dark:text-emerald-400">
+              <span className="mb-0.5 block text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600/80 dark:text-emerald-400">
                 Smart Hydroponic Control
               </span>
               <h1 className="truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
@@ -655,7 +655,7 @@ export function DashboardPage({
             </div>
           <Badge
             variant={mqttStatus === "connected" && boardConnected ? "default" : "secondary"}
-            className={`hidden border px-3 py-1.5 font-mono text-[10px] sm:flex ${mqttStatus === "connected" && boardConnected ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300" : "border-border bg-muted text-muted-foreground"}`}
+            className={`hidden border px-3 py-1.5 font-mono text-xs sm:flex ${mqttStatus === "connected" && boardConnected ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300" : "border-border bg-muted text-muted-foreground"}`}
           >
             {mqttStatus === "connected" ? (
               <span className="flex items-center gap-2">
@@ -691,7 +691,7 @@ export function DashboardPage({
             >
               <Bell className="h-4.5 w-4.5" />
               {!notificationsRead && notificationCount > 0 && (
-                <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full border-2 border-white bg-red-500 px-1 text-[9px] font-bold text-white">
+                <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full border-2 border-white bg-red-500 px-1 text-[11px] font-bold text-white">
                   {notificationCount}
                 </span>
               )}
@@ -700,7 +700,7 @@ export function DashboardPage({
               <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_60px_-22px_rgba(15,23,42,.35)] dark:border-slate-700 dark:bg-slate-900">
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
                   <p className="text-sm font-bold">{language === "TH" ? "การแจ้งเตือน" : "Notifications"}</p>
-                  <span className="text-[10px] text-slate-400">{language === "TH" ? "สถานะล่าสุด" : "Latest status"}</span>
+                  <span className="text-xs text-slate-400">{language === "TH" ? "สถานะล่าสุด" : "Latest status"}</span>
                 </div>
                 <div className="p-2">
                   {dashboardNotifications.map(({ title, detail, active, icon: Icon }) => (
@@ -710,7 +710,7 @@ export function DashboardPage({
                       </span>
                       <div className="min-w-0">
                         <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{title}</p>
-                        <p className="mt-0.5 text-[10px] leading-4 text-slate-500">{detail}</p>
+                        <p className="mt-0.5 text-xs leading-4 text-slate-500">{detail}</p>
                       </div>
                     </div>
                   ))}
@@ -744,7 +744,7 @@ export function DashboardPage({
                 <span className="block max-w-28 truncate text-xs font-semibold text-slate-800 dark:text-slate-100">
                   {user?.name || (language === "TH" ? "ผู้ใช้งาน" : "User")}
                 </span>
-                <span className="block text-[9px] uppercase tracking-wide text-slate-400">
+                <span className="block text-[11px] uppercase tracking-wide text-slate-400">
                   {user?.role || "Member"}
                 </span>
               </span>
@@ -754,7 +754,7 @@ export function DashboardPage({
               <div className="absolute right-0 top-12 z-50 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_20px_60px_-22px_rgba(15,23,42,.35)] dark:border-slate-700 dark:bg-slate-900">
                 <div className="mb-1 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
                   <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{user?.name || (language === "TH" ? "ผู้ใช้งาน" : "User")}</p>
-                  <p className="mt-0.5 truncate text-[10px] text-slate-500">{user?.email || user?.role || "Member"}</p>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">{user?.email || user?.role || "Member"}</p>
                 </div>
                 <button type="button" onClick={onOpenProfile} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 dark:text-slate-200">
                   <UserCircle className="h-4 w-4" />
@@ -773,9 +773,9 @@ export function DashboardPage({
       </header>
 
       <main className="relative z-10 flex-1 overflow-auto bg-[#edf3f0] p-3 dark:bg-slate-950 md:p-5">
-        <div className="w-full rounded-[30px] border border-white/80 bg-[#f4f7f5] p-3 shadow-[0_30px_90px_-52px_rgba(15,23,42,0.55)] dark:border-slate-800 dark:bg-slate-900/55 md:p-4">
+        <div className="dashboard-canvas w-full">
 
-        <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="dashboard-metrics mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[
             { label: language === "TH" ? "สภาพอากาศ" : "Weather", value: currentWeather ? `${Math.round(currentWeather.temperature)} °C` : "--", detail: weatherVisual.label, icon: weatherVisual.icon, tone: "weather", cardClass: weatherVisual.card, iconClass: weatherVisual.iconTone, badgeClass: weatherVisual.badge },
             { label: language === "TH" ? "สถานะระบบ" : "System status", value: liveSignal ? (language === "TH" ? "เชื่อมต่อแล้ว" : "Connected") : (language === "TH" ? "รอสัญญาณ" : "Waiting"), detail: locked ? "LOCKED" : liveSignal ? (language === "TH" ? "ปกติ" : "Normal") : "--", icon: Wifi, tone: "emerald" },
@@ -791,10 +791,10 @@ export function DashboardPage({
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-medium text-slate-500">{item.label}</p>
+                    <p className="text-xs font-medium text-slate-500">{item.label}</p>
                     <p className="mt-0.5 truncate text-sm font-bold text-slate-900 md:text-base">{item.value}</p>
                   </div>
-                  <Badge variant="secondary" className={`hidden shrink-0 text-[9px] sm:inline-flex ${item.badgeClass || "bg-emerald-50 text-emerald-700"}`}>{item.detail}</Badge>
+                  <Badge variant="secondary" className={`hidden shrink-0 text-[11px] sm:inline-flex ${item.badgeClass || "bg-emerald-50 text-emerald-700"}`}>{item.detail}</Badge>
                 </CardContent>
               </Card>
             );
@@ -802,7 +802,7 @@ export function DashboardPage({
         </div>
 
         {/* Machine Control Section (Hero) */}
-        <div className="mb-3 grid grid-cols-1 gap-3 xl:grid-cols-12">
+        <div className="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
 
           {/* Left Column: Visual Model */}
           <div className="space-y-3 xl:col-span-8">
@@ -849,17 +849,17 @@ export function DashboardPage({
                   <button disabled={controlsDisabled} onClick={() => { if (!controlsDisabled) sendStartCommand(); }} className="machine-action disabled:cursor-not-allowed group flex min-h-24 flex-col items-center justify-center rounded-2xl border border-emerald-500 bg-emerald-600 p-3 text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,.8)] transition hover:bg-emerald-700">
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-white text-emerald-600 shadow"><Power className="h-5 w-5" /></span>
                     <span className="mt-2 text-sm font-bold">{language === "TH" ? "เริ่มทำงาน" : "Start"}</span>
-                    <span className="text-[10px] text-emerald-50">Pump 2</span>
+                    <span className="text-xs text-emerald-50">Pump 2</span>
                   </button>
                   <button disabled={controlsDisabled} onClick={() => { if (!controlsDisabled) stopPump2FromWeb(); }} className="machine-action disabled:cursor-not-allowed flex min-h-24 flex-col items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-800 transition hover:bg-amber-100">
                     <span className="grid h-11 w-11 place-items-center rounded-full border border-amber-300 bg-white"><Cpu className="h-5 w-5" /></span>
                     <span className="mt-2 text-sm font-bold">{language === "TH" ? "หยุดชั่วคราว" : "Pause"}</span>
-                    <span className="text-[10px] text-amber-600">Pump 2</span>
+                    <span className="text-xs text-amber-600">Pump 2</span>
                   </button>
                   <button disabled={controlsDisabled} onClick={() => { if (!controlsDisabled) sendEmergencyStop(); }} className="machine-action disabled:cursor-not-allowed flex min-h-24 flex-col items-center justify-center rounded-2xl border border-red-600 bg-red-600 p-3 text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700">
                     <span className="grid h-11 w-11 place-items-center rounded-full border border-white/30 bg-white/15"><Siren className="h-5 w-5" /></span>
                     <span className="mt-2 text-sm font-bold">{language === "TH" ? "หยุดฉุกเฉิน" : "Emergency"}</span>
-                    <span className="text-[10px] text-red-100">E-STOP</span>
+                    <span className="text-xs text-red-100">E-STOP</span>
                   </button>
                 </div>
 
@@ -902,7 +902,7 @@ export function DashboardPage({
                 <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-[#f8faf9] px-4 py-3">
                   <div className="flex items-center gap-3">
                     <span className={`grid h-9 w-9 place-items-center rounded-full ${!boardConnected ? "bg-slate-100 text-slate-400" : locked || floatAlarm ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}><Cpu className="h-4 w-4" /></span>
-                    <div><p className="text-xs font-bold text-slate-800">{t.sensorNetwork}</p><p className="text-[10px] text-slate-500">{boardConnected ? t.sensorsOk : (language === "TH" ? "รอสัญญาณจากอุปกรณ์" : "Waiting for device")}</p></div>
+                    <div><p className="text-xs font-bold text-slate-800">{t.sensorNetwork}</p><p className="text-xs text-slate-500">{boardConnected ? t.sensorsOk : (language === "TH" ? "รอสัญญาณจากอุปกรณ์" : "Waiting for device")}</p></div>
                   </div>
                   <Badge className={boardConnected ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}>{boardConnected ? t.statusOnline : "OFFLINE"}</Badge>
                 </div>
@@ -943,7 +943,7 @@ export function DashboardPage({
                 </div>
                 <div className="mx-auto mt-4 grid h-24 w-24 place-items-center rounded-full p-[7px]" style={{ background: `conic-gradient(#10b981 ${systemHealthPercent * 3.6}deg, #e2e8f0 0deg)` }}>
                   <div className="grid h-full w-full place-items-center rounded-full bg-white text-center">
-                    <div><p className="text-2xl font-black leading-none text-emerald-600">{systemHealthPercent}%</p><p className="mt-1 text-[10px] text-slate-500">{language === "TH" ? "สุขภาพระบบ" : "Health"}</p></div>
+                    <div><p className="text-2xl font-semibold leading-none text-emerald-600">{systemHealthPercent}%</p><p className="mt-1 text-xs text-slate-500">{language === "TH" ? "สุขภาพระบบ" : "Health"}</p></div>
                   </div>
                 </div>
               </section>
@@ -960,8 +960,8 @@ export function DashboardPage({
                   return (
                     <div key={metric.label} className="mt-5">
                       <div className="flex items-end justify-between gap-2">
-                        <div><p className="text-xs font-bold text-slate-700">{metric.label}</p><p className="text-[10px] text-slate-400">{language === "TH" ? "เป้าหมาย" : "Target"} {metric.target}</p></div>
-                        <div className="text-right"><p className="text-[10px] text-slate-400">{language === "TH" ? "ปัจจุบัน" : "Current"}</p><p className="text-lg font-black text-slate-800">{metric.value != null ? metric.value.toFixed(metric.label === "pH" ? 2 : 2) : "--"}</p></div>
+                        <div><p className="text-xs font-bold text-slate-700">{metric.label}</p><p className="text-xs text-slate-400">{language === "TH" ? "เป้าหมาย" : "Target"} {metric.target}</p></div>
+                        <div className="text-right"><p className="text-xs text-slate-400">{language === "TH" ? "ปัจจุบัน" : "Current"}</p><p className="text-lg font-semibold text-slate-800">{metric.value != null ? metric.value.toFixed(metric.label === "pH" ? 2 : 2) : "--"}</p></div>
                       </div>
                       <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
                         <div className={`h-full rounded-full transition-all duration-500 ${metric.color}`} style={{ width: `${percentage}%` }} />
@@ -983,7 +983,7 @@ export function DashboardPage({
                   ].map(({ icon: Icon, label, value, danger }) => (
                     <div key={label} className="flex items-center gap-3 rounded-xl border border-white bg-white/80 p-3">
                       <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${danger ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-600"}`}><Icon className="h-4 w-4" /></span>
-                      <div className="min-w-0"><p className="text-[10px] text-slate-400">{label}</p><p className={`truncate text-sm font-black ${danger ? "text-red-600" : "text-slate-800"}`}>{value}</p></div>
+                      <div className="min-w-0"><p className="text-xs text-slate-400">{label}</p><p className={`truncate text-sm font-semibold ${danger ? "text-red-600" : "text-slate-800"}`}>{value}</p></div>
                     </div>
                   ))}
                 </div>
@@ -1005,7 +1005,7 @@ export function DashboardPage({
                   <span className={`h-2 w-2 shrink-0 rounded-full ${active ? "bg-emerald-500" : "bg-slate-300"}`} />
                   <Icon className="h-4 w-4 shrink-0 text-slate-400" />
                   <p className="min-w-0 flex-1 truncate text-xs font-medium text-slate-600">{String(label)}</p>
-                  <span className="text-[10px] text-slate-400">{index === 0 ? "now" : "—"}</span>
+                  <span className="text-xs text-slate-400">{index === 0 ? "now" : "—"}</span>
                 </div>
               ))}
             </CardContent>
