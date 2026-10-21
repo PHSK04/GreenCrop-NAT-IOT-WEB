@@ -461,7 +461,7 @@ body {
 }
 
 /* Shared page rhythm and surfaces with distinct jobs. */
-.greencrop-workspace { --workspace-width: 1840px; --workspace-radius: 20px; }
+.greencrop-workspace { --workspace-width: 100%; --workspace-radius: 20px; }
 .greencrop-workspace [data-workspace-page] { background: hsl(var(--background)); }
 .greencrop-workspace [data-workspace-page] header { box-shadow: none; }
 .greencrop-workspace [data-workspace-page] header h1 { font-size: clamp(1.25rem, 1.65vw, 1.8rem); font-weight: 650; line-height: 1.35; letter-spacing: -.025em; }
@@ -537,7 +537,7 @@ body {
 .greencrop-workspace .report-chart h2 { font-size: 22px; }
 .greencrop-workspace [data-slot="table-cell"] { padding-block: 18px; font-size: 14px; }
 .greencrop-workspace [data-slot="table-head"] { font-size: 13px; }
-@media (min-width: 1800px) { .greencrop-workspace { --workspace-width: 2100px; } }
+@media (min-width: 1800px) { .greencrop-workspace { --workspace-width: 100%; } }
 @media (max-width: 767px) {
   .greencrop-workspace [data-workspace-page] main { padding: 18px 16px; }
   .report-summary { gap: 12px; }
@@ -548,3 +548,9 @@ body {
 
 .greencrop-workspace [data-workspace-page] header > div > div { min-width: 0; }
 .greencrop-workspace [data-workspace-page] header h1 { overflow-wrap: anywhere; }
+
+/* Workspace content follows the available screen, including ultrawide displays. */
+.greencrop-workspace [data-workspace-page] main > div.w-full,
+.greencrop-workspace [data-workspace-page] header > div.mx-auto { max-width: none; width: 100%; }
+
+.greencrop-workspace [data-workspace-page] main { max-width: none; width: 100%; }

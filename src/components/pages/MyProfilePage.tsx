@@ -154,7 +154,7 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
             {/* Background Pattern */}
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none"></div>
 
-            <div className="max-w-5xl mx-auto space-y-8 relative z-10">
+            <div className="w-full space-y-8 relative z-10">
                 {/* Profile Header */}
                 <Card surface="flat" className="border-border bg-card shadow-2xl rounded-[2rem] overflow-hidden transition-all hover:shadow-emerald-900/10">
                     <div className="h-40 bg-gradient-to-r from-emerald-400 via-green-500 to-emerald-600 relative overflow-hidden">

@@ -257,7 +257,7 @@ export function DevicePairingPage({ user, onPaired, onSkip, language = "TH" }: D
         </div>
       </header>
 
-      <main className="page-solid-cards mx-auto grid w-full max-w-5xl gap-6 px-6 py-10 md:grid-cols-[1.1fr_0.9fr] md:px-10">
+      <main className="page-solid-cards mx-auto grid w-full gap-6 px-6 py-10 md:grid-cols-[1.1fr_0.9fr] md:px-10">
         <Card surface="flat" className="rounded-2xl border-border/70 bg-card shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
