@@ -200,11 +200,11 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   return (
     <>
       <header className="animate-in border-b border-white/80 bg-white/90 px-4 py-5 shadow-[0_12px_35px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl fade-in slide-in-from-bottom-2 duration-700 motion-reduce:animate-none md:px-8">
-        <div className="mx-auto flex w-full max-w-[1440px] flex-wrap items-center justify-between gap-4">
+        <div className="mx-auto flex w-full max-w-[1840px] flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900">
-              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-50 to-lime-50 text-emerald-600 shadow-sm"><Sprout className="h-6 w-6" /></span>
-              {isTH ? "รายงานผลผลิตและคุณภาพรายวัน" : "Daily Harvest & Quality"}
+            <h1 className="flex min-w-0 items-center gap-3 text-2xl font-black tracking-tight text-slate-900">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-50 to-lime-50 text-emerald-600 shadow-sm"><Sprout className="h-6 w-6" /></span>
+              <span className="min-w-0">{isTH ? "รายงานผลผลิตและคุณภาพรายวัน" : "Daily Harvest & Quality"}</span>
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               {isTH ? "ส่งออกและวิเคราะห์ผลผลิตรายวันและคุณภาพน้ำ" : "Export and analyze daily harvest and water quality data"}
@@ -220,7 +220,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
       </header>
 
       <main className="page-solid-cards flex-1 overflow-auto bg-[#f2f5f3] p-4 dark:bg-slate-950 md:p-6">
-        <div className="mx-auto w-full max-w-[1440px] space-y-5">
+        <div className="mx-auto w-full max-w-[1840px] space-y-5">
         <section className="report-summary" aria-label={isTH ? "สรุปช่วงที่เลือก" : "Selected period summary"}>
           <div className="report-summary-lead"><p className="workspace-eyebrow">{isTH ? "ผลผลิตรวมในช่วงที่เลือก" : "HARVEST IN SELECTED PERIOD"}</p><p className="report-summary-value">{reportSummary.totalYield.toLocaleString()}<span>g</span></p><p className="text-sm text-muted-foreground">{reportSummary.days} {isTH ? "วันที่มีการเก็บเกี่ยว" : "harvest days"}</p></div>
           {[
