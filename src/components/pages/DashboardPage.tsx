@@ -103,18 +103,18 @@ function RealtimeMetricCard({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-muted-foreground">{title}</p>
               <div className="mt-1 flex items-end gap-2">
-                <span className="font-mono text-3xl font-semibold leading-none text-foreground">{displayValue}</span>
+                <span className="sensor-reading font-mono text-3xl font-semibold leading-none text-foreground">{displayValue}</span>
                 {unit && <span className="pb-0.5 text-sm font-semibold text-muted-foreground">{unit}</span>}
               </div>
             </div>
           </div>
           <Badge variant="outline" className={`shrink-0 px-3 py-1 text-xs tracking-wider ${showingDemo ? "border-amber-200 bg-amber-50 text-amber-800" : "border-border bg-background/70 text-muted-foreground"}`}>
-            {showingDemo ? (language === "TH" ? "ข้อมูลจำลอง" : "Demo data") : status}
+            {showingDemo ? (language === "TH" ? "ข้อมูลจำลอง" : "Demo data") : (language === "TH" ? "ข้อมูลจริง" : "Live data")}
           </Badge>
         </div>
         <SensorTrendChart demo={showingDemo} data={chartData} dataKey={dataKey} title={title} unit={unit} language={language} />
         {!hasRealData && <button type="button" onClick={() => setDemoEnabled(enabled => !enabled)} className="justify-self-end rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted" aria-pressed={showingDemo}>
-          {showingDemo ? (language === "TH" ? "กลับไปดูข้อมูลจริง" : "Show real data") : (language === "TH" ? "ดูกราฟตัวอย่าง" : "Show demo chart")}
+          {showingDemo ? (language === "TH" ? "กลับไปดูข้อมูลจริง" : "Show real data") : (language === "TH" ? "ดูเกจตัวอย่าง" : "Show demo gauge")}
         </button>}
       </CardContent>
     </Card>
@@ -823,7 +823,20 @@ export function DashboardPage({
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
+
+                <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-[#f8faf9] px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className={`grid h-9 w-9 place-items-center rounded-full ${!boardConnected ? "bg-slate-100 text-slate-400" : locked || floatAlarm ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}><Cpu className="h-4 w-4" /></span>
+                    <div><p className="text-xs font-bold text-slate-800">{t.sensorNetwork}</p><p className="text-xs text-slate-500">{boardConnected ? t.sensorsOk : (language === "TH" ? "รอสัญญาณจากอุปกรณ์" : "Waiting for device")}</p></div>
+                  </div>
+                  <Badge className={boardConnected ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}>{boardConnected ? t.statusOnline : "OFFLINE"}</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+                <div className="dashboard-gauges grid grid-cols-1 gap-5 lg:grid-cols-3">
                   <RealtimeMetricCard
                     title={t.metrics.ph.title}
                     value={stablePhValue != null ? stablePhValue.toFixed(2) : "--"}
@@ -862,17 +875,6 @@ export function DashboardPage({
                   />
                 </div>
 
-                <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-[#f8faf9] px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <span className={`grid h-9 w-9 place-items-center rounded-full ${!boardConnected ? "bg-slate-100 text-slate-400" : locked || floatAlarm ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}><Cpu className="h-4 w-4" /></span>
-                    <div><p className="text-xs font-bold text-slate-800">{t.sensorNetwork}</p><p className="text-xs text-slate-500">{boardConnected ? t.sensorsOk : (language === "TH" ? "รอสัญญาณจากอุปกรณ์" : "Waiting for device")}</p></div>
-                  </div>
-                  <Badge className={boardConnected ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}>{boardConnected ? t.statusOnline : "OFFLINE"}</Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
 
         {/* Charts Row */}
         <div className="dashboard-insights grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-12">
@@ -917,7 +919,7 @@ export function DashboardPage({
                 </p>
                 {[
                   { label: "pH", target: "6.5–7.5", value: stablePhValue, max: 14, color: "bg-emerald-500" },
-                  { label: "EC", target: "1.5–2.0", value: stableEcValue, max: 4, color: "bg-cyan-500" },
+                  { label: "EC", target: "0.5–1.0 mS/cm", value: stableEcValue, max: 4, color: "bg-cyan-500" },
                 ].map((metric) => {
                   const percentage = metric.value == null ? 0 : Math.min(100, Math.max(0, (metric.value / metric.max) * 100));
                   return (
