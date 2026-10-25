@@ -22,8 +22,8 @@ export function HarvestReportChart({ rows, language = 'TH' }: { rows: CropYieldE
       <YAxis yAxisId="quality" orientation="right" width={42} tickLine={false} axisLine={false} domain={['auto', 'auto']} fontSize={13} />
       <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 12, color: 'hsl(var(--foreground))' }} labelFormatter={value => new Date(`${value}T00:00:00`).toLocaleDateString(isTH ? 'th-TH' : 'en-GB')} />
       <Legend iconType="circle" wrapperStyle={{ paddingTop: 16, fontSize: 14 }} />
-      <Bar yAxisId="yield" dataKey="totalYield" name={isTH ? 'ผลผลิต' : 'Harvest'} unit=" g" fill="#15956f" radius={[5, 5, 0, 0]} maxBarSize={48} isAnimationActive={false} />
-      <Line yAxisId="quality" dataKey={quality} name={selected.label} unit={selected.unit ? ` ${selected.unit}` : ''} stroke="#5276b8" strokeWidth={2.5} dot={{ r: 3 }} connectNulls={false} isAnimationActive={false} />
+      <Bar yAxisId="yield" dataKey="totalYield" name={isTH ? 'ผลผลิต' : 'Harvest'} unit=" g" fill="#12b77f" radius={[5, 5, 0, 0]} maxBarSize={48} isAnimationActive={false} />
+      <Line yAxisId="quality" dataKey={quality} name={selected.label} unit={selected.unit ? ` ${selected.unit}` : ''} stroke="#6f7fb8" strokeWidth={2.5} dot={{ r: 3 }} connectNulls={false} isAnimationActive={false} />
     </ComposedChart></ResponsiveContainer></div> : <div className="mt-5 flex min-h-48 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-muted/20 text-center"><BarChart3 className="h-7 w-7 text-muted-foreground/50" /><p className="text-sm text-muted-foreground">{isTH ? 'ยังไม่มีรายการในช่วงนี้ ลองเปลี่ยนตัวกรองหรือเพิ่มผลผลิต' : 'No records in this period. Change the filter or add a harvest.'}</p></div>}
   </section>;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMachine } from "../../contexts/MachineContext";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -22,10 +22,14 @@ import {
   ChevronDown,
   Bell,
   LogOut,
-  UserCircle
+  UserCircle,
+  Link2
 } from "lucide-react";
 import { MetricsChart } from "../MetricsChart";
-import { SensorCharts } from "../dashboard/SensorCharts";
+import { MachineRoomPreview } from "../dashboard/MachineRoomPreview";
+import { SensorTrendChart, type SensorTrendPoint } from "../dashboard/SensorTrendChart";
+import { createDemoSensorTrend } from "../dashboard/demoSensorTrend";
+import "../dashboard/dashboard-composition.css";
 import type { AdminDbDeviceRow } from "@/features/auth/services/authService";
 import type { LucideIcon } from "lucide-react";
 import { useLiveWeather } from "@/features/weather/useLiveWeather";
@@ -39,6 +43,7 @@ interface DashboardPageProps {
   onDeviceChange?: (deviceId: string) => void;
   user?: { name: string; email?: string; role?: string; avatar?: string };
   onOpenProfile?: () => void;
+  onOpenPairing?: () => void;
   onLogout?: () => void;
 }
 
@@ -58,60 +63,6 @@ const useStablePositiveValue = (value: number, enabled = true) => {
   return stableValue;
 };
 
-type SensorTrendPoint = {
-  time: number;
-  ph: number | null;
-  temp: number | null;
-  ec: number | null;
-};
-
-function MiniSensorChart({
-  data,
-  dataKey,
-  color,
-}: {
-  data: SensorTrendPoint[];
-  dataKey: "ph" | "temp" | "ec";
-  color: string;
-}) {
-  const values = data
-    .map((point) => point[dataKey])
-    .filter((value): value is number => value != null && Number.isFinite(value));
-
-  if (values.length < 2) {
-    return (
-      <div className="grid h-16 place-items-center rounded-xl border border-dashed border-border/70 bg-muted/20 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Waiting for trend
-      </div>
-    );
-  }
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = Math.max(max - min, 0.01);
-  const width = 220;
-  const height = 58;
-  const points = values.map((value, index) => {
-    const x = values.length === 1 ? 0 : (index / (values.length - 1)) * width;
-    const y = height - ((value - min) / span) * (height - 10) - 5;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const path = `M ${points.join(" L ")}`;
-  const fillPath = `${path} L ${width},${height} L 0,${height} Z`;
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-16 w-full overflow-visible rounded-xl bg-background/35">
-      <path d={fillPath} fill={color} opacity="0.12" />
-      <path d={path} fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-      {points.map((point, index) => {
-        if (index !== points.length - 1) return null;
-        const [cx, cy] = point.split(",");
-        return <circle key={point} cx={cx} cy={cy} r="4" fill={color} />;
-      })}
-    </svg>
-  );
-}
-
 function RealtimeMetricCard({
   title,
   value,
@@ -122,6 +73,7 @@ function RealtimeMetricCard({
   bgColor,
   data,
   dataKey,
+  language = "TH",
 }: {
   title: string;
   value: string;
@@ -132,9 +84,16 @@ function RealtimeMetricCard({
   bgColor: string;
   data: SensorTrendPoint[];
   dataKey: "ph" | "temp" | "ec";
+  language?: string;
 }) {
+  const [demoEnabled, setDemoEnabled] = useState(true);
+  const demoData = useMemo(() => createDemoSensorTrend(Date.now()), []);
+  const hasRealData = data.some(point => point[dataKey] != null && Number.isFinite(point[dataKey]));
+  const showingDemo = !hasRealData && demoEnabled;
+  const chartData = showingDemo ? demoData : data;
+  const displayValue = showingDemo ? Number(demoData[demoData.length - 1][dataKey]).toFixed(dataKey === "temp" ? 1 : 2) : value;
   return (
-    <Card surface="metric" className="rounded-2xl border-border/70 bg-card/65 shadow-lg backdrop-blur-sm">
+    <Card surface="metric" className={`sensor-trend-card sensor-trend-${dataKey} rounded-2xl border-border/70 bg-card/65`}>
       <CardContent className="grid gap-4 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -144,16 +103,19 @@ function RealtimeMetricCard({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-muted-foreground">{title}</p>
               <div className="mt-1 flex items-end gap-2">
-                <span className="font-mono text-3xl font-semibold leading-none text-foreground">{value}</span>
+                <span className="font-mono text-3xl font-semibold leading-none text-foreground">{displayValue}</span>
                 {unit && <span className="pb-0.5 text-sm font-semibold text-muted-foreground">{unit}</span>}
               </div>
             </div>
           </div>
-          <Badge variant="outline" className="shrink-0 border-border bg-background/70 px-3 py-1 text-xs uppercase tracking-wider text-muted-foreground">
-            {status}
+          <Badge variant="outline" className={`shrink-0 px-3 py-1 text-xs tracking-wider ${showingDemo ? "border-amber-200 bg-amber-50 text-amber-800" : "border-border bg-background/70 text-muted-foreground"}`}>
+            {showingDemo ? (language === "TH" ? "ข้อมูลจำลอง" : "Demo data") : status}
           </Badge>
         </div>
-        <MiniSensorChart data={data} dataKey={dataKey} color={color.includes("yellow") ? "#ca8a04" : color.includes("cyan") ? "#0891b2" : "#3b82f6"} />
+        <SensorTrendChart demo={showingDemo} data={chartData} dataKey={dataKey} title={title} unit={unit} language={language} />
+        {!hasRealData && <button type="button" onClick={() => setDemoEnabled(enabled => !enabled)} className="justify-self-end rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted" aria-pressed={showingDemo}>
+          {showingDemo ? (language === "TH" ? "กลับไปดูข้อมูลจริง" : "Show real data") : (language === "TH" ? "ดูกราฟตัวอย่าง" : "Show demo chart")}
+        </button>}
       </CardContent>
     </Card>
   );
@@ -247,6 +209,7 @@ export function DashboardPage({
   onDeviceChange,
   user,
   onOpenProfile,
+  onOpenPairing,
   onLogout,
 }: DashboardPageProps) {
   const t = translations[language as keyof typeof translations] || translations.EN;
@@ -269,10 +232,13 @@ export function DashboardPage({
     redOn,
     phOk,
     mqttStatus,
-    boardConnected
+    boardConnected,
+    telemetryHistory
   } = useMachine();
 
   const visiblePumpStates = [pump1On, pump2On];
+  // Plain-language placeholder instead of "--" while a reading has not arrived.
+  const noReading = language === "TH" ? "รอข้อมูล" : "No data yet";
   const activePumpLabels = visiblePumpStates
     .map((isActive, idx) => (isActive ? `P${idx + 1}` : null))
     .filter(Boolean)
@@ -308,7 +274,15 @@ export function DashboardPage({
     (systemHealthChecks.filter(Boolean).length / systemHealthChecks.length) * 100,
   );
   const activeAlertCount = [mqttStatus !== "connected", !boardConnected, locked, floatAlarm, redOn].filter(Boolean).length;
-  const [sensorTrend, setSensorTrend] = useState<SensorTrendPoint[]>([]);
+  const sensorTrend = useMemo<SensorTrendPoint[]>(() => telemetryHistory
+    .filter(row => Number.isFinite(Date.parse(row.timestamp)))
+    .slice().sort((a,b) => Date.parse(a.timestamp)-Date.parse(b.timestamp)).slice(-120)
+    .map(row => ({
+      time: Date.parse(row.timestamp),
+      ph: Number.isFinite(row.phValue) && row.phValue > 0 ? row.phValue : null,
+      temp: Number.isFinite(row.tempValue) && row.tempValue > 0 ? row.tempValue : null,
+      ec: Number.isFinite(row.ecValue) && row.ecValue > 0 ? row.ecValue : null,
+    })), [telemetryHistory]);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
   const [notificationsRead, setNotificationsRead] = useState(false);
@@ -408,29 +382,6 @@ export function DashboardPage({
     }
   }, [waterFullAlarm]);
 
-  useEffect(() => {
-    const hasAnyLiveMetric = stablePhValue != null || stableTempValue != null || stableEcValue != null;
-    if (!hasAnyLiveMetric) return;
-
-    setSensorTrend((prev) => {
-      const nextPoint: SensorTrendPoint = {
-        time: Date.now(),
-        ph: stablePhValue,
-        temp: stableTempValue,
-        ec: stableEcValue,
-      };
-      const last = prev[prev.length - 1];
-      if (
-        last &&
-        last.ph === nextPoint.ph &&
-        last.temp === nextPoint.temp &&
-        last.ec === nextPoint.ec
-      ) {
-        return prev;
-      }
-      return [...prev, nextPoint].slice(-24);
-    });
-  }, [stableEcValue, stablePhValue, stableTempValue]);
 
   const handleStopWaterFullAlarm = () => {
     if (controlsDisabled) return;
@@ -618,9 +569,10 @@ export function DashboardPage({
       {waterFullAlarmOverlay}
 
       {/* Header */}
-      <header className="sticky top-0 z-20 flex min-h-[102px] items-center border-b border-border/60 bg-white/90 px-4 text-foreground backdrop-blur-xl dark:bg-slate-950/90 md:px-6">
-        <div className="flex w-full flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-          <div className="flex min-w-0 items-center gap-3">
+      <header className="dashboard-topbar sticky top-0 z-20 flex min-h-[64px] items-center border-b border-border/60 bg-white/90 px-4 py-3 text-foreground backdrop-blur-xl dark:bg-slate-950/90 md:px-6 lg:min-h-[102px] lg:py-0">
+        <div className="flex w-full items-center justify-between gap-3">
+          {/* Below lg the workspace's mobile header already shows the brand and page title. */}
+          <div className="hidden min-w-0 items-center gap-3 lg:flex">
             <span className="dashboard-logo relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50 to-cyan-50 shadow-[0_10px_30px_-14px_rgba(5,150,105,0.65)] dark:border-emerald-700/50 dark:from-slate-900 dark:via-emerald-950 dark:to-slate-900">
               <span className="absolute inset-1 rounded-xl border border-white/80 dark:border-white/10" />
               <img
@@ -639,8 +591,18 @@ export function DashboardPage({
               <p className="mt-0.5 truncate text-xs text-muted-foreground">{t.subtitle}</p>
             </div>
           </div>
-          <div className="flex w-full items-center gap-2 sm:w-auto">
+          <div className="flex w-full items-center gap-2 lg:w-auto">
             <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+              {devices.length === 0 && onOpenPairing ? (
+                <button
+                  type="button"
+                  onClick={onOpenPairing}
+                  className="flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-400/70 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800 transition hover:border-emerald-500 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  {language === "TH" ? "จับคู่อุปกรณ์เพื่อเริ่มใช้งาน" : "Pair a device to get started"}
+                </button>
+              ) : (
               <select
                 aria-label={t.changeDevice}
                 className="h-9 w-full rounded-xl border border-border bg-background px-3 pr-8 text-xs font-medium text-foreground outline-none transition focus:border-emerald-500/50 disabled:opacity-60"
@@ -652,7 +614,9 @@ export function DashboardPage({
                   <option key={String(device.id)} value={device.device_id}>{device.device_name || device.device_id}</option>
                 ))}
               </select>
+              )}
             </div>
+            <span className="hidden flex-1 sm:block lg:hidden" aria-hidden="true" />
           <Badge
             variant={mqttStatus === "connected" && boardConnected ? "default" : "secondary"}
             className={`hidden border px-3 py-1.5 font-mono text-xs sm:flex ${mqttStatus === "connected" && boardConnected ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300" : "border-border bg-muted text-muted-foreground"}`}
@@ -772,15 +736,15 @@ export function DashboardPage({
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 overflow-auto bg-[#edf3f0] p-3 dark:bg-slate-950 md:p-5">
+      <main className="dashboard-main relative z-10 flex-1 overflow-auto bg-[#edf3f0] p-3 dark:bg-slate-950 md:p-5">
         <div className="dashboard-canvas w-full">
 
         <div className="dashboard-metrics mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[
-            { label: language === "TH" ? "สภาพอากาศ" : "Weather", value: currentWeather ? `${Math.round(currentWeather.temperature)} °C` : "--", detail: weatherVisual.label, icon: weatherVisual.icon, tone: "weather", cardClass: weatherVisual.card, iconClass: weatherVisual.iconTone, badgeClass: weatherVisual.badge },
+            { label: language === "TH" ? "สภาพอากาศ" : "Weather", value: currentWeather ? `${Math.round(currentWeather.temperature)} °C` : noReading, detail: weatherVisual.label, icon: weatherVisual.icon, tone: "weather", cardClass: weatherVisual.card, iconClass: weatherVisual.iconTone, badgeClass: weatherVisual.badge },
             { label: language === "TH" ? "สถานะระบบ" : "System status", value: liveSignal ? (language === "TH" ? "เชื่อมต่อแล้ว" : "Connected") : (language === "TH" ? "รอสัญญาณ" : "Waiting"), detail: locked ? "LOCKED" : liveSignal ? (language === "TH" ? "ปกติ" : "Normal") : "--", icon: Wifi, tone: "emerald" },
             { label: language === "TH" ? "สถานะปั๊ม" : "Pump status", value: pump2On ? (language === "TH" ? "ปั๊มน้ำ #2" : "Water pump #2") : (language === "TH" ? "ปั๊มหยุด" : "Pumps stopped"), detail: activePumpLabels || "OFF", icon: Cpu, tone: "cyan" },
-            { label: language === "TH" ? "ระดับน้ำ" : "Water level", value: liveSignal ? (wls2 ? (language === "TH" ? "ถึงระดับบน" : "Upper level") : wls1 ? (language === "TH" ? "ถึงระดับล่าง" : "Lower level") : (language === "TH" ? "ยังไม่ถึงระดับ" : "Below level")) : "--", detail: wls2 ? (language === "TH" ? "ระดับเหมาะสม" : "Normal") : (language === "TH" ? "กำลังตรวจสอบ" : "Checking"), icon: Droplets, tone: "blue" },
+            { label: language === "TH" ? "ระดับน้ำ" : "Water level", value: liveSignal ? (wls2 ? (language === "TH" ? "ถึงระดับบน" : "Upper level") : wls1 ? (language === "TH" ? "ถึงระดับล่าง" : "Lower level") : (language === "TH" ? "ยังไม่ถึงระดับ" : "Below level")) : noReading, detail: wls2 ? (language === "TH" ? "ระดับเหมาะสม" : "Normal") : (language === "TH" ? "กำลังตรวจสอบ" : "Checking"), icon: Droplets, tone: "blue" },
           ].map((item) => {
             const Icon = item.icon;
             const tone = item.iconClass || (item.tone === "blue" ? "bg-blue-50 text-blue-600" : item.tone === "cyan" ? "bg-cyan-50 text-cyan-600" : "bg-emerald-50 text-emerald-600");
@@ -792,7 +756,7 @@ export function DashboardPage({
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-slate-500">{item.label}</p>
-                    <p className="mt-0.5 truncate text-sm font-bold text-slate-900 md:text-base">{item.value}</p>
+                    <p className="mt-0.5 text-sm font-bold leading-snug text-slate-900 sm:truncate md:text-base">{item.value}</p>
                   </div>
                   <Badge variant="secondary" className={`hidden shrink-0 text-[11px] sm:inline-flex ${item.badgeClass || "bg-emerald-50 text-emerald-700"}`}>{item.detail}</Badge>
                 </CardContent>
@@ -802,19 +766,15 @@ export function DashboardPage({
         </div>
 
         {/* Machine Control Section (Hero) */}
-        <div className="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
+        <div className="dashboard-machine-hero mb-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
 
-          {/* Left Column: Visual Model */}
-          <div className="space-y-3 xl:col-span-8">
-            <Card surface="chart" className="h-full min-h-[400px] overflow-hidden rounded-[26px] border-white bg-white shadow-[0_26px_64px_-40px_rgba(15,23,42,.4)] sm:min-h-[580px] xl:min-h-[650px]">
-              <CardContent className="p-0">
-                <SensorCharts />
-              </CardContent>
-            </Card>
+          {/* Left Column: 3D room; sensor charts are temporarily hidden. */}
+          <div className="min-w-0 xl:col-span-7">
+            <MachineRoomPreview language={language} />
           </div>
 
           {/* Right Column: Controls and live readings */}
-          <div className="xl:col-span-4">
+          <div className="xl:col-span-5">
             <Card surface="focus" data-emergency-locked={emergencyLocked} className={`machine-control-panel h-full rounded-[26px] border-2 bg-white shadow-xl ${emergencyLocked ? "border-red-500 shadow-red-950/10" : "border-emerald-500/50 shadow-emerald-950/10"}`}>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between text-slate-900">
@@ -824,7 +784,7 @@ export function DashboardPage({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-4">
-                  <div className={`rounded-2xl px-4 py-3 ${emergencyLocked ? "bg-red-600 text-white" : controlsDisabled ? "bg-slate-800 text-white" : "bg-emerald-600 text-white"}`} role={emergencyLocked ? "alert" : "status"}>
+                  <div className={`control-status rounded-2xl px-4 py-3 ${emergencyLocked ? "bg-red-600 text-white" : controlsDisabled ? "bg-slate-800 text-white" : "bg-emerald-600 text-white"}`} role={emergencyLocked ? "alert" : "status"}>
                     <p className="text-xs font-medium uppercase tracking-widest opacity-80">{language === "TH" ? "สถานะการควบคุม" : "CONTROL STATUS"}</p>
                     <p className="mt-1 flex items-center gap-2 text-xl font-bold">{emergencyLocked ? <Siren className="h-6 w-6" /> : <Power className="h-6 w-6" />}{emergencyLocked ? "EMERGENCY LOCK" : controlMode === "auto" ? "AUTO" : "MANUAL"}</p>
                     <p className="mt-2 text-sm leading-6 opacity-90">{emergencyLocked
@@ -845,7 +805,7 @@ export function DashboardPage({
                     })}
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="control-actions grid grid-cols-3 gap-2">
                   <button disabled={controlsDisabled} onClick={() => { if (!controlsDisabled) sendStartCommand(); }} className="machine-action disabled:cursor-not-allowed group flex min-h-24 flex-col items-center justify-center rounded-2xl border border-emerald-500 bg-emerald-600 p-3 text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,.8)] transition hover:bg-emerald-700">
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-white text-emerald-600 shadow"><Power className="h-5 w-5" /></span>
                     <span className="mt-2 text-sm font-bold">{language === "TH" ? "เริ่มทำงาน" : "Start"}</span>
@@ -873,6 +833,7 @@ export function DashboardPage({
                     color="text-emerald-600"
                     bgColor="bg-emerald-50"
                     data={sensorTrend}
+                    language={language}
                     dataKey="ph"
                   />
                   <RealtimeMetricCard
@@ -884,6 +845,7 @@ export function DashboardPage({
                     color="text-blue-600"
                     bgColor="bg-blue-50"
                     data={sensorTrend}
+                    language={language}
                     dataKey="temp"
                   />
                   <RealtimeMetricCard
@@ -895,6 +857,7 @@ export function DashboardPage({
                     color="text-cyan-600"
                     bgColor="bg-cyan-50"
                     data={sensorTrend}
+                    language={language}
                     dataKey="ec"
                   />
                 </div>
@@ -912,17 +875,17 @@ export function DashboardPage({
         </div>
 
         {/* Charts Row */}
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(500px,1.15fr)_minmax(320px,0.72fr)]">
-          <div className="overflow-hidden rounded-[24px] border border-white bg-white p-1 shadow-[0_20px_50px_-38px_rgba(15,23,42,.42)]">
+        <div className="dashboard-insights grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-12">
+          <div className="dashboard-trend min-w-0 overflow-hidden rounded-[22px] border border-white bg-white p-1 shadow-sm 2xl:col-span-4">
             <MetricsChart compact />
           </div>
-          <Card surface="panel" className="min-h-[340px] rounded-[24px] border-white bg-white shadow-[0_20px_50px_-38px_rgba(15,23,42,.42)]">
+          <Card surface="panel" className="dashboard-overview min-w-0 rounded-[22px] border-white bg-white shadow-sm 2xl:col-span-5">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg text-slate-900">
                 {language === "TH" ? "ภาพรวมการทำงานวันนี้" : "Today's operation overview"}
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 min-[1680px]:grid-cols-3">
+            <CardContent className="grid gap-3 sm:grid-cols-3">
               <section className="rounded-2xl border border-slate-100 bg-[#f8faf9] p-4">
                 <p className="text-sm font-bold text-slate-800">
                   {language === "TH" ? "สุขภาพระบบ" : "System health"}
@@ -990,7 +953,7 @@ export function DashboardPage({
               </section>
             </CardContent>
           </Card>
-          <Card surface="panel" className="rounded-[24px] border-white bg-white shadow-[0_20px_50px_-38px_rgba(15,23,42,.42)]">
+          <Card surface="panel" className="dashboard-activity min-w-0 rounded-[22px] border-white bg-white shadow-sm lg:col-span-2 2xl:col-span-3">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">{language === "TH" ? "กิจกรรมระบบล่าสุด" : "Recent activity"}</CardTitle>
             </CardHeader>

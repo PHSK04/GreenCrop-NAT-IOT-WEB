@@ -19,6 +19,7 @@ import {
   Cpu,
   Headset,
 } from "lucide-react";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -183,21 +184,40 @@ function SidebarContent({
     if (onCloseMobile) onCloseMobile();
   };
 
+  // Icon-only rail: show the page name beside the icon on hover/focus.
+  // Portalled so the rail's overflow clipping cannot hide it.
+  const withRailTooltip = (label: string, node: React.ReactElement) => {
+    if (!compact) return node;
+    return (
+      <Tooltip.Root key={label}>
+        <Tooltip.Trigger asChild>{node}</Tooltip.Trigger>
+        <Tooltip.Portal>
+          <Tooltip.Content side="right" sideOffset={12} className="z-[100] rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg dark:bg-slate-100 dark:text-slate-900">
+            {label}
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      </Tooltip.Root>
+    );
+  };
+
   const renderNavItem = (item: any, isActive: boolean) => {
     const Icon = item.icon;
     const translatedLabel = t[item.label] || item.label;
-    return (
+    return withRailTooltip(translatedLabel,
       <button key={item.label} type="button" onClick={() => handleNavClick(item.label)}
         aria-label={translatedLabel} aria-current={isActive ? "page" : undefined}
-        title={compact ? translatedLabel : undefined}
-        className={`sidebar-item group relative flex shrink-0 items-center text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${compact ? "mx-auto h-12 w-12 justify-center rounded-full" : "w-full gap-3 rounded-xl px-3 py-2.5"} ${isActive ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700" : compact ? "border border-slate-100 bg-white text-slate-600 shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"}`}>
+        className={`sidebar-item group relative flex shrink-0 items-center text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${compact ? "mx-auto h-12 w-12 justify-center rounded-full" : "w-full gap-3 rounded-xl px-3 py-2.5"} ${isActive ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/60 dark:text-emerald-100" : compact ? "border border-slate-100 bg-white text-slate-600 shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"}`}>
         <Icon className={`${compact ? "h-[22px] w-[22px]" : "h-4 w-4"} shrink-0`} />
         {!compact && <span className="truncate">{translatedLabel}</span>}
       </button>
     );
   };
 
+  const languageLabel = language === "TH" ? "เปลี่ยนภาษา (EN)" : "Switch language (TH)";
+  const logoutLabel = language === "TH" ? "ออกจากระบบ" : "Logout";
+
   return (
+    <Tooltip.Provider delayDuration={150}>
     <div
       className={`sidebar-rail flex flex-col transition-[width,border-radius] duration-300 ${compact ? `pointer-events-auto mx-auto my-3 h-[calc(100%_-_1.5rem)] overflow-hidden border border-slate-200/70 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${isCompactHovered ? "w-56 rounded-[24px]" : "w-20 rounded-[36px]"}` : "h-full border-r border-border/70 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/92"}`}
     >
@@ -326,25 +346,29 @@ function SidebarContent({
       <div className={`${compact ? "mx-auto w-full shrink-0 border-t border-border/60 px-2 py-3" : "border-t border-border/60 p-3 dark:border-slate-800"}`}>
          {compact ? (
            <div className={`flex items-center justify-center ${isCompactHovered ? "w-[200px] gap-3" : "w-11 flex-col gap-2"}`}>
-             <Button
-               variant="ghost"
-               size="icon"
-               title={language === "TH" ? "เปลี่ยนภาษา" : "Change language"}
-               className={`${isCompactHovered ? "flex" : "hidden"} h-10 w-10 rounded-full`}
-               onClick={() => setLanguage(l => l === "EN" ? "TH" : "EN")}
-             >
-               <span className="text-xs font-bold font-mono">{language}</span>
-             </Button>
+             {withRailTooltip(languageLabel,
+               <Button
+                 variant="ghost"
+                 size="icon"
+                 aria-label={languageLabel}
+                 className="flex h-10 w-10 rounded-full"
+                 onClick={() => setLanguage(l => l === "EN" ? "TH" : "EN")}
+               >
+                 <span className="text-xs font-bold font-mono">{language}</span>
+               </Button>
+             )}
              <ModeToggle />
-             <Button
-               variant="ghost"
-               size="icon"
-               title={language === "TH" ? "ออกจากระบบ" : "Logout"}
-               className={`${isCompactHovered ? "flex" : "hidden"} h-10 w-10 rounded-full border border-white/90 bg-white/92 text-slate-600 shadow-[0_6px_18px_-12px_rgba(15,23,42,0.35)] hover:bg-white hover:text-red-500 dark:border-slate-700 dark:bg-slate-900`}
-               onClick={onLogout}
-             >
-               <LogOut className="h-4 w-4" />
-             </Button>
+             {withRailTooltip(logoutLabel,
+               <Button
+                 variant="ghost"
+                 size="icon"
+                 aria-label={logoutLabel}
+                 className="flex h-10 w-10 rounded-full text-slate-500 hover:bg-red-50 hover:text-red-500 dark:text-slate-400 dark:hover:bg-red-950/40"
+                 onClick={onLogout}
+               >
+                 <LogOut className="h-4 w-4" />
+               </Button>
+             )}
            </div>
          ) : (
          <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 p-1.5 dark:bg-slate-900/60">
@@ -367,6 +391,7 @@ function SidebarContent({
          )}
       </div>
       </div>
+    </Tooltip.Provider>
   );
 }
 
@@ -439,6 +464,7 @@ export function Dashboard({ onLogout, user }: DashboardProps) {
 	            onDeviceChange={handleDeviceChange}
 	            user={user}
 	            onOpenProfile={() => setActivePage("My Profile")}
+	            onOpenPairing={() => setActivePage("Device Pairing")}
 	            onLogout={onLogout}
 	          />
 	        );

@@ -6,7 +6,7 @@
 @layer base {
   :root {
     --font-size: 14px;
-    --background: 150 14% 98%;
+    --background: 140 14% 97.5%;
     --foreground: 222 38% 13%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -14,23 +14,23 @@
     --popover-foreground: 222 47% 11%;
     --primary: 160 84% 39%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 150 12% 96%;
+    --secondary: 140 14% 95%;
     --secondary-foreground: 222 47% 11%;
-    --muted: 150 14% 96%;
-    --muted-foreground: 215 16% 44%;
-    --accent: 154 24% 93%;
+    --muted: 140 14% 95.5%;
+    --muted-foreground: 150 8% 42%;
+    --accent: 142 20% 93%;
     --accent-foreground: 222 47% 11%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 150 10% 89%;
-    --input: 150 10% 87%;
+    --border: 140 12% 90%;
+    --input: 140 12% 87%;
     --ring: 160 84% 39%;
     --radius: 0.875rem;
-    --chart-1: 158 64% 52%;
-    --chart-2: 217 91% 60%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 335 85% 60%;
-    --chart-5: 247 74% 67%;
+    --chart-1: 160 84% 39%;
+    --chart-2: 210 45% 56%;
+    --chart-3: 36 60% 55%;
+    --chart-4: 350 45% 60%;
+    --chart-5: 255 30% 62%;
     --dark-bg: 210 40% 98%;
     --dark-card: 0 0% 100%;
     --dark-primary-text: 222 47% 11%;
@@ -48,8 +48,8 @@
     --card-foreground: 210 40% 98%;
     --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
-    --primary: 158 64% 52%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 145 28% 62%;
+    --primary-foreground: 150 30% 10%;
     --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217 33% 17%;
@@ -60,8 +60,8 @@
     --destructive-foreground: 210 40% 98%;
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 158 64% 52%;
-    --chart-1: 158 64% 52%;
+    --ring: 145 28% 62%;
+    --chart-1: 145 28% 58%;
     --chart-2: 217 91% 60%;
     --chart-3: 38 92% 50%;
     --chart-4: 335 85% 60%;
@@ -86,8 +86,6 @@ body {
   font-family: "Outfit", "Noto Sans Thai", sans-serif;
   line-height: 1.55;
   text-rendering: optimizeLegibility;
-  background-image: radial-gradient(circle at 85% -10%, hsl(158 60% 88% / 0.22), transparent 30rem);
-  background-attachment: fixed;
 }
 
 .scada-pipe {
@@ -390,7 +388,7 @@ body {
 /* GreenCrop workspace: shared finish, with the existing page structure retained. */
 .greencrop-workspace {
   --workspace-radius: 16px;
-  --workspace-shadow: 0 1px 2px rgb(24 45 36 / .04), 0 6px 16px -10px rgb(24 45 36 / .16);
+  --workspace-shadow: 0 1px 2px rgb(24 45 36 / .03);
   --workspace-border: hsl(var(--border));
   font-family: "Noto Sans Thai", system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
@@ -424,7 +422,7 @@ body {
 .greencrop-workspace :is(button,input,select,textarea) { transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease; }
 .greencrop-workspace .sidebar-rail { border-color: var(--workspace-border); box-shadow: var(--workspace-shadow); }
 .greencrop-workspace .sidebar-item { transition: background-color 140ms ease, color 140ms ease; }
-.greencrop-workspace .sidebar-item[aria-current="page"] { box-shadow: 0 3px 8px -5px rgb(6 78 59 / .35); }
+.greencrop-workspace .sidebar-item[aria-current="page"] { box-shadow: none; }
 .greencrop-workspace .machine-action { background-image: none; border-radius: 12px; box-shadow: 0 1px 2px rgb(15 23 42 / .1); }
 .greencrop-workspace .machine-action > span:first-child { box-shadow: none; }
 .greencrop-workspace .machine-action:active:not(:disabled) { transform: translateY(1px); }
@@ -442,12 +440,12 @@ body {
 .workspace-eyebrow { font-size: 13px; font-weight: 500; letter-spacing: .01em; color: hsl(var(--muted-foreground)); }
 .workspace-segments { display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 4px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--muted)); }
 .workspace-segments button { min-height: 40px; padding: 8px 16px; border-radius: 7px; font-size: 14px; font-weight: 500; color: hsl(var(--muted-foreground)); }
-.workspace-segments button[aria-pressed="true"] { color: white; background: #087f5b; box-shadow: 0 1px 3px rgb(6 78 59 / .18); }
+.workspace-segments button[aria-pressed="true"] { color: #2f4f3f; background: hsl(var(--card)); box-shadow: 0 1px 2px rgb(24 45 36 / .08); }
 .report-summary { display: grid; grid-template-columns: minmax(0,2fr) repeat(4,minmax(0,1fr)); gap: 16px; padding-block: 0 8px; }
-.report-summary-lead { padding: 26px 30px; border: 1px solid #075941; border-radius: 16px; background: #08634b; color: white; box-shadow: 0 4px 12px -8px rgb(6 78 59 / .4); }
-.report-summary-lead :is(.workspace-eyebrow,.text-muted-foreground) { color: #d1e8de; }
+.report-summary-lead { padding: 26px 30px; border: 1px solid #c4ecd9; border-radius: 16px; background: #eaf8f1; color: #1f3a2f; box-shadow: none; }
+.report-summary-lead :is(.workspace-eyebrow,.text-muted-foreground) { color: #4f6b5c; }
 .report-summary-value { margin: 12px 0 8px; font-size: clamp(44px,4.2vw,64px); font-weight: 500; line-height: 1.2; letter-spacing: -.04em; }
-.report-summary-value span { margin-left: 10px; font-size: 20px; letter-spacing: 0; color: #d1e8de; }
+.report-summary-value span { margin-left: 10px; font-size: 20px; letter-spacing: 0; color: #4f6b5c; }
 .report-summary-item { display: flex; flex-direction: column; justify-content: center; padding: 24px; border: 1px solid var(--workspace-border); border-radius: 16px; background: hsl(var(--card)); box-shadow: 0 1px 3px rgb(24 45 36 / .04); }
 .report-summary-item p:nth-child(2) { font-size: 34px; font-weight: 500; }
 .report-workbench { overflow: hidden; border: 1px solid var(--workspace-border); border-radius: 16px; background: hsl(var(--card)); box-shadow: var(--workspace-shadow); }
@@ -483,3 +481,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .greencrop-workspace :is(button,input,select,textarea) { transition: none; }
 }
+.dark .report-summary-lead { background: #1d3027; border-color: #2c4537; color: #e2efe7; }
+.dark .report-summary-lead :is(.workspace-eyebrow,.text-muted-foreground), .dark .report-summary-value span { color: #a8c2b2; }
+.dark .workspace-segments button[aria-pressed="true"] { color: #e2efe7; }

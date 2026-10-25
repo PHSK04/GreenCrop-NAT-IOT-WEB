@@ -1,0 +1,33 @@
+.hydroponic-room.dashboard-machine-room{flex:1;height:auto;min-height:620px;width:100%;border-radius:0}
+.hydroponic-room.dashboard-machine-room .machine-scene{position:absolute;inset:0;height:100%}
+.hydroponic-room.dashboard-machine-room header{display:none}
+.hydroponic-room.dashboard-machine-room #viewport,.hydroponic-room.dashboard-machine-room #second-viewport{inset:10px 0 112px}
+.hydroponic-room.dashboard-machine-room .action-feedback{bottom:93px;padding:0 12px;font-size:11px}
+.hydroponic-room.dashboard-machine-room .camera-hint{bottom:71px;max-width:none;left:18px;right:18px;text-align:center;font-size:10px;color:#678474}
+.hydroponic-room.dashboard-machine-room nav{left:14px;right:14px;bottom:14px;justify-content:center;gap:10px;border-radius:16px;box-shadow:0 6px 20px #355b4510;padding:7px 9px;flex-wrap:wrap}
+.hydroponic-room .room-toolbar-group{display:flex;align-items:center;gap:3px}
+.hydroponic-room .room-toolbar-group+.room-toolbar-group{border-left:1px solid #dce7dd;padding-left:10px}
+.hydroponic-room .room-toolbar-group button{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.hydroponic-room.dashboard-machine-room nav button{font-size:11px;padding:10px 11px;border-radius:10px}
+.hydroponic-room.dashboard-machine-room nav button[aria-pressed="true"]{background:#deecdf;color:#285541;box-shadow:inset 0 0 0 1px #bed5c0}
+.hydroponic-room.dashboard-machine-room .machine-state{left:16px;top:8px;font-size:10px}
+@media(max-width:700px){.hydroponic-room.dashboard-machine-room{height:580px;min-height:580px;flex:auto}.hydroponic-room.dashboard-machine-room nav{gap:6px;left:10px;right:10px;bottom:10px}.hydroponic-room.dashboard-machine-room nav button{font-size:10px;padding:9px 7px;gap:5px}.hydroponic-room .room-toolbar-group+.room-toolbar-group{border:0;padding-left:0}.hydroponic-room.dashboard-machine-room .camera-hint{font-size:9px;bottom:105px}.hydroponic-room.dashboard-machine-room .action-feedback{bottom:128px;font-size:10px}.hydroponic-room.dashboard-machine-room #viewport,.hydroponic-room.dashboard-machine-room #second-viewport{bottom:142px}}
+/* Compact footer with views first and demonstration controls alongside. */
+.hydroponic-room.dashboard-machine-room #viewport,.hydroponic-room.dashboard-machine-room #second-viewport{inset:12px 0 108px}
+.hydroponic-room.dashboard-machine-room nav{justify-content:space-between;left:16px;right:16px;bottom:12px;box-shadow:none;background:#ffffffed;border-color:#dce6de;padding:7px}
+.hydroponic-room.dashboard-machine-room .action-feedback{bottom:86px;line-height:1.5}
+.hydroponic-room.dashboard-machine-room .camera-hint{bottom:66px;font-size:10px;line-height:1.5}
+@media(max-width:700px){.hydroponic-room.dashboard-machine-room nav{justify-content:center;left:10px;right:10px}.hydroponic-room.dashboard-machine-room #viewport,.hydroponic-room.dashboard-machine-room #second-viewport{bottom:142px}.hydroponic-room.dashboard-machine-room .action-feedback{bottom:128px}.hydroponic-room.dashboard-machine-room .camera-hint{bottom:105px;font-size:9px}}
+/* Match the room to the dashboard's deeper botanical palette. */
+.hydroponic-room.dashboard-machine-room canvas{filter:saturate(1.12) contrast(1.045)}
+.hydroponic-room.dashboard-machine-room nav{border-radius:13px;border:1px solid #dbe6df;background:#ffffffed;padding:6px}
+.hydroponic-room.dashboard-machine-room nav button{padding:10px 12px;font-weight:550;color:#557363;transition:background .18s,color .18s}
+.hydroponic-room.dashboard-machine-room nav button:hover{background:#eef5f0;color:#234f3b}
+.hydroponic-room.dashboard-machine-room nav button[aria-pressed="true"]{background:#e5f1e9;box-shadow:inset 0 0 0 1px #d0e3d6;color:#285e42}
+@media(prefers-reduced-motion:reduce){.hydroponic-room.dashboard-machine-room nav button{transition:none}}
+/* 3D could not start: shrink to a short notice with a retry button. */
+.hydroponic-room.dashboard-machine-room.room-failed{min-height:220px;height:220px;flex:none;background:transparent}
+.hydroponic-room.room-failed nav,.hydroponic-room.room-failed .camera-hint,.hydroponic-room.room-failed .stage-labels,.hydroponic-room.room-failed #second-focus,.hydroponic-room.room-failed .action-feedback,.hydroponic-room.room-failed .machine-state{display:none}
+.hydroponic-room.room-failed #status{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;font-size:13px;color:#4c6a5a;background:none;transform:none}
+.hydroponic-room .room-retry{border:1px solid #9ac6ab;background:#fff;color:#17563b;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer}
+.hydroponic-room .room-retry:hover{background:#eef5f0}

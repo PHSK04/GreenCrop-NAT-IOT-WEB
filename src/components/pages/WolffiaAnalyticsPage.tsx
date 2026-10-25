@@ -342,11 +342,11 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                   <YAxis 
                     yAxisId="right"
                     orientation="right"
-                    stroke="#f59e0b"
+                    stroke="#c09a52"
                     fontSize={12}
                     tickLine={false}
                     axisLine={false}
-                    label={{ value: 'Frequency (times)', angle: 90, position: 'insideRight', fill: '#f59e0b' }}
+                    label={{ value: 'Frequency (times)', angle: 90, position: 'insideRight', fill: '#c09a52' }}
                   />
                   <Tooltip 
                     contentStyle={{
@@ -369,7 +369,7 @@ export function WolffiaAnalyticsPage({ language = "TH" }: WolffiaAnalyticsPagePr
                     cursor="pointer"
                     onClick={(data) => setSelectedMonth(data.payload as MonthlyYieldSummary)}
                   />
-                  <Line yAxisId="right" type="monotone" dataKey="frequency" stroke="#f59e0b" strokeWidth={3} name={isTH ? "จำนวนเก็บเกี่ยว (ครั้ง/เดือน)" : "Harvests (times/month)"} dot={{ r: 4, fill: "#f59e0b" }} />
+                  <Line yAxisId="right" type="monotone" dataKey="frequency" stroke="#c09a52" strokeWidth={3} name={isTH ? "จำนวนเก็บเกี่ยว (ครั้ง/เดือน)" : "Harvests (times/month)"} dot={{ r: 4, fill: "#c09a52" }} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

@@ -2,11 +2,10 @@ import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Thermometer, Droplets, Activity, AlertTriangle, Download, FileText, CloudRain, Database, LocateFixed, MapPin, RefreshCw, Wind, CloudSun, Sparkles, Sprout, Navigation } from "lucide-react";
+import { Thermometer, Droplets, Activity, AlertTriangle, Download, FileText, CloudRain, Database, LocateFixed, MapPin, RefreshCw, Wind, CloudSun, Sparkles, Sprout, Navigation, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { useDeviceSeed } from "@/hooks/useActiveDeviceId";
@@ -249,15 +248,15 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
   const missingWaterQualityData = waterQualityHistoryDevice.length === 0;
   const hasNoTelemetry = telemetryHistory.length === 0;
   const emptyDataKey = `${telemetryHistory.length}:${selectedMonth}:${startDate}:${endDate}:${tempHistoryDevice.length}:${waterQualityHistoryDevice.length}`;
-  const showEmptyDataDialog = (missingTempData || missingWaterQualityData) && dismissedEmptyDataKey !== emptyDataKey;
+  const showEmptyDataNotice = (missingTempData || missingWaterQualityData) && dismissedEmptyDataKey !== emptyDataKey;
   const missingSections = [
     missingTempData ? (isTH ? "อุณหภูมิน้ำ (24 ชม.)" : "Water Temperature (24h)") : "",
     missingWaterQualityData ? (isTH ? "แนวโน้มคุณภาพน้ำ (7 วัน)" : "Water Quality Trends (7 Days)") : "",
   ].filter(Boolean);
-  const emptyDialogTitle = hasNoTelemetry
+  const emptyNoticeTitle = hasNoTelemetry
     ? (isTH ? "ยังไม่มีข้อมูลเซ็นเซอร์ในฐานข้อมูล" : "No sensor data in the database yet")
     : (isTH ? "ไม่พบข้อมูลจริงในช่วงที่เลือก" : "No real data in the selected range");
-  const emptyDialogDescription = hasNoTelemetry
+  const emptyNoticeDescription = hasNoTelemetry
     ? (isTH
       ? "ระบบยังไม่ได้รับข้อมูลจาก sensor_data จึงยังวาดกราฟอุณหภูมิน้ำและ pH/EC ไม่ได้"
       : "No sensor_data rows have been received yet, so the water temperature and pH/EC charts cannot be drawn.")
@@ -267,38 +266,6 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
 
   return (
     <>
-      <Dialog
-        open={showEmptyDataDialog}
-        onOpenChange={(open) => {
-          if (!open) setDismissedEmptyDataKey(emptyDataKey);
-        }}
-      >
-        <DialogContent className="bg-card border-border text-foreground sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <Database className="h-5 w-5 text-blue-500" />
-              {emptyDialogTitle}
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              {emptyDialogDescription}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-4 text-sm">
-            <p className="font-medium text-foreground">{isTH ? "กราฟที่ยังไม่มีข้อมูล:" : "Charts without data:"}</p>
-            <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-              {missingSections.map((section) => (
-                <li key={section}>{section}</li>
-              ))}
-            </ul>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setDismissedEmptyDataKey(emptyDataKey)}>
-              {isTH ? "รับทราบ" : "OK"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <header className="border-b border-border/60 bg-card/80 px-4 py-4 backdrop-blur-xl md:px-6">
         <div className="flex w-full flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0">
@@ -343,6 +310,27 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
       </header>
 
       <main className="flex-1 overflow-auto px-4 py-5 md:px-6 md:py-6">
+        {/* Inline notice instead of a blocking dialog: the charts below already show their own empty states. */}
+        {showEmptyDataNotice && (
+          <div role="status" className="mb-5 flex items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-100">
+            <Database className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-300" />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">{emptyNoticeTitle}</p>
+              <p className="mt-0.5 text-xs leading-5 text-sky-800/80 dark:text-sky-200/80">
+                {emptyNoticeDescription} ({missingSections.join(", ")})
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 text-sky-700 hover:bg-sky-100 dark:text-sky-200 dark:hover:bg-sky-900/50"
+              aria-label={isTH ? "ปิดข้อความ" : "Dismiss"}
+              onClick={() => setDismissedEmptyDataKey(emptyDataKey)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="mb-6 grid w-full max-w-xl grid-cols-4 rounded-xl border border-border/60 bg-muted/60 p-1">
             <TabsTrigger value="overview" className="data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground">{isTH ? "ภาพรวม" : "Overview"}</TabsTrigger>
@@ -439,8 +427,8 @@ export function WeatherDataPage({ language = "TH" }: WeatherDataPageProps) {
             {/* Detailed Sensor Table */}
             <Card surface="flat" className="rounded-xl border border-border shadow-lg bg-card/50 backdrop-blur-md">
                <CardHeader>
-                 <CardTitle className="text-foreground">Detailed Sensor Readings</CardTitle>
-                 <CardDescription className="text-muted-foreground">Real-time values from all active field nodes</CardDescription>
+                 <CardTitle className="text-foreground">{isTH ? "ค่าเซนเซอร์โดยละเอียด" : "Detailed Sensor Readings"}</CardTitle>
+                 <CardDescription className="text-muted-foreground">{isTH ? "ค่าล่าสุดจากอุปกรณ์ที่ใช้งานอยู่ทั้งหมด" : "Real-time values from all active field nodes"}</CardDescription>
                </CardHeader>
                <CardContent>
                  <Table>
