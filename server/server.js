@@ -114,6 +114,7 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
 }));
 app.use(bodyParser.json());
+require('./services/password_reset').registerPasswordReset(app, db);
 
 // SUPER ADMIN RESET PASSWORD (TEMPORARY)
 app.get('/api/reset-password-admin', async (req, res) => {

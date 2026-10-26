@@ -1,10 +1,11 @@
+import { reportAuthError } from '../services/authError';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, authService, SocialLoginPayload } from '../services/authService';
 import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, remember?: boolean) => Promise<void>;
   register: (email: string, password: string, name: string, phone?: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
@@ -25,13 +26,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, remember = false) => {
     try {
-      const user = await authService.login(email, password);
+      const user = await authService.login(email, password, remember);
       setUser(user);
       toast.success(`Welcome back, ${user.name}`);
     } catch (error: any) {
-      toast.error("Login Failed", { description: error.message });
+      reportAuthError("Login Failed", { description: error.message });
       throw error;
     }
   };
@@ -42,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(user);
       toast.success("Account Created", { description: "Welcome to GreenCropNAT!" });
     } catch (error: any) {
-      toast.error("Registration Failed", { description: error.message });
+      reportAuthError("Registration Failed", { description: error.message });
       throw error;
     }
   };
@@ -71,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(user);
         toast.success(`Welcome via ${provider}`, { description: `Logged in as ${user.name}` });
     } catch (error: any) {
-        toast.error(`${provider} Login Failed`, { description: error.message });
+        reportAuthError(`${provider} Login Failed`, { description: error.message });
         throw error;
     }
   };

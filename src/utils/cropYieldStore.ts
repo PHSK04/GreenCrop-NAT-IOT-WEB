@@ -117,7 +117,7 @@ export const subscribeCropYieldEntries = (callback: () => void) => {
 const getAuthToken = () => {
   if (typeof window === "undefined") return "";
   try {
-    const session = JSON.parse(window.localStorage.getItem("smart_iot_session") || "null");
+    const session = JSON.parse((window.sessionStorage.getItem("smart_iot_session") || window.localStorage.getItem("smart_iot_session")) || "null");
     return String(session?.token || session?.user?.token || "");
   } catch {
     return "";
@@ -127,7 +127,7 @@ const getAuthToken = () => {
 const getSessionUserId = () => {
   if (typeof window === "undefined") return "";
   try {
-    const session = JSON.parse(window.localStorage.getItem("smart_iot_session") || "null");
+    const session = JSON.parse((window.sessionStorage.getItem("smart_iot_session") || window.localStorage.getItem("smart_iot_session")) || "null");
     return String(session?.user?.id || "");
   } catch {
     return "";

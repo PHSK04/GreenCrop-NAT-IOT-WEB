@@ -202,7 +202,7 @@ const buildApiUrl = (path: string) => `${API_URL}${path.startsWith("/") ? path :
 const getAuthHeaders = () => {
   let token = "";
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    const raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       token = parsed?.token || parsed?.user?.token || "";

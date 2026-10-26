@@ -76,7 +76,7 @@ const getActiveDeviceId = () => {
 };
 
 const getSessionAuth = () => {
-  const raw = localStorage.getItem('smart_iot_session');
+  const raw = (sessionStorage.getItem('smart_iot_session') || localStorage.getItem('smart_iot_session'));
   if (!raw) {
     return { token: '', tenantId: '' };
   }

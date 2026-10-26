@@ -155,7 +155,7 @@ export function UserManagementPage({ language = "TH" }: UserManagementPageProps)
         // A better way is to get the current user from session or context, 
         // but for now let's assume the current user is checking against their own email.
         // We'll use the email from localStorage 'smart_iot_session'
-        const session = localStorage.getItem('smart_iot_session');
+        const session = (sessionStorage.getItem('smart_iot_session') || localStorage.getItem('smart_iot_session'));
         const currentUser = session ? JSON.parse(session) : null;
         
         if (!currentUser) {

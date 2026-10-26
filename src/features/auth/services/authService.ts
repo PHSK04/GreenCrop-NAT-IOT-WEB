@@ -147,6 +147,7 @@ const clearSession = () => {
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem('smart_iot_token');
   localStorage.removeItem('auth_token');
+  sessionStorage.removeItem(SESSION_KEY);
 };
 
 const parseJwtPayload = (token: string): Record<string, any> | null => {
@@ -205,7 +206,7 @@ const normalizeUser = (raw: any): User | null => {
 };
 
 const readSession = (): { token: string; user: User | null } => {
-  const raw = localStorage.getItem(SESSION_KEY);
+  const raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
   if (!raw) {
     const legacyToken =
       localStorage.getItem('smart_iot_token') ||
@@ -239,8 +240,9 @@ const readSession = (): { token: string; user: User | null } => {
   }
 };
 
-const writeSession = (payload: { token?: string; user: User }) => {
-  localStorage.setItem(
+const writeSession = (payload: { token?: string; user: User }, remember = !sessionStorage.getItem(SESSION_KEY)) => {
+  clearSession();
+  (remember ? localStorage : sessionStorage).setItem(
     SESSION_KEY,
     JSON.stringify({
       token: payload.token || '',
@@ -352,8 +354,19 @@ const throwHttpError = async (response: Response, fallbackMessage: string): Prom
 };
 
 export const authService = {
+  passwordRecovery: async (payload: { email: string } | { token: string; password: string }): Promise<string> => {
+    const response = await fetchWithApiFallback('token' in payload ? '/reset-password' : '/forgot-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(20000),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(response.status === 404 ? 'บริการกู้คืนบัญชียังไม่พร้อม กรุณาติดต่อผู้ดูแลระบบ' : data.error || 'ไม่สามารถดำเนินการได้ กรุณาลองอีกครั้ง');
+    if (typeof data.message !== 'string' || !data.message.trim()) throw new Error('บริการกู้คืนบัญชียังไม่พร้อม กรุณาติดต่อผู้ดูแลระบบ');
+    return data.message;
+  },
+
   // Login via API (DB-backed)
-  login: async (email: string, password: string): Promise<User> => {
+  login: async (email: string, password: string, remember = true): Promise<User> => {
     return withTransientRetry(async () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -376,7 +389,7 @@ export const authService = {
         if (!normalizedUser) {
           throw new Error('Login response is missing user data');
         }
-        writeSession({ token: data?.token || '', user: normalizedUser });
+        writeSession({ token: data?.token || '', user: normalizedUser }, remember);
         return normalizedUser;
       } catch (error: any) {
         if (error?.name === 'AbortError') {

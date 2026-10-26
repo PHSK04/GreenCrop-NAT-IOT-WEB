@@ -1,0 +1,26 @@
+.auth-dialog{font-family:"Noto Sans Thai",system-ui,sans-serif;color-scheme:light}
+.auth-dialog input[data-auth-invalid]{border-color:#e45b65!important;box-shadow:0 0 0 1px #e45b6520}
+.auth-dialog input:not([type=checkbox]){font-size:16px}
+.auth-dialog .auth-eye{position:absolute;right:4px;top:4px;display:grid;place-items:center;width:52px;height:52px;color:#64748b;border-radius:10px}
+.auth-dialog .auth-eye:hover{background:#ecfdf5;color:#047857}
+.auth-dialog button:focus-visible,.auth-dialog a:focus-visible{outline:2px solid #059669;outline-offset:3px}
+.auth-dialog button:disabled{cursor:wait;opacity:.65}
+@media(max-width:420px){.auth-dialog h2{font-size:30px;line-height:1.3}.auth-dialog{width:calc(100% - 24px)}}
+/* Readable Thai type at normal browser zoom. */
+.auth-dialog{font-size:18px;line-height:1.65}
+.auth-dialog label>span:first-child{font-size:18px;font-weight:600}
+.auth-dialog input:not([type=checkbox]){font-size:18px}
+.auth-dialog button[type=submit]{font-size:19px;font-weight:700}
+.auth-dialog .auth-eye svg{width:24px;height:24px}
+.auth-dialog button[aria-label^="ปิดหน้าต่าง"]{width:44px;height:44px}
+.auth-dialog button[aria-label^="ปิดหน้าต่าง"] svg{width:20px;height:20px}
+@media(max-width:420px){.auth-dialog{font-size:16px}.auth-dialog label>span:first-child,.auth-dialog input:not([type=checkbox]){font-size:17px}}
+.auth-dialog .auth-brand{border:1px solid #ccebdd;border-radius:26px;background:linear-gradient(145deg,#f1fcf6,#fff);box-shadow:0 8px 24px -16px #04785765}
+.auth-dialog .auth-input-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#edf8f2;color:#298463;pointer-events:none}
+.auth-dialog .auth-input-icon svg{width:21px;height:21px;stroke-width:1.8}
+.auth-dialog .relative:focus-within>.auth-input-icon{background:#dcf5e8;color:#047857}
+.auth-dialog .auth-eye{right:8px;top:8px;width:44px;height:44px;border:1px solid #e4eae7;background:#f7faf8;color:#536d61;border-radius:12px}
+.auth-dialog .auth-eye svg{width:22px;height:22px;stroke-width:1.8}
+.auth-dialog .auth-eye[aria-pressed=true]{border-color:#a7d9c0;background:#e9f8ef;color:#047857}
+.auth-dialog .auth-eye:hover{border-color:#b5d9c7;background:#edf8f1}
+.auth-dialog [data-auth-invalid]+.auth-eye{border-color:#eed4d7}

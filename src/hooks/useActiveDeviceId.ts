@@ -5,7 +5,7 @@ export const ACTIVE_DEVICE_EVENT_NAME = "active-device-changed";
 
 const getSessionTenantId = () => {
   if (typeof window === "undefined") return "";
-  const raw = window.localStorage.getItem("smart_iot_session");
+  const raw = (window.sessionStorage.getItem("smart_iot_session") || window.localStorage.getItem("smart_iot_session"));
   if (!raw) return "";
   try {
     const parsed = JSON.parse(raw);

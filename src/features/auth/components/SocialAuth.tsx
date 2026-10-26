@@ -1,35 +1,19 @@
-
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
-import { toast } from "sonner";
-import { useEffect } from "react";
+import { reportAuthError } from "../services/authError";
 import { consumeLineOAuthCallback, consumeMicrosoftOAuthCallback, startSocialWebAuth } from "../services/socialWebAuth";
-
-// --- Constants ---
-const FACEBOOK_APP_ID = "1585600402556361"; // Facebook App ID
 
 // --- Brand Icons ---
 
 const GoogleIcon = () => (
-   <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
-      <path
-         d="M21.805 10.023h-9.8v3.955h5.62c-.48 2.52-2.62 3.955-5.62 3.955-3.33 0-6.04-2.79-6.04-6.23s2.71-6.23 6.04-6.23c1.89 0 3.13.8 3.85 1.47l2.63-2.71c-1.69-1.6-3.88-2.58-6.48-2.58-5.32 0-9.63 4.43-9.63 9.89s4.31 9.89 9.63 9.89c5.56 0 9.24-3.95 9.24-9.5 0-.64-.06-1.1-.14-1.91z"
-         fill="#4285F4"
-      />
-      <path
-         d="M3.59 7.35l3.25 2.45c.88-2.67 2.84-4.33 5.17-4.33 1.89 0 3.13.8 3.85 1.47l2.63-2.71c-1.69-1.6-3.88-2.58-6.48-2.58-3.7 0-6.94 2.17-8.42 5.7z"
-         fill="#EA4335"
-      />
-      <path
-         d="M12 21.43c2.54 0 4.69-.86 6.26-2.47l-2.9-2.4c-.87.62-1.96 1.37-3.36 1.37-2.98 0-5.14-1.92-5.62-4.5l-3.22 2.52c1.46 3.58 4.77 5.48 8.84 5.48z"
-         fill="#34A853"
-      />
-      <path
-         d="M6.38 13.43a6.42 6.42 0 0 1 0-3.96L3.16 6.95a10.23 10.23 0 0 0 0 9l3.22-2.52z"
-         fill="#FBBC05"
-      />
-   </svg>
+  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+    <path fill="#4285F4" d="M21.35 12.2c0-.7-.06-1.2-.2-1.72H12v3.3h5.37a4.6 4.6 0 0 1-2 2.94v2.14h3.25c1.9-1.75 2.73-4.34 2.73-6.66Z" />
+    <path fill="#34A853" d="M12 21.7c2.72 0 5-.9 6.62-2.44l-3.25-2.54c-.9.6-2.06.96-3.37.96-2.62 0-4.84-1.77-5.64-4.15H3v2.2A10 10 0 0 0 12 21.7Z" />
+    <path fill="#FBBC05" d="M6.36 13.53A6 6 0 0 1 6.05 12c0-.53.1-1.04.3-1.53v-2.2H3A10 10 0 0 0 2 12c0 1.35.32 2.62 1 3.73l3.36-2.2Z" />
+    <path fill="#EA4335" d="M12 6.32c1.48 0 2.8.5 3.84 1.5l2.86-2.87A9.6 9.6 0 0 0 12 2.3a10 10 0 0 0-9 5.97l3.36 2.2C7.16 8.09 9.38 6.32 12 6.32Z" />
+  </svg>
 );
 
 const MicrosoftIcon = () => (
@@ -52,275 +36,67 @@ const LineIcon = () => (
     </svg>
 );
 
+
+type Provider = 'Google' | 'Microsoft' | 'LINE' | 'Facebook';
 interface SocialAuthProps {
-    onLoginSuccess?: () => void;
-    actionText?: string;
-    dividerLabel?: string;
-    showDivider?: boolean;
-    providers?: Array<'Google' | 'Microsoft' | 'LINE' | 'Facebook'>;
-    tone?: 'default' | 'light' | 'dark';
+  onLoginSuccess?: () => void;
+  actionText?: string;
+  dividerLabel?: string;
+  showDivider?: boolean;
+  providers?: Provider[];
+  tone?: 'default' | 'light' | 'dark';
+  disabled?: boolean;
+  onBusyChange?: (busy: boolean) => void;
 }
-
-export function SocialAuth({
-    onLoginSuccess,
-    actionText = "register",
-    dividerLabel,
-    showDivider = true,
-    providers = ['Google', 'Microsoft', 'LINE', 'Facebook'],
-    tone = 'default',
-}: SocialAuthProps) {
-    const { socialLogin } = useAuth();
-    const [isLoading, setIsLoading] = useState<string | null>(null);
-
-    // Initialize Facebook SDK
-    useEffect(() => {
-        // Load the SDK asynchronously
-        (function(d, s, id) {
-             const fjs = d.getElementsByTagName(s)[0];
-             if (d.getElementById(id)) {return;}
-             const js = d.createElement(s) as HTMLScriptElement;
-             js.id = id;
-             js.src = "https://connect.facebook.net/en_US/sdk.js";
-             if (fjs && fjs.parentNode) {
-                 fjs.parentNode.insertBefore(js, fjs);
-             } else {
-                 d.head.appendChild(js);
-             }
-        }(document, 'script', 'facebook-jssdk'));
-
-        (window as any).fbAsyncInit = function() {
-            (window as any).FB.init({
-              appId      : FACEBOOK_APP_ID,
-              cookie     : true,
-              xfbml      : true,
-              version    : 'v18.0'
-            });
-        };
-    }, []);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        const completeSocialCallbackIfPresent = async () => {
-            try {
-                const linePayload = consumeLineOAuthCallback();
-                if (linePayload) {
-                    setIsLoading('LINE');
-                    await socialLogin('LINE', {
-                        authorizationCode: linePayload.authorizationCode,
-                        redirectUri: linePayload.redirectUri,
-                    });
-                    if (!cancelled && onLoginSuccess) onLoginSuccess();
-                    return;
-                }
-
-                const microsoftPayload = consumeMicrosoftOAuthCallback();
-                if (microsoftPayload) {
-                    setIsLoading('Microsoft');
-                    await socialLogin('Microsoft', {
-                        authorizationCode: microsoftPayload.authorizationCode,
-                        redirectUri: microsoftPayload.redirectUri,
-                    });
-                    if (!cancelled && onLoginSuccess) onLoginSuccess();
-                }
-            } catch (err: any) {
-                if (!cancelled) {
-                    const message = err?.message || "Unknown error";
-                    const title = message.toLowerCase().includes('microsoft')
-                        ? "Microsoft Login Failed"
-                        : "LINE Login Failed";
-                    toast.error(title, { description: message });
-                }
-            } finally {
-                if (!cancelled) setIsLoading(null);
-            }
-        };
-
-        completeSocialCallbackIfPresent();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [socialLogin, onLoginSuccess]);
-
-    const handleFacebookLogin = () => {
-        setIsLoading('Facebook');
-        if (!(window as any).FB) {
-            toast.error("Facebook SDK not loaded yet.");
-            setIsLoading(null);
-            return;
-        }
-
-        (window as any).FB.login((response: any) => {
-            if (response.authResponse) {
-                // User authorized app
-                const accessToken = response.authResponse.accessToken;
-                console.log('Facebook Access Token:', accessToken);
-                
-                // Call Auth Service with token
-                socialLogin('Facebook', { accessToken })
-                    .then(() => {
-                        if (onLoginSuccess) onLoginSuccess();
-                    })
-                    .catch((err) => {
-                        toast.error("Login failed: " + err.message);
-                    })
-                    .finally(() => setIsLoading(null));
-            } else {
-                // User cancelled or failed
-                console.log('User cancelled login or did not fully authorize.');
-                setIsLoading(null);
-            }
-        }, { scope: 'public_profile,email' });
+const configured: Record<Provider, boolean> = {
+  Google: Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim()),
+  Microsoft: Boolean(import.meta.env.VITE_MICROSOFT_CLIENT_ID?.trim()),
+  LINE: Boolean(import.meta.env.VITE_LINE_CHANNEL_ID?.trim()),
+  Facebook: Boolean(import.meta.env.VITE_FACEBOOK_APP_ID?.trim()),
+};
+const icons = { Google: GoogleIcon, Microsoft: MicrosoftIcon, LINE: LineIcon, Facebook: FacebookIcon };
+export function SocialAuth({ onLoginSuccess, actionText = 'เข้าสู่ระบบ', dividerLabel, showDivider = true, providers = ['Google', 'Microsoft', 'LINE', 'Facebook'], disabled = false, onBusyChange }: SocialAuthProps) {
+  const { socialLogin } = useAuth();
+  const [loading, setLoading] = useState<Provider | null>(null);
+  const pending = useRef(false);
+  const available = providers.filter(provider => configured[provider]);
+  const setBusy = (provider: Provider | null) => { pending.current = !!provider; setLoading(provider); onBusyChange?.(!!provider); };
+  useEffect(() => {
+    // Redirect callbacks are consumed once, including when the modal opens after OAuth.
+    const complete = async () => {
+      try {
+        const line = consumeLineOAuthCallback();
+        const microsoft = line ? null : consumeMicrosoftOAuthCallback();
+        const payload = line || microsoft;
+        if (!payload) return;
+        setBusy(line ? 'LINE' : 'Microsoft');
+        await socialLogin(line ? 'LINE' : 'Microsoft', payload);
+        onLoginSuccess?.();
+      } catch (error) {
+        reportAuthError('เข้าสู่ระบบไม่สำเร็จ', { description: error instanceof Error ? error.message : 'กรุณาลองอีกครั้ง' });
+      } finally { setBusy(null); }
     };
-
-    const handleGoogleLogin = async () => {
-        setIsLoading('Google');
-        try {
-            const payload = await startSocialWebAuth('google');
-            await socialLogin('Google', {
-                accessToken: payload.accessToken,
-                idToken: payload.idToken,
-                email: payload.email,
-                name: payload.name,
-            });
-            if (onLoginSuccess) onLoginSuccess();
-        } catch (err: any) {
-            toast.error("Google Login Failed", { description: err?.message || "Unknown error" });
-        } finally {
-            setIsLoading(null);
-        }
-    };
-
-    const handleMicrosoftLogin = async () => {
-        setIsLoading('Microsoft');
-        try {
-            const payload = await startSocialWebAuth('microsoft');
-            await socialLogin('Microsoft', {
-                authorizationCode: payload.authorizationCode,
-                redirectUri: payload.redirectUri,
-                accessToken: payload.accessToken,
-                idToken: payload.idToken,
-                email: payload.email,
-                name: payload.name,
-            });
-            if (onLoginSuccess) onLoginSuccess();
-        } catch (err: any) {
-            if (err?.message === 'MICROSOFT_AUTH_REDIRECT') {
-                return;
-            }
-            toast.error("Microsoft Login Failed", { description: err?.message || "Unknown error" });
-        } finally {
-            setIsLoading(null);
-        }
-    };
-
-    const handleLineLogin = async () => {
-        setIsLoading('LINE');
-        try {
-            const payload = await startSocialWebAuth('line');
-            await socialLogin('LINE', {
-                authorizationCode: payload.authorizationCode,
-                redirectUri: payload.redirectUri,
-            });
-            if (onLoginSuccess) onLoginSuccess();
-        } catch (err: any) {
-            if (err?.message === 'LINE_AUTH_REDIRECT') {
-                return;
-            }
-            const message = err?.message || "Unknown error";
-            console.error("LINE Login Failed:", err);
-            toast.error("LINE Login Failed", { description: message });
-        } finally {
-            setIsLoading(null);
-        }
-    };
-
-    const socialButtonBase = tone === 'dark'
-        ? "group relative h-11 w-full overflow-hidden rounded-[13px] border !border-[#111d33] !bg-[#020817] !text-slate-300 shadow-[0_8px_18px_rgba(2,8,23,0.16)] transition-all duration-200 hover:-translate-y-0.5 hover:!border-emerald-500/40 hover:!bg-[#071326] hover:!text-white hover:shadow-[0_12px_24px_rgba(2,8,23,0.22)] disabled:opacity-60"
-        : tone === 'light'
-          ? "group relative h-11 w-full overflow-hidden rounded-[13px] border !border-slate-200 !bg-white !text-slate-700 shadow-[0_8px_18px_rgba(15,118,110,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:!border-emerald-200 hover:!bg-emerald-50 hover:shadow-[0_12px_24px_rgba(15,118,110,0.14)] disabled:opacity-60 dark:!border-slate-200 dark:!bg-white dark:!text-slate-700 dark:hover:!bg-emerald-50"
-          : "group relative h-12 w-full overflow-hidden rounded-[1.1rem] border transition-all duration-200 disabled:opacity-60 " +
-          "border-slate-200 bg-white/90 text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.05)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)] " +
-          "dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-emerald-500/40 dark:hover:bg-slate-900";
-
-    const gridClassName = providers.length === 1 ? "grid grid-cols-1 gap-4" : tone === 'light' || tone === 'dark' ? "grid grid-cols-2 gap-3" : "grid grid-cols-2 gap-4";
-    const dividerClassName = tone === 'light'
-        ? "bg-emerald-50/90 px-3 text-slate-400"
-        : "bg-slate-50 px-3 text-slate-400 dark:bg-slate-900/95 dark:text-slate-300";
-
-    return (
-        <div className="space-y-4 pt-2 text-center">
-            {showDivider ? (
-                <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-slate-200 dark:border-slate-700/80" />
-                    </div>
-                    <div className="relative flex justify-center text-xs font-semibold uppercase tracking-[0.12em]">
-                        <span className={dividerClassName}>
-                            {dividerLabel || `Or ${actionText} with`}
-                        </span>
-                    </div>
-                </div>
-            ) : null}
-            
-            <div className={gridClassName}>
-                {providers.includes('Google') ? (
-                <Button 
-                    type="button"
-                    variant="outline" 
-                    onClick={handleGoogleLogin}
-                    className={socialButtonBase}
-                    disabled={!!isLoading}
-                >
-                    <div className="absolute inset-0 bg-transparent transition-colors duration-300 group-hover:bg-slate-900/[0.02] dark:group-hover:bg-white/[0.03]" />
-                    <GoogleIcon />
-                    <span className="ml-3 text-sm font-semibold tracking-tight">Google</span>
-                </Button>
-                ) : null}
-                
-                {providers.includes('Microsoft') ? (
-                <Button 
-                    type="button"
-                    variant="outline" 
-                    onClick={handleMicrosoftLogin}
-                    className={socialButtonBase}
-                    disabled={!!isLoading}
-                >
-                     <div className="absolute inset-0 bg-transparent transition-colors duration-300 group-hover:bg-slate-900/[0.02] dark:group-hover:bg-white/[0.03]" />
-                    <MicrosoftIcon />
-                    <span className="ml-3 text-sm font-semibold tracking-tight">Microsoft</span>
-                </Button>
-                ) : null}
-
-                {providers.includes('LINE') ? (
-                <Button 
-                    type="button"
-                    variant="outline" 
-                    onClick={handleLineLogin}
-                    className={socialButtonBase}
-                    disabled={!!isLoading}
-                >
-                     <div className="absolute inset-0 bg-transparent transition-colors duration-300 group-hover:bg-slate-900/[0.02] dark:group-hover:bg-white/[0.03]" />
-                    <LineIcon />
-                    <span className="ml-3 text-sm font-semibold tracking-tight">LINE</span>
-                </Button>
-                ) : null}
-
-                {providers.includes('Facebook') ? (
-                <Button 
-                    type="button"
-                    variant="outline" 
-                    onClick={handleFacebookLogin}
-                    className={socialButtonBase}
-                    disabled={!!isLoading}
-                >
-                     <div className="absolute inset-0 bg-transparent transition-colors duration-300 group-hover:bg-slate-900/[0.02] dark:group-hover:bg-white/[0.03]" />
-                    <FacebookIcon />
-                    <span className="ml-3 text-sm font-semibold tracking-tight">Facebook</span>
-                </Button>
-                ) : null}
-            </div>
-        </div>
-    );
+    void complete();
+  }, []);
+  const start = async (provider: Provider) => {
+    if (pending.current || disabled) return;
+    setBusy(provider);
+    try {
+      const payload = await startSocialWebAuth(provider.toLowerCase() as 'google' | 'microsoft' | 'line' | 'facebook');
+      await socialLogin(provider, payload);
+      onLoginSuccess?.();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'กรุณาลองอีกครั้ง';
+      if (!message.endsWith('_AUTH_REDIRECT')) reportAuthError('เข้าสู่ระบบไม่สำเร็จ', { description: message });
+    } finally { setBusy(null); }
+  };
+  if (!available.length) return null;
+  return <div className="space-y-4">
+    {showDivider && <p className="text-center text-sm text-slate-500">{dividerLabel || `หรือ${actionText}ด้วย`}</p>}
+    <div className="grid grid-cols-2 gap-3">
+      {available.map(provider => { const Icon = icons[provider]; return <Button key={provider} type="button" variant="outline" className="h-[60px] rounded-xl border-slate-200 bg-white text-base text-slate-700 hover:bg-emerald-50 disabled:opacity-60" disabled={disabled || !!loading} onClick={() => void start(provider)} aria-label={`${actionText}ด้วย ${provider}`} aria-busy={loading === provider}>
+        {loading === provider ? <Loader2 className="h-5 w-5 animate-spin" /> : <Icon />}<span className="ml-2">{provider}</span>
+      </Button>; })}
+    </div>
+  </div>;
 }

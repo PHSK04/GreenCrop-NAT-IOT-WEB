@@ -64,7 +64,7 @@ export function MyProfilePage({ onLogout, language = "TH" }: MyProfilePageProps)
             // 2. Fetch LATEST data from Server (slow but accurate)
             const fetchLatestProfile = async () => {
                 try {
-                    const rawSession = localStorage.getItem("smart_iot_session");
+                    const rawSession = (sessionStorage.getItem("smart_iot_session") || localStorage.getItem("smart_iot_session"));
                     let token = "";
                     if (rawSession) {
                         try {
