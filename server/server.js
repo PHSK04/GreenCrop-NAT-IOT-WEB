@@ -1110,7 +1110,8 @@ const handleLogin = async (req, res) => {
     }
 
     try {
-        const user = await db.get("SELECT * FROM users WHERE email = ?", [email]);
+        const identifier = String(email).trim();
+        const user = await db.get("SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR name = ?", [identifier, identifier]);
         
         if (!user) {
             await logAudit(email, 'LOGIN_ATTEMPT', auditDeviceFromRequest(req, 'Web'), 'FAILED', 'User not found');
