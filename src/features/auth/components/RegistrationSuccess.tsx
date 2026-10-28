@@ -1,24 +1,24 @@
 import { Check, ArrowRight, X, Mail, Droplets, Thermometer, Bell } from 'lucide-react';
 
-export function RegistrationSuccess({ email, onLogin, onClose }: { demo?: boolean; email?: string; onLogin: () => void; onClose?: () => void }) {
+export function RegistrationSuccess({ email, onLogin, onClose, purpose = 'registration' }: { demo?: boolean; purpose?: 'registration' | 'password'; email?: string; onLogin: () => void; onClose?: () => void }) {
   return <section className="recovery-card registration-success" aria-labelledby="registration-success-title">
     <header className="registration-canopy">
       <img className="registration-farm-photo" src={`${import.meta.env.BASE_URL}images/watermeal-farm-welcome.jpg`} alt="" aria-hidden="true" />
       <div className="registration-wordmark"><img className="registration-brand-logo" src={`${import.meta.env.BASE_URL}favicon.png`} alt="" /><span>GreenCrop <b>NAT</b></span></div>
       <span className="registration-canopy-caption">เติบโตไปด้วยกันอย่างชาญฉลาด</span>
-      {onClose && <button type="button" className="recovery-close" onClick={onClose} aria-label="ปิดหน้าต่างสมัครสมาชิก"><X aria-hidden="true" /></button>}
+      {onClose && <button type="button" className="recovery-close" onClick={onClose} aria-label={purpose === 'password' ? 'ปิดหน้าต่างตั้งรหัสผ่านใหม่' : 'ปิดหน้าต่างสมัครสมาชิก'}><X aria-hidden="true" /></button>}
     </header>
     <div className="registration-welcome">
       <span className="registration-check"><Check aria-hidden="true" /></span>
       <div role="status" aria-live="polite">
-        <span className="registration-eyebrow">สมัครสมาชิกสำเร็จ</span>
-        <h2 id="registration-success-title">ยินดีต้อนรับสู่ GreenCrop</h2>
-        <p>บัญชีของคุณพร้อมแล้ว<br />เริ่มต้นดูแลฟาร์มผำในแบบของคุณ</p>
+        <span className="registration-eyebrow">{purpose === 'password' ? 'ดำเนินการเสร็จสิ้น' : 'สมัครสมาชิกสำเร็จ'}</span>
+        <h2 id="registration-success-title">{purpose === 'password' ? 'ตั้งค่ารหัสผ่านใหม่สำเร็จ' : 'ยินดีต้อนรับสู่ GreenCrop'}</h2>
+        <p>{purpose === 'password' ? <>รหัสผ่านใหม่ของคุณพร้อมใช้งานแล้ว<br />กลับเข้าสู่ระบบเพื่อดูแลฟาร์มของคุณต่อ</> : <>บัญชีของคุณพร้อมแล้ว<br />เริ่มต้นดูแลฟาร์มผำในแบบของคุณ</>}</p>
       </div>
       {email && <div className="registration-email"><Mail aria-hidden="true" /><span>{email}</span></div>}
       <div className="registration-features" aria-label="สิ่งที่คุณสามารถดูแลได้"><div><Droplets aria-hidden="true" /><span>คุณภาพน้ำ</span></div><div><Thermometer aria-hidden="true" /><span>อุณหภูมิ</span></div><div><Bell aria-hidden="true" /><span>การแจ้งเตือน</span></div></div>
       <button type="button" className="recovery-primary" onClick={onLogin}>กลับไปเข้าสู่ระบบ<ArrowRight aria-hidden="true" /></button>
-      <p className="registration-success-note">ใช้บัญชีที่เพิ่งสมัครเพื่อเข้าสู่ระบบ</p>
+      <p className="registration-success-note">{purpose === 'password' ? 'เข้าสู่ระบบด้วยรหัสผ่านใหม่ของคุณ' : 'ใช้บัญชีที่เพิ่งสมัครเพื่อเข้าสู่ระบบ'}</p>
     </div>
   </section>;
 }

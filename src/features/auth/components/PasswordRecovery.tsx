@@ -1,7 +1,8 @@
+import { RegistrationSuccess } from './RegistrationSuccess';
 import { OTPInput, REGEXP_ONLY_DIGITS } from 'input-otp';
 import { AuthErrorPopup } from './AuthErrorPopup';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowLeft, Check, Eye, EyeOff, KeyRound, ShieldCheck, Loader2, X } from 'lucide-react';
+import { ArrowLeft, Check, Eye, EyeOff, Loader2, X } from 'lucide-react';
 import { authService } from '../services/authService';
 import { reportAuthError } from '../services/authError';
 
@@ -54,25 +55,25 @@ export function PasswordRecovery({ token, onClose, onLogin }: Props) {
   const startAgain = () => { setChallenge(''); setResetToken(''); setPreview(false); setStep('request'); };
   const startPreview = () => { setPreview(true); setEmail('demo@example.com'); setChallenge(''); setResetToken(''); setStep('otp'); };
   const inputClass = 'recovery-input';
-  const activeStep = step === 'success' ? 3 : ['request', 'otp', 'password'].indexOf(step);
-  const title = step === 'request' ? 'ลืมรหัสผ่าน?' : step === 'otp' ? 'ยืนยันรหัส OTP' : step === 'password' ? 'ตั้งรหัสผ่านใหม่' : 'ตั้งรหัสผ่านใหม่สำเร็จ';
-  return <div ref={cardRef} className={`recovery-card ${step === 'success' ? 'recovery-complete' : ''}`}>
+  const activeStep = ['request', 'otp', 'password'].indexOf(step);
+  if (step === 'success') return <RegistrationSuccess purpose="password" email={email || undefined} onLogin={onLogin} onClose={onClose} />;
+  const title = step === 'request' ? 'ลืมรหัสผ่าน?' : step === 'otp' ? 'ยืนยันรหัส OTP' : 'ตั้งรหัสผ่านใหม่';
+  return <div ref={cardRef} className="recovery-card">
     <button type="button" onClick={onClose} aria-label="ปิดหน้าต่างกู้คืนบัญชี" className="recovery-close"><X aria-hidden="true" /></button>
     <div className="recovery-brand-row">
       <div className="recovery-brand"><img src={`${import.meta.env.BASE_URL}favicon.png`} alt="" /><span>GreenCrop<span className="recovery-brand-nat"> NAT</span></span></div>
     </div>
-    {step !== 'success' && <nav className="recovery-progress" aria-label="ขั้นตอนตั้งรหัสผ่านใหม่">
+    <nav className="recovery-progress" aria-label="ขั้นตอนตั้งรหัสผ่านใหม่">
       <ol className="recovery-steps">{['อีเมล', 'ยืนยัน OTP', 'รหัสผ่านใหม่'].map((label, index) => {
         const state = index < activeStep ? 'complete' : index === activeStep ? 'current' : 'upcoming';
         return <li key={label} data-step-state={state} aria-current={state === 'current' ? 'step' : undefined}><span className="recovery-step-label">{state === 'complete' ? <Check aria-hidden="true" /> : <span className="recovery-step-number">{index + 1}</span>}{label}</span></li>;
       })}</ol>
-    </nav>}
+    </nav>
     <header className="recovery-heading">
-      {step === 'success' && <div className="recovery-complete-art" aria-hidden="true"><span className="recovery-complete-orbit" /><span className="recovery-complete-icon"><ShieldCheck /></span><span className="recovery-complete-tick"><Check /></span></div>}
       <h2 className="recovery-heading-title">{title}</h2>
       <p>{step === 'request' ? 'กรอกอีเมลที่ลงทะเบียน เพื่อเริ่มตั้งรหัสผ่านใหม่' : step === 'otp' ? preview ? 'กรอกรหัสยืนยัน 6 หลักเพื่อดำเนินการต่อ' : `หากอีเมลนี้มีบัญชีในระบบ กรุณาตรวจสอบรหัสที่ ${email}` : step === 'password' ? 'ใช้รหัสผ่านอย่างน้อย 8 ตัวอักษร และกรอกยืนยันให้ตรงกัน' : 'เข้าสู่ระบบด้วยรหัสผ่านใหม่ของคุณได้เลย'}</p>
     </header>
-    {step !== 'success' && <form key={step} onSubmit={submit} aria-busy={busy} className="recovery-form" onInvalidCapture={event => { event.preventDefault(); reportAuthError('กรุณาตรวจสอบข้อมูล', { fields: [(event.target as HTMLInputElement).name] }); }}>
+    <form key={step} onSubmit={submit} aria-busy={busy} className="recovery-form" onInvalidCapture={event => { event.preventDefault(); reportAuthError('กรุณาตรวจสอบข้อมูล', { fields: [(event.target as HTMLInputElement).name] }); }}>
       <AuthErrorPopup />
       {step === 'request' && <label className="recovery-field"><span>อีเมลที่ลงทะเบียน</span><input type="email" name="email" defaultValue={email} required maxLength={254} autoComplete="email" placeholder="name@example.com" className={inputClass} /></label>}
       {step === 'otp' && <div className="recovery-otp">
@@ -87,13 +88,11 @@ export function PasswordRecovery({ token, onClose, onLogin }: Props) {
       <button type="submit" disabled={busy} className="recovery-primary">{busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}{busy ? 'กำลังดำเนินการ...' : step === 'request' ? 'ส่งรหัสยืนยัน' : step === 'otp' ? 'ยืนยันและดำเนินการต่อ' : 'บันทึกรหัสผ่านใหม่'}{!busy && <span aria-hidden="true">→</span>}</button>
       {step === 'otp' && <div className="recovery-resend"><span>ไม่ได้รับรหัส?</span><button type="button" disabled={busy} onClick={preview ? startPreview : startAgain}>ส่งรหัสอีกครั้ง</button></div>}
       {step === 'password' && !preview && <button type="button" disabled={busy} onClick={startAgain} className="recovery-text-action">ลิงก์ใช้งานไม่ได้? ขอรหัสใหม่</button>}
-    </form>}
+    </form>
     {preview && step === 'otp' && <button type="button" disabled={busy} onClick={() => setStep('password')} className="recovery-text-action recovery-skip">ข้ามขั้นตอนนี้ <span aria-hidden="true">→</span></button>}
     {step === 'request' && <button type="button" disabled={busy} onClick={startPreview} className="recovery-text-action">ทดลองขั้นตอนการกู้คืนบัญชี</button>}
-    {step === 'success' && <div className="recovery-complete-status"><KeyRound aria-hidden="true" /><span>พร้อมเข้าสู่ระบบ</span><Check aria-hidden="true" /></div>}
-    {step === 'success' && <button type="button" onClick={onLogin} className="recovery-primary">กลับไปเข้าสู่ระบบ <span aria-hidden="true">→</span></button>}
-    {step !== 'success' && <footer className="recovery-footer">
+    <footer className="recovery-footer">
       <button type="button" disabled={busy} onClick={onLogin}><ArrowLeft aria-hidden="true" />กลับไปเข้าสู่ระบบ</button>
-    </footer>}
+    </footer>
   </div>;
 }
