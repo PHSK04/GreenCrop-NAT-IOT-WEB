@@ -1,3 +1,4 @@
+import { SignupDemoOtp } from '@/features/auth/components/SignupDemoOtp';
 import { RegistrationSuccess } from '@/features/auth/components/RegistrationSuccess';
 import * as Dialog from "@radix-ui/react-dialog";
 import "@/features/auth/components/auth.css";
@@ -147,6 +148,8 @@ function LoginForm({ onClose, onRegister, onForgot }: { onClose: () => void; onR
 
 function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () => void }) {
   const [registrationComplete, setRegistrationComplete] = useState(false);
+  const [demoOtp, setDemoOtp] = useState(false);
+  const isDemo = window.location.hash === '#signup-demo';
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const pending = useRef(false);
@@ -172,6 +175,11 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
       reportAuthError('สมัครสมาชิกไม่สำเร็จ', { description: 'กรุณากรอกเบอร์โทรศัพท์อย่างน้อย 10 หลัก' });
       return;
     }
+    if (isDemo) {
+      setRegisteredEmail(String(form.get('email') || '').trim());
+      setDemoOtp(true);
+      return;
+    }
     pending.current = true;
     setIsSubmitting(true);
     try {
@@ -186,7 +194,8 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
     }
   };
 
-  if (registrationComplete) return <RegistrationSuccess email={registeredEmail} onLogin={onLogin} onClose={onClose} />;
+  if (demoOtp && !registrationComplete) return <SignupDemoOtp email={registeredEmail} onComplete={() => setRegistrationComplete(true)} onBack={() => setDemoOtp(false)} onClose={onClose} />;
+  if (registrationComplete) return <RegistrationSuccess demo={isDemo} email={registeredEmail} onLogin={onLogin} onClose={onClose} />;
 
   return (
     <div className="relative mx-auto max-h-[calc(100dvh-3rem)] w-full max-w-[640px] overflow-y-auto rounded-2xl border border-emerald-100 !bg-white p-5 !text-slate-900 shadow-[0_24px_70px_-34px_rgba(6,78,59,0.45)] sm:p-10">
@@ -205,6 +214,7 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
         </div>
         <p className="mb-1 text-sm font-semibold uppercase tracking-[0.22em] text-emerald-700">GreenCrop NAT IoT</p>
         <h2 className="text-[40px] sm:text-5xl font-semibold leading-none tracking-tight text-slate-900">สมัครสมาชิก</h2>
+        {isDemo && <p className="text-sm text-emerald-700">โหมดตัวอย่าง · ไม่สร้างบัญชีหรือส่งอีเมลจริง</p>}
         <p className="mt-2 text-base text-slate-500">สร้างบัญชีเพื่อเริ่มจัดการฟาร์มอัจฉริยะ</p>
       </div>
 
@@ -265,8 +275,8 @@ function GreenCropLanding() {
     const params = new URLSearchParams(window.location.hash.slice(1));
     return params.get('reset_token') || '';
   });
-  const [loginOpen, setLoginOpen] = useState(Boolean(resetToken) || (window.location.hash === '#forgot-password' || window.location.hash === '#recovery-demo') || new URLSearchParams(window.location.search).has("code"));
-  const [authMode, setAuthMode] = useState<"login" | "register" | "forgot" | "reset">(resetToken ? 'reset' : (window.location.hash === '#forgot-password' || window.location.hash === '#recovery-demo') ? 'forgot' : new URLSearchParams(window.location.search).has('code') && sessionStorage.getItem('greencrop:auth-intent') === 'register' ? 'register' : 'login');
+  const [loginOpen, setLoginOpen] = useState(window.location.hash === '#signup-demo' || Boolean(resetToken) || (window.location.hash === '#forgot-password' || window.location.hash === '#recovery-demo') || new URLSearchParams(window.location.search).has("code"));
+  const [authMode, setAuthMode] = useState<"login" | "register" | "forgot" | "reset">(window.location.hash === '#signup-demo' ? 'register' : resetToken ? 'reset' : (window.location.hash === '#forgot-password' || window.location.hash === '#recovery-demo') ? 'forgot' : new URLSearchParams(window.location.search).has('code') && sessionStorage.getItem('greencrop:auth-intent') === 'register' ? 'register' : 'login');
   useEffect(() => {
     if (resetToken) window.history.replaceState({}, '', window.location.pathname + window.location.search);
   }, [resetToken]);
@@ -437,7 +447,7 @@ function AuthGate() {
     return <div className="flex min-h-screen items-center justify-center bg-emerald-950 text-sm text-white/70">กำลังตรวจสอบเซสชัน...</div>;
   }
 
-  const recoveryLink = new URLSearchParams(window.location.hash.slice(1)).has("reset_token") || (window.location.hash === "#forgot-password" || window.location.hash === "#recovery-demo");
+  const recoveryLink = window.location.hash === "#signup-demo" || new URLSearchParams(window.location.hash.slice(1)).has("reset_token") || (window.location.hash === "#forgot-password" || window.location.hash === "#recovery-demo");
   return user && !recoveryLink ? <AppRouter /> : <GreenCropLanding />;
 }
 
