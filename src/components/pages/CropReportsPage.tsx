@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
-import { Download, Eye, Calendar, FileText, Share2, Sprout, Droplets, Zap, Plus, Trash2, Thermometer } from "lucide-react";
+import { Download, Eye, Calendar, FileText, Share2, Sprout, Droplets, Zap, Plus, Save, Loader2, Trash2, Thermometer } from "lucide-react";
 import { toast } from "sonner";
 import { downloadSimplePdf, downloadTextFile } from "@/utils/download";
 import { ExportFiltersCard } from "@/components/ExportFiltersCard";
@@ -42,7 +42,8 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   const isTH = language === "TH";
   const activeDeviceId = deviceId || "default";
   const deviceLabel = deviceId ? `${isTH ? "อุปกรณ์" : "Device"} ${deviceId}` : (isTH ? "ทุกอุปกรณ์" : "All Devices");
-  const [showEntry, setShowEntry] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
   const [selectedReport, setSelectedReport] = useState<CropYieldEntry | null>(null);
   const [selectedMonth, setSelectedMonth] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -114,6 +115,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
   }, [filteredReportData, selectedFields]);
 
   const handleSaveManualEntry = async () => {
+    if (savingRef.current) return;
     const yieldValue = Number(form.yield);
     const phValue = Number(form.ph);
     const ecValue = Number(form.ec);
@@ -126,6 +128,8 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
       return;
     }
 
+    savingRef.current = true;
+    setIsSaving(true);
     try {
       const saved = await createMyCropYieldEntry({
         deviceId: activeDeviceId,
@@ -144,6 +148,9 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
         description: error instanceof Error ? error.message : undefined,
       });
       return;
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
     }
 
     setForm((prev) => ({
@@ -215,7 +222,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
               </Badge>
             </div>
           </div>
-          <Button aria-controls="harvest-entry-form" aria-expanded={showEntry} onClick={() => setShowEntry(value => !value)} className="shrink-0 gap-2"><Plus className="h-4 w-4" />{isTH ? (showEntry ? "ปิดฟอร์ม" : "เพิ่มผลผลิต") : (showEntry ? "Close entry" : "Add harvest")}</Button>
+          <Button aria-controls="harvest-entry-form" disabled={isSaving} onClick={handleSaveManualEntry} className="h-12 shrink-0 gap-2 bg-emerald-600 px-6 text-base font-semibold text-white hover:bg-emerald-700">{isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}{isTH ? (isSaving ? "กำลังบันทึก..." : "บันทึกผลผลิต") : (isSaving ? "Saving..." : "Save harvest")}</Button>
         </div>
       </header>
 
@@ -231,7 +238,7 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
           ].map(metric => <div key={metric.label} className="report-summary-item"><p className="text-sm text-muted-foreground">{metric.label}</p><p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">{metric.value}</p><p className="mt-1 text-xs text-muted-foreground">{metric.unit}</p></div>)}
         </section>
         <div className="[&>div:last-child]:mb-0 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 motion-reduce:animate-none">
-          {showEntry && <Card id="harvest-entry-form" surface="flat" className="mb-5 rounded-2xl border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
+          <Card id="harvest-entry-form" surface="flat" className="mb-5 rounded-2xl border border-white/80 shadow-[0_24px_60px_-42px_rgba(15,23,42,.5)] !bg-white !opacity-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                 <Plus className="h-5 w-5 text-emerald-500" />
@@ -306,10 +313,10 @@ export function CropReportsPage({ language = "TH" }: CropReportsPageProps) {
                   onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
                   placeholder={isTH ? "หมายเหตุ เช่น รอบเช้า / บ่อ A / คุณภาพดี" : "Note, e.g. morning batch / pond A / good quality"}
                 />
-                <Button className="h-10 shrink-0 gap-2 rounded-xl bg-emerald-600 px-6 text-white hover:bg-emerald-700" onClick={handleSaveManualEntry}><Plus className="h-4 w-4" />{isTH ? "บันทึกผลผลิต" : "Save harvest"}</Button>
+                <Button disabled={isSaving} className="h-12 shrink-0 gap-2 rounded-xl bg-emerald-600 px-6 text-base font-semibold text-white hover:bg-emerald-700" onClick={handleSaveManualEntry}>{isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}{isTH ? (isSaving ? "กำลังบันทึก..." : "บันทึกผลผลิต") : (isSaving ? "Saving..." : "Save harvest")}</Button>
               </div>
             </CardContent>
-          </Card>}
+          </Card>
 
           <section className="report-workbench">
           <ExportFiltersCard
