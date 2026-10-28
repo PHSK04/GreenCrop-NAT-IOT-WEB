@@ -1,6 +1,6 @@
 import { AuthErrorPopup } from './AuthErrorPopup';
-import { useRef, useState, type FormEvent } from 'react';
-import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, KeyRound, Mail, ShieldCheck, Loader2, X } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { ArrowLeft, Check, Eye, EyeOff, KeyRound, Mail, ShieldCheck, Loader2, X } from 'lucide-react';
 import { authService } from '../services/authService';
 import { reportAuthError } from '../services/authError';
 
@@ -13,6 +13,8 @@ export function PasswordRecovery({ token, onClose, onLogin }: Props) {
   const [resetToken, setResetToken] = useState(token || '');
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { cardRef.current?.scrollTo({ top: 0 }); }, [step]);
   const [visible, setVisible] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -52,30 +54,30 @@ export function PasswordRecovery({ token, onClose, onLogin }: Props) {
   const inputClass = 'h-[60px] w-full rounded-xl border border-slate-200 bg-white pl-16 pr-16 text-base text-slate-900 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10';
   const activeStep = step === 'success' ? 3 : ['request', 'otp', 'password'].indexOf(step);
   const title = step === 'request' ? 'ขอตั้งรหัสผ่านใหม่' : step === 'otp' ? 'ยืนยันรหัส OTP' : step === 'password' ? 'ตั้งรหัสผ่านใหม่' : preview ? 'ตัวอย่างการเปลี่ยนรหัสผ่านสำเร็จ' : 'เปลี่ยนรหัสผ่านสำเร็จ';
-  return <div className="relative mx-auto max-h-[calc(100dvh-3rem)] w-full max-w-[640px] overflow-y-auto rounded-2xl border border-emerald-100 bg-white p-6 text-slate-900 shadow-2xl sm:p-10">
+  return <div ref={cardRef} className="relative mx-auto max-h-[calc(100dvh-3rem)] w-full max-w-[640px] overflow-y-auto recovery-card rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl sm:p-10">
     <button type="button" onClick={onClose} aria-label="ปิดหน้าต่างกู้คืนบัญชี" className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-full bg-white text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
-    {preview && <div role="status" className="mb-5 mt-8 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900"><strong>โหมดตัวอย่างสำหรับนำเสนอ</strong><br />ไม่ส่งอีเมลและไม่เปลี่ยนรหัสผ่านบัญชีจริง</div>}
-    <div className="mb-7 text-center">
-      <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-3xl border border-emerald-200 bg-emerald-50 text-emerald-700">{step === 'success' ? <CheckCircle2 className="h-10 w-10" /> : step === 'otp' ? <ShieldCheck className="h-10 w-10" /> : <KeyRound className="h-10 w-10" />}</div>
-      <h2 className="text-3xl font-bold sm:text-4xl">{title}</h2>
-      <p className="mt-3 text-base leading-relaxed text-slate-500">{step === 'request' ? 'กรอกอีเมลที่ลงทะเบียนเพื่อขอรหัส OTP สำหรับตั้งรหัสผ่านใหม่' : step === 'otp' ? preview ? 'ใช้รหัสตัวอย่าง 123456 หรือกดข้ามเพื่อดูหน้าตั้งรหัสผ่านใหม่' : `หากอีเมล ${email} มีบัญชีในระบบ กรุณาตรวจสอบ OTP 6 หลักในกล่องจดหมายหรือสแปม` : step === 'password' ? 'กรอกรหัสผ่านใหม่ และกรอกอีกครั้งเพื่อยืนยันให้ตรงกัน' : preview ? 'จบขั้นตอนตัวอย่างแล้ว ไม่มีการเปลี่ยนรหัสผ่านหรือบันทึกข้อมูลลงบัญชีจริง' : 'บันทึกรหัสผ่านใหม่เรียบร้อยแล้ว เข้าสู่ระบบด้วยรหัสผ่านใหม่ได้เลย'}</p>
-    </div>
+    {preview && <div role="status" className="recovery-preview"><span>DEMO</span>โหมดนำเสนอ · ไม่ส่งอีเมลหรือเปลี่ยนรหัสผ่านจริง</div>}
+    <header className="recovery-heading">
+      <div className="recovery-heading-kicker"><span className="recovery-heading-symbol" aria-hidden="true">{step === 'success' ? <Check /> : step === 'request' ? <Mail /> : step === 'otp' ? <ShieldCheck /> : <KeyRound />}</span><span>GreenCrop <span className="recovery-heading-separator">/</span> กู้คืนบัญชี</span></div>
+      <h2 className="recovery-heading-title">{title}</h2>
+      <p className="mt-3 text-base leading-relaxed text-slate-500">{step === 'request' ? 'กรอกอีเมลที่ลงทะเบียนเพื่อขอรหัส OTP สำหรับตั้งรหัสผ่านใหม่' : step === 'otp' ? preview ? 'ใช้รหัสตัวอย่าง 123456 หรือกดข้ามเพื่อดูหน้าตั้งรหัสผ่านใหม่' : `หากอีเมล ${email} มีบัญชีในระบบ กรุณาตรวจสอบ OTP 6 หลักในกล่องจดหมายหรือสแปม` : step === 'password' ? 'กรอกรหัสผ่านใหม่ให้ตรงกันทั้งสองช่อง' : preview ? 'จบขั้นตอนตัวอย่างแล้ว ไม่มีการเปลี่ยนรหัสผ่านหรือบันทึกข้อมูลลงบัญชีจริง' : 'บันทึกรหัสผ่านใหม่เรียบร้อยแล้ว เข้าสู่ระบบด้วยรหัสผ่านใหม่ได้เลย'}</p>
+    </header>
     <nav className="recovery-progress" aria-label="ขั้นตอนตั้งรหัสผ่านใหม่">
       <div className="recovery-progress-heading"><span>{step === 'success' ? 'ดำเนินการครบแล้ว' : `ขั้นตอนที่ ${activeStep + 1} จาก 3`}</span><span>{step === 'success' ? 'พร้อมเข้าสู่ระบบ' : 'กู้คืนบัญชีของคุณ'}</span></div>
       <ol className="recovery-steps">
         {['ระบุอีเมล', 'ยืนยัน OTP', 'รหัสผ่านใหม่'].map((label, index) => {
           const state = index < activeStep ? 'complete' : index === activeStep ? 'current' : 'upcoming';
           return <li key={label} data-step-state={state} aria-current={state === 'current' ? 'step' : undefined}>
-            <span className="recovery-step-marker" aria-hidden="true">{state === 'complete' ? <Check /> : String(index + 1).padStart(2, '0')}</span>
+            <span className="recovery-step-marker" aria-hidden="true">{state === 'complete' ? <Check /> : index + 1}</span>
             <span className="recovery-step-label">{label}</span>
-            <span className="recovery-step-description">{state === 'complete' ? 'เสร็จแล้ว' : state === 'current' ? 'ขั้นตอนปัจจุบัน' : 'ขั้นตอนถัดไป'}</span>
+            <span className="sr-only">{state === 'complete' ? 'เสร็จแล้ว' : state === 'current' ? 'ขั้นตอนปัจจุบัน' : 'ขั้นตอนถัดไป'}</span>
           </li>;
         })}
       </ol>
     </nav>
     {step !== 'success' && <form key={step} onSubmit={submit} aria-busy={busy} className="space-y-5" onInvalidCapture={event => { event.preventDefault(); reportAuthError('กรุณาตรวจสอบข้อมูล', { fields: [(event.target as HTMLInputElement).name] }); }}>
       <AuthErrorPopup />
-      {preview && step === 'otp' && <div className="rounded-xl bg-emerald-50 p-4 text-center text-emerald-900"><p className="text-sm">OTP ตัวอย่างสำหรับนำเสนอ</p><p className="mt-1 font-mono text-3xl font-bold tracking-[.3em]">123456</p></div>}
+      {preview && step === 'otp' && <div className="recovery-demo-code"><span>รหัสสำหรับตัวอย่าง</span><strong>123456</strong></div>}
       {step === 'request' && <label className="block"><span className="mb-2 block font-medium">อีเมลที่ลงทะเบียน</span><span className="relative block"><span className="auth-input-icon"><Mail aria-hidden="true" /></span><input type="email" name="email" defaultValue={email} required maxLength={254} autoComplete="email" placeholder="name@example.com" className={inputClass} /></span></label>}
       {step === 'otp' && <label className="block"><span className="mb-2 block font-medium">รหัส OTP 6 หลัก</span><input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" required pattern="[0-9]{6}" minLength={6} maxLength={6} placeholder="000000" className="h-[60px] w-full rounded-xl border border-slate-200 bg-white px-4 text-center font-mono text-2xl tracking-[.4em] text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" /><span className="mt-2 block text-sm text-slate-500">OTP ใช้ได้ 15 นาที และใช้ได้ครั้งเดียว</span></label>}
       {step === 'password' && <>
