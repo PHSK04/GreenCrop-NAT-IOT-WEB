@@ -6,8 +6,9 @@ import { reportAuthError } from '../services/authError';
 
 type Props = { token?: string; onClose: () => void; onLogin: () => void; onRequestNew: () => void };
 export function PasswordRecovery({ token, onClose, onLogin }: Props) {
-  const [step, setStep] = useState<'request' | 'otp' | 'password' | 'success'>(token ? 'password' : 'request');
-  const [email, setEmail] = useState('');
+  const [step, setStep] = useState<'request' | 'otp' | 'password' | 'success'>(token ? 'password' : window.location.hash === '#recovery-demo' ? 'otp' : 'request');
+  const [email, setEmail] = useState(window.location.hash === '#recovery-demo' ? 'demo@example.com' : '');
+  const [preview, setPreview] = useState(window.location.hash === '#recovery-demo');
   const [challenge, setChallenge] = useState('');
   const [resetToken, setResetToken] = useState(token || '');
   const [busy, setBusy] = useState(false);
@@ -26,7 +27,12 @@ export function PasswordRecovery({ token, onClose, onLogin }: Props) {
     pending.current = true;
     setBusy(true);
     try {
-      if (step === 'request') {
+      if (preview && step === 'otp') {
+        if (String(form.get('code') || '') !== '123456') { reportAuthError('กรุณาตรวจสอบ OTP', { description: 'โหมดตัวอย่างใช้รหัส OTP 123456 หรือกดข้ามขั้นตอน', fields: ['code'] }); return; }
+        setStep('password');
+      } else if (preview && step === 'password') {
+        setStep('success');
+      } else if (step === 'request') {
         const address = String(form.get('email') || '').trim();
         const result = await authService.requestPasswordOtp(address);
         setEmail(address); setChallenge(result.challenge); setStep('otp');
@@ -41,16 +47,18 @@ export function PasswordRecovery({ token, onClose, onLogin }: Props) {
       reportAuthError('กู้คืนบัญชีไม่สำเร็จ', { description: error instanceof Error ? error.message : 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่ภายหลัง', fields: step === 'otp' ? ['code'] : undefined });
     } finally { pending.current = false; setBusy(false); }
   };
-  const startAgain = () => { setChallenge(''); setResetToken(''); setStep('request'); };
+  const startAgain = () => { setChallenge(''); setResetToken(''); setPreview(false); setStep('request'); };
+  const startPreview = () => { setPreview(true); setEmail('demo@example.com'); setChallenge(''); setResetToken(''); setStep('otp'); };
   const inputClass = 'h-[60px] w-full rounded-xl border border-slate-200 bg-white pl-16 pr-16 text-base text-slate-900 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10';
   const activeStep = step === 'success' ? 3 : ['request', 'otp', 'password'].indexOf(step);
-  const title = step === 'request' ? 'ขอตั้งรหัสผ่านใหม่' : step === 'otp' ? 'ยืนยันรหัส OTP' : step === 'password' ? 'ตั้งรหัสผ่านใหม่' : 'เปลี่ยนรหัสผ่านสำเร็จ';
+  const title = step === 'request' ? 'ขอตั้งรหัสผ่านใหม่' : step === 'otp' ? 'ยืนยันรหัส OTP' : step === 'password' ? 'ตั้งรหัสผ่านใหม่' : preview ? 'ตัวอย่างการเปลี่ยนรหัสผ่านสำเร็จ' : 'เปลี่ยนรหัสผ่านสำเร็จ';
   return <div className="relative mx-auto max-h-[calc(100dvh-3rem)] w-full max-w-[640px] overflow-y-auto rounded-2xl border border-emerald-100 bg-white p-6 text-slate-900 shadow-2xl sm:p-10">
     <button type="button" onClick={onClose} aria-label="ปิดหน้าต่างกู้คืนบัญชี" className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-full bg-white text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+    {preview && <div role="status" className="mb-5 mt-8 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900"><strong>โหมดตัวอย่างสำหรับนำเสนอ</strong><br />ไม่ส่งอีเมลและไม่เปลี่ยนรหัสผ่านบัญชีจริง</div>}
     <div className="mb-7 text-center">
       <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-3xl border border-emerald-200 bg-emerald-50 text-emerald-700">{step === 'success' ? <CheckCircle2 className="h-10 w-10" /> : step === 'otp' ? <ShieldCheck className="h-10 w-10" /> : <KeyRound className="h-10 w-10" />}</div>
       <h2 className="text-3xl font-bold sm:text-4xl">{title}</h2>
-      <p className="mt-3 text-base leading-relaxed text-slate-500">{step === 'request' ? 'กรอกอีเมลที่ลงทะเบียนเพื่อขอรหัส OTP สำหรับตั้งรหัสผ่านใหม่' : step === 'otp' ? `หากอีเมล ${email} มีบัญชีในระบบ กรุณาตรวจสอบ OTP 6 หลักในกล่องจดหมายหรือสแปม` : step === 'password' ? 'กรอกรหัสผ่านใหม่ และกรอกอีกครั้งเพื่อยืนยันให้ตรงกัน' : 'บันทึกรหัสผ่านใหม่เรียบร้อยแล้ว เข้าสู่ระบบด้วยรหัสผ่านใหม่ได้เลย'}</p>
+      <p className="mt-3 text-base leading-relaxed text-slate-500">{step === 'request' ? 'กรอกอีเมลที่ลงทะเบียนเพื่อขอรหัส OTP สำหรับตั้งรหัสผ่านใหม่' : step === 'otp' ? preview ? 'ใช้รหัสตัวอย่าง 123456 หรือกดข้ามเพื่อดูหน้าตั้งรหัสผ่านใหม่' : `หากอีเมล ${email} มีบัญชีในระบบ กรุณาตรวจสอบ OTP 6 หลักในกล่องจดหมายหรือสแปม` : step === 'password' ? 'กรอกรหัสผ่านใหม่ และกรอกอีกครั้งเพื่อยืนยันให้ตรงกัน' : preview ? 'จบขั้นตอนตัวอย่างแล้ว ไม่มีการเปลี่ยนรหัสผ่านหรือบันทึกข้อมูลลงบัญชีจริง' : 'บันทึกรหัสผ่านใหม่เรียบร้อยแล้ว เข้าสู่ระบบด้วยรหัสผ่านใหม่ได้เลย'}</p>
     </div>
     <nav className="recovery-progress" aria-label="ขั้นตอนตั้งรหัสผ่านใหม่">
       <div className="recovery-progress-heading"><span>{step === 'success' ? 'ดำเนินการครบแล้ว' : `ขั้นตอนที่ ${activeStep + 1} จาก 3`}</span><span>{step === 'success' ? 'พร้อมเข้าสู่ระบบ' : 'กู้คืนบัญชีของคุณ'}</span></div>
@@ -67,6 +75,7 @@ export function PasswordRecovery({ token, onClose, onLogin }: Props) {
     </nav>
     {step !== 'success' && <form key={step} onSubmit={submit} aria-busy={busy} className="space-y-5" onInvalidCapture={event => { event.preventDefault(); reportAuthError('กรุณาตรวจสอบข้อมูล', { fields: [(event.target as HTMLInputElement).name] }); }}>
       <AuthErrorPopup />
+      {preview && step === 'otp' && <div className="rounded-xl bg-emerald-50 p-4 text-center text-emerald-900"><p className="text-sm">OTP ตัวอย่างสำหรับนำเสนอ</p><p className="mt-1 font-mono text-3xl font-bold tracking-[.3em]">123456</p></div>}
       {step === 'request' && <label className="block"><span className="mb-2 block font-medium">อีเมลที่ลงทะเบียน</span><span className="relative block"><span className="auth-input-icon"><Mail aria-hidden="true" /></span><input type="email" name="email" defaultValue={email} required maxLength={254} autoComplete="email" placeholder="name@example.com" className={inputClass} /></span></label>}
       {step === 'otp' && <label className="block"><span className="mb-2 block font-medium">รหัส OTP 6 หลัก</span><input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" required pattern="[0-9]{6}" minLength={6} maxLength={6} placeholder="000000" className="h-[60px] w-full rounded-xl border border-slate-200 bg-white px-4 text-center font-mono text-2xl tracking-[.4em] text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" /><span className="mt-2 block text-sm text-slate-500">OTP ใช้ได้ 15 นาที และใช้ได้ครั้งเดียว</span></label>}
       {step === 'password' && <>
@@ -74,8 +83,10 @@ export function PasswordRecovery({ token, onClose, onLogin }: Props) {
         <label className="block"><span className="mb-2 block font-medium">ยืนยันรหัสผ่านใหม่</span><span className="relative block"><span className="auth-input-icon"><ShieldCheck aria-hidden="true" /></span><input type={confirmVisible ? 'text' : 'password'} name="confirmPassword" required minLength={8} autoComplete="new-password" placeholder="กรอกรหัสผ่านใหม่อีกครั้ง" className={inputClass} /><button type="button" className="auth-eye" aria-label={confirmVisible ? 'ซ่อนการยืนยันรหัสผ่าน' : 'แสดงการยืนยันรหัสผ่าน'} aria-pressed={confirmVisible} onClick={() => setConfirmVisible(!confirmVisible)}>{confirmVisible ? <Eye /> : <EyeOff />}</button></span></label>
       </>}
       <button disabled={busy} className="flex h-[60px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">{busy && <Loader2 className="h-5 w-5 animate-spin" />}{busy ? 'กำลังดำเนินการ...' : step === 'request' ? 'ขอรหัส OTP' : step === 'otp' ? 'ยืนยัน OTP' : 'ยืนยันและบันทึกรหัสผ่านใหม่'}</button>
+      {preview && step === 'otp' && <button type="button" disabled={busy} onClick={() => setStep('password')} className="min-h-[48px] w-full rounded-xl border border-emerald-300 bg-white px-4 font-semibold text-emerald-700 hover:bg-emerald-50">ข้าม OTP ไปหน้าตั้งรหัสผ่าน (ตัวอย่าง)</button>}
       {step !== 'request' && <button type="button" disabled={busy} onClick={startAgain} className="min-h-11 w-full font-semibold text-emerald-700">{step === 'otp' ? 'ไม่ได้รับ OTP หรือรหัสหมดอายุ? ขอรหัสใหม่' : 'ลิงก์หมดอายุหรือใช้งานไม่ได้? ขอลิงก์หรือ OTP ใหม่'}</button>}
     </form>}
+    {step === 'request' && <button type="button" disabled={busy} onClick={startPreview} className="mt-5 min-h-[52px] w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 font-semibold text-emerald-800 hover:bg-emerald-100">ดูตัวอย่างสำหรับส่งอาจารย์ · ไม่ต้องรับ OTP</button>}
     <button type="button" disabled={busy} onClick={onLogin} className="mt-7 flex min-h-11 w-full items-center justify-center gap-2 border-t border-slate-200 pt-5 font-semibold text-emerald-700"><ArrowLeft className="h-4 w-4" />กลับไปเข้าสู่ระบบ</button>
   </div>;
 }

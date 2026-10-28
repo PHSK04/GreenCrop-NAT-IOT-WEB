@@ -259,8 +259,8 @@ function GreenCropLanding() {
     const params = new URLSearchParams(window.location.hash.slice(1));
     return params.get('reset_token') || '';
   });
-  const [loginOpen, setLoginOpen] = useState(Boolean(resetToken) || window.location.hash === '#forgot-password' || new URLSearchParams(window.location.search).has("code"));
-  const [authMode, setAuthMode] = useState<"login" | "register" | "forgot" | "reset">(resetToken ? 'reset' : window.location.hash === '#forgot-password' ? 'forgot' : 'login');
+  const [loginOpen, setLoginOpen] = useState(Boolean(resetToken) || (window.location.hash === '#forgot-password' || window.location.hash === '#recovery-demo') || new URLSearchParams(window.location.search).has("code"));
+  const [authMode, setAuthMode] = useState<"login" | "register" | "forgot" | "reset">(resetToken ? 'reset' : (window.location.hash === '#forgot-password' || window.location.hash === '#recovery-demo') ? 'forgot' : 'login');
   useEffect(() => {
     if (resetToken) window.history.replaceState({}, '', window.location.pathname + window.location.search);
   }, [resetToken]);
@@ -431,7 +431,7 @@ function AuthGate() {
     return <div className="flex min-h-screen items-center justify-center bg-emerald-950 text-sm text-white/70">กำลังตรวจสอบเซสชัน...</div>;
   }
 
-  const recoveryLink = new URLSearchParams(window.location.hash.slice(1)).has("reset_token") || window.location.hash === "#forgot-password";
+  const recoveryLink = new URLSearchParams(window.location.hash.slice(1)).has("reset_token") || (window.location.hash === "#forgot-password" || window.location.hash === "#recovery-demo");
   return user && !recoveryLink ? <AppRouter /> : <GreenCropLanding />;
 }
 
