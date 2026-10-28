@@ -92,7 +92,7 @@
 .registration-success.recovery-card{padding:0;border:0;border-radius:26px;background:#fff}
 .registration-canopy{position:relative;overflow:hidden;min-height:164px;padding:30px 32px;background:linear-gradient(115deg,#104d39,#227554);color:#fff;text-align:left}
 .registration-wordmark{position:relative;z-index:1;display:flex;align-items:center;gap:10px;font-size:20px;font-weight:600;letter-spacing:-.4px}
-.registration-wordmark svg{width:28px;height:28px;color:#c7e6ad}
+.registration-brand-logo{width:34px;height:34px;object-fit:contain;flex-shrink:0}
 .registration-wordmark b{font-weight:400;color:#cce2d5}
 .registration-canopy-caption{position:relative;z-index:1;display:block;margin:7px 0 0 38px;font-size:12px;color:#c4dfcf}
 .registration-canopy .recovery-close{z-index:2;color:#e3efe8;background:#103b2db3;border-color:#ffffff38;top:20px;right:20px}
