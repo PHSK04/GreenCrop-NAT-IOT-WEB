@@ -1,6 +1,6 @@
 # Authentication and password recovery
 
-The landing page supports login, registration, reset-link requests and new passwords. Authentication dialogs preserve and blur the existing background; the Dashboard layout is unchanged.
+The landing page supports login, registration, OTP requests, OTP verification and new passwords. Authentication dialogs preserve and blur the existing background; the Dashboard layout is unchanged.
 
 ## Render setup
 
@@ -31,3 +31,9 @@ In the browser, test invalid credentials, required fields, mismatched passwords,
 Real inbox delivery requires configured Render variables and a deployed API. Unit tests use a mocked Resend transport and cannot establish real email delivery.
 
 Before publishing, verify the remote main commit and confirm Dashboard files match the latest agreed version. Publish from the current source; never publish an older worktree's `dist` folder.
+
+## OTP flow
+
+`POST /api/forgot-password` sends a six-digit OTP along with the existing reset link and returns an opaque challenge after Resend accepts delivery. `POST /api/verify-reset-otp` accepts `{ challenge, code }` and returns a reset token only after verification. The frontend then opens the new-password and confirmation fields and shows a success screen after saving. OTP and challenges expire after 15 minutes. Verification consumes a row atomically in the existing `otp_codes` table; no schema migration is required. Only an HMAC-derived lookup key is stored, never the raw OTP. Account metadata inside challenges is encrypted and padded to avoid exposing account existence. Guessing is rate limited by IP and challenge.
+
+The legacy reset link remains usable and opens the same new-password form. Neither flow claims delivery when Resend or the API is unavailable.

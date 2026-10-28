@@ -7,6 +7,7 @@ const crypto = require('crypto');
 
 function harness() {
     const routes = {}, emails = [];
+    const otpRows = new Map();
     const user = { id: 7, email: 'test@example.com', password: 'old-hash' };
     const env = { JWT_SECRET: 'test-secret', RESEND_API_KEY: 'test-key', RESEND_FROM_EMAIL: 'test@example.com' };
     const module = { exports: {} };
@@ -17,8 +18,10 @@ function harness() {
         fetch: async (_, options) => { emails.push(JSON.parse(options.body)); return { ok: deliveryOK, json: async () => ({ id: 'mail-accepted' }) }; },
     });
     const db = {
-        get: async (_, [value]) => String(value) === '7' || value === user.email ? { ...user } : undefined,
-        run: async (_, [hash, id, previous]) => {
+        get: async (sql, [value]) => sql.includes('FROM otp_codes') ? otpRows.get(value) : String(value) === '7' || value === user.email ? { ...user } : undefined,
+        run: async (sql, [hash, id, previous]) => {
+            if (sql.startsWith('INSERT INTO otp_codes')) { otpRows.set(hash, { contact: hash, expires_at: previous }); return { changes: 1 }; }
+            if (sql.startsWith('DELETE FROM otp_codes')) return { changes: otpRows.delete(hash) ? 1 : 0 };
             if (id !== user.id || previous !== user.password) return { changes: 0 };
             user.password = hash; updates++; return { changes: 1 };
         },
@@ -84,4 +87,36 @@ test('unconfigured delivery never claims success; validation and throttling reje
     for (let i = 0; i < 5; i++) await h.call('/api/forgot-password', { email: h.user.email });
     assert.equal((await h.call('/api/forgot-password', { email: h.user.email })).statusCode, 429);
     assert.equal((await h.call('/api/reset-password', { password: 'ก'.repeat(25), token: 'fake' })).statusCode, 400);
+});
+
+
+test('OTP verification unlocks reset, rejects guesses, and consumes the code atomically', async () => {
+    const h = harness();
+    const result = await h.call('/api/forgot-password', { email: h.user.email });
+    const challenge = result.body.challenge;
+    const claims = jwt.decode(challenge);
+    assert.equal(claims.sub, undefined);
+    assert.equal(claims.version, undefined);
+    assert.equal(claims.exp - claims.iat, 900);
+    const code = h.emails[0].text.match(/OTP[^:]*: (\d{6})/)[1];
+    const wrong = code === '000000' ? '111111' : '000000';
+    assert.equal((await h.call('/api/verify-reset-otp', { challenge, code: wrong })).statusCode, 400);
+    const results = await Promise.all([1, 2].map(() => h.call('/api/verify-reset-otp', { challenge, code })));
+    assert.deepEqual(results.map(r => r.statusCode).sort(), [200, 400]);
+    const verified = results.find(r => r.statusCode === 200);
+    assert.equal((await h.call('/api/reset-password', { token: verified.body.token, password: 'password123' })).statusCode, 200);
+    assert.equal((await h.call('/api/reset-password', { token: verified.body.token, password: 'password456' })).statusCode, 400);
+});
+
+test('OTP challenges expire and unknown accounts cannot redeem their code', async () => {
+    const h = harness();
+    const result = await h.call('/api/forgot-password', { email: 'unknown@example.com' });
+    const code = h.emails[0].text.match(/OTP[^:]*: (\d{6})/)[1];
+    assert.equal((await h.call('/api/verify-reset-otp', { challenge: result.body.challenge, code })).statusCode, 400);
+    const known = await h.call('/api/forgot-password', { email: h.user.email });
+    const claims = jwt.decode(known.body.challenge);
+    const key = crypto.createHmac('sha256', h.env.JWT_SECRET).update('password-reset-v1').digest('hex');
+    const expired = jwt.sign({ ...claims, exp: Math.floor(Date.now() / 1000) - 1 }, key);
+    const correct = h.emails[1].text.match(/OTP[^:]*: (\d{6})/)[1];
+    assert.equal((await h.call('/api/verify-reset-otp', { challenge: expired, code: correct })).statusCode, 400);
 });

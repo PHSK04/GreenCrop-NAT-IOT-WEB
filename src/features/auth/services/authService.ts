@@ -354,6 +354,18 @@ const throwHttpError = async (response: Response, fallbackMessage: string): Prom
 };
 
 export const authService = {
+  requestPasswordOtp: async (email: string): Promise<{ challenge: string; message: string }> => {
+    const response = await fetchWithApiFallback('/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }), timeoutMs: 20000 });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || typeof data.challenge !== 'string') throw new Error(data.error || 'บริการส่ง OTP ยังไม่พร้อม กรุณาติดต่อผู้ดูแลระบบ');
+    return data;
+  },
+  verifyPasswordOtp: async (challenge: string, code: string): Promise<string> => {
+    const response = await fetchWithApiFallback('/verify-reset-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ challenge, code }) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || typeof data.token !== 'string') throw new Error(data.error || 'ไม่สามารถตรวจสอบ OTP ได้ กรุณาลองใหม่');
+    return data.token;
+  },
   passwordRecovery: async (payload: { email: string } | { token: string; password: string }): Promise<string> => {
     const response = await fetchWithApiFallback('token' in payload ? '/reset-password' : '/forgot-password', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
