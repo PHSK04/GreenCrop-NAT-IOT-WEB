@@ -1,6 +1,6 @@
 import { Check, ArrowRight, X, Mail, Droplets, Thermometer, Bell } from 'lucide-react';
 
-export function RegistrationSuccess({ email, onLogin, onClose, demo = false }: { demo?: boolean; email?: string; onLogin: () => void; onClose?: () => void }) {
+export function RegistrationSuccess({ email, onLogin, onClose }: { demo?: boolean; email?: string; onLogin: () => void; onClose?: () => void }) {
   return <section className="recovery-card registration-success" aria-labelledby="registration-success-title">
     <header className="registration-canopy">
       <img className="registration-farm-photo" src={`${import.meta.env.BASE_URL}images/watermeal-farm-welcome.jpg`} alt="" aria-hidden="true" />
@@ -13,12 +13,12 @@ export function RegistrationSuccess({ email, onLogin, onClose, demo = false }: {
       <div role="status" aria-live="polite">
         <span className="registration-eyebrow">สมัครสมาชิกสำเร็จ</span>
         <h2 id="registration-success-title">ยินดีต้อนรับสู่ GreenCrop</h2>
-        <p>{demo ? 'ตัวอย่างการสมัครเสร็จสมบูรณ์' : 'บัญชีของคุณพร้อมแล้ว'}<br />เริ่มต้นดูแลฟาร์มผำในแบบของคุณ</p>
+        <p>บัญชีของคุณพร้อมแล้ว<br />เริ่มต้นดูแลฟาร์มผำในแบบของคุณ</p>
       </div>
       {email && <div className="registration-email"><Mail aria-hidden="true" /><span>{email}</span></div>}
       <div className="registration-features" aria-label="สิ่งที่คุณสามารถดูแลได้"><div><Droplets aria-hidden="true" /><span>คุณภาพน้ำ</span></div><div><Thermometer aria-hidden="true" /><span>อุณหภูมิ</span></div><div><Bell aria-hidden="true" /><span>การแจ้งเตือน</span></div></div>
       <button type="button" className="recovery-primary" onClick={onLogin}>กลับไปเข้าสู่ระบบ<ArrowRight aria-hidden="true" /></button>
-      <p className="registration-success-note">{demo ? 'โหมดตัวอย่าง · ยังไม่ได้สร้างบัญชีจริง' : 'ใช้บัญชีที่เพิ่งสมัครเพื่อเข้าสู่ระบบ'}</p>
+      <p className="registration-success-note">ใช้บัญชีที่เพิ่งสมัครเพื่อเข้าสู่ระบบ</p>
     </div>
   </section>;
 }

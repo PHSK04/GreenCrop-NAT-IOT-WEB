@@ -214,7 +214,6 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
         </div>
         <p className="mb-1 text-sm font-semibold uppercase tracking-[0.22em] text-emerald-700">GreenCrop NAT IoT</p>
         <h2 className="text-[40px] sm:text-5xl font-semibold leading-none tracking-tight text-slate-900">สมัครสมาชิก</h2>
-        {isDemo && <p className="text-sm text-emerald-700">โหมดตัวอย่าง · ไม่สร้างบัญชีหรือส่งอีเมลจริง</p>}
         <p className="mt-2 text-base text-slate-500">สร้างบัญชีเพื่อเริ่มจัดการฟาร์มอัจฉริยะ</p>
       </div>
 
