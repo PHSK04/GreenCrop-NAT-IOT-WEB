@@ -250,6 +250,7 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
         </button>
       </form>
 
+      {!isDemo && <>
       <div className="my-4 flex items-center gap-3">
         <span className="h-px flex-1 bg-slate-200" />
         <span className="text-sm text-slate-400">หรือสมัครสมาชิกด้วย</span>
@@ -258,6 +259,7 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
       <div className="[&_button]:h-[60px] [&_button_span]:text-base sm:[&_button_span]:text-lg">
         <SocialAuth registration onLoginSuccess={() => setRegistrationComplete(true)} disabled={isSubmitting} onBusyChange={setSocialBusy} showDivider={false} actionText="สมัครสมาชิก" tone="light" />
       </div>
+      </>}
 
       <p className="mt-4 border-t border-slate-200 pt-4 text-center text-base text-slate-500">
         มีบัญชีอยู่แล้ว?{" "}

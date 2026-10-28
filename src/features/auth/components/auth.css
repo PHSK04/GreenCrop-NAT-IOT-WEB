@@ -121,3 +121,5 @@
 .signup-demo-actions{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:20px;font-size:13px;color:#287253}
 .signup-demo-actions button,.signup-demo-back{min-height:44px}
 .signup-demo-back{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:24px;border-top:1px solid #edf1ed;padding-top:16px;font-size:14px;color:#657e6c}
+
+.signup-demo-error{display:flex;align-items:center;gap:10px}.signup-demo-error svg{flex-shrink:0}.signup-otp-invalid .recovery-otp-slot{border-color:#d99b9b}
