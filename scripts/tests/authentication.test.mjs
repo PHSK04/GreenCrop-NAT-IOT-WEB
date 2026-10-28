@@ -48,3 +48,22 @@ test('recovery never treats unavailable mail or malformed success responses as s
   await reset.service.passwordRecovery({ token: 'token-fixture', password: 'password123' });
   assert.ok(reset.requests[0].url.endsWith('/reset-password'));
 });
+
+test('registration creates an account without persisting a logged-in session', async () => {
+  const h = loadService();
+  const account = await h.service.register('student@example.com', 'password123', 'Student', '0812345678');
+  assert.equal(account.name, 'QA');
+  assert.equal(h.requests.length, 1);
+  assert.ok(h.requests[0].url.endsWith('/register'));
+  assert.equal(h.local.getItem('smart_iot_session'), null);
+  assert.equal(h.session.getItem('smart_iot_session'), null);
+  assert.equal(h.service.getCurrentUser(), null);
+});
+
+test('social registration also waits for a separate login', async () => {
+  const h = loadService();
+  await h.service.socialLogin('Google', { accessToken: 'test-provider-token' }, false);
+  assert.equal(h.local.getItem('smart_iot_session'), null);
+  assert.equal(h.session.getItem('smart_iot_session'), null);
+  assert.equal(h.service.getCurrentUser(), null);
+});

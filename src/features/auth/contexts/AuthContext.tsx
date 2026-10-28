@@ -10,7 +10,7 @@ interface AuthContextType {
   logout: () => void;
   isLoading: boolean;
   updateProfile: (data: Partial<User>) => Promise<void>;
-  socialLogin: (provider: string, payload?: SocialLoginPayload) => Promise<void>;
+  socialLogin: (provider: string, payload?: SocialLoginPayload, authenticate?: boolean) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,9 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (email: string, password: string, name: string, phone?: string) => {
     try {
-      const user = await authService.register(email, password, name, phone);
-      setUser(user);
-      toast.success("Account Created", { description: "Welcome to GreenCropNAT!" });
+      await authService.register(email, password, name, phone);
     } catch (error: any) {
       reportAuthError("Registration Failed", { description: error.message });
       throw error;
@@ -66,11 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const socialLogin = async (provider: string, payload: SocialLoginPayload = {}) => {
+  const socialLogin = async (provider: string, payload: SocialLoginPayload = {}, authenticate = true) => {
     try {
-        const user = await authService.socialLogin(provider, payload);
-        setUser(user);
-        toast.success(`Welcome via ${provider}`, { description: `Logged in as ${user.name}` });
+        const user = await authService.socialLogin(provider, payload, authenticate);
+        if (authenticate) {
+          setUser(user);
+          toast.success(`Welcome via ${provider}`, { description: `Logged in as ${user.name}` });
+        }
     } catch (error: any) {
         reportAuthError(`${provider} Login Failed`, { description: error.message });
         throw error;

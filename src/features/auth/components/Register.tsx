@@ -1,3 +1,4 @@
+import { RegistrationSuccess } from './RegistrationSuccess';
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -39,6 +40,8 @@ interface RegisterProps {
 }
 
 export function Register({ onSwitchToLogin }: RegisterProps) {
+    const [complete, setComplete] = useState(false);
+    const [registeredEmail, setRegisteredEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -80,14 +83,8 @@ export function Register({ onSwitchToLogin }: RegisterProps) {
 
             await regRes.json();
             
-            toast.success("Account Created!", { 
-                description: "You have successfully registered." 
-            });
-            
-            // Redirect to login
-            setTimeout(() => {
-                onSwitchToLogin();
-            }, 1000);
+            setRegisteredEmail(data.email);
+            setComplete(true);
 
         } catch (error: any) {
              console.error(error);
@@ -103,6 +100,7 @@ export function Register({ onSwitchToLogin }: RegisterProps) {
 
     // handleSocialLogin removed (delegated to SocialAuth)
 
+    if (complete) return <div className="auth-dialog mx-auto w-full max-w-[640px]"><RegistrationSuccess email={registeredEmail} onLogin={onSwitchToLogin} /></div>;
     return (
         <div className="w-full min-h-screen flex overflow-hidden bg-background font-sans relative">
             
@@ -316,7 +314,7 @@ export function Register({ onSwitchToLogin }: RegisterProps) {
                             </form>
                         </Form>
 
-                        <SocialAuth actionText="register" />
+                        <SocialAuth registration onLoginSuccess={() => setComplete(true)} actionText="register" />
                     </div>
                     
                     <div className="text-center text-sm text-muted-foreground">

@@ -1,3 +1,4 @@
+import { RegistrationSuccess } from '@/features/auth/components/RegistrationSuccess';
 import * as Dialog from "@radix-ui/react-dialog";
 import "@/features/auth/components/auth.css";
 import { PasswordRecovery } from '@/features/auth/components/PasswordRecovery';
@@ -145,6 +146,8 @@ function LoginForm({ onClose, onRegister, onForgot }: { onClose: () => void; onR
 }
 
 function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () => void }) {
+  const [registrationComplete, setRegistrationComplete] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const pending = useRef(false);
   const [socialBusy, setSocialBusy] = useState(false);
@@ -173,7 +176,8 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
     setIsSubmitting(true);
     try {
       await register(String(form.get("email") || "").trim(), password, String(form.get("name") || "").trim(), phone);
-      onClose();
+      setRegisteredEmail(String(form.get("email") || "").trim());
+      setRegistrationComplete(true);
     } catch {
       // AuthContext displays the error inside the open form.
     } finally {
@@ -181,6 +185,8 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
       setIsSubmitting(false);
     }
   };
+
+  if (registrationComplete) return <RegistrationSuccess email={registeredEmail} onLogin={onLogin} onClose={onClose} />;
 
   return (
     <div className="relative mx-auto max-h-[calc(100dvh-3rem)] w-full max-w-[640px] overflow-y-auto rounded-2xl border border-emerald-100 !bg-white p-5 !text-slate-900 shadow-[0_24px_70px_-34px_rgba(6,78,59,0.45)] sm:p-10">
@@ -240,7 +246,7 @@ function RegisterForm({ onClose, onLogin }: { onClose: () => void; onLogin: () =
         <span className="h-px flex-1 bg-slate-200" />
       </div>
       <div className="[&_button]:h-[60px] [&_button_span]:text-base sm:[&_button_span]:text-lg">
-        <SocialAuth disabled={isSubmitting} onBusyChange={setSocialBusy} showDivider={false} actionText="สมัครสมาชิก" tone="light" />
+        <SocialAuth registration onLoginSuccess={() => setRegistrationComplete(true)} disabled={isSubmitting} onBusyChange={setSocialBusy} showDivider={false} actionText="สมัครสมาชิก" tone="light" />
       </div>
 
       <p className="mt-4 border-t border-slate-200 pt-4 text-center text-base text-slate-500">
@@ -260,7 +266,7 @@ function GreenCropLanding() {
     return params.get('reset_token') || '';
   });
   const [loginOpen, setLoginOpen] = useState(Boolean(resetToken) || (window.location.hash === '#forgot-password' || window.location.hash === '#recovery-demo') || new URLSearchParams(window.location.search).has("code"));
-  const [authMode, setAuthMode] = useState<"login" | "register" | "forgot" | "reset">(resetToken ? 'reset' : (window.location.hash === '#forgot-password' || window.location.hash === '#recovery-demo') ? 'forgot' : 'login');
+  const [authMode, setAuthMode] = useState<"login" | "register" | "forgot" | "reset">(resetToken ? 'reset' : (window.location.hash === '#forgot-password' || window.location.hash === '#recovery-demo') ? 'forgot' : new URLSearchParams(window.location.search).has('code') && sessionStorage.getItem('greencrop:auth-intent') === 'register' ? 'register' : 'login');
   useEffect(() => {
     if (resetToken) window.history.replaceState({}, '', window.location.pathname + window.location.search);
   }, [resetToken]);

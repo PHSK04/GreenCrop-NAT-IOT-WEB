@@ -441,7 +441,6 @@ export const authService = {
         if (!normalizedUser) {
           throw new Error('Registration response is missing user data');
         }
-        writeSession({ token: data?.token || '', user: normalizedUser });
         return normalizedUser;
       } catch (error: any) {
         if (error?.name === 'AbortError') {
@@ -652,6 +651,7 @@ export const authService = {
   socialLogin: async (
     provider: string,
     payload: SocialLoginPayload = {},
+    authenticate = true,
   ): Promise<User> => {
      // Simulate API Delay for UI feedback
      await new Promise(resolve => setTimeout(resolve, 800));
@@ -771,7 +771,7 @@ export const authService = {
          
          if (!normalizedUser) throw new Error('Invalid user data from server');
          
-         writeSession({ token: data.token, user: normalizedUser });
+         if (authenticate) writeSession({ token: data.token, user: normalizedUser });
          return normalizedUser;
      } catch (error: any) {
          console.error("Social Auth Error:", error);

@@ -40,6 +40,7 @@ const LineIcon = () => (
 type Provider = 'Google' | 'Microsoft' | 'LINE' | 'Facebook';
 interface SocialAuthProps {
   onLoginSuccess?: () => void;
+  registration?: boolean;
   actionText?: string;
   dividerLabel?: string;
   showDivider?: boolean;
@@ -55,7 +56,7 @@ const configured: Record<Provider, boolean> = {
   Facebook: Boolean(import.meta.env.VITE_FACEBOOK_APP_ID?.trim()),
 };
 const icons = { Google: GoogleIcon, Microsoft: MicrosoftIcon, LINE: LineIcon, Facebook: FacebookIcon };
-export function SocialAuth({ onLoginSuccess, actionText = 'เข้าสู่ระบบ', dividerLabel, showDivider = true, providers = ['Google', 'Microsoft', 'LINE', 'Facebook'], disabled = false, onBusyChange }: SocialAuthProps) {
+export function SocialAuth({ onLoginSuccess, actionText = 'เข้าสู่ระบบ', dividerLabel, showDivider = true, providers = ['Google', 'Microsoft', 'LINE', 'Facebook'], disabled = false, onBusyChange, registration = false }: SocialAuthProps) {
   const { socialLogin } = useAuth();
   const [loading, setLoading] = useState<Provider | null>(null);
   const pending = useRef(false);
@@ -70,7 +71,8 @@ export function SocialAuth({ onLoginSuccess, actionText = 'เข้าสู่
         const payload = line || microsoft;
         if (!payload) return;
         setBusy(line ? 'LINE' : 'Microsoft');
-        await socialLogin(line ? 'LINE' : 'Microsoft', payload);
+        await socialLogin(line ? 'LINE' : 'Microsoft', payload, !registration);
+        sessionStorage.removeItem('greencrop:auth-intent');
         onLoginSuccess?.();
       } catch (error) {
         reportAuthError('เข้าสู่ระบบไม่สำเร็จ', { description: error instanceof Error ? error.message : 'กรุณาลองอีกครั้ง' });
@@ -81,14 +83,17 @@ export function SocialAuth({ onLoginSuccess, actionText = 'เข้าสู่
   const start = async (provider: Provider) => {
     if (pending.current || disabled) return;
     setBusy(provider);
+    sessionStorage.setItem('greencrop:auth-intent', registration ? 'register' : 'login');
+    let redirecting = false;
     try {
       const payload = await startSocialWebAuth(provider.toLowerCase() as 'google' | 'microsoft' | 'line' | 'facebook');
-      await socialLogin(provider, payload);
+      await socialLogin(provider, payload, !registration);
       onLoginSuccess?.();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'กรุณาลองอีกครั้ง';
-      if (!message.endsWith('_AUTH_REDIRECT')) reportAuthError('เข้าสู่ระบบไม่สำเร็จ', { description: message });
-    } finally { setBusy(null); }
+      redirecting = message.endsWith('_AUTH_REDIRECT');
+      if (!redirecting) reportAuthError('เข้าสู่ระบบไม่สำเร็จ', { description: message });
+    } finally { if (!redirecting) sessionStorage.removeItem('greencrop:auth-intent'); setBusy(null); }
   };
   if (!available.length) return null;
   return <div className="space-y-4">
