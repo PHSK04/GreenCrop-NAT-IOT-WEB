@@ -24,3 +24,20 @@
 .auth-dialog .auth-eye[aria-pressed=true]{border-color:#a7d9c0;background:#e9f8ef;color:#047857}
 .auth-dialog .auth-eye:hover{border-color:#b5d9c7;background:#edf8f1}
 .auth-dialog [data-auth-invalid]+.auth-eye{border-color:#eed4d7}
+.recovery-progress{margin:0 0 28px;padding:20px 0 24px;border-top:1px solid #edf1ee;border-bottom:1px solid #edf1ee}
+.recovery-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;font-size:12px;line-height:1.5;color:#6b7c72}
+.recovery-progress-heading>span:first-child{font-weight:650;color:#237052}
+.recovery-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));list-style:none;margin:0;padding:0}
+.recovery-steps>li{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0}
+.recovery-steps>li:not(:last-child):after{content:"";position:absolute;top:22px;left:calc(50% + 30px);width:calc(100% - 60px);height:2px;border-radius:2px;background:#e1e8e3}
+.recovery-steps>li[data-step-state=complete]:after{background:#0d9b6c}
+.recovery-step-marker{position:relative;display:grid;place-items:center;width:44px;height:44px;border:1px solid #dfe7e1;border-radius:50%;background:#f7f9f7;color:#87988d;font-size:14px;font-weight:650;font-variant-numeric:tabular-nums}
+.recovery-step-marker svg{width:22px;height:22px;stroke-width:2.5}
+.recovery-steps>li[data-step-state=current] .recovery-step-marker{border-color:#087d56;background:#087d56;color:white;box-shadow:0 0 0 5px #e8f6ee,0 3px 8px #087d561a}
+.recovery-steps>li[data-step-state=complete] .recovery-step-marker{border-color:#bfe4d1;background:#eaf8f0;color:#087d56}
+.recovery-step-label{margin-top:14px;font-size:14px;font-weight:650;line-height:1.5;color:#819087}
+.recovery-steps>li[data-step-state=current] .recovery-step-label{color:#104d35;font-weight:750}
+.recovery-steps>li[data-step-state=complete] .recovery-step-label{color:#285d43}
+.recovery-step-description{margin-top:3px;font-size:11px;line-height:1.5;color:#8b9891}
+.recovery-steps>li[data-step-state=current] .recovery-step-description{color:#398366}
+@media(max-width:420px){.recovery-progress-heading{font-size:11px}.recovery-step-label{font-size:13px}.recovery-step-description{font-size:11px}.recovery-step-marker{width:40px;height:40px}.recovery-steps>li:not(:last-child):after{top:20px;left:calc(50% + 26px);width:calc(100% - 52px)}}
