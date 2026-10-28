@@ -95,13 +95,9 @@
 .registration-wordmark svg{width:28px;height:28px;color:#c7e6ad}
 .registration-wordmark b{font-weight:400;color:#cce2d5}
 .registration-canopy-caption{position:relative;z-index:1;display:block;margin:7px 0 0 38px;font-size:12px;color:#c4dfcf}
-.registration-canopy .recovery-close{z-index:2;color:#e3efe8;background:#ffffff12;border-color:#ffffff24;top:20px;right:20px}
-.registration-leaves{position:absolute;inset:0;pointer-events:none}
-.registration-leaves i{position:absolute;width:110px;height:66px;border-radius:100% 0 100% 0;background:#ffffff0b;transform:rotate(-24deg);right:36px;bottom:8px}
-.registration-leaves i:nth-child(2){width:145px;height:85px;right:-46px;bottom:62px;transform:rotate(30deg);background:#bde2a51c}
-.registration-leaves i:nth-child(3){width:50px;height:30px;right:170px;bottom:42px;background:#bde2a526}
-.registration-leaves i:nth-child(4){width:100px;height:60px;left:-25px;bottom:-30px;transform:rotate(15deg)}
-.registration-leaves i:nth-child(5){width:24px;height:14px;right:150px;top:32px;background:#bde2a526}
+.registration-canopy .recovery-close{z-index:2;color:#e3efe8;background:#103b2db3;border-color:#ffffff38;top:20px;right:20px}
+.registration-farm-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 52%}
+.registration-canopy::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,46,29,.87),rgba(8,46,29,.48) 48%,rgba(8,46,29,.08));pointer-events:none}
 .registration-welcome{position:relative;padding:56px 36px 25px;text-align:center}
 .registration-check{position:absolute;top:-38px;left:calc(50% - 38px);display:grid;place-items:center;width:76px;height:76px;border:7px solid #fff;border-radius:50%;background:#e7f4de;color:#24633b;box-shadow:0 5px 14px #183d2110}
 .registration-check svg{width:31px;height:31px;stroke-width:2.5}

@@ -3,9 +3,9 @@ import { Check, ArrowRight, X, Mail, Droplets, Thermometer, Bell, Sprout } from 
 export function RegistrationSuccess({ email, onLogin, onClose, demo = false }: { demo?: boolean; email?: string; onLogin: () => void; onClose?: () => void }) {
   return <section className="recovery-card registration-success" aria-labelledby="registration-success-title">
     <header className="registration-canopy">
+      <img className="registration-farm-photo" src={`${import.meta.env.BASE_URL}images/watermeal-farm-welcome.jpg`} alt="" aria-hidden="true" />
       <div className="registration-wordmark"><Sprout aria-hidden="true" /><span>GreenCrop <b>NAT</b></span></div>
       <span className="registration-canopy-caption">เติบโตไปด้วยกันอย่างชาญฉลาด</span>
-      <div className="registration-leaves" aria-hidden="true"><i /><i /><i /><i /><i /></div>
       {onClose && <button type="button" className="recovery-close" onClick={onClose} aria-label="ปิดหน้าต่างสมัครสมาชิก"><X aria-hidden="true" /></button>}
     </header>
     <div className="registration-welcome">
