@@ -317,6 +317,23 @@ async function initDb() {
                     ALTER TABLE sensor_data ADD pairing_status NVARCHAR(32) NULL;
             END
         `);
+        await pool.request().query(`
+            IF COL_LENGTH('sensor_data', 'received_at') IS NULL
+                ALTER TABLE sensor_data ADD received_at DATETIME2 NULL;
+            IF COL_LENGTH('sensor_data', 'timestamp_source') IS NULL
+                ALTER TABLE sensor_data ADD timestamp_source NVARCHAR(16) NULL;
+            IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('sensor_data') AND name = 'uq_sensor_data_msg_id')
+                DROP INDEX uq_sensor_data_msg_id ON sensor_data;
+            IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('sensor_data') AND name = 'ux_sensor_msgid_tenant')
+                DROP INDEX ux_sensor_msgid_tenant ON sensor_data;
+        `);
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('sensor_data') AND name = 'uq_sensor_device_message')
+                CREATE UNIQUE INDEX uq_sensor_device_message ON sensor_data(tenant_id, device_id, msg_id)
+                WHERE msg_id IS NOT NULL AND device_id IS NOT NULL;
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('sensor_data') AND name = 'ix_sensor_account_device_time')
+                CREATE INDEX ix_sensor_account_device_time ON sensor_data(tenant_id, device_id, timestamp DESC, id DESC);
+        `);
         console.log('✅ Sensor Data table validated');
 
         await pool.request().query(`
