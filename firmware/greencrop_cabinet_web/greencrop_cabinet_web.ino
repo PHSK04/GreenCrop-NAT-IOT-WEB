@@ -40,9 +40,9 @@ const int MQTT_PORT = 8883;
 const char* MQTT_USERNAME = "GreenCropnat";
 const char* MQTT_PASSWORD = "YOUR_MQTT_PASSWORD";
 
-// ดู 2 ค่านี้ได้ที่เว็บ WolffiaSmart > อุปกรณ์ > ••• ของบอร์ดนี้
-const char* TENANT_ID = "YOUR_ACCOUNT_ID"; // รหัสบัญชีเว็บ
-const char* DEVICE_ID = "GREENCROP01";     // ต้องตรงกับรหัสอุปกรณ์ที่จับคู่ในเว็บ
+// DEVICE_ID ต้องตรงกับรหัสอุปกรณ์ที่จับคู่ในเว็บ WolffiaSmart (อุปกรณ์ > เพิ่มอุปกรณ์)
+// ใช้ตัวพิมพ์ใหญ่ ใครจับคู่รหัสนี้ก่อนจะเป็นเจ้าของเครื่อง จึงควรจับคู่ทันทีหลังอัปโหลด
+const char* DEVICE_ID = "GREENCROP05";
 
 WiFiClientSecure mqttSecureClient;
 PubSubClient mqttClient(mqttSecureClient);
@@ -728,7 +728,8 @@ void webTelemetryTask(void* parameter) {
   (void)parameter;
 
   char topic[128];
-  snprintf(topic, sizeof(topic), "tenants/%s/devices/%s/sensors", TENANT_ID, DEVICE_ID);
+  // tenant "public": เว็บส่งข้อมูลเครื่องนี้ให้เฉพาะบัญชีที่จับคู่ DEVICE_ID ไว้
+  snprintf(topic, sizeof(topic), "tenants/public/devices/%s/sensors", DEVICE_ID);
 
   char clientId[40];
   snprintf(clientId, sizeof(clientId), "GREENCROP_CABINET_%08lX",

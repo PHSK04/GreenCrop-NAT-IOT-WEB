@@ -4,22 +4,24 @@
 
 ## ตั้งค่าก่อนอัปโหลด
 
-1. ที่เว็บ ไปหน้า **อุปกรณ์ → เพิ่มอุปกรณ์** จับคู่รหัส `GREENCROP01` (หรือรหัสที่ใช้)
-2. กด **•••** ที่อุปกรณ์นั้น เว็บจะแสดงค่า `TENANT_ID` และ `DEVICE_ID`
-3. แก้บรรทัดบนสุดของ `greencrop_cabinet_web.ino`:
+1. แก้บรรทัดบนสุดของ `greencrop_cabinet_web.ino`:
    - `WIFI_SSID`, `WIFI_PASSWORD`
    - `MQTT_PASSWORD` (รหัส HiveMQ ของ `GreenCropnat`)
-   - `TENANT_ID`, `DEVICE_ID` ตามข้อ 2
-4. ไลบรารี: LiquidCrystal_I2C, OneWire, DallasTemperature, PubSubClient
-5. บอร์ด ESP32 Dev Module (ทดสอบ compile แล้วกับ esp32 core 3.3.11)
+   - `DEVICE_ID` รหัสเครื่อง ตัวพิมพ์ใหญ่ เช่น `GREENCROP01`
+2. ไลบรารี: LiquidCrystal_I2C, OneWire, DallasTemperature, PubSubClient
+3. บอร์ด ESP32 Dev Module (ทดสอบ compile แล้วกับ esp32 core 3.3.11)
+4. อัปโหลด แล้วที่เว็บ [WolffiaSmart](https://phsk04.github.io/WolffiaSmart/) ไปหน้า **อุปกรณ์ → เพิ่มอุปกรณ์**
+   - รหัสอุปกรณ์: ตรงกับ `DEVICE_ID`
+   - รหัสจับคู่: ตั้งเองได้
+   - ถ้าขึ้น "Device already claimed by another account" แปลว่ารหัสนี้มีบัญชีอื่นจับคู่ไว้แล้ว ให้ล็อกอินบัญชีนั้น หรือเปลี่ยน `DEVICE_ID` เป็นรหัสใหม่
 
-Serial Monitor (115200) จะขึ้น `WEB: topic tenants/.../sensors` และ `WEB: MQTT connected` เมื่อต่อสำเร็จ
+Serial Monitor (115200) จะขึ้น `WEB: topic tenants/public/devices/<DEVICE_ID>/sensors` และ `WEB: MQTT connected` เมื่อต่อสำเร็จ
 
 ## สิ่งที่เปลี่ยนจาก greencrop_web_telemetry.ino
 
 - โค้ดควบคุมตู้ `setup()` และ `loop()` เหมือนเดิมทุกบรรทัด เปลี่ยนเฉพาะส่วน WEB TELEMETRY
 - WiFi/MQTT ย้ายไปทำงานใน task แยกบน core 0 ของเดิมรอ WiFi สูงสุด 15 วินาทีทุกรอบ `loop()` ตอนเน็ตหลุด ซึ่งระหว่างนั้นปุ่ม STOP ลูกลอย และตัวตัดปั๊ม 10 นาทีไม่ทำงาน ตอนนี้ `loop()` ไม่ต้องรอเน็ตแล้ว
-- ส่งไปที่ `tenants/<TENANT_ID>/devices/<DEVICE_ID>/sensors` แทน `smartfarm/sensors` เพราะเว็บ WolffiaSmart แสดงเฉพาะข้อมูลของบัญชีที่ล็อกอิน
+- ส่งไปที่ `tenants/public/devices/<DEVICE_ID>/sensors` แทน `smartfarm/sensors` backend ส่งข้อมูลเครื่องนี้ให้เฉพาะบัญชีที่จับคู่ `DEVICE_ID` ไว้ จึงไม่ต้องใส่รหัสบัญชีในโค้ด
 - ส่งทุก 1 วินาที และส่งทันทีเมื่อสถานะตู้เปลี่ยน (ไม่ถี่กว่า 250 ms)
 
 ## ข้อมูลที่ส่ง
@@ -51,4 +53,4 @@ Serial Monitor (115200) จะขึ้น `WEB: topic tenants/.../sensors` แ�
 ## ข้อจำกัด
 
 - ใช้ `setInsecure()` กับ HiveMQ เหมือนของเดิม คือไม่ตรวจใบรับรอง TLS
-- ใครมีรหัส HiveMQ ก็ส่งข้อมูลเข้า tenant ไหนก็ได้ ระบบตรวจเจ้าของอุปกรณ์ฝั่งเซิร์ฟเวอร์ยังอยู่ใน draft PR #7
+- ใครมีรหัส HiveMQ ก็ส่งข้อมูลเข้า tenant ไหนก็ได้ ระบบตรวจเจ้าของอุปกรณ์ฝั่งเซิร์ฟเวอร์ยังอยู่ใน draft PR (ดู `docs/telemetry-isolation.md`)
