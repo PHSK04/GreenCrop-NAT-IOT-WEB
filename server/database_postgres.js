@@ -209,9 +209,15 @@ async function initDb() {
         CREATE UNIQUE INDEX IF NOT EXISTS uq_tenant_device_sensor_ts
         ON sensor_data(tenant_id, device_id, sensor_id, timestamp);
 
-        CREATE UNIQUE INDEX IF NOT EXISTS uq_sensor_data_msg_id
-        ON sensor_data(tenant_id, msg_id)
-        WHERE msg_id IS NOT NULL;
+        DROP INDEX IF EXISTS uq_sensor_data_msg_id;
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_sensor_device_message
+        ON sensor_data(tenant_id, device_id, msg_id)
+        WHERE msg_id IS NOT NULL AND device_id IS NOT NULL;
+
+        ALTER TABLE sensor_data ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ;
+        ALTER TABLE sensor_data ADD COLUMN IF NOT EXISTS timestamp_source VARCHAR(16);
+        CREATE INDEX IF NOT EXISTS ix_sensor_account_device_time
+        ON sensor_data(tenant_id, device_id, timestamp DESC, id DESC);
 
         CREATE INDEX IF NOT EXISTS ix_sensor_data_tenant_ts
         ON sensor_data(tenant_id, timestamp DESC);

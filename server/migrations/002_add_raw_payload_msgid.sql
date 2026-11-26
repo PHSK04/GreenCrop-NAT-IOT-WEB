@@ -9,10 +9,10 @@ BEGIN
     ALTER TABLE dbo.sensor_data ADD msg_id NVARCHAR(128) NULL;
 END
 
--- Optional unique constraint to prevent exact duplicate messages by msg_id per tenant
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'ux_sensor_msgid_tenant')
+-- Message IDs are scoped to the device, not all devices of an account.
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'uq_sensor_device_message')
 BEGIN
-    CREATE UNIQUE INDEX ux_sensor_msgid_tenant ON dbo.sensor_data(tenant_id, msg_id) WHERE msg_id IS NOT NULL;
+    CREATE UNIQUE INDEX uq_sensor_device_message ON dbo.sensor_data(tenant_id, device_id, msg_id) WHERE msg_id IS NOT NULL AND device_id IS NOT NULL;
 END
 
 PRINT 'Migration 002_add_raw_payload_msgid applied';

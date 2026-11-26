@@ -1,6 +1,7 @@
 const mqtt = require('mqtt');
 const crypto = require('crypto');
 const db = require('./database');
+const { assertMeasurementOwnership, telemetryTime, telemetryMessageId, isDuplicateTelemetry } = require('./services/telemetry_scope');
 const { recordAiSensorSample } = require('./services/ai_training');
 
 const MQTT_BROKER = process.env.MQTT_BROKER_URL || process.env.MQTT_BROKER || 'mqtts://862ddab18768410486982f71e1ac75bb.s1.eu.hivemq.cloud:8883';
@@ -345,9 +346,17 @@ function startMqttListener() {
             const pumpsJson = normalizePumpsJson(payload.pumps);
 
             // Obtain device_id and sensor_id from payload if not from topic
-            const payloadDeviceId = payload.device_id || payload.device || deviceId || null;
+            const payloadDeviceId = String(deviceId || payload.device_id || payload.device || '').trim().toUpperCase();
+            const claimedDevice = String(payload.device_id || payload.device || payloadDeviceId).trim().toUpperCase();
+            if (!payloadDeviceId || claimedDevice !== payloadDeviceId) return;
+            const owner = await db.get('SELECT user_id, paired_at FROM device_pairings WHERE device_id = ?', [payloadDeviceId]);
+            if (!owner) return;
+            const finalTenant = String(owner.user_id);
+            if (tenantId && String(tenantId) !== 'public' && String(tenantId) !== finalTenant) return;
+            if (payloadTenantId && String(payloadTenantId) !== 'public' && String(payloadTenantId) !== finalTenant) return;
             const payloadSensorId = payload.sensor_id || payload.sensor || null;
-            const finalTenant = tenantId || payloadTenantId || 'public';
+            const timing = telemetryTime(payload);
+            assertMeasurementOwnership(timing, owner.paired_at);
 
             // Insert into Database (include tenant/device/sensor, raw payload and optional msg_id for idempotency)
             try {
@@ -357,12 +366,12 @@ function startMqttListener() {
                     mqtt_topic: topic,
                 };
                 const raw = JSON.stringify(rawPayload);
-                const msgId = payload.msg_id || payload.msgId || payload.id || null;
+                const msgId = telemetryMessageId(payload);
                 const latest = await db.get(
                     `SELECT TOP 1 ${SENSOR_DATA_SELECT_COLUMNS}
                      FROM sensor_data
                      WHERE tenant_id = ?${payloadDeviceId ? ' AND device_id = ?' : ''}
-                     ORDER BY id DESC`,
+                     ORDER BY timestamp DESC, id DESC`,
                     payloadDeviceId ? [finalTenant, payloadDeviceId] : [finalTenant]
                 );
 
@@ -384,9 +393,8 @@ function startMqttListener() {
                 };
                 const insertSql =
                     `INSERT INTO sensor_data 
-                    (tenant_id, device_id, sensor_id, msg_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, ph_value, temp_c, wls1, wls2, float_alarm, locked, pump1_on, pump2_on, green_on, red_on, ph_ok, start_button, stop_button, alarm_muted, pairing_status, active_tank, is_on, uptime_seconds, timestamp) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-                const nowMs = Date.now();
+                    (tenant_id, device_id, sensor_id, msg_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, ph_value, temp_c, wls1, wls2, float_alarm, locked, pump1_on, pump2_on, green_on, red_on, ph_ok, start_button, stop_button, alarm_muted, pairing_status, active_tank, is_on, uptime_seconds, timestamp, received_at, timestamp_source)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
                 const insertParams = [
                     finalTenant,
                     payloadDeviceId,
@@ -417,21 +425,18 @@ function startMqttListener() {
                     active_tank,
                     is_on,
                     Number.isFinite(uptime_seconds) ? uptime_seconds : 0,
-                    new Date(nowMs),
+                    timing.measuredAt,
+                    timing.receivedAt,
+                    timing.timestampSource,
                 ];
 
-                let insertResult = null;
-                let insertedTimestamp = new Date(nowMs);
-                for (let attempt = 0; attempt < 5; attempt += 1) {
-                    try {
-                        insertParams[29] = new Date(nowMs + attempt);
-                        insertedTimestamp = insertParams[29];
-                        insertResult = await db.run(insertSql, insertParams);
-                        break;
-                    } catch (insertErr) {
-                        if (attempt < 4 && isSensorTimestampUniqueError(insertErr)) continue;
-                        throw insertErr;
-                    }
+                let insertResult;
+                const insertedTimestamp = timing.measuredAt;
+                try {
+                    insertResult = await db.run(insertSql, insertParams);
+                } catch (error) {
+                    if (isDuplicateTelemetry(error)) return;
+                    throw error;
                 }
                 recordAiSensorSample(db, {
                     tenantId: finalTenant,

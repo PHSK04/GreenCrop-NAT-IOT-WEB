@@ -5,6 +5,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt');
 const db = require('./database');
+const { accountDeviceScope, assertMeasurementOwnership, telemetryTime, telemetryMessageId, isDuplicateTelemetry, telemetryRange } = require('./services/telemetry_scope');
 const jwt = require('jsonwebtoken');
 const https = require('https');
 const crypto = require('crypto');
@@ -60,7 +61,9 @@ const SENSOR_DATA_SELECT_COLUMNS = [
     'active_tank',
     'is_on',
     'uptime_seconds',
-    'timestamp'
+    'timestamp',
+    'received_at',
+    'timestamp_source'
 ].join(', ');
 const GOOGLE_CLIENT_IDS = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
     .split(',')
@@ -559,72 +562,27 @@ async function reconcileUserLinkedData(user) {
 }
 
 async function getDevicesForUser(user) {
-    const userId = user?.id;
-    if (!userId) return [];
-    const normalizedEmail = normalizeEmail(user?.email || '');
-    const where = ['user_id = ?'];
-    const params = [userId];
-
-    if (normalizedEmail) {
-        where.push('LOWER(user_email) = ?');
-        params.push(normalizedEmail);
-    }
-
-    await reconcileUserLinkedData(user);
+    if (!user?.id) return [];
     return db.all(`
         SELECT id, user_id, user_email, device_id, device_name, location, pairing_code, status, created_at, paired_at, last_seen, is_primary, updated_at
-        FROM device_pairings
-        WHERE ${where.join(' OR ')}
+        FROM device_pairings WHERE user_id = ?
         ORDER BY is_primary DESC, paired_at DESC
-    `, params);
+    `, [user.id]);
 }
 
 async function userCanUseDevice(user, deviceId) {
-    const normalizedDeviceId = String(deviceId || '').trim().toUpperCase();
-    if (!user?.id || !normalizedDeviceId) return false;
-    const normalizedEmail = normalizeEmail(user.email || '');
-    const where = ['device_id = ?', 'user_id = ?'];
-    const params = [normalizedDeviceId, user.id];
-
-    if (normalizedEmail) {
-        where[1] = '(user_id = ? OR LOWER(user_email) = ?)';
-        params.push(normalizedEmail);
+    try {
+        await accountDeviceScope(db, user, deviceId);
+        return true;
+    } catch (error) {
+        if (error.status) return false;
+        throw error;
     }
-
-    const row = await db.get(
-        `SELECT id FROM device_pairings WHERE ${where.join(' AND ')}`,
-        params
-    );
-    return Boolean(row);
 }
 
 async function getSensorTenantCandidates(req, requestedTenantId, deviceId) {
-    const candidates = [requestedTenantId];
-    const normalizedDeviceId = String(deviceId || '').trim().toUpperCase();
-    const isAdmin = String(req.user?.role || '').toLowerCase() === 'admin';
-
-    if (isAdmin) {
-        const rows = await db.all(
-            `SELECT DISTINCT tenant_id
-             FROM sensor_data
-             WHERE tenant_id IS NOT NULL
-             ORDER BY tenant_id`
-        );
-        candidates.push(...rows.map((row) => row.tenant_id));
-    }
-
-    if (normalizedDeviceId && await userCanUseDevice(req.user, normalizedDeviceId)) {
-        const rows = await db.all(
-            `SELECT DISTINCT tenant_id
-             FROM sensor_data
-             WHERE device_id = ?
-             ORDER BY tenant_id`,
-            [normalizedDeviceId]
-        );
-        candidates.push(...rows.map((row) => row.tenant_id));
-    }
-
-    return uniqueStrings(candidates);
+    const scope = await accountDeviceScope(db, req.user, deviceId);
+    return [scope.tenantId];
 }
 
 async function loadLatestSensorRows(tenantIds, deviceId) {
@@ -635,14 +593,14 @@ async function loadLatestSensorRows(tenantIds, deviceId) {
             SELECT TOP 25 ${SENSOR_DATA_SELECT_COLUMNS}
             FROM sensor_data
             WHERE tenant_id = ?
-            ORDER BY id DESC
+            ORDER BY timestamp DESC, id DESC
         `;
         if (deviceId) {
             query = `
                 SELECT TOP 25 ${SENSOR_DATA_SELECT_COLUMNS}
                 FROM sensor_data
-                WHERE tenant_id = ? AND (device_id = ? OR device_id IS NULL)
-                ORDER BY id DESC
+                WHERE tenant_id = ? AND device_id = ?
+                ORDER BY timestamp DESC, id DESC
             `;
             params.push(deviceId);
         }
@@ -658,14 +616,13 @@ async function loadLatestSensorRows(tenantIds, deviceId) {
 
 async function loadSensorHistoryRows(tenantIds, deviceId, options = {}) {
     const limit = parsePositiveInt(options.limit, 20000, 1, 50000);
-    const startDate = normalizeDateTime(options.startDate, false);
-    const endDate = normalizeDateTime(options.endDate, true);
+    const { startDate, endDate } = telemetryRange(options.startDate, options.endDate);
     const rows = [];
     for (const tenantId of tenantIds) {
         const where = ['tenant_id = ?'];
         const params = [tenantId];
         if (deviceId) {
-            where.push('(device_id = ? OR device_id IS NULL)');
+            where.push('device_id = ?');
             params.push(deviceId);
         }
         if (startDate) {
@@ -682,7 +639,7 @@ async function loadSensorHistoryRows(tenantIds, deviceId, options = {}) {
             SELECT TOP ${limit} ${SENSOR_DATA_SELECT_COLUMNS}
             FROM sensor_data 
             WHERE ${where.join(' AND ')}
-            ORDER BY id DESC
+            ORDER BY timestamp DESC, id DESC
           `,
           params
         );
@@ -3658,13 +3615,7 @@ app.get('/api/sensor-data', async (req, res) => {
     try {
         const serverNowMs = Date.now();
         const serverNowIso = new Date(serverNowMs).toISOString();
-        // In shared mode, app/web always read the same stream.
-        let tenantId = SHARED_SENSOR_TENANT
-            ? DEFAULT_TENANT_ID
-            : (req.tenant || req.headers['x-tenant-id'] || req.query.tenant_id);
-        if (tenantId) tenantId = String(tenantId); // Ensure String for MSSQL comparison
-        
-        console.log(`[READ] Sensor Request - Tenant ID: ${tenantId}`);
+        const tenantId = String(req.user.id);
 
         const noDataPayload = (message) => ([{
             no_data: true,
@@ -3724,23 +3675,20 @@ app.get('/api/sensor-data', async (req, res) => {
         
     } catch (err) {
         console.error("GET Sensor Error:", err);
-        res.status(500).json({ error: err.message });
+        res.status(err.status || 500).json({ error: err.message });
     }
 });
 
 app.post('/api/sensor-data', async (req, res) => {
     try {
-        // In shared mode, app/web always write to the same stream.
-        let tenant = SHARED_SENSOR_TENANT
-            ? DEFAULT_TENANT_ID
-            : (req.tenant || req.headers['x-tenant-id'] || req.body.tenant_id || DEFAULT_TENANT_ID);
-        tenant = String(tenant); // Ensure String
-        
+        const scope = await accountDeviceScope(db, req.user, req.body.device_id);
+        const tenant = scope.tenantId;
+        const deviceId = scope.deviceId;
+        const timing = telemetryTime(req.body);
+        assertMeasurementOwnership(timing, scope.pairedAt);
+        const msgId = telemetryMessageId(req.body);
         const source = String(req.body.source || 'unknown');
-        console.log(`[DATA SYNC] Update from Tenant ID: ${tenant} | Power: ${req.body.is_on} | source=${source}`);
-
-        const { device_id, sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds, timestamp } = req.body;
-        const deviceId = device_id ? String(device_id).trim().toUpperCase() : null;
+        const { sensor_id, pressure, flow_rate, ec_value, pumps, active_tank, is_on, uptime_seconds } = req.body;
         const normalizedSource = source.trim().toLowerCase();
         const sensorColumns = normalizeSensorColumnValues(req.body);
         const rawPayload = JSON.stringify({
@@ -3759,7 +3707,7 @@ app.post('/api/sensor-data', async (req, res) => {
             `SELECT TOP 1 ${SENSOR_DATA_SELECT_COLUMNS}
              FROM sensor_data
              WHERE tenant_id = ?${deviceId ? ' AND device_id = ?' : ''}
-             ORDER BY id DESC`,
+             ORDER BY timestamp DESC, id DESC`,
             deviceId ? [tenant, deviceId] : [tenant]
         );
 
@@ -3776,7 +3724,7 @@ app.post('/api/sensor-data', async (req, res) => {
             latestTsMs > 0 &&
             (nowMs - latestTsMs) <= 15000;
 
-        if (!isTrustedControlSource && incomingIsOffReset && recentOnRow) {
+        if (!isTrustedControlSource && incomingIsOffReset && recentOnRow && timing.measuredAt.getTime() >= latestTsMs) {
             console.warn(`[DATA SYNC] Suppressed stale OFF overwrite for tenant=${tenant} from source=${source}`);
             return res.json({ ok: true, suppressed: true, reason: 'stale-off-overwrite' });
         }
@@ -3797,11 +3745,8 @@ app.post('/api/sensor-data', async (req, res) => {
             raw_payload: rawPayload,
             ...sensorColumns
         };
-        const parsedTsMs = timestamp ? new Date(timestamp).getTime() : NaN;
-        const clientTsSkewMs = Number.isFinite(parsedTsMs) ? Math.abs(nowMs - parsedTsMs) : Number.POSITIVE_INFINITY;
-        const safeTimestampMs = (clientTsSkewMs <= 5 * 60 * 1000) ? parsedTsMs : nowMs;
-        const insertSql = `INSERT INTO sensor_data (tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, ph_value, temp_c, wls1, wls2, float_alarm, locked, pump1_on, pump2_on, green_on, red_on, ph_ok, start_button, stop_button, alarm_muted, pairing_status, active_tank, is_on, uptime_seconds, timestamp)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const insertSql = `INSERT INTO sensor_data (tenant_id, device_id, sensor_id, pressure, flow_rate, ec_value, pumps, raw_payload, source, mqtt_topic, ph_value, temp_c, wls1, wls2, float_alarm, locked, pump1_on, pump2_on, green_on, red_on, ph_ok, start_button, stop_button, alarm_muted, pairing_status, active_tank, is_on, uptime_seconds, timestamp, received_at, timestamp_source, msg_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
         const insertParams = [
             tenant,
             deviceId,
@@ -3831,19 +3776,18 @@ app.post('/api/sensor-data', async (req, res) => {
             nextRow.active_tank,
             normalizedIsOn,
             parsedIncomingUptime,
-            new Date(safeTimestampMs),
+            timing.measuredAt,
+            timing.receivedAt,
+            timing.timestampSource,
+            msgId,
         ];
 
         let result;
-        for (let attempt = 0; attempt < 5; attempt += 1) {
-            try {
-                insertParams[28] = new Date(safeTimestampMs + attempt);
-                result = await db.run(insertSql, insertParams);
-                break;
-            } catch (insertErr) {
-                if (attempt < 4 && isSensorTimestampUniqueError(insertErr)) continue;
-                throw insertErr;
-            }
+        try {
+            result = await db.run(insertSql, insertParams);
+        } catch (error) {
+            if (isDuplicateTelemetry(error)) return res.json({ ok: true, duplicate: true });
+            throw error;
         }
 
         recordAiSensorSample(db, {
@@ -3875,7 +3819,7 @@ app.post('/api/sensor-data', async (req, res) => {
 
         res.json({ ok: true, id: result.id });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(err.status || 500).json({ error: err.message });
     }
 });
 
